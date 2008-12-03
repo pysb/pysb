@@ -1,17 +1,23 @@
 nan = float("nan")
 
 class Model:
-    rules = []
-
     def __init__(self, rules):
+        self.rules = []
+        self.species = {}
+
         for r in rules:
             if r:
-                self.rules += [r]
+                r.coalesce_species(self.species)
+                new_rules = [r]
+                if r.__class__ is RuleReversible:
+                    new_rules = [
+                        RuleIrreversible(reactants=r.reactants, products=r.products, rate=r.rates[0]),
+                        RuleIrreversible(reactants=r.products, products=r.reactants, rate=r.rates[1]),
+                        ]
+                self.rules += new_rules
 
 
 class Species:
-    name = '<unnamed>'
-
     def __init__(self, name):
         self.name = name
 
@@ -20,13 +26,19 @@ class Species:
 
 
 class Rule:
-    reactants = []
-    products = []
+    def coalesce_species(self, species):
+        for sl in [self.reactants, self.products]:
+            for i in range(len(sl)):
+                name = sl[i]
+                if name in species:
+                    s = species[name]
+                else:
+                    s = Species(name)
+                    species[name] = s
+                sl[i] = s
 
 
 class RuleIrreversible(Rule):
-    rate = nan
-
     def __init__(self, reactants, products, rate):
         self.reactants = reactants
         self.products = products
@@ -34,15 +46,13 @@ class RuleIrreversible(Rule):
 
     def __str__(self):
         return '%s --> %s (%s)' % (
-            ' + '.join(str(r) for r in self.reactants),
-            ' + '.join(str(p) for p in self.products),
+            ' + '.join(r.id for r in self.reactants),
+            ' + '.join(p.id for p in self.products),
             self.rate
             )
 
 
 class RuleReversible(Rule):
-    rates = [nan, nan]
-
     def __init__(self, reactants, products, rates):
         self.reactants = reactants
         self.products = products
