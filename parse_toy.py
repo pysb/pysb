@@ -16,9 +16,6 @@ B + D <-> C (1.5, .9) #comment
 #    print tok
 
 
-rules = '''
-'''
-
 import toyyacc
 yacc.parse(rules)
 
