@@ -1,5 +1,5 @@
 from ply import yacc
-from toymodels import RuleReversible, RuleIrreversible
+from toymodels import Model, RuleReversible, RuleIrreversible
 
 
 # Get the token map from the lexer.  This is required.
@@ -8,7 +8,7 @@ from toylex import tokens
 
 def p_model(p):
     'model : statement_list'
-    p[0] = p[1]
+    p[0] = Model(rules=p[1])
     print "model:", p[0]
 
 def p_statement_list(p):
@@ -26,9 +26,15 @@ def p_statement_empty(p):
     print "statement_empty:", p[0]
 
 def p_statement(p):
-    'statement : expression NEWLINE'
+    'statement : rule NEWLINE'
     p[0] = p[1]
     print "statement:", p[0]
+
+def p_rule(p):
+    '''rule : irr_rule
+            | rev_rule'''
+    p[0] = p[1]
+    print "rule:", p[0]
 
 def p_expression_plus(p):
     'expression : expression PLUS SPECIES'

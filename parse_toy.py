@@ -17,5 +17,8 @@ B + D <-> C (1.5, .9) #comment
 
 
 import toyyacc
-yacc.parse(rules)
+model = yacc.parse(rules)
 
+print "\nrules:"
+for r in model.rules:
+    print r

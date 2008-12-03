@@ -1,5 +1,14 @@
 nan = float("nan")
 
+class Model:
+    rules = []
+
+    def __init__(self, rules):
+        for r in rules:
+            if r:
+                self.rules += [r]
+
+
 class Rule:
     reactants = []
     products = []
@@ -7,5 +16,22 @@ class Rule:
 class RuleIrreversible(Rule):
     rate = nan
 
+    def __init__(self, reactants, products, rate):
+        self.reactants = reactants
+        self.products = products
+        self.rate = rate
+
+    def __str__(self):
+        return '%s --> %s (%s)' % (' + '.join(self.reactants), ' + '.join(self.products), self.rate)
+
+
 class RuleReversible(Rule):
     rates = [nan, nan]
+
+    def __init__(self, reactants, products, rates):
+        self.reactants = reactants
+        self.products = products
+        self.rates = rates
+
+    def __str__(self):
+        return '%s <-> %s (%s)' % (' + '.join(self.reactants), ' + '.join(self.products), ', '.join(str(r) for r in self.rates))
