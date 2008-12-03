@@ -9,9 +9,20 @@ class Model:
                 self.rules += [r]
 
 
+class Species:
+    name = '<unnamed>'
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return '%s' % (self.name)
+
+
 class Rule:
     reactants = []
     products = []
+
 
 class RuleIrreversible(Rule):
     rate = nan
@@ -22,7 +33,11 @@ class RuleIrreversible(Rule):
         self.rate = rate
 
     def __str__(self):
-        return '%s --> %s (%s)' % (' + '.join(self.reactants), ' + '.join(self.products), self.rate)
+        return '%s --> %s (%s)' % (
+            ' + '.join(str(r) for r in self.reactants),
+            ' + '.join(str(p) for p in self.products),
+            self.rate
+            )
 
 
 class RuleReversible(Rule):
@@ -34,4 +49,8 @@ class RuleReversible(Rule):
         self.rates = rates
 
     def __str__(self):
-        return '%s <-> %s (%s)' % (' + '.join(self.reactants), ' + '.join(self.products), ', '.join(str(r) for r in self.rates))
+        return '%s <-> %s (%s)' % (
+            ' + '.join(str(r) for r in self.reactants),
+            ' + '.join(str(p) for p in self.products),
+            ', '.join(str(r) for r in self.rates)
+            )

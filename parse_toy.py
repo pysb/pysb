@@ -2,10 +2,8 @@ from ply import yacc, lex
 
 
 rules = '''
-A + B --> C (0.5) # blah #
-
-#this is all a comment
-B + D <-> C (1.5, .9) #comment 
+E + S <-> ES (1,1)
+ES --> E + P (1)
 '''
 
 #import toylex
