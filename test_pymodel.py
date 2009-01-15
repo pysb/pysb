@@ -1,20 +1,20 @@
 from Pysb import *
 
 
-egf = Monomer('egf', 'L')
-egfr = Monomer('egfr', ['R', 'D', 'C'])
+egf = Monomer('egf', 'R')
+egfr = Monomer('egfr', ['L', 'D', 'C'])
 
-mp1 = egf.m(L=None)
-mp2 = egfr.m(R=None)
-mp3 = egfr.m(R=egf, D=[egfr,egfr], C=None)
-egfr.m(R=1)
+egfr.m(L=egf, D=[egfr,egfr], C=None)
+egfr.m(L=1)
+
+K_egfr_egf = Parameter('K_egfr_egf', 1.2)
+r_egfr_egf = Rule('egfr_egf',
+                  [egfr.m(L=None), egf.m(R=None)],
+                  [egfr.m(L=1),    egf.m(R=1)],
+                  K_egfr_egf)
 
 print egf
 print egfr
-print
-print mp1
-print mp2
-print mp3
 
 print "\ntesting error checking..."
 
