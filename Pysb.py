@@ -73,3 +73,13 @@ class Rule:
         self.products = products
         self.rate = rate
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
+
+
+
+class Parameter:
+    name = '**UNNAMED**'
+    value = float('nan')
+
+    def __init__(self, name, value=float('nan')):
+        self.name = name
+        self.value = value
