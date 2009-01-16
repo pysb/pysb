@@ -19,10 +19,10 @@ class SelfExporter:
 
 
 class Monomer(SelfExporter):
-    name = '**UNNAMED**'
+    name = None
     sites = []
 
-    def __init__(self, name, sites):
+    def __init__(self, name, sites=[], site_states={}):
         SelfExporter.__init__(self, name)
         
         # ensure no duplicate sites
@@ -37,9 +37,18 @@ class Monomer(SelfExporter):
         self.sites = sites
         self.sites_dict = dict.fromkeys(sites)
 
-    def __call__(self, **site_states):
+        # ensure site_states keys are all known sites
+        unknown_sites = [site for site in site_states.keys() if not site in self.sites_dict]
+        if unknown_sites:
+            raise Exception("Unknown sites in site_states: " + str(unknown_sites))
+        # ensure site_states values are all strings
+        invalid_sites = [site for (site, states) in site_states.items() if not all([type(s) == str for s in states])]
+        if invalid_sites:
+            raise Exception("Non-string state values in site_states for sites: " + str(invalid_sites))
+
+    def __call__(self, **site_conditions):
         """Build a pattern object with convenient kwargs for the sites"""
-        return MonomerPattern(self, site_states)
+        return MonomerPattern(self, site_conditions)
 
     def __str__(self):
         return self.name + '(' + ', '.join(self.sites) + ')'
@@ -48,21 +57,21 @@ class Monomer(SelfExporter):
 
 class MonomerPattern:
     monomer = None
-    site_states = {}
+    site_conditions = {}
 
-    def __init__(self, monomer, site_states):
-        # ensure all keys in site_states are sites in monomer
-        unknown_sites = [site for site in site_states.keys() if site not in monomer.sites_dict]
+    def __init__(self, monomer, site_conditions):
+        # ensure all keys in site_conditions are sites in monomer
+        unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
         if unknown_sites:
             raise Exception("Unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
         # ensure each value is None, integer, Monomer, or list of Monomers
         invalid_sites = []
-        for (site, state) in site_states.items():
+        for (site, state) in site_conditions.items():
             # convert singleton monomer to list
             if isinstance(state, Monomer):
                 state = [state]
-                site_states[site] = state
+                site_conditions[site] = state
             # pass through to next iteration if state type is ok
             if state == None:
                 continue
@@ -75,10 +84,11 @@ class MonomerPattern:
             raise Exception("Invalid state value for sites: " + str(invalid_sites))
 
         self.monomer = monomer
-        self.site_states = site_states
+        self.site_conditions = site_conditions
 
     def __str__(self):
-        return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_states[k]) for k in self.site_states.keys()]) + ')'
+        return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
+                                                    for k in self.site_conditions.keys()]) + ')'
 
 
 
