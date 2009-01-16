@@ -1,17 +1,14 @@
 from Pysb import *
 
 
-egf = Monomer('egf', 'R')
-egfr = Monomer('egfr', ['L', 'D', 'C'])
+Monomer('egf', 'R')
+Monomer('egfr', ['L', 'D', 'C'])
 
-egfr.m(L=egf, D=[egfr,egfr], C=None)
-egfr.m(L=1)
-
-K_egfr_egf = Parameter('K_egfr_egf', 1.2)
-r_egfr_egf = Rule('egfr_egf',
-                  [egfr.m(L=None), egf.m(R=None)],
-                  [egfr.m(L=1),    egf.m(R=1)],
-                  K_egfr_egf)
+Parameter('K_egfr_egf', 1.2)
+Rule('egfr_egf',
+     [egfr.m(L=None), egf.m(R=None)],
+     [egfr.m(L=1),    egf.m(R=1)],
+     K_egfr_egf)
 
 print egf
 print egfr

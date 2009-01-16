@@ -1,8 +1,30 @@
-class Monomer:
+import sys
+
+
+
+class SelfExporter:
+    """Expects a constructor paramter 'name', under which this object is
+    inserted into the __main__ namespace."""
+
+    name = None
+
+    def __init__(self, name):
+        self.name = name
+        # load self into __main__ namespace
+        main = sys.modules['__main__']
+        if hasattr(main, name):
+            raise Exception("'%s' already defined" % (name))
+        setattr(main, name, self)
+
+
+
+class Monomer(SelfExporter):
     name = '**UNNAMED**'
     sites = []
 
     def __init__(self, name, sites):
+        SelfExporter.__init__(self, name)
+        
         # ensure no duplicate sites
         sites_seen = {}
         for site in sites:
@@ -12,7 +34,6 @@ class Monomer:
         if sites_dup:
             raise Exception("Duplicate sites specified: " + str(sites_dup))
 
-        self.name = name
         self.sites = sites
         self.sites_dict = dict.fromkeys(sites)
 
@@ -61,14 +82,13 @@ class MonomerPattern:
 
 
 
-class Rule:
-    name = '**UNNAMED**'
+class Rule(SelfExporter):
     reactants = []
     products = []
     rate = []
 
     def __init__(self, name, reactants, products, rate):
-        self.name = name
+        SelfExporter.__init__(self, name)
         self.reactants = reactants
         self.products = products
         self.rate = rate
@@ -76,10 +96,9 @@ class Rule:
 
 
 
-class Parameter:
-    name = '**UNNAMED**'
+class Parameter(SelfExporter):
     value = float('nan')
 
     def __init__(self, name, value=float('nan')):
-        self.name = name
+        SelfExporter.__init__(self, name)
         self.value = value
