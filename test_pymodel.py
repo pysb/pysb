@@ -6,8 +6,8 @@ Monomer('egfr', ['L', 'D', 'C'])
 
 Parameter('K_egfr_egf', 1.2)
 Rule('egfr_egf',
-     [egfr.m(L=None), egf.m(R=None)],
-     [egfr.m(L=1),    egf.m(R=1)],
+     [egfr(L=None), egf(R=None)],
+     [egfr(L=1),    egf(R=1)],
      K_egfr_egf)
 
 print egf
@@ -26,7 +26,7 @@ if fail:
 
 fail = False
 try:
-    egfr.m(L=None, x=None)
+    egfr(L=None, x=None)
     fail = True
 except:
     pass
@@ -35,7 +35,7 @@ if fail:
 
 fail = False
 try:
-    egfr.m('x')
+    egfr('x')
     fail = True
 except:
     pass
@@ -44,7 +44,7 @@ if fail:
 
 fail = False
 try:
-    egfr.m(D=[egfr, 'x'])
+    egfr(D=[egfr, 'x'])
     fail = True
 except:
     pass

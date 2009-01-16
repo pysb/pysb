@@ -37,7 +37,7 @@ class Monomer(SelfExporter):
         self.sites = sites
         self.sites_dict = dict.fromkeys(sites)
 
-    def m(self, **site_states):
+    def __call__(self, **site_states):
         """Build a pattern object with convenient kwargs for the sites"""
         return MonomerPattern(self, site_states)
 
