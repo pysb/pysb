@@ -82,6 +82,15 @@ class MonomerPattern:
 
 
 
+class Parameter(SelfExporter):
+    value = float('nan')
+
+    def __init__(self, name, value=float('nan')):
+        SelfExporter.__init__(self, name)
+        self.value = value
+
+
+
 class Rule(SelfExporter):
     reactants = []
     products = []
@@ -89,16 +98,15 @@ class Rule(SelfExporter):
 
     def __init__(self, name, reactants, products, rate):
         SelfExporter.__init__(self, name)
+
+        if not all([isinstance(r, MonomerPattern) for r in reactants]):
+            raise Exception("Reactants must all be MonomerPatterns")
+        if not all([isinstance(p, MonomerPattern) for p in products]):
+            raise Exception("Products must all be MonomerPatterns")
+        if not isinstance(rate, Parameter):
+            raise Exception("Rate must be a Parameter")
+
         self.reactants = reactants
         self.products = products
         self.rate = rate
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
-
-
-
-class Parameter(SelfExporter):
-    value = float('nan')
-
-    def __init__(self, name, value=float('nan')):
-        SelfExporter.__init__(self, name)
-        self.value = value
