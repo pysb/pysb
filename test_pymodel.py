@@ -1,5 +1,6 @@
 from Pysb import *
 
+Compartment('membrane', dimension=2)
 
 Monomer('egf', 'R')
 Monomer('egfr', ['L', 'D', 'C'])

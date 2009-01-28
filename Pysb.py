@@ -21,8 +21,10 @@ class SelfExporter:
 class Monomer(SelfExporter):
     name = None
     sites = []
+    site_states = {}
+    compartment = None
 
-    def __init__(self, name, sites=[], site_states={}):
+    def __init__(self, name, sites=[], site_states={}, compartment=None):
         SelfExporter.__init__(self, name)
         
         # ensure no duplicate sites
@@ -34,9 +36,6 @@ class Monomer(SelfExporter):
         if sites_dup:
             raise Exception("Duplicate sites specified: " + str(sites_dup))
 
-        self.sites = sites
-        self.sites_dict = dict.fromkeys(sites)
-
         # ensure site_states keys are all known sites
         unknown_sites = [site for site in site_states.keys() if not site in self.sites_dict]
         if unknown_sites:
@@ -46,9 +45,19 @@ class Monomer(SelfExporter):
         if invalid_sites:
             raise Exception("Non-string state values in site_states for sites: " + str(invalid_sites))
 
+        # ensure compartment is a Compartment
+        if compartment and not isinstance(compartment, Compartment):
+            raise Exception("compartment is not a Compartment object")
+
+        self.sites = sites
+        self.sites_dict = dict.fromkeys(sites)
+        self.site_states = site_states
+        self.compartment = compartment
+
     def __call__(self, **site_conditions):
         """Build a pattern object with convenient kwargs for the sites"""
-        return MonomerPattern(self, site_conditions)
+        compartment = site_conditions.pop('compartment', self.compartment)
+        return MonomerPattern(self, site_conditions, compartment)
 
     def __str__(self):
         return self.name + '(' + ', '.join(self.sites) + ')'
@@ -58,8 +67,9 @@ class Monomer(SelfExporter):
 class MonomerPattern:
     monomer = None
     site_conditions = {}
+    compartment = None
 
-    def __init__(self, monomer, site_conditions):
+    def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
         if unknown_sites:
@@ -83,8 +93,13 @@ class MonomerPattern:
         if invalid_sites:
             raise Exception("Invalid state value for sites: " + str(invalid_sites))
 
+        # ensure compartment is a Compartment
+        if compartment and not isinstance(compartment, Compartment):
+            raise Exception("compartment is not a Compartment object")
+
         self.monomer = monomer
         self.site_conditions = site_conditions
+        self.compartment = compartment
 
     def __str__(self):
         return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
@@ -98,6 +113,24 @@ class Parameter(SelfExporter):
     def __init__(self, name, value=float('nan')):
         SelfExporter.__init__(self, name)
         self.value = value
+
+
+
+class Compartment(SelfExporter):
+    dimension = float('nan')
+    size = float('nan')
+    neighbors = []
+
+    # FIXME: sane defaults?
+    def __init__(self, name, neighbors=[], dimension=3, size=1):
+        SelfExporter.__init__(self, name)
+
+        if not all([isinstance(n, Compartment) for n in neighbors]):
+            raise Exception("neighbors must all be Compartments")
+
+        self.neighbors = neighbors
+        self.dimension = dimension
+        self.size = size
 
 
 
