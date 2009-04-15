@@ -101,6 +101,19 @@ class MonomerPattern:
         self.site_conditions = site_conditions
         self.compartment = compartment
 
+    def __add__(self, other):
+        if isinstance(other, MonomerPattern):
+            return [self, other]
+        else: 
+            return NotImplemented
+
+    def __radd__(self, other):
+        if isinstance(other, list) and all(isinstance(v, MonomerPattern) for v in other):
+            return [self] + other
+        else:
+            return NotImplemented
+        
+
     def __str__(self):
         return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
                                                     for k in self.site_conditions.keys()]) + ')'
