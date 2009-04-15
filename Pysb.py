@@ -120,6 +120,15 @@ class MonomerPattern:
 
 
 
+class ReactionPattern:
+    def __init__(self, monomer_patterns):
+        monomer_patterns = this.monomer_patterns
+
+    def __rshift__(self, other):
+        return Rule(name, self.monomer_patterns, other.monomer_patterns)
+
+
+
 class Parameter(SelfExporter):
     value = float('nan')
 
