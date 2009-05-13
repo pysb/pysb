@@ -1,6 +1,8 @@
 import sys
 
 
+default_model = Model('default_model')
+
 
 class SelfExporter:
     """Expects a constructor paramter 'name', under which this object is
@@ -16,6 +18,15 @@ class SelfExporter:
             raise Exception("'%s' already defined" % (name))
         setattr(main, name, self)
 
+
+class Model(SelfExporter):
+    name = None
+    monomers = []
+    compartments = []
+    parameters = []
+    rules = []
+
+    
 
 
 class Monomer(SelfExporter):
