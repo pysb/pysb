@@ -1,5 +1,7 @@
 from Pysb import *
 
+Model('test')
+
 Compartment('membrane', dimension=2)
 
 Monomer('egf', 'R')

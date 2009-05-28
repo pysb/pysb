@@ -1,40 +1,59 @@
 import sys
 
 
-default_model = Model('default_model')
-
-
-class SelfExporter:
+class SelfExporter(object):
     """Expects a constructor paramter 'name', under which this object is
     inserted into the __main__ namespace."""
 
-    name = None
+    do_self_export = True
+    default_model = None
 
     def __init__(self, name):
         self.name = name
-        # load self into __main__ namespace
-        main = sys.modules['__main__']
-        if hasattr(main, name):
-            raise Exception("'%s' already defined" % (name))
-        setattr(main, name, self)
+
+        if SelfExporter.do_self_export:
+            if isinstance(self, Model):
+                if SelfExporter.default_model != None:
+                    raise Exception("Only one instance of Model may be declared ('%s' previously declared)" % SelfExporter.default_model.name)
+                SelfExporter.default_model = self
+            elif isinstance(self, (Monomer, Compartment, Parameter, Rule)):
+                if SelfExporter.default_model == None:
+                    raise Exception("A Model must be declared before declaring any model components")
+                SelfExporter.default_model.add_component(self)
+
+            # load self into __main__ namespace
+            main = sys.modules['__main__']
+            if hasattr(main, name):
+                raise Exception("'%s' already defined" % (name))
+            setattr(main, name, self)
+
 
 
 class Model(SelfExporter):
-    name = None
-    monomers = []
-    compartments = []
-    parameters = []
-    rules = []
+    def __init__(self, name):
+        SelfExporter.__init__(self, name)
+        self.monomers = []
+        self.compartments = []
+        self.parameters = []
+        self.rules = []
+
+    def add_component(self, other):
+        if isinstance(other, Monomer):
+            self.monomers.append(other)
+        elif isinstance(other, Compartment):
+            self.compartments.append(other)
+        elif isinstance(other, Parameter):
+            self.parameters.append(other)
+        elif isinstance(other, Rule):
+            self.rules.append(other)
+        else:
+            raise Exception("Tried to add component of unknown type (%s) to model" % type(other))
 
     
 
 
-class Monomer(SelfExporter):
-    name = None
-    sites = []
-    site_states = {}
-    compartment = None
 
+class Monomer(SelfExporter):
     def __init__(self, name, sites=[], site_states={}, compartment=None):
         SelfExporter.__init__(self, name)
         
@@ -75,11 +94,8 @@ class Monomer(SelfExporter):
 
 
 
-class MonomerPattern:
-    monomer = None
-    site_conditions = {}
-    compartment = None
 
+class MonomerPattern:
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
@@ -141,19 +157,14 @@ class ReactionPattern:
 
 
 class Parameter(SelfExporter):
-    value = float('nan')
-
     def __init__(self, name, value=float('nan')):
         SelfExporter.__init__(self, name)
         self.value = value
 
 
 
-class Compartment(SelfExporter):
-    dimension = float('nan')
-    size = float('nan')
-    neighbors = []
 
+class Compartment(SelfExporter):
     # FIXME: sane defaults?
     def __init__(self, name, neighbors=[], dimension=3, size=1):
         SelfExporter.__init__(self, name)
@@ -167,11 +178,8 @@ class Compartment(SelfExporter):
 
 
 
-class Rule(SelfExporter):
-    reactants = []
-    products = []
-    rate = []
 
+class Rule(SelfExporter):
     def __init__(self, name, reactants, products, rate):
         SelfExporter.__init__(self, name)
 
