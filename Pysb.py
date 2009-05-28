@@ -49,7 +49,9 @@ class Model(SelfExporter):
         else:
             raise Exception("Tried to add component of unknown type (%s) to model" % type(other))
 
-    
+    def __repr__(self):
+        return "%s( \\\n    monomers=%s \\\n    compartments=%s\\\n    parameters=%s\\\n    rules=%s\\\n)" % \
+            (self.__class__.__name__, repr(self.monomers), repr(self.compartments), repr(self.parameters), repr(self.rules))
 
 
 
@@ -89,9 +91,13 @@ class Monomer(SelfExporter):
         compartment = site_conditions.pop('compartment', self.compartment)
         return MonomerPattern(self, site_conditions, compartment)
 
-    def __str__(self):
-        return self.name + '(' + ', '.join(self.sites) + ')'
+    #def __str__(self):
+    #    return self.name + '(' + ', '.join(self.sites) + ')'
 
+    def __repr__(self):
+        return  '%s(name=%s, sites=%s, site_states=%s, compartment=%s)' % \
+            (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states), repr(self.compartment))
+        # FIXME don't recurse into compartment
 
 
 
@@ -141,9 +147,9 @@ class MonomerPattern:
             return NotImplemented
         
 
-    def __str__(self):
-        return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
-                                                    for k in self.site_conditions.keys()]) + ')'
+    #def __str__(self):
+    #    return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
+    #                                                for k in self.site_conditions.keys()]) + ')'
 
 
 
@@ -161,6 +167,8 @@ class Parameter(SelfExporter):
         SelfExporter.__init__(self, name)
         self.value = value
 
+    def __repr__(self):
+        return  '%s(name=%s, value=%s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
 
 
@@ -176,6 +184,10 @@ class Compartment(SelfExporter):
         self.dimension = dimension
         self.size = size
 
+    def __repr__(self):
+        return  '%s(name=%s, dimension=%s, size=%s, neighbors=%s)' % \
+            (self.__class__.__name__, repr(self.name), repr(self.dimension), repr(self.size), repr(self.neighbors))
+        # FIXME don't recurse into neighbors, just print their names
 
 
 
@@ -194,3 +206,8 @@ class Rule(SelfExporter):
         self.products = products
         self.rate = rate
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
+
+    def __repr__(self):
+        return  '%s(name=%s, reactants=%s, products=%s, rate=%s)' % \
+            (self.__class__.__name__, repr(self.name), repr(self.reactants), repr(self.products), repr(self.rate))
+        # FIXME don't recurse into reactants/products/rate
