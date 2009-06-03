@@ -1,4 +1,5 @@
 from Pysb import *
+import generator.bng as bng
 
 Model('test')
 
@@ -14,3 +15,6 @@ Rule('egfr_egf',
      [egfr(L=None), egf(R=None)],
      [egfr(L=1),    egf(R=1)],
      K_egfr_egf)
+
+gen = bng.BngGenerator(model=test)
+print gen.content
