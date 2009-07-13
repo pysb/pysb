@@ -2,6 +2,7 @@ import sys
 
 
 
+# FIXME: make this behavior toggleable
 class SelfExporter(object):
     """Expects a constructor paramter 'name', under which this object is
     inserted into the __main__ namespace."""
@@ -37,6 +38,7 @@ class Model(SelfExporter):
         self.compartments = []
         self.parameters = []
         self.rules = []
+        self.observables = []
 
     def add_component(self, other):
         if isinstance(other, Monomer):
@@ -49,6 +51,14 @@ class Model(SelfExporter):
             self.rules.append(other)
         else:
             raise Exception("Tried to add component of unknown type (%s) to model" % type(other))
+
+    # FIXME should this be named add_observable??
+    def observe(self, name, pattern_list):
+        if isinstance(pattern_list, MonomerPattern):
+            pattern_list = [pattern_list]
+        if not all([isinstance(p, MonomerPattern) for p in pattern_list]):
+            raise Exception("Observable must be a list of MonomerPatterns")
+        self.observables.append( (name, pattern_list) )
 
     def __repr__(self):
         return "%s( \\\n    monomers=%s \\\n    compartments=%s\\\n    parameters=%s\\\n    rules=%s\\\n)" % \
@@ -115,6 +125,24 @@ class MonomerAny(Monomer):
         self.site_states = {}
         self.compartment = None
 
+    def __repr__(self):
+        return self.name
+
+
+
+class MonomerWild(Monomer):
+    def __init__(self):
+        # don't call Monomer.__init__ since this doesn't want
+        # SelfExporter stuff and has no user-accessible API
+        self.name = 'WILD'
+        self.sites = None
+        self.sites_dict = {}
+        self.site_states = {}
+        self.compartment = None
+
+    def __repr__(self):
+        return self.name
+
 
 
 class MonomerPattern:
@@ -124,7 +152,7 @@ class MonomerPattern:
         if unknown_sites:
             raise Exception("Unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is None, integer, string, (string,integer) tuple, Monomer, or list of Monomers
+        # ensure each value is None, integer, string, (string,integer), (string,WILD), Monomer, or list of Monomers
         # FIXME: support state sites
         invalid_sites = []
         for (site, state) in site_conditions.items():
@@ -139,7 +167,7 @@ class MonomerPattern:
                 continue
             elif type(state) == str:
                 continue
-            elif type(state) == tuple and type(state[0]) == str and type(state[1]) == int:
+            elif type(state) == tuple and type(state[0]) == str and (type(state[1]) == int or state[1] == WILD):
                 continue
             elif type(state) == list and all([isinstance(s, Monomer) for s in state]):
                 continue
@@ -174,6 +202,7 @@ class MonomerPattern:
 
 
 
+# FIXME: refactor Rule and Model.observe using this, once it's finished
 class ReactionPattern:
     def __init__(self, monomer_patterns):
         monomer_patterns = this.monomer_patterns
@@ -244,3 +273,4 @@ class Rule(SelfExporter):
 
 
 ANY = MonomerAny()
+WILD = MonomerWild()

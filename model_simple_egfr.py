@@ -4,6 +4,8 @@ import generator.bng as bng
 Model('simple_egfr')
 
 
+
+# Concentrations in number per cell
 Parameter('EGF_tot',      1.2e6)
 Parameter('EGFR_tot',     1.8e5)
 Parameter('Grb2_tot',     1.5e5)
@@ -32,16 +34,29 @@ Parameter('km5',           0.06) # dissociation of Grb2 from Sos
 Parameter('kdeg',          0.01)
 
 
+
+#  EGF(r)
 Monomer('EGF', 'r')
+
+#  EGFR(l, r, Y1068~U~P, Y1148~U~P)
 Monomer('EGFR',
         ['l','r','Y1068','Y1148'],
         { 'Y1068': ['U','P'],
           'Y1148': ['U','P'] }
         )
+
+#  Grb2(SH2, SH3)
 Monomer('Grb2', ['SH2','SH3'])
+
+#  Shc(PTB, Y317~U~P)
 Monomer('Shc', ['PTB','Y317'], { 'Y317': ['U','P'] } )
+
+#  Sos(PR)
 Monomer('Sos', 'PR')
+
+#  NULL()
 Monomer('NULL')
+
 
 
 # Ligand-receptor binding      
@@ -77,7 +92,7 @@ Rule('dephos_egfr',
 # Grb2 binding to pY1068
 #EGFR(Y1068~P) + Grb2(SH2)   <-> EGFR(Y1068~P!1).Grb2(SH2!1)   kp4,km4
 Rule('grb2_bind_egfr',
-     EGFR(Y1068='P') + Grb2(SH2=None),
+     EGFR(Y1068='P')     + Grb2(SH2=None),
      EGFR(Y1068=('P',1)) + Grb2(SH2=1),
      kp4)
 grb2_bind_egfr.reversible(km4)
@@ -89,6 +104,18 @@ Rule('grb2_bind_sos',
      Grb2(SH2=None, SH3=1)    + Sos(PR=1),
      kp5)
 grb2_bind_sos.reversible(km5)
+
+
+#  D        EGFR(l!+)
+simple_egfr.observe('D', EGFR(l=ANY))
+#  RP	   EGFR(Y1068~P!?)
+simple_egfr.observe('RP', EGFR(Y1068=('P',WILD)))
+#  R_Grb2   EGFR(Y1068!1).Grb2(SH2!1)
+simple_egfr.observe('R_Grb2', EGFR(Y1068=1) + Grb2(SH2=1))
+#  Sos_act  EGFR(Y1068!1).Grb2(SH2!1,SH3!2).Sos(PR!2)
+simple_egfr.observe('Sos_act', EGFR(Y1068=1) + Grb2(SH2=1, SH3=2) + Sos(PR=2))
+#  EGFR_tot EGFR()
+simple_egfr.observe('EGFR_tot', EGFR())
 
 
 

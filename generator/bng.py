@@ -19,6 +19,7 @@ class BngGenerator(object):
         self.generate_parameters()
         self.generate_molecule_types()
         self.generate_reaction_rules()
+        self.generate_observables()
 
     def generate_parameters(self):
         self.__content += "begin parameters\n"
@@ -42,6 +43,14 @@ class BngGenerator(object):
             self.__content += "  # %s\n" % (r.name)
             self.__content += "  %s -> %s    %s\n\n" % (reactants_code, products_code, r.rate.name)
         self.__content += "end reaction rules\n\n"
+
+    def generate_observables(self):
+        max_length = max([len(name) for name, pattern_list in self.model.observables])
+        self.__content += "begin observables\n"
+        for name, pattern_list in self.model.observables:
+            observable_code = ' + '.join([format_monomerpattern(mp) for mp in pattern_list])
+            self.__content += ("  %-" + str(max_length) + "s   %s\n") % (name, observable_code)
+        self.__content += "end observables\n\n"
 
 
 
@@ -67,6 +76,8 @@ def format_site_condition(site, state):
     elif type(state) == str:
         state_code = '~' + state
     elif type(state) == tuple:
+        if state[1] == Pysb.WILD:
+            state = (state[0], '?')
         state_code = '~%s!%s' % state
     elif type(state) == list:
         if len(state) == 1:
