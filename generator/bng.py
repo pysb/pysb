@@ -31,7 +31,7 @@ class BngGenerator(object):
     def generate_molecule_types(self):
         self.__content += "begin molecule types\n"
         for m in self.model.monomers:
-            site_code = ', '.join([format_monomer_site(m, s) for s in m.sites])
+            site_code = ','.join([format_monomer_site(m, s) for s in m.sites])
             self.__content += "  %s(%s)\n" % (m.name, site_code)
         self.__content += "end molecule types\n\n"
 
@@ -48,7 +48,8 @@ class BngGenerator(object):
         max_length = max([len(name) for name, pattern_list in self.model.observables])
         self.__content += "begin observables\n"
         for name, pattern_list in self.model.observables:
-            observable_code = ' + '.join([format_monomerpattern(mp) for mp in pattern_list])
+            # FIXME: BNG only accepts "dot" bonds in observables anyway. I suppose we really need explicit support for "dot" vs. "plus" in reaction patterns.
+            observable_code = '.'.join([format_monomerpattern(mp) for mp in pattern_list])
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % (name, observable_code)
         self.__content += "end observables\n\n"
 
