@@ -1,6 +1,7 @@
 import sys
 
 
+
 class SelfExporter(object):
     """Expects a constructor paramter 'name', under which this object is
     inserted into the __main__ namespace."""
@@ -58,6 +59,10 @@ class Model(SelfExporter):
 class Monomer(SelfExporter):
     def __init__(self, name, sites=[], site_states={}, compartment=None):
         SelfExporter.__init__(self, name)
+
+        # convert single site string to list
+        if type(sites) == str:
+            sites = [sites]
         
         # ensure no duplicate sites
         sites_seen = {}
@@ -69,7 +74,7 @@ class Monomer(SelfExporter):
             raise Exception("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
-        unknown_sites = [site for site in site_states.keys() if not site in self.sites_dict]
+        unknown_sites = [site for site in site_states.keys() if not site in sites_seen]
         if unknown_sites:
             raise Exception("Unknown sites in site_states: " + str(unknown_sites))
         # ensure site_states values are all strings
@@ -96,8 +101,19 @@ class Monomer(SelfExporter):
 
     def __repr__(self):
         return  '%s(name=%s, sites=%s, site_states=%s, compartment=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states), repr(self.compartment))
-        # FIXME don't recurse into compartment
+            (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states), self.compartment and self.compartment.name or None)
+
+
+
+class MonomerAny(Monomer):
+    def __init__(self):
+        # don't call Monomer.__init__ since this doesn't want
+        # SelfExporter stuff and has no user-accessible API
+        self.name = 'ANY'
+        self.sites = None
+        self.sites_dict = {}
+        self.site_states = {}
+        self.compartment = None
 
 
 
@@ -109,6 +125,7 @@ class MonomerPattern:
             raise Exception("Unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
         # ensure each value is None, integer, Monomer, or list of Monomers
+        # FIXME: support state sites
         invalid_sites = []
         for (site, state) in site_conditions.items():
             # convert singleton monomer to list
@@ -207,7 +224,14 @@ class Rule(SelfExporter):
         self.rate = rate
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
+    def reversible(self, rate):
+        return Rule(self.name + '_reverse', self.products, self.reactants, rate)
+
     def __repr__(self):
         return  '%s(name=%s, reactants=%s, products=%s, rate=%s)' % \
             (self.__class__.__name__, repr(self.name), repr(self.reactants), repr(self.products), repr(self.rate))
         # FIXME don't recurse into reactants/products/rate
+
+
+
+ANY = MonomerAny()
