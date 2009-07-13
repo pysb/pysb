@@ -163,7 +163,7 @@ class MonomerPattern:
 
     def __radd__(self, other):
         if isinstance(other, list) and all(isinstance(v, MonomerPattern) for v in other):
-            return [self] + other
+            return other + [self]
         else:
             return NotImplemented
         
