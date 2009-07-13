@@ -36,12 +36,13 @@ class BngGenerator(object):
         self.__content += "end molecule types\n\n"
 
     def generate_reaction_rules(self):
-        self.__content += "begin reaction rules\n\n"
+        self.__content += "begin reaction rules\n"
+        max_length = max([len(r.name) for r in self.model.rules]) + 1  # +1 for the colon
         for r in self.model.rules:
+            label = r.name + ':'
             reactants_code = ' + '.join([format_monomerpattern(mp) for mp in r.reactants])
             products_code  = ' + '.join([format_monomerpattern(mp) for mp in r.products])
-            self.__content += "  # %s\n" % (r.name)
-            self.__content += "  %s -> %s    %s\n\n" % (reactants_code, products_code, r.rate.name)
+            self.__content += ("  %-" + str(max_length) + "s  %s -> %s    %s\n") % (label, reactants_code, products_code, r.rate.name)
         self.__content += "end reaction rules\n\n"
 
     def generate_observables(self):
