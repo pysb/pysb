@@ -62,19 +62,33 @@ receptor_aggregation.reversible(km2)
 
 # Transphosphorylation of EGFR by RTK
 #EGFR(r!+,Y1068~U) -> EGFR(r!+,Y1068~P)  kp3
-# FIXME: implement once we support states in MonomerPattern
+Rule('transphos_egfr',
+     EGFR(r=ANY, Y1068='U'),
+     EGFR(r=ANY, Y1068='P'),
+     kp3)
 
 # Dephosphorylayion
 #EGFR(Y1068~P) -> EGFR(Y1068~U)  km3
+Rule('dephos_egfr',
+     EGFR(Y1068='P'),
+     EGFR(Y1068='U'),
+     km3)
 
 # Grb2 binding to pY1068
 #EGFR(Y1068~P) + Grb2(SH2)   <-> EGFR(Y1068~P!1).Grb2(SH2!1)   kp4,km4
+Rule('grb2_bind_egfr',
+     EGFR(Y1068='P') + Grb2(SH2=None),
+     EGFR(Y1068=('P',1)) + Grb2(SH2=1),
+     kp4)
+grb2_bind_egfr.reversible(km4)
 
 # Grb2 binding to Sos
 #Grb2(SH2,SH3) + Sos(PR) <-> Grb2(SH2,SH3!1).Sos(PR!1) kp5,km5
-
-# Receptor dimer internalization/degradation
-#EGFR().EGFR() -> NULL() kdeg DeleteMolecules
+Rule('grb2_bind_sos',
+     Grb2(SH2=None, SH3=None) + Sos(PR=None),
+     Grb2(SH2=None, SH3=1)    + Sos(PR=1),
+     kp5)
+grb2_bind_sos.reversible(km5)
 
 
 

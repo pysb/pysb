@@ -56,21 +56,26 @@ def format_monomerpattern(mp):
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))
-    site_pattern_code = ', '.join([format_site_condition(site, state) for (site, state) in site_conditions])
+    site_pattern_code = ','.join([format_site_condition(site, state) for (site, state) in site_conditions])
     return '%s(%s)' % (mp.monomer.name, site_pattern_code)
 
 def format_site_condition(site, state):
-    state_code = ''
     if state == None:
-        pass
+        state_code = ''
     elif type(state) == int:
-        state_code += '!' + str(state)
+        state_code = '!' + str(state)
+    elif type(state) == str:
+        state_code = '~' + state
+    elif type(state) == tuple:
+        state_code = '~%s!%s' % state
     elif type(state) == list:
         if len(state) == 1:
             if (state[0] == Pysb.ANY):
-                state_code += '!+'
+                state_code = '!+'
             else:
-                state_code += '!' + state[0].name
+                raise Exception("BNG generator does not support named monomers in rule pattern site conditions.")
         else:
-            raise Exception("BNG generator does not support multi-species lists in rule pattern site conditions.")
+            raise Exception("BNG generator does not support multi-monomer lists in rule pattern site conditions.")
+    else:
+        raise Exception("BNG generator has encountered an unknown element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)

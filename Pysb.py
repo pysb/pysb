@@ -124,7 +124,7 @@ class MonomerPattern:
         if unknown_sites:
             raise Exception("Unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is None, integer, Monomer, or list of Monomers
+        # ensure each value is None, integer, string, (string,integer) tuple, Monomer, or list of Monomers
         # FIXME: support state sites
         invalid_sites = []
         for (site, state) in site_conditions.items():
@@ -137,11 +137,15 @@ class MonomerPattern:
                 continue
             elif type(state) == int:
                 continue
+            elif type(state) == str:
+                continue
+            elif type(state) == tuple and type(state[0]) == str and type(state[1]) == int:
+                continue
             elif type(state) == list and all([isinstance(s, Monomer) for s in state]):
                 continue
             invalid_sites.append(site)
         if invalid_sites:
-            raise Exception("Invalid state value for sites: " + str(invalid_sites))
+            raise Exception("Invalid state value for sites: " + '; '.join(['%s=%s' % (s,str(site_conditions[s])) for s in invalid_sites]))
 
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
@@ -211,6 +215,11 @@ class Compartment(SelfExporter):
 class Rule(SelfExporter):
     def __init__(self, name, reactants, products, rate):
         SelfExporter.__init__(self, name)
+
+        if isinstance(reactants, MonomerPattern):
+            reactants = [reactants]
+        if isinstance(products, MonomerPattern):
+            products = [products]
 
         if not all([isinstance(r, MonomerPattern) for r in reactants]):
             raise Exception("Reactants must all be MonomerPatterns")
