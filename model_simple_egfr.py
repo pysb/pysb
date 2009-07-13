@@ -121,3 +121,15 @@ simple_egfr.observe('EGFR_tot', EGFR())
 
 gen = bng.BngGenerator(model=simple_egfr)
 print gen.content
+print """
+begin species
+EGF(r)                           EGF_tot
+EGFR(l,r,Y1068~U,Y1148~U)        EGFR_tot
+Grb2(SH2,SH3)                    Grb2_tot
+Sos(PR)                          Sos_tot
+end species
+
+begin actions
+generate_network({overwrite=>1});
+end actions
+"""
