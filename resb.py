@@ -54,9 +54,9 @@ class MonomerWidget(gtk.DrawingArea):
 
 
 def apply_mixin(base_class, widget_class):
-        if reinteract.custom_result.CustomResult not in base_class.__bases__:
-            base_class.__bases__ += (reinteract.custom_result.CustomResult,)
-            base_class.create_widget = lambda self: widget_class(self)
+    if reinteract.custom_result.CustomResult not in base_class.__bases__:
+        base_class.__bases__ += (reinteract.custom_result.CustomResult,)
+        base_class.create_widget = lambda self: widget_class(self)
 
 
 # mix-in with some Pysb classes, but only if reinteract is available and running
