@@ -1,4 +1,5 @@
 import sys
+import warnings
 
 
 
@@ -26,7 +27,7 @@ class SelfExporter(object):
             # load self into __main__ namespace
             main = sys.modules['__main__']
             if hasattr(main, name):
-                raise Exception("'%s' already defined" % (name))
+                warnings.warn("'%s' already defined" % (name))
             setattr(main, name, self)
 
 
