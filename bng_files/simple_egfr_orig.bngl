@@ -1,0 +1,92 @@
+# This is a demo model of EGFR signaling.
+# The parameters and rules have been modified to keep things
+# as simple as possible.
+#
+# from http://bionetgen.org/index.php/Simple_EGFR_model
+
+#version("2.0.41");
+
+begin parameters
+# Concentrations in number per cell
+EGF_tot      1.2e6   
+EGFR_tot     1.8e5   
+Grb2_tot     1.5e5   
+Sos_tot      6.2e4
+
+# Biomolecular rate constants are in (# per cell)^-1 s^-1,
+#  obtained by dividing constants in M^-1 s^-1 by Na*V,
+#  where Na is Avogadro's number and V is the volume
+#  of the relevant compartment (the cytoplasm for all cases here).
+# Unimolecular rate constants are in s^-1
+kp1      1.667e-06 # ligand-monomer binding
+km1           0.06 # ligand-monomer dissociation
+
+kp2      5.556e-06 # aggregation of bound monomers
+km2            0.1 # dissociation of bound monomers
+
+kp3            0.5 # dimer transphosphorylation   
+km3          4.505 # dimer dephosphorylation        
+
+kp4      8.333e-07 # binding of Grb2 to receptor
+km4           0.05 # dissociation of Grb2 from receptor
+
+kp5     5.556e-06 # binding of Grb2 to Sos
+km5          0.06 # dissociation of Grb2 from Sos
+
+kdeg    0.01
+end parameters
+
+begin molecule types
+EGF(r)
+EGFR(l,r,Y1068~U~P,Y1148~U~P)
+Grb2(SH2,SH3)
+Shc(PTB,Y317~U~P)
+Sos(PR)
+NULL()
+end  molecule types
+
+begin species
+EGF(r)                           EGF_tot
+EGFR(l,r,Y1068~U,Y1148~U)        EGFR_tot
+Grb2(SH2,SH3)                    Grb2_tot
+Sos(PR)                          Sos_tot
+end species
+
+begin reaction rules
+
+# Ligand-receptor binding      
+EGFR(l,r) + EGF(r) <-> EGFR(l!1,r).EGF(r!1) kp1, km1
+
+# Receptor-aggregation 
+EGFR(l!+,r) + EGFR(l!+,r) <-> EGFR(l!+,r!1).EGFR(l!+,r!1) kp2,km2
+
+# Transphosphorylation of EGFR by RTK
+EGFR(r!+,Y1068~U) -> EGFR(r!+,Y1068~P)  kp3
+
+# Dephosphorylayion
+EGFR(Y1068~P) -> EGFR(Y1068~U)  km3
+
+# Grb2 binding to pY1068
+EGFR(Y1068~P) + Grb2(SH2)   <-> EGFR(Y1068~P!1).Grb2(SH2!1)   kp4,km4
+
+# Grb2 binding to Sos
+Grb2(SH2,SH3) + Sos(PR) <-> Grb2(SH2,SH3!1).Sos(PR!1) kp5,km5
+
+# Receptor dimer internalization/degradation
+#EGFR().EGFR() -> NULL() kdeg DeleteMolecules
+
+end reaction rules
+
+begin observables
+  D        EGFR(l!+)
+  RP	   EGFR(Y1068~P!?)
+  R_Grb2   EGFR(Y1068!1).Grb2(SH2!1)
+  Sos_act  EGFR(Y1068!1).Grb2(SH2!1,SH3!2).Sos(PR!2)
+  EGFR_tot EGFR()
+end observables
+
+begin actions
+
+generate_network({overwrite=>1});
+
+end actions

@@ -54,12 +54,12 @@ class Model(SelfExporter):
             raise Exception("Tried to add component of unknown type (%s) to model" % type(other))
 
     # FIXME should this be named add_observable??
-    def observe(self, name, pattern_list):
-        if isinstance(pattern_list, MonomerPattern):
-            pattern_list = [pattern_list]
-        if not all([isinstance(p, MonomerPattern) for p in pattern_list]):
-            raise Exception("Observable must be a list of MonomerPatterns")
-        self.observables.append( (name, pattern_list) )
+    def observe(self, name, reaction_pattern):
+        try:
+            reaction_pattern = as_reaction_pattern(reaction_pattern)
+        except InvalidReactionPatternException as e:
+            raise type(e)("Observable does not look like a reaction pattern")
+        self.observables.append( (name, reaction_pattern) )
 
     def __repr__(self):
         return "%s( \\\n    monomers=%s \\\n    compartments=%s\\\n    parameters=%s\\\n    rules=%s\\\n)" % \
@@ -106,9 +106,6 @@ class Monomer(SelfExporter):
         """Build a pattern object with convenient kwargs for the sites"""
         compartment = site_conditions.pop('compartment', self.compartment)
         return MonomerPattern(self, site_conditions, compartment)
-
-    #def __str__(self):
-    #    return self.name + '(' + ', '.join(self.sites) + ')'
 
     def __repr__(self):
         return  '%s(name=%s, sites=%s, site_states=%s, compartment=%s)' % \
@@ -186,13 +183,9 @@ class MonomerPattern(object):
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
-            return [ComplexPattern([self]), ComplexPattern([other])]
-        else:
-            return NotImplemented
-
-    def __radd__(self, other):
-        if isinstance(other, list) and all(isinstance(v, ComplexPattern) for v in other):
-            return other + [ComplexPattern([self])]
+            return ReactionPattern([ComplexPattern([self]), ComplexPattern([other])])
+        if isinstance(other, ComplexPattern):
+            return ReactionPattern([ComplexPattern([self]), other])
         else:
             return NotImplemented
 
@@ -202,6 +195,17 @@ class MonomerPattern(object):
         else:
             return NotImplemented
 
+    def __rshift__(self, other):
+        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
+            return (self, other, False)
+        else:
+            return NotImplemented
+
+    def __ne__(self, other):
+        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
+            return (self, other, True)
+        else:
+            return NotImplemented
 
     def __repr__(self):
         return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
@@ -219,17 +223,9 @@ class ComplexPattern(object):
 
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
-            return [self, other]
+            return ReactionPattern([self, other])
         elif isinstance(other, MonomerPattern):
-            return [self, ComplexPattern([other])]
-        else: 
-            return NotImplemented
-
-    def __radd__(self, other):
-        if isinstance(other, list) and all(isinstance(v, ComplexPattern) for v in other):
-            return other + [self]
-        elif isinstance(other, MonomerPattern):
-            return [ComplexPattern([other]), self]
+            return ReactionPattern([self, ComplexPattern([other])])
         else:
             return NotImplemented
 
@@ -239,18 +235,69 @@ class ComplexPattern(object):
         else:
             return NotImplemented
 
+    def __rshift__(self, other):
+        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
+            return (self, other, False)
+        else:
+            return NotImplemented
+
+    def __ne__(self, other):
+        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
+            return (self, other, True)
+        else:
+            return NotImplemented
+
     def __repr__(self):
         return ' * '.join([repr(p) for p in self.monomer_patterns])
 
 
 
-# FIXME: refactor Rule and Model.observe using this, once it's finished
-class ReactionPattern:
-    def __init__(self, monomer_patterns):
-        monomer_patterns = this.monomer_patterns
+class ReactionPattern(object):
+    """Represents a complete pattern for the product or reactant side
+    of a rule.  Essentially a thin wrapper around a list of
+    ComplexPatterns."""
+
+    def __init__(self, complex_patterns):
+        self.complex_patterns = complex_patterns
+
+    def __add__(self, other):
+        if isinstance(other, MonomerPattern):
+            return ReactionPattern(self.complex_patterns + [ComplexPattern([other])])
+        elif isinstance(other, ComplexPattern):
+            return ReactionPattern(self.complex_patterns + [other])
+        else:
+            return NotImplemented
 
     def __rshift__(self, other):
-        return Rule(name, self.monomer_patterns, other.monomer_patterns)
+        """Irreversible reaction"""
+        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
+            return (self, other, False)
+        else:
+            return NotImplemented
+
+    def __ne__(self, other):
+        """Reversible reaction"""
+        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
+            return (self, other, True)
+        else:
+            return NotImplemented
+
+    def __repr__(self):
+        return ' + '.join([repr(p) for p in self.complex_patterns])
+
+
+
+def as_reaction_pattern(v):
+    """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
+    complete ReactionPattern."""
+    if isinstance(v, ReactionPattern):
+        return v
+    elif isinstance(v, ComplexPattern):
+        return ReactionPattern([v])
+    elif isinstance(v, MonomerPattern):
+        return ReactionPattern([ComplexPattern([v])])
+    else:
+        raise InvalidReactionPatternException
 
 
 
@@ -284,33 +331,48 @@ class Compartment(SelfExporter):
 
 
 class Rule(SelfExporter):
-    def __init__(self, name, reactants, products, rate):
+    def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None):
         SelfExporter.__init__(self, name)
 
-        if isinstance(reactants, MonomerPattern):
-            reactants = [reactants]
-        if isinstance(products, MonomerPattern):
-            products = [products]
+        # FIXME: This tuple thing is ugly (used to support >> and <> operators between ReactionPatterns).
+        # This is how the reactant and product ReactionPatterns are passed, along with is_reversible.
+        if not isinstance(reaction_pattern_set, tuple) and len(reaction_pattern_set) != 3:
+            raise Exception("reaction_pattern_set must be a tuple of (ReactionPattern, ReactionPattern, Boolean)")
 
-        if not all([isinstance(r, MonomerPattern) for r in reactants]):
-            raise Exception("Reactants must all be MonomerPatterns")
-        if not all([isinstance(p, MonomerPattern) for p in products]):
-            raise Exception("Products must all be MonomerPatterns")
-        if not isinstance(rate, Parameter):
-            raise Exception("Rate must be a Parameter")
+        try:
+            reactant_pattern = as_reaction_pattern(reaction_pattern_set[0])
+        except InvalidReactionPatternException as e:
+            raise type(e)("Reactant does not look like a reaction pattern")
 
-        self.reactants = reactants
-        self.products = products
-        self.rate = rate
+        try:
+            product_pattern = as_reaction_pattern(reaction_pattern_set[1])
+        except InvalidReactionPatternException as e:
+            raise type(e)("Product does not look like a reaction pattern")
+
+        self.is_reversible = reaction_pattern_set[2]
+
+        if not isinstance(rate_forward, Parameter):
+            raise Exception("Forward rate must be a Parameter")
+        if self.is_reversible and not isinstance(rate_reverse, Parameter):
+            raise Exception("Reverse rate must be a Parameter")
+
+        self.reactant_pattern = reactant_pattern
+        self.product_pattern = product_pattern
+        self.rate_forward = rate_forward
+        self.rate_reverse = rate_reverse
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
-    def reversible(self, rate):
-        return Rule(self.name + '_reverse', self.products, self.reactants, rate)
-
     def __repr__(self):
-        return  '%s(name=%s, reactants=%s, products=%s, rate=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.reactants), repr(self.products), repr(self.rate))
-        # FIXME don't recurse into reactants/products/rate
+        ret = '%s(name=%s, reactants=%s, products=%s, rate_forward=%s' % \
+            (self.__class__.__name__, repr(self.name), repr(self.reactant_pattern), repr(self.product_pattern), repr(self.rate_forward))
+        if self.is_reversible:
+            ret += ', rate_reverse=%s' % repr(self.rate_reverse)
+        ret += ')'
+
+
+
+class InvalidReactionPatternException(Exception):
+    pass
 
 
 

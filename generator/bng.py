@@ -40,17 +40,23 @@ class BngGenerator(object):
         max_length = max([len(r.name) for r in self.model.rules]) + 1  # +1 for the colon
         for r in self.model.rules:
             label = r.name + ':'
-            reactants_code = ' + '.join([format_monomerpattern(mp) for mp in r.reactants])
-            products_code  = ' + '.join([format_monomerpattern(mp) for mp in r.products])
-            self.__content += ("  %-" + str(max_length) + "s  %s -> %s    %s\n") % (label, reactants_code, products_code, r.rate.name)
+            reactants_code = format_reactionpattern(r.reactant_pattern)
+            products_code  = format_reactionpattern(r.product_pattern)
+            arrow = '->'
+            if r.is_reversible:
+                arrow = '<->'
+            self.__content += ("  %-" + str(max_length) + "s  %s %s %s    %s") % \
+                (label, reactants_code, arrow, products_code, r.rate_forward.name)
+            if r.is_reversible:
+                self.__content += ', %s' % r.rate_reverse.name
+            self.__content += "\n"
         self.__content += "end reaction rules\n\n"
 
     def generate_observables(self):
-        max_length = max([len(name) for name, pattern_list in self.model.observables])
+        max_length = max([len(name) for name, pattern in self.model.observables])
         self.__content += "begin observables\n"
-        for name, pattern_list in self.model.observables:
-            # FIXME: BNG only accepts "dot" bonds in observables anyway. I suppose we really need explicit support for "dot" vs. "plus" in reaction patterns.
-            observable_code = '.'.join([format_monomerpattern(mp) for mp in pattern_list])
+        for name, pattern in self.model.observables:
+            observable_code = format_reactionpattern(pattern)
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % (name, observable_code)
         self.__content += "end observables\n\n"
 
@@ -62,6 +68,12 @@ def format_monomer_site(monomer, site):
         for state in monomer.site_states[site]:
             ret += '~' + state
     return ret
+
+def format_reactionpattern(rp):
+    return ' + '.join([format_complexpattern(cp) for cp in rp.complex_patterns])
+
+def format_complexpattern(cp):
+    return '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
 
 def format_monomerpattern(mp):
     # sort sites in the same order given in the original Monomer
