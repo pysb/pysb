@@ -146,7 +146,7 @@ class MonomerWild(Monomer):
 
 
 
-class MonomerPattern:
+class MonomerPattern(object):
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
@@ -186,20 +186,61 @@ class MonomerPattern:
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
+            return [ComplexPattern([self]), ComplexPattern([other])]
+        else:
+            return NotImplemented
+
+    def __radd__(self, other):
+        if isinstance(other, list) and all(isinstance(v, ComplexPattern) for v in other):
+            return other + [ComplexPattern([self])]
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        if isinstance(other, MonomerPattern):
+            return ComplexPattern([self, other])
+        else:
+            return NotImplemented
+
+
+    def __repr__(self):
+        return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
+                                                    for k in self.monomer.sites
+                                                    if self.site_conditions.has_key(k)]) + ')'
+
+
+
+class ComplexPattern(object):
+    """Represents a bound set of MonomerPatterns, i.e. a complex.  In
+    BNG terms, a list of patterns combined with the '.' operator)."""
+
+    def __init__(self, monomer_patterns):
+        self.monomer_patterns = monomer_patterns
+
+    def __add__(self, other):
+        if isinstance(other, ComplexPattern):
             return [self, other]
+        elif isinstance(other, MonomerPattern):
+            return [self, ComplexPattern([other])]
         else: 
             return NotImplemented
 
     def __radd__(self, other):
-        if isinstance(other, list) and all(isinstance(v, MonomerPattern) for v in other):
+        if isinstance(other, list) and all(isinstance(v, ComplexPattern) for v in other):
             return other + [self]
+        elif isinstance(other, MonomerPattern):
+            return [ComplexPattern([other]), self]
         else:
             return NotImplemented
-        
 
-    #def __str__(self):
-    #    return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
-    #                                                for k in self.site_conditions.keys()]) + ')'
+    def __mul__(self, other):
+        if isinstance(other, MonomerPattern):
+            return ComplexPattern(self.monomer_patterns + [other])
+        else:
+            return NotImplemented
+
+    def __repr__(self):
+        return ' * '.join([repr(p) for p in self.monomer_patterns])
 
 
 
