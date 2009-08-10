@@ -368,6 +368,7 @@ class Rule(SelfExporter):
         if self.is_reversible:
             ret += ', rate_reverse=%s' % repr(self.rate_reverse)
         ret += ')'
+        return ret
 
 
 
