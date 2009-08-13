@@ -15,6 +15,8 @@ class SelfExporter(object):
         self.name = name
 
         if SelfExporter.do_self_export:
+            # FIXME if name already used, add_component will succeed since it's done first.
+            #   this whole thing needs to be rethought, really.
             if isinstance(self, Model):
                 if SelfExporter.default_model != None:
                     raise Exception("Only one instance of Model may be declared ('%s' previously declared)" % SelfExporter.default_model.name)
@@ -24,11 +26,16 @@ class SelfExporter(object):
                     raise Exception("A Model must be declared before declaring any model components")
                 SelfExporter.default_model.add_component(self)
 
-            # load self into __main__ namespace
-            main = sys.modules['__main__']
-            if hasattr(main, name):
+            # load self into caller's global namespace under self.name
+            import inspect
+            cur_module = inspect.getmodule(inspect.currentframe())
+            caller_frame = inspect.currentframe()
+            # iterate up through the stack until we hit a different module
+            while inspect.getmodule(caller_frame) == cur_module:
+                caller_frame = caller_frame.f_back
+            if caller_frame.f_globals.has_key(name):
                 warnings.warn("'%s' already defined" % (name))
-            setattr(main, name, self)
+            caller_frame.f_globals[name] = self
 
 
 
