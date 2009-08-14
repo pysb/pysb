@@ -1,4 +1,4 @@
-import Pysb
+import pysb
 
 
 class BngGenerator(object):
@@ -90,12 +90,12 @@ def format_site_condition(site, state):
     elif type(state) == str:
         state_code = '~' + state
     elif type(state) == tuple:
-        if state[1] == Pysb.WILD:
+        if state[1] == pysb.WILD:
             state = (state[0], '?')
         state_code = '~%s!%s' % state
     elif type(state) == list:
         if len(state) == 1:
-            if (state[0] == Pysb.ANY):
+            if (state[0] == pysb.ANY):
                 state_code = '!+'
             else:
                 raise Exception("BNG generator does not support named monomers in rule pattern site conditions.")

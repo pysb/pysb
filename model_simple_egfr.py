@@ -1,5 +1,5 @@
-from Pysb import *
-import generator.bng as bng
+from pysb import *
+import pysb.generator.bng as bng
 
 # from http://bionetgen.org/index.php/Simple_EGFR_model
 
