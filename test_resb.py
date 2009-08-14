@@ -1,5 +1,5 @@
-from Pysb import *
-from resb import *
+from pysb import *
+from pysb.reinteract import *
 import gtk
 
 Model('test')

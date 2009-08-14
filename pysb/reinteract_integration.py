@@ -1,4 +1,5 @@
-import Pysb
+import pysb
+import reinteract
 import gtk
 import math
 
@@ -66,21 +67,14 @@ class MonomerWidget(gtk.DrawingArea):
 
 
 
-def apply_mixin(base_class, widget_class):
-    if reinteract.custom_result.CustomResult not in base_class.__bases__:
-        base_class.__bases__ += (reinteract.custom_result.CustomResult,)
-        base_class.create_widget = lambda self: widget_class(self)
 
 
-# mix-in with some Pysb classes, but only if reinteract is available and running
-class_pairs = [
-    (Pysb.Monomer, MonomerWidget),
+# mix-in with some pysb classes, but only if reinteract is available and running
+mixin_pairs = [
+    (pysb.Monomer, MonomerWidget),
     ]
-try:
-    import reinteract         # fails if reinteract not installed
-    reinteract.custom_result  # fails if this code is run outside of the reinteract shell
-except (ImportError, AttributeError):
-    pass                      # silently skip applying the mixin below
-else:
-    for pair in class_pairs:
-        apply_mixin(*pair)
+def apply_mixins():
+    for (base_class, widget_class) in mixin_pairs:
+        if reinteract.custom_result.CustomResult not in base_class.__bases__:
+            base_class.__bases__ += (reinteract.custom_result.CustomResult,)
+            base_class.create_widget = lambda self: widget_class(self)
