@@ -1,5 +1,6 @@
-from pysb.generator.bng import BngGenerator
+#from pysb.generator.bng import BngGenerator
 import os
+import subprocess
 import random
 
 pkg_path = None
@@ -10,29 +11,36 @@ generate_network({overwrite=>1});
 end actions
 """
 
-def generate_equations(model):
+def generate_equations(content):
     if pkg_path == None:
         raise Exception('must set pysb.bng.pkg_path to BNG directory')
 
-    gen = BngGenerator(model)
+    #gen = BngGenerator(model)
 
     bng_filename = '%d_%d_temp.bngl' % (os.getpid(), random.randint(0, 10000))
-    bng_file = open(bng_filename, 'w')
-    bng_file.write(gen.content)
-    bng_file.write(generate_network_code)
-    bng_file.close()
-
-    os.spawnl(os.P_WAIT, pkg_path+'/BNG2.pl', 'BNG2.pl', bng_filename)
-
     net_filename = bng_filename.replace('.bngl', '.net')
-    net_file = open(net_filename, 'r')
-    while net_file.readline() != 'begin reactions':
-        pass
-    while True:
-        line = net_file.readline()
-        if line == 'end reactions': break
-        print "line:", line
-    net_file.close()
+    try:
+        bng_file = open(bng_filename, 'w')
+        bng_file.write(content)
+        bng_file.write(generate_network_code)
+        bng_file.close()
 
-    #os.unlink(bng_filename)
-    #os.unlink(net_filename)
+        subprocess.call(['/usr/bin/perl', pkg_path+'/Perl2/BNG2.pl', bng_filename],
+                        stdout=subprocess.PIPE)
+
+        net_file = open(net_filename, 'r')
+        while net_file.readline().strip() != 'begin reactions':
+            pass
+        while True:
+            line = net_file.readline()
+            if line == 'end reactions\n' or line == '': break
+            line = line.strip()
+            print "line:", line
+        net_file.close()
+    except Exception as e:
+        print "problem running BNG:\n"
+        print e
+        print "\n"
+    finally:
+        os.unlink(bng_filename)
+        os.unlink(net_filename)
