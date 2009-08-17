@@ -2,6 +2,7 @@
 import os
 import subprocess
 import random
+import sympy
 
 pkg_path = None
 
@@ -31,11 +32,19 @@ def generate_equations(content):
         net_file = open(net_filename, 'r')
         while net_file.readline().strip() != 'begin reactions':
             pass
+        ydot = {}
         while True:
             line = net_file.readline()
             if line == 'end reactions\n' or line == '': break
-            line = line.strip()
-            print "line:", line
+            (number, reactants, products, rate, rule) = line.strip().split()
+            reactants = reactants.split(',')
+            products = products.split(',')
+            rate = rate.rsplit('*')
+            for p in products:
+                p = int(p)
+                ydot.setdefault(p, sympy.S(0))
+                r_names = ['s' + r for r in reactants]
+                ydot[p] += sympy.Mul(*[sympy.S(t) for t in r_names + rate])
         net_file.close()
     except Exception as e:
         print "problem running BNG:\n"
@@ -44,3 +53,5 @@ def generate_equations(content):
     finally:
         os.unlink(bng_filename)
         os.unlink(net_filename)
+
+    return ydot
