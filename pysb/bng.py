@@ -40,11 +40,16 @@ def generate_equations(content):
             reactants = reactants.split(',')
             products = products.split(',')
             rate = rate.rsplit('*')
+            r_names = ['s' + r for r in reactants]
+            combined_rate = sympy.Mul(*[sympy.S(t) for t in r_names + rate]) 
             for p in products:
                 p = int(p)
                 ydot.setdefault(p, sympy.S(0))
-                r_names = ['s' + r for r in reactants]
-                ydot[p] += sympy.Mul(*[sympy.S(t) for t in r_names + rate])
+                ydot[p] += combined_rate
+            for r in reactants:
+                r = int(r)
+                ydot.setdefault(r, sympy.S(0))
+                ydot[r] -= combined_rate
         net_file.close()
     except Exception as e:
         print "problem running BNG:\n"
