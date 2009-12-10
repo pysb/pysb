@@ -6,10 +6,11 @@ import warnings
 # FIXME: make this behavior toggleable
 class SelfExporter(object):
     """Expects a constructor paramter 'name', under which this object is
-    inserted into the __main__ namespace."""
+    inserted into the namespace from which the Model constructor was called."""
 
     do_self_export = True
     default_model = None
+    target_globals = None   # the globals dict to which we'll export our symbols
 
     def __init__(self, name):
         self.name = name
@@ -20,22 +21,24 @@ class SelfExporter(object):
             if isinstance(self, Model):
                 if SelfExporter.default_model != None:
                     raise Exception("Only one instance of Model may be declared ('%s' previously declared)" % SelfExporter.default_model.name)
+                # determine the module from which the Model constructor was called
+                import inspect
+                cur_module = inspect.getmodule(inspect.currentframe())
+                caller_frame = inspect.currentframe()
+                # iterate up through the stack until we hit a different module
+                while inspect.getmodule(caller_frame) == cur_module:
+                    caller_frame = caller_frame.f_back
+                SelfExporter.target_globals = caller_frame.f_globals
                 SelfExporter.default_model = self
             elif isinstance(self, (Monomer, Compartment, Parameter, Rule)):
                 if SelfExporter.default_model == None:
                     raise Exception("A Model must be declared before declaring any model components")
                 SelfExporter.default_model.add_component(self)
 
-            # load self into caller's global namespace under self.name
-            import inspect
-            cur_module = inspect.getmodule(inspect.currentframe())
-            caller_frame = inspect.currentframe()
-            # iterate up through the stack until we hit a different module
-            while inspect.getmodule(caller_frame) == cur_module:
-                caller_frame = caller_frame.f_back
-            if caller_frame.f_globals.has_key(name):
+            # load self into target namespace under self.name
+            if SelfExporter.target_globals.has_key(name):
                 warnings.warn("'%s' already defined" % (name))
-            caller_frame.f_globals[name] = self
+            SelfExporter.target_globals[name] = self
 
 
 
