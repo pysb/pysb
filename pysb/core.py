@@ -112,8 +112,14 @@ class Monomer(SelfExporter):
         self.site_states = site_states
         self.compartment = compartment
 
-    def __call__(self, **site_conditions):
+    def __call__(self, *dict_site_conditions, **named_site_conditions):
         """Build a pattern object with convenient kwargs for the sites"""
+        site_conditions = named_site_conditions.copy()
+        # TODO: should key conflicts silently overwrite, or warn, or error?
+        # TODO: ensure all values are dicts or dict-like?
+        for condition_dict in dict_site_conditions:
+            if condition_dict is not None:
+                site_conditions.update(condition_dict)
         compartment = site_conditions.pop('compartment', self.compartment)
         return MonomerPattern(self, site_conditions, compartment)
 
