@@ -53,6 +53,8 @@ class BngGenerator(object):
         self.__content += "end reaction rules\n\n"
 
     def generate_observables(self):
+        if not self.model.observables:
+            return
         max_length = max([len(name) for name, pattern in self.model.observables])
         self.__content += "begin observables\n"
         for name, pattern in self.model.observables:
