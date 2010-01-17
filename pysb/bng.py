@@ -54,4 +54,7 @@ def generate_equations(content):
         os.unlink(bng_filename)
         os.unlink(net_filename)
 
+    for i in range(1, max(ydot) + 1):
+        ydot.setdefault(i, sympy.S(0))
+
     return ydot
