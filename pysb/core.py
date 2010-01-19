@@ -43,7 +43,7 @@ class SelfExporter(object):
 
 
 class Model(SelfExporter):
-    def __init__(self, name):
+    def __init__(self, name='model'):
         SelfExporter.__init__(self, name)
         self.monomers = []
         self.compartments = []
@@ -70,6 +70,13 @@ class Model(SelfExporter):
         except InvalidReactionPatternException as e:
             raise type(e)("Observable does not look like a reaction pattern")
         self.observables.append( (name, reaction_pattern) )
+
+    def parameter(self, name):
+        # FIXME probably want to store params in a dict by name instead of a list
+        try:
+            return (p for p in self.parameters if p.name == name).next()
+        except StopIteration:
+            return None
 
     def __repr__(self):
         return "%s( \\\n    monomers=%s \\\n    compartments=%s\\\n    parameters=%s\\\n    rules=%s\\\n)" % \
