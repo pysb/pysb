@@ -7,12 +7,10 @@ class BngGenerator(object):
         self.model = model
         self.__content = None
 
-    def __get_content(self):
+    def get_content(self):
         if self.__content == None:
             self.generate_content()
         return self.__content
-
-    content = property(fget=__get_content)
 
     def generate_content(self):
         self.__content = ''
@@ -20,10 +18,11 @@ class BngGenerator(object):
         self.generate_molecule_types()
         self.generate_reaction_rules()
         self.generate_observables()
+        self.generate_species()
 
     def generate_parameters(self):
         self.__content += "begin parameters\n"
-        max_length = max([len(p.name) for p in self.model.parameters])
+        max_length = max(len(p.name) for p in self.model.parameters)
         for p in self.model.parameters:
             self.__content += ("  %-" + str(max_length) + "s   %e\n") % (p.name, p.value)
         self.__content += "end parameters\n\n"
@@ -37,7 +36,7 @@ class BngGenerator(object):
 
     def generate_reaction_rules(self):
         self.__content += "begin reaction rules\n"
-        max_length = max([len(r.name) for r in self.model.rules]) + 1  # +1 for the colon
+        max_length = max(len(r.name) for r in self.model.rules) + 1  # +1 for the colon
         for r in self.model.rules:
             label = r.name + ':'
             reactants_code = format_reactionpattern(r.reactant_pattern)
@@ -53,14 +52,25 @@ class BngGenerator(object):
         self.__content += "end reaction rules\n\n"
 
     def generate_observables(self):
-        if not self.model.observables:
+        if not self.model.observable_patterns:
             return
-        max_length = max([len(name) for name, pattern in self.model.observables])
+        max_length = max(len(name) for name, pattern in self.model.observable_patterns)
         self.__content += "begin observables\n"
-        for name, pattern in self.model.observables:
+        for name, pattern in self.model.observable_patterns:
             observable_code = format_reactionpattern(pattern)
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % (name, observable_code)
         self.__content += "end observables\n\n"
+
+    def generate_species(self):
+        if not self.model.initial_conditions:
+            raise Exception("BNG generator requires initial conditions.")
+        species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
+        max_length = max(len(code) for code in species_codes)
+        self.__content += "begin species\n"
+        for i, code in enumerate(species_codes):
+            param = self.model.initial_conditions[i][1]
+            self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code, param.name)
+        self.__content += "end species\n"
 
 
 

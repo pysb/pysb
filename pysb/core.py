@@ -3,6 +3,13 @@ import warnings
 
 
 
+def observe(*args):
+    return SelfExporter.default_model.observe(*args)
+
+def initial(*args):
+    return SelfExporter.default_model.initial(*args)
+
+
 # FIXME: make this behavior toggleable
 class SelfExporter(object):
     """Expects a constructor paramter 'name', under which this object is
@@ -19,7 +26,7 @@ class SelfExporter(object):
             # FIXME if name already used, add_component will succeed since it's done first.
             #   this whole thing needs to be rethought, really.
             if isinstance(self, Model):
-                if SelfExporter.default_model != None:
+                if SelfExporter.default_model is not None:
                     raise Exception("Only one instance of Model may be declared ('%s' previously declared)" % SelfExporter.default_model.name)
                 # determine the module from which the Model constructor was called
                 import inspect
@@ -49,7 +56,11 @@ class Model(SelfExporter):
         self.compartments = []
         self.parameters = []
         self.rules = []
-        self.observables = []
+        self.species = []
+        self.odes = []
+        self.observable_patterns = []
+        self.observable_groups = {}
+        self.initial_conditions = []
 
     def add_component(self, other):
         if isinstance(other, Monomer):
@@ -68,13 +79,39 @@ class Model(SelfExporter):
         try:
             reaction_pattern = as_reaction_pattern(reaction_pattern)
         except InvalidReactionPatternException as e:
-            raise type(e)("Observable does not look like a reaction pattern")
-        self.observables.append( (name, reaction_pattern) )
+            raise type(e)("Observable pattern does not look like a ReactionPattern")
+        self.observable_patterns.append( (name, reaction_pattern) )
+
+    def initial(self, complex_pattern, value):
+        try:
+            complex_pattern = as_complex_pattern(complex_pattern)
+        except InvalidComplexPatternException as e:
+            raise type(e)("Initial condition species does not look like a ComplexPattern")
+        if not isinstance(value, Parameter):
+            raise Exception("Value must be a Parameter")
+        if not complex_pattern.is_concrete():
+            raise Exception("Pattern must be concrete (all sites specified)")
+        self.initial_conditions.append( (complex_pattern, value) )
 
     def parameter(self, name):
+        # FIXME rename to get_parameter
         # FIXME probably want to store params in a dict by name instead of a list
         try:
             return (p for p in self.parameters if p.name == name).next()
+        except StopIteration:
+            return None
+
+    def get_monomer(self, name):
+        # FIXME probably want to store monomers in a dict by name instead of a list
+        try:
+            return (m for m in self.monomers if m.name == name).next()
+        except StopIteration:
+            return None
+
+    def get_species_index(self, complex_pattern):
+        # FIXME I don't even want to think about the inefficiency of this, but at least it works
+        try:
+            return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
         except StopIteration:
             return None
 
@@ -204,6 +241,11 @@ class MonomerPattern(object):
         self.site_conditions = site_conditions
         self.compartment = compartment
 
+    def is_concrete(self):
+        """Tests whether all sites in monomer are specified."""
+        # assume __init__ did a thorough enough job of error checking that this is is all we need to do
+        return len(self.site_conditions) == len(self.monomer.sites)
+
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
             return ReactionPattern([ComplexPattern([self]), ComplexPattern([other])])
@@ -243,6 +285,22 @@ class ComplexPattern(object):
 
     def __init__(self, monomer_patterns):
         self.monomer_patterns = monomer_patterns
+
+    def is_concrete(self):
+        """Tests whether all sites in all of monomer_patterns are specified."""
+        return all(mp.is_concrete() for mp in self.monomer_patterns)
+
+    def is_equivalent_to(self, other):
+        """Checks for equality with another ComplexPattern"""
+        # Didn't implement __eq__ to avoid confusion with __ne__ operator used for Rule building
+
+        # FIXME the literal site_conditions comparison requires bond numbering to be identical,
+        #   so some sort of canonicalization of that numbering is necessary.
+        if not isinstance(other, ComplexPattern):
+            raise Exception("Can only compare ComplexPattern to another ComplexPattern")
+        return \
+            sorted((mp.monomer, mp.site_conditions) for mp in self.monomer_patterns) == \
+            sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
 
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
@@ -310,17 +368,26 @@ class ReactionPattern(object):
 
 
 
+def as_complex_pattern(v):
+    """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
+    if isinstance(v, ComplexPattern):
+        return v
+    elif isinstance(v, MonomerPattern):
+        return ComplexPattern([v])
+    else:
+        raise InvalidComplexPatternException
+
+
 def as_reaction_pattern(v):
     """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
     complete ReactionPattern."""
     if isinstance(v, ReactionPattern):
         return v
-    elif isinstance(v, ComplexPattern):
-        return ReactionPattern([v])
-    elif isinstance(v, MonomerPattern):
-        return ReactionPattern([ComplexPattern([v])])
     else:
-        raise InvalidReactionPatternException
+        try:
+            return ReactionPattern([as_complex_pattern(v)])
+        except InvalidComplexPatternException:
+            raise InvalidReactionPatternException
 
 
 
@@ -394,6 +461,9 @@ class Rule(SelfExporter):
         return ret
 
 
+
+class InvalidComplexPatternException(Exception):
+    pass
 
 class InvalidReactionPatternException(Exception):
     pass
