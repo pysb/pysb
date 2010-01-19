@@ -3,10 +3,10 @@ import warnings
 
 
 
-def observe(*args):
+def Observe(*args):
     return SelfExporter.default_model.observe(*args)
 
-def initial(*args):
+def Initial(*args):
     return SelfExporter.default_model.initial(*args)
 
 
@@ -19,10 +19,10 @@ class SelfExporter(object):
     default_model = None
     target_globals = None   # the globals dict to which we'll export our symbols
 
-    def __init__(self, name):
+    def __init__(self, name, __export=True):
         self.name = name
 
-        if SelfExporter.do_self_export:
+        if SelfExporter.do_self_export and __export:
             # FIXME if name already used, add_component will succeed since it's done first.
             #   this whole thing needs to be rethought, really.
             if isinstance(self, Model):
@@ -50,11 +50,12 @@ class SelfExporter(object):
 
 
 class Model(SelfExporter):
-    def __init__(self, name='model'):
-        SelfExporter.__init__(self, name)
+    def __init__(self, name='model', __export=True):
+        SelfExporter.__init__(self, name, __export)
         self.monomers = []
         self.compartments = []
         self.parameters = []
+        self.parameter_overrides = {}
         self.rules = []
         self.species = []
         self.odes = []
@@ -101,6 +102,16 @@ class Model(SelfExporter):
         except StopIteration:
             return None
 
+    def set_parameter(self, name, value):
+        """Overrides the baseline value of a parameter."""
+        if not self.parameter(name):
+            raise Exception("Model does not have a parameter named '%s'" % name)
+        self.parameter_overrides[name] = Parameter(name, value, False)
+
+    def reset_parameters(self):
+        """Resets all parameters back to the baseline defined in the model script."""
+        self.parameter_overrides = {}
+
     def get_monomer(self, name):
         # FIXME probably want to store monomers in a dict by name instead of a list
         try:
@@ -122,8 +133,8 @@ class Model(SelfExporter):
 
 
 class Monomer(SelfExporter):
-    def __init__(self, name, sites=[], site_states={}, compartment=None):
-        SelfExporter.__init__(self, name)
+    def __init__(self, name, sites=[], site_states={}, compartment=None, __export=True):
+        SelfExporter.__init__(self, name, __export)
 
         # convert single site string to list
         if type(sites) == str:
@@ -392,8 +403,8 @@ def as_reaction_pattern(v):
 
 
 class Parameter(SelfExporter):
-    def __init__(self, name, value=float('nan')):
-        SelfExporter.__init__(self, name)
+    def __init__(self, name, value=float('nan'), __export=True):
+        SelfExporter.__init__(self, name, __export)
         self.value = value
 
     def __repr__(self):
@@ -403,8 +414,8 @@ class Parameter(SelfExporter):
 
 class Compartment(SelfExporter):
     # FIXME: sane defaults?
-    def __init__(self, name, neighbors=[], dimension=3, size=1):
-        SelfExporter.__init__(self, name)
+    def __init__(self, name, neighbors=[], dimension=3, size=1, __export=True):
+        SelfExporter.__init__(self, name, __export)
 
         if not all([isinstance(n, Compartment) for n in neighbors]):
             raise Exception("neighbors must all be Compartments")
@@ -421,8 +432,8 @@ class Compartment(SelfExporter):
 
 
 class Rule(SelfExporter):
-    def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None):
-        SelfExporter.__init__(self, name)
+    def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None, __export=True):
+        SelfExporter.__init__(self, name, __export)
 
         # FIXME: This tuple thing is ugly (used to support >> and <> operators between ReactionPatterns).
         # This is how the reactant and product ReactionPatterns are passed, along with is_reversible.
