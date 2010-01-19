@@ -1,7 +1,7 @@
 from pysb.integrate import odesolve
 from pylab import *
 
-from earm_1_0_b import model
+from earm_1_0 import model
 
 
 # saturating level of ligand (corresponding to ~1000 ng/ml SuperKiller TRAIL)
