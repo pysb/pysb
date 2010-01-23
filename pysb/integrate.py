@@ -39,7 +39,8 @@ def odesolve(model, t):
     yout[:, :nspecies] = odeint(rhs, y0, t)
 
     for i, name in enumerate(obs_names):
-        yout[:, nspecies + i] = yout[:, model.observable_groups[name]].sum(1)
+        factors, species = zip(*model.observable_groups[name])
+        yout[:, nspecies + i] = (yout[:, species] * factors).sum(1)
 
     dtype = zip(rec_names, (yout.dtype,) * len(rec_names))
     yrec = numpy.recarray((yout.shape[0],), dtype=dtype, buf=yout)

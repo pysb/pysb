@@ -60,7 +60,7 @@ class Model(SelfExporter):
         self.species = []
         self.odes = []
         self.observable_patterns = []
-        self.observable_groups = {}
+        self.observable_groups = {}  # values are tuples of factor,speciesnumber
         self.initial_conditions = []
 
     def add_component(self, other):
