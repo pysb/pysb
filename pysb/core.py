@@ -1,9 +1,6 @@
 import sys
 import warnings
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
 def Observe(*args):
     return SelfExporter.default_model.observe(*args)
 
@@ -143,6 +140,8 @@ class Model(SelfExporter):
 
 
 class Monomer(SelfExporter):
+    """The Monomer class creates monomers with the specified sites, state-sites, and compartment
+    """
 
     if DEBUG:
         print "in Monomer"
