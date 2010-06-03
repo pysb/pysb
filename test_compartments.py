@@ -1,5 +1,9 @@
 from pysb import *
 
+if DEBUG:
+    print "in test_compartments"
+
+
 Model('test')
 
 Compartment('membrane', dimension=2)
@@ -9,8 +13,8 @@ Monomer('egfr', ['L', 'D', 'C'])
 
 Parameter('K_egfr_egf', 1.2)
 Rule('egfr_egf',
-     [egfr(L=None), egf(R=None)],
-     [egfr(L=1),    egf(R=1)], K_egfr_egf)
+     egfr(L=None) + egf(R=None) >>
+     egfr(L=1)    * egf(R=1), K_egfr_egf)
 
 print egf
 print egfr

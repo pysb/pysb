@@ -10,11 +10,16 @@ def Observe(*args):
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
 
+DEBUG = True
+
 
 # FIXME: make this behavior toggleable
 class SelfExporter(object):
     """Expects a constructor paramter 'name', under which this object is
     inserted into the namespace from which the Model constructor was called."""
+
+    if DEBUG:
+        print "in SelfExporter"
 
     do_self_export = True
     default_model = None
@@ -51,6 +56,10 @@ class SelfExporter(object):
 
 
 class Model(SelfExporter):
+
+    if DEBUG:
+        print "in Model"
+
     def __init__(self, name='model', __export=True):
         SelfExporter.__init__(self, name, __export)
         self.monomers = []
@@ -134,6 +143,10 @@ class Model(SelfExporter):
 
 
 class Monomer(SelfExporter):
+
+    if DEBUG:
+        print "in Monomer"
+
     def __init__(self, name, sites=[], site_states={}, compartment=None, __export=True):
         SelfExporter.__init__(self, name, __export)
 
@@ -186,6 +199,10 @@ class Monomer(SelfExporter):
 
 
 class MonomerAny(Monomer):
+
+    if DEBUG:
+        print "in MonomerAny"
+
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
         # SelfExporter stuff and has no user-accessible API
@@ -201,6 +218,10 @@ class MonomerAny(Monomer):
 
 
 class MonomerWild(Monomer):
+
+    if DEBUG:
+        print "in MonomerWild"
+
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
         # SelfExporter stuff and has no user-accessible API
@@ -216,6 +237,10 @@ class MonomerWild(Monomer):
 
 
 class MonomerPattern(object):
+
+    if DEBUG:
+        print "in MonomerPattern"
+
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
@@ -295,6 +320,9 @@ class ComplexPattern(object):
     """Represents a bound set of MonomerPatterns, i.e. a complex.  In
     BNG terms, a list of patterns combined with the '.' operator)."""
 
+    if DEBUG:
+        print "in ComplexPattern"
+
     def __init__(self, monomer_patterns):
         self.monomer_patterns = monomer_patterns
 
@@ -350,6 +378,9 @@ class ReactionPattern(object):
     of a rule.  Essentially a thin wrapper around a list of
     ComplexPatterns."""
 
+    if DEBUG:
+        print "in ReactionPattern"
+
     def __init__(self, complex_patterns):
         self.complex_patterns = complex_patterns
 
@@ -382,6 +413,10 @@ class ReactionPattern(object):
 
 def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
+
+    if DEBUG:
+        print "in as_complex_pattern"
+
     if isinstance(v, ComplexPattern):
         return v
     elif isinstance(v, MonomerPattern):
@@ -393,6 +428,10 @@ def as_complex_pattern(v):
 def as_reaction_pattern(v):
     """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
     complete ReactionPattern."""
+
+    if DEBUG:
+        print "in as_reaction_pattern"
+
     if isinstance(v, ReactionPattern):
         return v
     else:
@@ -404,6 +443,10 @@ def as_reaction_pattern(v):
 
 
 class Parameter(SelfExporter):
+
+    if DEBUG:
+        print "in Parameter"
+
     def __init__(self, name, value=float('nan'), __export=True):
         SelfExporter.__init__(self, name, __export)
         self.value = value
@@ -414,6 +457,10 @@ class Parameter(SelfExporter):
 
 
 class Compartment(SelfExporter):
+
+    if DEBUG:
+        print "in Compartment"
+
     # FIXME: sane defaults?
     def __init__(self, name, neighbors=[], dimension=3, size=1, __export=True):
         SelfExporter.__init__(self, name, __export)
@@ -433,6 +480,10 @@ class Compartment(SelfExporter):
 
 
 class Rule(SelfExporter):
+
+    if DEBUG:
+        print "in Rule"
+
     def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None, __export=True):
         SelfExporter.__init__(self, name, __export)
 
