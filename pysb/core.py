@@ -1,7 +1,8 @@
 import sys
 import warnings
 
-
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 def Observe(*args):
     return SelfExporter.default_model.observe(*args)
