@@ -1,12 +1,17 @@
 from pysb import *
+import logging
 
-if DEBUG:
-    print "in test_compartments"
+logging.basicConfig()
+complog = logging.getLogger("CompartmentsFile")
+complog.setLevel(logging.DEBUG)
 
-
+complog.debug("starting Model")
 Model('test')
 
+complog.debug("setting Compartment")
 Compartment('membrane', dimension=2)
+
+
 
 Monomer('egf', 'R')
 Monomer('egfr', ['L', 'D', 'C'])
