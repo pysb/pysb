@@ -30,7 +30,7 @@ class SelfExporter(object):
     def __init__(self, name, __export=True):
         self.name = name
 
-        if SelfExporter.do_self_export and __export:
+        if SelfExporter.do_self_export and __export: #isn't __export always True by the time we get here?
             # FIXME if name already used, add_component will succeed since it's done first.
             #   this whole thing needs to be rethought, really.
             if isinstance(self, Model):
@@ -137,7 +137,7 @@ class Model(SelfExporter):
         except StopIteration:
             return None
 
-    def __repr__(self):
+    def __repr__(self): 
         return "%s( \\\n    monomers=%s \\\n    compartments=%s\\\n    parameters=%s\\\n    rules=%s\\\n)" % \
             (self.__class__.__name__, repr(self.monomers), repr(self.compartments), repr(self.parameters), repr(self.rules))
 
@@ -195,10 +195,12 @@ class Monomer(SelfExporter):
         return MonomerPattern(self, site_conditions, compartment)
 
     def __repr__(self):
-        return  '%s(name=%s, sites=%s, site_states=%s, compartment=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states), self.compartment and self.compartment.name or None)
-
-
+        if self.sites and self.site_states:
+            return  '%s(name=%s, sites=%s, site_states=%s, compartment=%s)' % \
+                (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states), self.compartment and self.compartment.name or None)
+        else:
+            return  '%s(name=%s Has no sites and/or state sites)' % (self.__class__.__name__, repr(self.name))
+    
 
 class MonomerAny(Monomer):
 

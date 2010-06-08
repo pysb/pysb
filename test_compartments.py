@@ -9,12 +9,14 @@ complog.debug("starting Model")
 Model('test')
 
 complog.debug("setting Compartment")
-Compartment('membrane', dimension=2)
+# Compartment('extra',     dimension=3, size=extraSize, parent=None)
+# Compartment('membrane',  dimension=2, size=memSize,   parent=extra)
+# Compartment('cytoplasm', dimension=3, size=cytoSize,  parent=membrane)
 
 
 
-Monomer('egf', 'R')
-Monomer('egfr', ['L', 'D', 'C'])
+Monomer('egf', 'R', {'R':['up', 'down']})
+Monomer('egfr', ['L', 'D', 'C'], {'C':['on', 'off']})
 
 Parameter('K_egfr_egf', 1.2)
 Rule('egfr_egf',
