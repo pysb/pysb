@@ -1,15 +1,15 @@
 from pysb import *
 import logging
 
-logging.basicConfig()
-complog = logging.getLogger("CompartmentsFile")
+yeahlogging.basicConfig()
+complog = logging.getLogger("compartments_file")
 complog.setLevel(logging.DEBUG)
 
 complog.debug("starting Model")
 Model('test')
 
 complog.debug("setting Compartment")
-# Compartment('extra',     dimension=3, size=extraSize, parent=None)
+# Compartment('eCell',     dimension=3, size=extraSize, parent=None)
 # Compartment('membrane',  dimension=2, size=memSize,   parent=extra)
 # Compartment('cytoplasm', dimension=3, size=cytoSize,  parent=membrane)
 

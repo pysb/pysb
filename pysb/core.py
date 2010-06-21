@@ -453,11 +453,15 @@ class Parameter(SelfExporter):
 
 
 class Compartment(SelfExporter):
-
+    """The Compartment class expects a "name", "parent", "dimension", and "size" variable from the
+    compartment call. name is a string, "parent" should be the name of a defined parent, or None. 
+    Dimension should be only 2 (e.g. membranes) or 3 (e.g. cytosol). The size units will depend in the
+    manner in which the model variable units have been determined. 
+    example: Compartment('eCell', dimension=3, size=extraSize, parent=None)
+    """
     clogger.debug('in Compartment')
-
-    # FIXME: sane defaults?
-    def __init__(self, name, neighbors=[], dimension=3, size=1, __export=True):
+   
+    def __init__(self, name, parent=None, dimension=3, size=1, __export=True):
         SelfExporter.__init__(self, name, __export)
 
         if not all([isinstance(n, Compartment) for n in neighbors]):
