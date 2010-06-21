@@ -10,7 +10,7 @@ clogger.setLevel(logging.DEBUG)
 clogger.info("INITIALIZING")
 
 def Observe(*args):
-    return SelfExporter.default_model.observe(*args)
+    return SelfExporter.default_model.add_observable(*args)
 
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
@@ -87,7 +87,7 @@ class Model(SelfExporter):
             raise Exception("Tried to add component of unknown type (%s) to model" % type(other))
 
     # FIXME should this be named add_observable??
-    def observe(self, name, reaction_pattern):
+    def add_observable(self, name, reaction_pattern):
         try:
             reaction_pattern = as_reaction_pattern(reaction_pattern)
         except InvalidReactionPatternException as e:
@@ -456,7 +456,7 @@ class Compartment(SelfExporter):
     """The Compartment class expects a "name", "parent", "dimension", and "size" variable from the
     compartment call. name is a string, "parent" should be the name of a defined parent, or None. 
     Dimension should be only 2 (e.g. membranes) or 3 (e.g. cytosol). The size units will depend in the
-    manner in which the model variable units have been determined. 
+    manner in which the model variable units have been determined. Note, parent is the compartment object.
     example: Compartment('eCell', dimension=3, size=extraSize, parent=None)
     """
     clogger.debug('in Compartment')
@@ -464,17 +464,17 @@ class Compartment(SelfExporter):
     def __init__(self, name, parent=None, dimension=3, size=1, __export=True):
         SelfExporter.__init__(self, name, __export)
 
-        if not all([isinstance(n, Compartment) for n in neighbors]):
-            raise Exception("neighbors must all be Compartments")
+        if parent != None and isinstance(parent, Compartment) == False:
+            raise Exception("parent must be a predefined Compartment or None")
+        #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
 
-        self.neighbors = neighbors
+        self.parent = parent
         self.dimension = dimension
         self.size = size
 
     def __repr__(self):
-        return  '%s(name=%s, dimension=%s, size=%s, neighbors=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.dimension), repr(self.size), repr(self.neighbors))
-        # FIXME don't recurse into neighbors, just print their names
+        return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
+            (self.__class__.__name__, repr(self.name), repr(self.parent), repr(self.dimension), repr(self.size))
 
 
 

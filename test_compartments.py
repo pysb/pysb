@@ -1,22 +1,23 @@
 from pysb import *
 import logging
 
-yeahlogging.basicConfig()
+logging.basicConfig()
 complog = logging.getLogger("compartments_file")
 complog.setLevel(logging.DEBUG)
 
 complog.debug("starting Model")
-Model('test')
+Model('comptest')
 
 complog.debug("setting Compartment")
-# Compartment('eCell',     dimension=3, size=extraSize, parent=None)
-# Compartment('membrane',  dimension=2, size=memSize,   parent=extra)
-# Compartment('cytoplasm', dimension=3, size=cytoSize,  parent=membrane)
+Compartment('eCell',     dimension=3, size=1,   parent=None)
+Compartment('ECmembrane',  dimension=2, size=1.0, parent=eCell)
+Compartment('cytoplasm', dimension=3, size=1.0, parent=ECmembrane)
 
 
-
-Monomer('egf', 'R', {'R':['up', 'down']})
-Monomer('egfr', ['L', 'D', 'C'], {'C':['on', 'off']})
+complog.debug("setting Monomers")
+Monomer('egf', 'R', {'R':['up', 'down']}, compartment = eCell)
+Monomer('egfr', ['L', 'D', 'C'], {'C':['on', 'off']}, compartment = ECmembrane)
+Monomer('shc', ['L', 'A'], {'A':['on', 'off']}, compartment = cytoplasm)
 
 Parameter('K_egfr_egf', 1.2)
 Rule('egfr_egf',
@@ -25,43 +26,7 @@ Rule('egfr_egf',
 
 print egf
 print egfr
-
-print "\ntesting error checking..."
-
-fail = False
-try:
-    Monomer('M', ['a', 'b', 'c', 'a', 'c'])
-    fail = True
-except:
-    pass
-if fail:
-    raise Exception("Didn't throw expected exception")
-
-fail = False
-try:
-    egfr(L=None, x=None)
-    fail = True
-except:
-    pass
-if fail:
-    raise Exception("Didn't throw expected exception")
-
-fail = False
-try:
-    egfr('x')
-    fail = True
-except:
-    pass
-if fail:
-    raise Exception("Didn't throw expected exception")
-
-fail = False
-try:
-    egfr(D=[egfr, 'x'])
-    fail = True
-except:
-    pass
-if fail:
-    raise Exception("Didn't throw expected exception")
-
-print "\tsuccess!"
+print shc
+print eCell
+print ECmembrane
+print cytoplasm
