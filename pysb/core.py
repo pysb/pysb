@@ -292,7 +292,7 @@ class MonomerPattern(object):
         else:
             return NotImplemented
 
-    def __mul__(self, other):
+    def __pow__(self, other):
         if isinstance(other, MonomerPattern):
             return ComplexPattern([self, other])
         else:
@@ -309,6 +309,10 @@ class MonomerPattern(object):
             return (self, other, True)
         else:
             return NotImplemented
+
+    def __pow__(self, other):
+        if isinstance(other, MonomerPattern):
+            return MonomerPatternComp()#???? --> MAKE A MONOMER PATTERN COMPARTMENT? OR ADD IT TO THE CURRENT MON PATT?
 
     def __repr__(self):
         return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
@@ -350,7 +354,7 @@ class ComplexPattern(object):
         else:
             return NotImplemented
 
-    def __mul__(self, other):
+    def __pow__(self, other):
         if isinstance(other, MonomerPattern):
             return ComplexPattern(self.monomer_patterns + [other])
         else:

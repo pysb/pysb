@@ -19,10 +19,11 @@ Monomer('egf', 'R', {'R':['up', 'down']}, compartment = eCell)
 Monomer('egfr', ['L', 'D', 'C'], {'C':['on', 'off']}, compartment = ECmembrane)
 Monomer('shc', ['L', 'A'], {'A':['on', 'off']}, compartment = cytoplasm)
 
-Parameter('K_egfr_egf', 1.2)
+Parameter('K_egfr_egf_F', 1.2)
+Parameter('K_egfr_egf_R', 1.2)
 Rule('egfr_egf',
-     egfr(L=None) + egf(R=None) >>
-     egfr(L=1)    * egf(R=1), K_egfr_egf)
+     egfr(L=None) + egf(R=None) <>
+     egfr(L=1)    ** egf(R=1), K_egfr_egf_F, K_egfr_egf_R)
 
 print egf
 print egfr
