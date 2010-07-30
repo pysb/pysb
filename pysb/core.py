@@ -2,10 +2,8 @@ import sys
 import warnings
 import logging
 
-#set core logger to DEBUG level
 logging.basicConfig()
 clogger = logging.getLogger("CoreFile")
-clogger.setLevel(logging.DEBUG)
 
 clogger.info("INITIALIZING")
 

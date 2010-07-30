@@ -1,10 +1,9 @@
 from pysb import *
-import pysb.generator.bng as bng
 
 # from http://bionetgen.org/index.php/Simple_EGFR_model
 
 
-Model('simple_egfr')
+Model()
 
 
 
@@ -66,14 +65,14 @@ Monomer('NULL')
 #EGFR(l,r) + EGF(r) <-> EGFR(l!1,r).EGF(r!1) kp1, km1
 Rule('ligand_receptor_binding',
      EGFR(l=None, r=None) + EGF(r=None) <>
-     EGFR(l=1, r=None)    * EGF(r=1),
+     EGFR(l=1, r=None)    % EGF(r=1),
      kp1, km1)
 
 # Receptor-aggregation 
 #EGFR(l!+,r) + EGFR(l!+,r) <-> EGFR(l!+,r!1).EGFR(l!+,r!1) kp2,km2
 Rule('receptor_aggregation',
      EGFR(l=ANY, r=None) + EGFR(l=ANY, r=None) <>
-     EGFR(l=ANY, r=1)    * EGFR(l=ANY, r=1),
+     EGFR(l=ANY, r=1)    % EGFR(l=ANY, r=1),
      kp2, km2)
 
 # Transphosphorylation of EGFR by RTK
@@ -94,7 +93,7 @@ Rule('dephos_egfr',
 #EGFR(Y1068~P) + Grb2(SH2)   <-> EGFR(Y1068~P!1).Grb2(SH2!1)   kp4,km4
 Rule('grb2_bind_egfr',
      EGFR(Y1068='P')     + Grb2(SH2=None) <>
-     EGFR(Y1068=('P',1)) * Grb2(SH2=1),
+     EGFR(Y1068=('P',1)) % Grb2(SH2=1),
      kp4, km4)
 
 # Grb2 binding to Sos
@@ -103,38 +102,41 @@ Rule('grb2_bind_egfr',
 # (some of the tests are baroque on purpose :)
 Rule('grb2_bind_sos',
      Grb2({'SH2':None}, SH3=None) + Sos(None, PR=None) <>
-     Grb2({'SH2':None, 'SH3':1})    * Sos({}, {}, None, {}, PR=1),
+     Grb2({'SH2':None, 'SH3':1})    % Sos({}, {}, None, {}, PR=1),
      kp5, km5)
 
 
 #  D        EGFR(l!+)
-simple_egfr.observe('D', EGFR(l=ANY))
+Observe('D', EGFR(l=ANY))
 #  RP	   EGFR(Y1068~P!?)
-simple_egfr.observe('RP', EGFR(Y1068=('P',WILD)))
+Observe('RP', EGFR(Y1068=('P',WILD)))
 #  R_Grb2   EGFR(Y1068!1).Grb2(SH2!1)
-simple_egfr.observe('R_Grb2', EGFR(Y1068=1) * Grb2(SH2=1))
+Observe('R_Grb2', EGFR(Y1068=1) % Grb2(SH2=1))
 #  Sos_act  EGFR(Y1068!1).Grb2(SH2!1,SH3!2).Sos(PR!2)
-simple_egfr.observe('Sos_act', EGFR(Y1068=1) * Grb2(SH2=1, SH3=2) * Sos(PR=2))
+Observe('Sos_act', EGFR(Y1068=1) % Grb2(SH2=1, SH3=2) % Sos(PR=2))
 #  EGFR_tot EGFR()
-simple_egfr.observe('EGFR_tot', EGFR())
+Observe('EGFR_tot', EGFR())
 
 
-gen = bng.BngGenerator(model=simple_egfr)
+# generate initial conditions from _tot parameter naming convention
+for m in model.monomers:
+    ic_param = model.parameter('%s_tot' % m.name)
+    if ic_param is not None:
+        sites = {}
+        # build monomerpattern for "base" state (no bonds, first-listed states)
+        for s in m.sites:
+            if s in m.site_states:
+                sites[s] = m.site_states[s][0]
+            else:
+                sites[s] = None
+        Initial(m(sites), ic_param)
 
-
-bng_content = gen.content
-bng_content += """
-begin species
-  EGF(r)                           EGF_tot
-  EGFR(l,r,Y1068~U,Y1148~U)        EGFR_tot
-  Grb2(SH2,SH3)                    Grb2_tot
-  Sos(PR)                          Sos_tot
-end species
-"""
 
 if __name__ == '__main__':
-    print bng_content
+    from pysb.generator.bng import BngGenerator
+    gen = BngGenerator(model)
+    print gen.get_content()
+    print ""
     print "begin actions"
     print "  generate_network({overwrite=>1});"
     print "end actions"
-
