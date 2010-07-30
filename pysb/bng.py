@@ -82,7 +82,7 @@ def _parse_species(model, line):
     monomer_strings = complex_string.split('.')
     monomer_patterns = []
     for ms in monomer_strings:
-        monomer_name, site_strings = re.match(r'(\w+)\(([^)]*)\)', ms).groups()
+        compartment_name, monomer_name, site_strings = re.match(r'(?:@(\w+)::)?(\w+)\(([^)]*)\)', ms).groups()
         site_conditions = {}
         for ss in site_strings.split(','):
             if '!' in ss:
@@ -96,7 +96,8 @@ def _parse_species(model, line):
         monomer = model.get_monomer(monomer_name)
         monomer_patterns.append(monomer(site_conditions))
 
-    cp = pysb.ComplexPattern(monomer_patterns)
+    compartment = model.get_compartment(compartment_name)
+    cp = pysb.ComplexPattern(monomer_patterns, compartment)
     model.species.append(cp)
 
 

@@ -16,15 +16,15 @@ Parameter('kdimf', 1e-6)
 Parameter('kdimr', 1e-7)
 Rule('bax_dim',
      BAX(t1=None, t2=None) + BAX(t1=None, t2=None) <>
-     BAX(t1=1, t2=None) * BAX(t1=None, t2=1),
+     BAX(t1=1, t2=None) % BAX(t1=None, t2=1),
      kdimf, kdimr)
 
 # Two lone dimers form a tetramer, with a higher rate than the dimerization.
 Parameter('ktetf', 1e-3)
 Parameter('ktetr', 1e-4)
 Rule('bax_tet',
-     BAX(t1=1, t2=None) * BAX(t1=None, t2=1) + BAX(t1=2, t2=None) * BAX(t1=None, t2=2) <>
-     BAX(t1=1, t2=3) * BAX(t1=4, t2=1) * BAX(t1=2, t2=4) * BAX(t1=3, t2=2),
+     BAX(t1=1, t2=None) % BAX(t1=None, t2=1) + BAX(t1=2, t2=None) % BAX(t1=None, t2=2) <>
+     BAX(t1=1, t2=3) % BAX(t1=4, t2=1) % BAX(t1=2, t2=4) % BAX(t1=3, t2=2),
      ktetf, ktetr)
 
 # An inhibitory protein can bind to a BAX subunit at any time.
@@ -32,7 +32,7 @@ Parameter('kbaxmcl1f', 1e-5)
 Parameter('kbaxmcl1r', 1e-6)
 Rule('bax_inh_mcl1',
      BAX(inh=None) + MCL1(b=None) <>
-     BAX(inh=1)    * MCL1(b=1),
+     BAX(inh=1)    % MCL1(b=1),
      kbaxmcl1f, kbaxmcl1r)
 
 # Initial conditions
@@ -45,12 +45,12 @@ Initial(MCL1(b=None), MCL1_0)
 # is too loose, match a given species multiple times (beyond the
 # factor of four expected due to the rotational symmetry of the
 # tetramer), resulting in erroneously high values.
-Observe('BAX4', BAX(t1=1, t2=3) * BAX(t1=4, t2=1) * BAX(t1=2, t2=4) * BAX(t1=3, t2=2))
+Observe('BAX4', BAX(t1=1, t2=3) % BAX(t1=4, t2=1) % BAX(t1=2, t2=4) % BAX(t1=3, t2=2))
 # Same all-bonds requirement here.  However since the BAX tetramer is
 # considered inhibited when even one subunit has an inhibitor bound,
 # we only need to explicitly write inh=ANY on one of the monomer
 # patterns.
-Observe('BAX4_inh', BAX(inh=ANY, t1=1, t2=3) * BAX(t1=4, t2=1) * BAX(t1=2, t2=4) * BAX(t1=3, t2=2))
+Observe('BAX4_inh', BAX(inh=ANY, t1=1, t2=3) % BAX(t1=4, t2=1) % BAX(t1=2, t2=4) % BAX(t1=3, t2=2))
 
 
 if __name__ == '__main__':

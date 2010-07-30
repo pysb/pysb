@@ -15,6 +15,7 @@ class BngGenerator(object):
     def generate_content(self):
         self.__content = ''
         self.generate_parameters()
+        self.generate_compartments()
         self.generate_molecule_types()
         self.generate_reaction_rules()
         self.generate_observables()
@@ -26,6 +27,16 @@ class BngGenerator(object):
         for p in self.model.parameters:
             self.__content += ("  %-" + str(max_length) + "s   %e\n") % (p.name, p.value)
         self.__content += "end parameters\n\n"
+
+    def generate_compartments(self):
+        self.__content += "begin compartments\n"
+        for c in self.model.compartments:
+            if c.parent is None:
+                parent_name = ''
+            else:
+                parent_name = c.parent.name
+            self.__content += ("  %s  %d  %f  %s\n") % (c.name, c.dimension, c.size, parent_name)
+        self.__content += "end compartments\n\n"        
 
     def generate_molecule_types(self):
         self.__content += "begin molecule types\n"
@@ -85,14 +96,20 @@ def format_reactionpattern(rp):
     return ' + '.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
 def format_complexpattern(cp):
-    return '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
+    ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
+    if cp.compartment is not None:
+        ret = '@%s:%s' % (cp.compartment.name, ret)
+    return ret
 
 def format_monomerpattern(mp):
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))
     site_pattern_code = ','.join([format_site_condition(site, state) for (site, state) in site_conditions])
-    return '%s(%s)' % (mp.monomer.name, site_pattern_code)
+    ret = '%s(%s)' % (mp.monomer.name, site_pattern_code)
+    if mp.compartment is not None:
+        ret = '%s@%s' % (ret, mp.compartment.name)
+    return ret
 
 def format_site_condition(site, state):
     if state == None:

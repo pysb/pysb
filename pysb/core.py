@@ -1,10 +1,14 @@
 import sys
 import warnings
+import logging
 
+logging.basicConfig()
+clogger = logging.getLogger("CoreFile")
 
+clogger.info("INITIALIZING")
 
 def Observe(*args):
-    return SelfExporter.default_model.observe(*args)
+    return SelfExporter.default_model.add_observable(*args)
 
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
@@ -15,6 +19,8 @@ class SelfExporter(object):
     """Expects a constructor paramter 'name', under which this object is
     inserted into the namespace from which the Model constructor was called."""
 
+    clogger.debug('in SelfExporter')
+
     do_self_export = True
     default_model = None
     target_globals = None   # the globals dict to which we'll export our symbols
@@ -22,7 +28,7 @@ class SelfExporter(object):
     def __init__(self, name, __export=True):
         self.name = name
 
-        if SelfExporter.do_self_export and __export:
+        if SelfExporter.do_self_export and __export: #isn't __export always True by the time we get here?
             # FIXME if name already used, add_component will succeed since it's done first.
             #   this whole thing needs to be rethought, really.
             if isinstance(self, Model):
@@ -50,6 +56,9 @@ class SelfExporter(object):
 
 
 class Model(SelfExporter):
+
+    clogger.debug('in Model')
+
     def __init__(self, name='model', __export=True):
         SelfExporter.__init__(self, name, __export)
         self.monomers = []
@@ -76,7 +85,7 @@ class Model(SelfExporter):
             raise Exception("Tried to add component of unknown type (%s) to model" % type(other))
 
     # FIXME should this be named add_observable??
-    def observe(self, name, reaction_pattern):
+    def add_observable(self, name, reaction_pattern):
         try:
             reaction_pattern = as_reaction_pattern(reaction_pattern)
         except InvalidReactionPatternException as e:
@@ -119,6 +128,13 @@ class Model(SelfExporter):
         except StopIteration:
             return None
 
+    def get_compartment(self, name):
+        # FIXME probably want to store compartments in a dict by name instead of a list
+        try:
+            return (c for c in self.compartments if c.name == name).next()
+        except StopIteration:
+            return None
+
     def get_species_index(self, complex_pattern):
         # FIXME I don't even want to think about the inefficiency of this, but at least it works
         try:
@@ -126,14 +142,19 @@ class Model(SelfExporter):
         except StopIteration:
             return None
 
-    def __repr__(self):
+    def __repr__(self): 
         return "%s( \\\n    monomers=%s \\\n    compartments=%s\\\n    parameters=%s\\\n    rules=%s\\\n)" % \
             (self.__class__.__name__, repr(self.monomers), repr(self.compartments), repr(self.parameters), repr(self.rules))
 
 
 
 class Monomer(SelfExporter):
-    def __init__(self, name, sites=[], site_states={}, compartment=None, __export=True):
+    """The Monomer class creates monomers with the specified sites, state-sites, and compartment
+    """
+
+    clogger.debug('in Monomer')
+
+    def __init__(self, name, sites=[], site_states={}, __export=True):
         SelfExporter.__init__(self, name, __export)
 
         # convert single site string to list
@@ -158,14 +179,9 @@ class Monomer(SelfExporter):
         if invalid_sites:
             raise Exception("Non-string state values in site_states for sites: " + str(invalid_sites))
 
-        # ensure compartment is a Compartment
-        if compartment and not isinstance(compartment, Compartment):
-            raise Exception("compartment is not a Compartment object")
-
         self.sites = sites
         self.sites_dict = dict.fromkeys(sites)
         self.site_states = site_states
-        self.compartment = compartment
 
     def __call__(self, *dict_site_conditions, **named_site_conditions):
         """Build a pattern object with convenient kwargs for the sites"""
@@ -175,16 +191,20 @@ class Monomer(SelfExporter):
         for condition_dict in dict_site_conditions:
             if condition_dict is not None:
                 site_conditions.update(condition_dict)
-        compartment = site_conditions.pop('compartment', self.compartment)
-        return MonomerPattern(self, site_conditions, compartment)
+        return MonomerPattern(self, site_conditions, None)
 
     def __repr__(self):
-        return  '%s(name=%s, sites=%s, site_states=%s, compartment=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states), self.compartment and self.compartment.name or None)
-
-
+        if self.sites and self.site_states:
+            return  '%s(name=%s, sites=%s, site_states=%s)' % \
+                (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states))
+        else:
+            return  '%s(name=%s Has no sites and/or state sites)' % (self.__class__.__name__, repr(self.name))
+    
 
 class MonomerAny(Monomer):
+
+    clogger.debug('in MonomerAny')
+
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
         # SelfExporter stuff and has no user-accessible API
@@ -200,6 +220,9 @@ class MonomerAny(Monomer):
 
 
 class MonomerWild(Monomer):
+
+    clogger.debug('in MonomerWild')
+
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
         # SelfExporter stuff and has no user-accessible API
@@ -215,6 +238,9 @@ class MonomerWild(Monomer):
 
 
 class MonomerPattern(object):
+
+    clogger.debug('in MonomerPattern')
+
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
@@ -253,21 +279,32 @@ class MonomerPattern(object):
         self.compartment = compartment
 
     def is_concrete(self):
-        """Tests whether all sites in monomer are specified."""
+        """Tests whether all sites and compartment are specified."""
         # assume __init__ did a thorough enough job of error checking that this is is all we need to do
-        return len(self.site_conditions) == len(self.monomer.sites)
+        # FIXME accessing the model via SelfExporter.default_model is
+        #   a temporary hack - all model components (SelfExporter
+        #   subclasses?) need weak refs to their parent model.
+        return len(self.site_conditions) == len(self.monomer.sites) and \
+            (len(SelfExporter.default_model.compartments) == 0 or self.compartment is not None)
+
+    def _copy(self):
+        """Implement our own brand of semi-deep copy.
+
+        The new object will have references to the original monomer and compartment, and
+        a shallow copy of site_conditions."""
+        return MonomerPattern(self.monomer, self.site_conditions.copy(), self.compartment)
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
-            return ReactionPattern([ComplexPattern([self]), ComplexPattern([other])])
+            return ReactionPattern([ComplexPattern([self], None), ComplexPattern([other], None)])
         if isinstance(other, ComplexPattern):
-            return ReactionPattern([ComplexPattern([self]), other])
+            return ReactionPattern([ComplexPattern([self], None), other])
         else:
             return NotImplemented
 
-    def __mul__(self, other):
+    def __mod__(self, other):
         if isinstance(other, MonomerPattern):
-            return ComplexPattern([self, other])
+            return ComplexPattern([self, other], None)
         else:
             return NotImplemented
 
@@ -283,10 +320,22 @@ class MonomerPattern(object):
         else:
             return NotImplemented
 
+    def __pow__(self, other):
+        if isinstance(other, Compartment):
+            mp_new = self._copy()
+            mp_new.compartment = other
+            return mp_new
+        else:
+            return NotImplemented
+
     def __repr__(self):
-        return self.monomer.name + '(' + ', '.join([k + '=' + str(self.site_conditions[k])
-                                                    for k in self.monomer.sites
-                                                    if self.site_conditions.has_key(k)]) + ')'
+        return self.monomer.name + \
+            '(' + \
+            ', '.join([k + '=' + str(self.site_conditions[k])
+                       for k in self.monomer.sites
+                       if self.site_conditions.has_key(k)]) + \
+            ', compartment=' + (self.compartment and self.compartment.name or 'None') + \
+            ')'
 
 
 
@@ -294,11 +343,19 @@ class ComplexPattern(object):
     """Represents a bound set of MonomerPatterns, i.e. a complex.  In
     BNG terms, a list of patterns combined with the '.' operator)."""
 
-    def __init__(self, monomer_patterns):
+    clogger.debug('in ComplexPattern')
+
+    def __init__(self, monomer_patterns, compartment):
+        # ensure compartment is a Compartment
+        if compartment and not isinstance(compartment, Compartment):
+            raise Exception("compartment is not a Compartment object")
+
         self.monomer_patterns = monomer_patterns
+        self.compartment = compartment
 
     def is_concrete(self):
         """Tests whether all sites in all of monomer_patterns are specified."""
+        # FIXME should we also check that self.compartment is None? (BNG rules seem to dictate it)
         return all(mp.is_concrete() for mp in self.monomer_patterns)
 
     def is_equivalent_to(self, other):
@@ -313,17 +370,24 @@ class ComplexPattern(object):
             sorted((mp.monomer, mp.site_conditions) for mp in self.monomer_patterns) == \
             sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
 
+    def _copy(self):
+        """Implement our own brand of semi-deep copy.
+
+        The new object will have references to the original compartment, and
+        a _copy of the contents of monomer_patterns."""
+        return ComplexPattern([mp._copy() for mp in self.monomer_patterns], self.compartment)
+
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
             return ReactionPattern([self, other])
         elif isinstance(other, MonomerPattern):
-            return ReactionPattern([self, ComplexPattern([other])])
+            return ReactionPattern([self, ComplexPattern([other], None)])
         else:
             return NotImplemented
 
-    def __mul__(self, other):
+    def __mod__(self, other):
         if isinstance(other, MonomerPattern):
-            return ComplexPattern(self.monomer_patterns + [other])
+            return ComplexPattern(self.monomer_patterns + [other], None)
         else:
             return NotImplemented
 
@@ -339,8 +403,19 @@ class ComplexPattern(object):
         else:
             return NotImplemented
 
+    def __pow__(self, other):
+        if isinstance(other, Compartment):
+            cp_new = self._copy()
+            cp_new.compartment = other
+            return cp_new
+        else:
+            return NotImplemented
+
     def __repr__(self):
-        return ' * '.join([repr(p) for p in self.monomer_patterns])
+        ret = ' % '.join([repr(p) for p in self.monomer_patterns])
+        if self.compartment is not None:
+            ret = '(%s) ** %s' % (ret, self.compartment.name)
+        return ret
 
 
 
@@ -349,12 +424,14 @@ class ReactionPattern(object):
     of a rule.  Essentially a thin wrapper around a list of
     ComplexPatterns."""
 
+    clogger.debug('in ReactionPattern')
+
     def __init__(self, complex_patterns):
         self.complex_patterns = complex_patterns
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
-            return ReactionPattern(self.complex_patterns + [ComplexPattern([other])])
+            return ReactionPattern(self.complex_patterns + [ComplexPattern([other], None)])
         elif isinstance(other, ComplexPattern):
             return ReactionPattern(self.complex_patterns + [other])
         else:
@@ -381,10 +458,13 @@ class ReactionPattern(object):
 
 def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
+
+    clogger.debug('in as_complex_pattern')
+
     if isinstance(v, ComplexPattern):
         return v
     elif isinstance(v, MonomerPattern):
-        return ComplexPattern([v])
+        return ComplexPattern([v], None)
     else:
         raise InvalidComplexPatternException
 
@@ -392,6 +472,9 @@ def as_complex_pattern(v):
 def as_reaction_pattern(v):
     """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
     complete ReactionPattern."""
+
+    clogger.debug('in as_reaction_pattern')
+
     if isinstance(v, ReactionPattern):
         return v
     else:
@@ -403,6 +486,9 @@ def as_reaction_pattern(v):
 
 
 class Parameter(SelfExporter):
+
+    clogger.debug('in Parameter')
+
     def __init__(self, name, value=float('nan'), __export=True):
         SelfExporter.__init__(self, name, __export)
         self.value = value
@@ -413,25 +499,35 @@ class Parameter(SelfExporter):
 
 
 class Compartment(SelfExporter):
-    # FIXME: sane defaults?
-    def __init__(self, name, neighbors=[], dimension=3, size=1, __export=True):
+    """The Compartment class expects a "name", "parent", "dimension", and "size" variable from the
+    compartment call. name is a string, "parent" should be the name of a defined parent, or None. 
+    Dimension should be only 2 (e.g. membranes) or 3 (e.g. cytosol). The size units will depend in the
+    manner in which the model variable units have been determined. Note, parent is the compartment object.
+    example: Compartment('eCell', dimension=3, size=extraSize, parent=None)
+    """
+    clogger.debug('in Compartment')
+   
+    def __init__(self, name, parent=None, dimension=3, size=1, __export=True):
         SelfExporter.__init__(self, name, __export)
 
-        if not all([isinstance(n, Compartment) for n in neighbors]):
-            raise Exception("neighbors must all be Compartments")
+        if parent != None and isinstance(parent, Compartment) == False:
+            raise Exception("parent must be a predefined Compartment or None")
+        #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
 
-        self.neighbors = neighbors
+        self.parent = parent
         self.dimension = dimension
         self.size = size
 
     def __repr__(self):
-        return  '%s(name=%s, dimension=%s, size=%s, neighbors=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.dimension), repr(self.size), repr(self.neighbors))
-        # FIXME don't recurse into neighbors, just print their names
+        return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
+            (self.__class__.__name__, repr(self.name), repr(self.parent), repr(self.dimension), repr(self.size))
 
 
 
 class Rule(SelfExporter):
+
+    clogger.debug('in Rule')
+
     def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None, __export=True):
         SelfExporter.__init__(self, name, __export)
 
