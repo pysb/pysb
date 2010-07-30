@@ -8,10 +8,10 @@ Model()
 
 
 # Concentrations in number per cell
-Parameter('EGF_tot',      1.2e6)
-Parameter('EGFR_tot',     1.8e5)
-Parameter('Grb2_tot',     1.5e5)
-Parameter('Sos_tot',      6.2e4)
+Parameter('EGF_0',      1.2e6)
+Parameter('EGFR_0',     1.8e5)
+Parameter('Grb2_0',     1.5e5)
+Parameter('Sos_0',      6.2e4)
 
 # Biomolecular rate constants are in (# per cell)^-1 s^-1,
 #  obtained by dividing constants in M^-1 s^-1 by Na*V,
@@ -118,9 +118,9 @@ Observe('Sos_act', EGFR(Y1068=1) % Grb2(SH2=1, SH3=2) % Sos(PR=2))
 Observe('EGFR_tot', EGFR())
 
 
-# generate initial conditions from _tot parameter naming convention
+# generate initial conditions from _0 parameter naming convention
 for m in model.monomers:
-    ic_param = model.parameter('%s_tot' % m.name)
+    ic_param = model.parameter('%s_0' % m.name)
     if ic_param is not None:
         sites = {}
         # build monomerpattern for "base" state (no bonds, first-listed states)
