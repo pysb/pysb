@@ -7,7 +7,7 @@ import re
 import sympy
 
 # not ideal, but it will work for now during development
-pkg_path = '/usr/local/share/bionetgen'
+pkg_path = '/usr/local/share/BioNetGen'
 
 generate_network_code = """
 begin actions
@@ -50,6 +50,8 @@ def generate_equations(model):
         while 'begin reactions' not in lines.next():
             pass
         model.odes = [sympy.S(0)] * len(model.species)
+        import time; time.sleep(5)
+        rnum = 1; import sys
         while True:
             line = lines.next()
             if 'end reactions' in line: break
@@ -64,10 +66,13 @@ def generate_equations(model):
                 model.odes[int(p) - 1] += combined_rate
             for r in reactants:
                 model.odes[int(r) - 1] -= combined_rate
+            sys.stderr.write('reaction %5d: p=%d r=%d\n' % (rnum, len(products), len(reactants)))
+            rnum += 1
 
         while 'begin groups' not in lines.next():
             pass
         model.observable_groups = {}
+        import time; time.sleep(5)
         while True:
             line = lines.next()
             if 'end groups' in line: break
