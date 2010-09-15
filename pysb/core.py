@@ -194,11 +194,8 @@ class Monomer(SelfExporter):
         return MonomerPattern(self, site_conditions, None)
 
     def __repr__(self):
-        if self.sites and self.site_states:
-            return  '%s(name=%s, sites=%s, site_states=%s)' % \
-                (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states))
-        else:
-            return  '%s(name=%s Has no sites and/or state sites)' % (self.__class__.__name__, repr(self.name))
+        return  '%s(name=%s, sites=%s, site_states=%s)' % \
+            (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states))
     
 
 class MonomerAny(Monomer):
@@ -245,7 +242,7 @@ class MonomerPattern(object):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
         if unknown_sites:
-            raise Exception("Unknown sites in " + str(monomer) + ": " + str(unknown_sites))
+            raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
         # ensure each value is None, integer, string, (string,integer), (string,WILD), Monomer, or list of Monomers
         # FIXME: support state sites
