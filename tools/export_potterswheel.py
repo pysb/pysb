@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import pysb
 import pysb.bng
 import sympy
