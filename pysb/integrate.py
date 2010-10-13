@@ -36,6 +36,7 @@ def odesolve(model, t):
     yout = numpy.ndarray((len(t), len(rec_names)))
 
     # perform the actual integration
+    print "integrating model"
     yout[:, :nspecies] = odeint(rhs, y0, t)
 
     for i, name in enumerate(obs_names):
