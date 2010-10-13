@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='pysb',
-      version='0.1.0',
+      version='0.1.1',
       description='Python Systems Biology modeling system',
       author='Jeremy Muhlich',
       author_email='jmuhlich@bitflood.org',
