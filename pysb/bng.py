@@ -106,7 +106,18 @@ def _parse_species(model, line):
         compartment_name, monomer_name, site_strings = re.match(r'(?:@(\w+)::)?(\w+)\(([^)]*)\)', ms).groups()
         site_conditions = {}
         for ss in site_strings.split(','):
-            if '!' in ss:
+            # FIXME this should probably be done with regular expressions
+            if '!' in ss and '~' in ss:
+                site_name, condition = ss.split('~')
+                state, bond = condition.split('!')
+                if bond == '?':
+                    bond = pysb.WILD
+                elif bond == '!':
+                    bond = pysb.ANY
+                else:
+                    bond = int(bond)
+                condition = (state, bond)
+            elif '!' in ss:
                 site_name, condition = ss.split('!')
                 condition = int(condition)
             elif '~' in ss:
