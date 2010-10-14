@@ -7,5 +7,5 @@ setup(name='pysb',
       description='Python Systems Biology modeling system',
       author='Jeremy Muhlich',
       author_email='jmuhlich@bitflood.org',
-      packages=['pysb', 'pysb.generator'],
+      packages=['pysb', 'pysb.generator', 'pysb.tools'],
       )
