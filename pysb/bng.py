@@ -17,9 +17,9 @@ for test_path in pkg_paths_to_check:
         pkg_path = test_path
         break
 if pkg_path is None:
-    msg = "Could not find BioNetGen installed in one of the following locations:" + \
-        '\n'.join(pkg_paths_to_check)
-    raise Exception()
+    msg = "Could not find BioNetGen installed in one of the following locations:\n    " + \
+        '\n    '.join(pkg_paths_to_check)
+    raise Exception(msg)
 
 generate_network_code = """
 begin actions
