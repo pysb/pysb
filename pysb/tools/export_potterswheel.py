@@ -6,10 +6,11 @@ import sympy
 import re
 import sys
 import os
+from StringIO import StringIO
 
 
 def run(model):
-    print '%',
+    output = StringIO()
     pysb.bng.generate_equations(model)
 
     obs_names = [name for name, rp in model.observable_patterns]
@@ -19,10 +20,10 @@ def run(model):
         ic_values[model.get_species_index(cp)] = ic_param.value
 
     # list of "dynamic variables"
-        pw_x = ["m = pwAddX(m, 's%d', %e);" % (i, ic_values[i]) for i in range(len(model.odes))]
+    pw_x = ["m = pwAddX(m, 's%d', %e);" % (i, ic_values[i]) for i in range(len(model.odes))]
 
     # parameters
-        pw_k = ["m = pwAddK(m, '%s', %e);" % (p.name, p.value) for p in model.parameters]
+    pw_k = ["m = pwAddK(m, '%s', %e);" % (p.name, p.value) for p in model.parameters]
 
     # equations (one for each dynamic variable)
     # Note that we just generate C code, which for basic math expressions
@@ -34,31 +35,42 @@ def run(model):
     # observables or "derived variables"
     pw_z = ["m = pwAddZ(m, '%s', '%s');" % (' + '.join(['%f * s%s' % g for g in model.observable_groups[name]]), name) for name in obs_names]
 
-    print '% PottersWheel model definition file'
-    print 'function m = %s()' % (model_name)
-    print ''
-    print 'm = pwGetEmptyModel();'
-    print ''
-    print '% meta information'
-    print "m.ID          = '%s';" % model_name
-    print "m.name        = '%s';" % model_name
-    print "m.description = '';"
-    print "m.authors     = {''};"
-    print "m.dates       = {''};"
-    print "m.type        = 'PW-1-5';"
-    print ''
-    print '% dynamic variables'
-    print '\n'.join(pw_x)
-    print ''
-    print '% dynamic parameters'
-    print '\n'.join(pw_k)
-    print ''
-    print '% ODEs'
-    print '\n'.join(pw_ode)
-    print ''
-    print '% derived variables'
-    print '\n'.join(pw_z)
-
+    output.write('% PottersWheel model definition file\n')
+    output.write('%% save as %s.m\n' % model_name)
+    output.write('function m = %s()\n' % model_name)
+    output.write('\n')
+    output.write('m = pwGetEmptyModel();\n')
+    output.write('\n')
+    output.write('% meta information\n')
+    output.write("m.ID          = '%s';\n" % model_name)
+    output.write("m.name        = '%s';\n" % model_name)
+    output.write("m.description = '';\n")
+    output.write("m.authors     = {''};\n")
+    output.write("m.dates       = {''};\n")
+    output.write("m.type        = 'PW-1-5';\n")
+    output.write('\n')
+    output.write('% dynamic variables\n')
+    for x in pw_x:
+        output.write(x)
+        output.write('\n')
+    output.write('\n')
+    output.write('% dynamic parameters\n')
+    for k in pw_k:
+        output.write(k)
+        output.write('\n')
+    output.write('\n')
+    output.write('% ODEs\n')
+    for ode in pw_ode:
+        output.write(ode)
+        output.write('\n')
+    output.write('\n')
+    output.write('% derived variables\n')
+    for z in pw_z:
+        output.write(z)
+        output.write('\n')
+    output.write('\n')
+    output.write('%% end of PottersWheel model %s\n' % model_name)
+    return output.getvalue()
 
 if __name__ == '__main__':
     # sanity checks on filename
@@ -84,4 +96,4 @@ if __name__ == '__main__':
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    run(model)
+    print run(model)

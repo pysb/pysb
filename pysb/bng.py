@@ -38,7 +38,6 @@ def generate_equations(model):
 
     bng_filename = '%d_%d_temp.bngl' % (os.getpid(), random.randint(0, 10000))
     net_filename = bng_filename.replace('.bngl', '.net')
-    print "running BioNetGen"
     try:
         bng_file = open(bng_filename, 'w')
         bng_file.write(gen.get_content())

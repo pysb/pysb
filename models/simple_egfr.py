@@ -133,10 +133,6 @@ for m in model.monomers:
 
 
 if __name__ == '__main__':
-    from pysb.generator.bng import BngGenerator
-    gen = BngGenerator(model)
-    print gen.get_content()
-    print ""
-    print "begin actions"
-    print "  generate_network({overwrite=>1});"
-    print "end actions"
+    from pysb.bng import generate_network_code
+    from pysb.tools.export_bng import run as run_export
+    print run_export(model)

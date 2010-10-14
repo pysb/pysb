@@ -8,7 +8,7 @@ import os
 
 def run(model):
     gen = BngGenerator(model)
-    print gen.get_content()
+    return gen.get_content()
 
 
 if __name__ == '__main__':
@@ -35,4 +35,4 @@ if __name__ == '__main__':
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    run(model)
+    print run(model)

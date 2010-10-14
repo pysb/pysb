@@ -7,10 +7,12 @@ import sys
 import os
 import random
 import subprocess
+from StringIO import StringIO
 
 
 def run(model):
     gen = BngGenerator(model)
+    output = StringIO()
     bng_filename = '%d_%d_temp.bngl' % (os.getpid(), random.randint(0, 10000))
     net_filename = bng_filename.replace('.bngl', '.net')
     # FIXME this should be factored out in bng.py instead of copy+pasted
@@ -24,10 +26,11 @@ def run(model):
         p_stdout = p.communicate()[0]
         if p.returncode:
             raise Exception(p_stdout)
-        print "# BioNetGen output:\n#\n#",
-        print re.sub(r'\n', r'\n# ', p_stdout)
         net_file = open(net_filename, 'r')
-        print '\n' + ''.join(net_file.readlines())
+        output.write("# BioNetGen output:\n#\n#")
+        output.write(re.sub(r'\n', r'\n# ', p_stdout))
+        output.write('\n')
+        output.write(net_file.read())
         net_file.close()
     except Exception as e:
         raise Exception("problem running BNG: " + str(e))
@@ -35,6 +38,7 @@ def run(model):
         for filename in [bng_filename, net_filename]:
             if os.access(filename, os.F_OK):
                 os.unlink(filename)
+    return output.getvalue()
 
 
 if __name__ == '__main__':
@@ -61,4 +65,4 @@ if __name__ == '__main__':
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    run(model)
+    print run(model)

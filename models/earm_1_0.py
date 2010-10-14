@@ -284,27 +284,10 @@ for m in model.monomers:
         Initial(m(sites), ic_param)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 ####
 
 
 if __name__ == '__main__':
-    from pysb.generator.bng import BngGenerator
-    gen = BngGenerator(model)
-    print gen.get_content()
-    print ""
-    print "begin actions"
-    print "  generate_network({overwrite=>1});"
-    print "  simulate_ode({t_end=>21600,n_steps=>360});" # 6 hours, 1-minute steps
-    print "end actions"
+    from pysb.bng import generate_network_code
+    from pysb.tools.export_bng import run as run_export
+    print run_export(model)
