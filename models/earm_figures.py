@@ -33,6 +33,7 @@ def fig_4a():
         model.reset_parameters()
         model.set_parameter('L_0', Ls[i])
 
+        print "integrating model"
         x = odesolve(model, t)
 
         fs[i] = (x['PARP'][0] - x['PARP'][-1]) / x['PARP'][0]
