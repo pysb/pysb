@@ -9,6 +9,7 @@ import os
 
 
 def run(model):
+    print '%',
     pysb.bng.generate_equations(model)
 
     obs_names = [name for name, rp in model.observable_patterns]
