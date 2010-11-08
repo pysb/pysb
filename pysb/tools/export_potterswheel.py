@@ -32,8 +32,8 @@ def run(model):
     pw_ode = ["m = pwAddODE(m, 's%d', '%s');" % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))]
     pw_ode = [re.sub(r'pow(?=\()', 'power', s) for s in pw_ode]
 
-    # observables or "derived variables"
-    pw_z = ["m = pwAddZ(m, '%s', '%s');" % (' + '.join(['%f * s%s' % g for g in model.observable_groups[name]]), name) for name in obs_names]
+    # observables
+    pw_y = ["m = pwAddY(m, '%s', '%s');" % (' + '.join(['%f * s%s' % g for g in model.observable_groups[name]]), name) for name in obs_names]
 
     output.write('% PottersWheel model definition file\n')
     output.write('%% save as %s.m\n' % model_name)
@@ -64,9 +64,9 @@ def run(model):
         output.write(ode)
         output.write('\n')
     output.write('\n')
-    output.write('% derived variables\n')
-    for z in pw_z:
-        output.write(z)
+    output.write('% observables\n')
+    for y in pw_y:
+        output.write(y)
         output.write('\n')
     output.write('\n')
     output.write('%% end of PottersWheel model %s\n' % model_name)
