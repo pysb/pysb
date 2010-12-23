@@ -104,26 +104,27 @@ def _parse_species(model, line):
     for ms in monomer_strings:
         compartment_name, monomer_name, site_strings = re.match(r'(?:@(\w+)::)?(\w+)\(([^)]*)\)', ms).groups()
         site_conditions = {}
-        for ss in site_strings.split(','):
-            # FIXME this should probably be done with regular expressions
-            if '!' in ss and '~' in ss:
-                site_name, condition = ss.split('~')
-                state, bond = condition.split('!')
-                if bond == '?':
-                    bond = pysb.WILD
-                elif bond == '!':
-                    bond = pysb.ANY
+        if len(site_strings):
+            for ss in site_strings.split(','):
+                # FIXME this should probably be done with regular expressions
+                if '!' in ss and '~' in ss:
+                    site_name, condition = ss.split('~')
+                    state, bond = condition.split('!')
+                    if bond == '?':
+                        bond = pysb.WILD
+                    elif bond == '!':
+                        bond = pysb.ANY
+                    else:
+                        bond = int(bond)
+                    condition = (state, bond)
+                elif '!' in ss:
+                    site_name, condition = ss.split('!')
+                    condition = int(condition)
+                elif '~' in ss:
+                    site_name, condition = ss.split('~')
                 else:
-                    bond = int(bond)
-                condition = (state, bond)
-            elif '!' in ss:
-                site_name, condition = ss.split('!')
-                condition = int(condition)
-            elif '~' in ss:
-                site_name, condition = ss.split('~')
-            else:
-                site_name, condition = ss, None
-            site_conditions[site_name] = condition
+                    site_name, condition = ss, None
+                site_conditions[site_name] = condition
         monomer = model.get_monomer(monomer_name)
         monomer_patterns.append(monomer(site_conditions))
 
