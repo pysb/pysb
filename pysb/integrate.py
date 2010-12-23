@@ -11,10 +11,13 @@ def odesolve(model, t):
     
     # FIXME code outside of model shouldn't have to handle parameter_overrides (same for initial_conditions below)
     param_subs = dict([ (p.name, p.value) for p in model.parameters + model.parameter_overrides.values() ])
+    param_indices = # TODO: build map of param name to lexical rank
+    param_values = [param_subs[name] for name in param_names]
 
-    c_code_consts = '\n'.join(['float %s = %e;' % (p.name, p.value) for p in model.parameters])
     c_code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
     c_code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), c_code_eqs)
+    c_code_eqs = re.sub(r'\b(\w+)\b', lambda m: m.group(1), c_code_eqs)
+    print "EQS:\n" + c_code_eqs
     c_code = c_code_consts + '\n\n' + c_code_eqs
 
     y0 = numpy.zeros((len(model.odes),))
