@@ -33,7 +33,10 @@ class SelfExporter(object):
             #   this whole thing needs to be rethought, really.
             if isinstance(self, Model):
                 if SelfExporter.default_model is not None:
-                    raise Exception("Only one instance of Model may be declared ('%s' previously declared)" % SelfExporter.default_model.name)
+                    print >> sys.stderr, "\n**\n** WARNING!\n**"
+                    print >> sys.stderr, "** Redefining model!  You can probably ignore this if you are"
+                    print >> sys.stderr, "** running code interactively."
+                    print >> sys.stderr, "**\n"
                 # determine the module from which the Model constructor was called
                 import inspect
                 cur_module = inspect.getmodule(inspect.currentframe())
