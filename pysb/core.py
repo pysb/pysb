@@ -110,6 +110,7 @@ class Model(SelfExporter):
             self.compartments.append(other)
         elif isinstance(other, Parameter):
             self.parameters.append(other)
+            self.parameters.sort(key=lambda p: p.name)  # keep param list sorted
         elif isinstance(other, Rule):
             self.rules.append(other)
         else:
