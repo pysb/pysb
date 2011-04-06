@@ -48,12 +48,14 @@ class SelfExporter(object):
                     warnings.warn("Redefining model! (You can probably ignore this if you are running"
                                   " code interactively)", ModelExistsWarning, stacklevel);
                     # delete previously exported symbols to prevent extra SymbolExistsWarnings
-                    for component in SelfExporter.default_model.all_components() + [SelfExporter.default_model]:
-                        if component.name in SelfExporter.target_globals:
-                            del SelfExporter.target_globals[component.name]
+                    for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
+                        if name in SelfExporter.target_globals:
+                            del SelfExporter.target_globals[name]
                 SelfExporter.target_module = inspect.getmodule(caller_frame)
                 SelfExporter.target_globals = caller_frame.f_globals
                 SelfExporter.default_model = self
+                # assign model's name from the module it lives in.  slightly sneaky.
+                self.name = SelfExporter.target_module.__name__
             elif isinstance(self, (Monomer, Compartment, Parameter, Rule)):
                 if SelfExporter.default_model == None:
                     raise Exception("A Model must be declared before declaring any model components")
