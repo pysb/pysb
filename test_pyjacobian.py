@@ -1,19 +1,37 @@
 from PyJacobian import PyJacobian
 from pysb.jacobian import JacobianGenerator
-import os
+import sys, os, random, numpy, pylab
 
-os.chdir('models')
+sys.path.append('models')
 from earm_1_0 import model
 
-workdir = '/tmp/%d_%d/' % (os.getpid(), random.randint(0, 10000))
-print "working dir:" + workdir
-jac_filename = workdir + 'model.jac'
+workdir = 'tmp_pysb_jac_%d_%d/' % (os.getpid(), random.randint(0, 10000))
+print "working dir:", workdir
+os.mkdir(workdir)
 
+jac_filename = workdir + 'model.jac'
 gen = JacobianGenerator(model)
 jac_file = file(jac_filename, 'w')
-jac_file.write(gen.get_content)
+jac_file.write(gen.get_content(sim_length=72000))
 jac_file.close()
 
 pj = PyJacobian()
-pj.load(jac_file)
+pj.setJacobianDirectory(all=workdir)
+pj.loadFile(jac_file.name)
 pj.execute('SIM')
+ts = pj.createTimeSeriesData()
+pj.terminate()
+
+full = numpy.memmap(filename=ts.binfile, dtype='float32', mode='r', offset=4, shape=(ts.getNumData(), ts.getNumVariables()), order='C')
+indices = [ts._getIndex(name) for name in ('time', 'sim.m.tBid', 'sim.m.CPARP', 'sim.m.cSmac')]
+a = full[:,indices]
+
+last_i = numpy.searchsorted(a[:,0], 25000)
+b = a[0:last_i,:]
+t = b[:,0]
+y = b[:,1:]
+pylab.plot(t, y / y.max(0))
+pylab.legend(('tBid', 'CPARP', 'cSmac'), loc='upper left', bbox_to_anchor=(0,1)).draw_frame(False)
+pylab.show()
+
+# TODO remove workdir (and all contents)
