@@ -41,7 +41,7 @@ class JacobianGenerator(object):
         self.outdent()
         self.emit("END")
         self.emit()
-        self.emit("SIMULATION %s_sim" % self.model.name)
+        self.emit("SIMULATION SIM")
         self.indent()
         self.generate_options()
         self.generate_units()
