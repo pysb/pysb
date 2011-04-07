@@ -8,9 +8,9 @@ class JacobianGenerator(object):
         self.indent_level = 0
         self.__content = None
 
-    def get_content(self):
+    def get_content(self, sim_length=1):
         if self.__content == None:
-            self.generate_content()
+            self.generate_content(sim_length=sim_length)
         assert self.indent_level == 0, "missing %d outdent call(s)" % self.indent_level
         return self.__content
 
@@ -24,7 +24,7 @@ class JacobianGenerator(object):
         assert self.indent_level > 0, "called outdent without matching indent"
         self.indent_level -= 1
 
-    def generate_content(self):
+    def generate_content(self, sim_length):
         pysb.bng.generate_equations(self.model)
         self.__content = ''
         self.emit("DECLARE")
@@ -47,7 +47,7 @@ class JacobianGenerator(object):
         self.generate_units()
         self.generate_set()
         self.generate_initial()
-        self.generate_schedule()
+        self.generate_schedule(sim_length)
         self.outdent()
         self.emit("END")
 
@@ -93,7 +93,6 @@ class JacobianGenerator(object):
     def generate_options(self):
         self.emit("OPTIONS")
         self.indent()
-        self.emit("CSVOUTPUT := TRUE;")
         self.outdent()
 
     def generate_units(self):
@@ -124,10 +123,10 @@ class JacobianGenerator(object):
             self.emit("M.%s = 0;" % sname)
         self.outdent()
 
-    def generate_schedule(self):
+    def generate_schedule(self, sim_length):
         self.emit("SCHEDULE")
         self.indent()
-        self.emit("CONTINUE FOR 1  # EDIT THIS - change 1 to desired simulation end time")
+        self.emit("CONTINUE FOR %d" % sim_length);
         self.outdent()
 
     def make_groups(self, elements, size):
