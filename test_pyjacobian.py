@@ -1,12 +1,17 @@
 from PyJacobian import PyJacobian
 from pysb.jacobian import JacobianGenerator
-import sys, os, random, numpy, pylab
+import sys, os, shutil, random, numpy, pylab
 
 sys.path.append('models')
 from earm_1_0 import model
 
+def output_handler(icode, message):
+    pass
+
+def input_handler(icode, message):
+    raise Exception("Jacobian backend asked for console input unexpectedly")
+
 workdir = 'tmp_pysb_jac_%d_%d/' % (os.getpid(), random.randint(0, 10000))
-print "working dir:", workdir
 os.mkdir(workdir)
 
 jac_filename = workdir + 'model.jac'
@@ -17,6 +22,8 @@ jac_file.close()
 
 pj = PyJacobian()
 pj.setJacobianDirectory(all=workdir)
+pj.addOutputCallback(output_handler)
+pj.addInputCallback(input_handler)
 pj.loadFile(jac_file.name)
 pj.execute('SIM')
 ts = pj.createTimeSeriesData()
@@ -34,4 +41,4 @@ pylab.plot(t, y / y.max(0))
 pylab.legend(('tBid', 'CPARP', 'cSmac'), loc='upper left', bbox_to_anchor=(0,1)).draw_frame(False)
 pylab.show()
 
-# TODO remove workdir (and all contents)
+shutil.rmtree(workdir)
