@@ -55,7 +55,8 @@ class SelfExporter(object):
                 SelfExporter.target_globals = caller_frame.f_globals
                 SelfExporter.default_model = self
                 # assign model's name from the module it lives in.  slightly sneaky.
-                self.name = SelfExporter.target_module.__name__
+                if self.name is None:
+                    self.name = SelfExporter.target_module.__name__
             elif isinstance(self, (Monomer, Compartment, Parameter, Rule)):
                 if SelfExporter.default_model == None:
                     raise Exception("A Model must be declared before declaring any model components")
