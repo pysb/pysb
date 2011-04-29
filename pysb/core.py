@@ -538,12 +538,15 @@ class Compartment(SelfExporter):
     """
     clogger.debug('in Compartment')
    
-    def __init__(self, name, parent=None, dimension=3, size=1, __export=True):
+    def __init__(self, name, parent=None, dimension=3, size=None, __export=True):
         SelfExporter.__init__(self, name, __export)
 
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
         #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
+
+        if size is not None and not isinstance(size, Parameter):
+            raise Exception("size must be a parameter (or omitted)")
 
         self.parent = parent
         self.dimension = dimension
