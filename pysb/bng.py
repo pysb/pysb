@@ -118,8 +118,11 @@ def _parse_species(model, line):
                         bond = int(bond)
                     condition = (state, bond)
                 elif '!' in ss:
-                    site_name, condition = ss.split('!')
-                    condition = int(condition)
+                    site_name, condition = ss.split('!', 1)
+                    if '!' in condition:
+                        condition = [int(c) for c in condition.split('!')]
+                    else:
+                        condition = int(condition)
                 elif '~' in ss:
                     site_name, condition = ss.split('~')
                 else:

@@ -116,24 +116,27 @@ def format_monomerpattern(mp):
     return ret
 
 def format_site_condition(site, state):
+    # empty
     if state == None:
         state_code = ''
+    # single bond
     elif type(state) == int:
         state_code = '!' + str(state)
+    # multiple bonds
+    elif type(state) == list and all(isinstance(s, int) for s in state):
+        state_code = ''.join('!%d' % s for s in state)
+    # state
     elif type(state) == str:
         state_code = '~' + state
+    # state AND single bond
     elif type(state) == tuple:
+        # bond is wildcard (zero or more unspecified bonds)
         if state[1] == pysb.WILD:
             state = (state[0], '?')
         state_code = '~%s!%s' % state
-    elif type(state) == list:
-        if len(state) == 1:
-            if (state[0] == pysb.ANY):
-                state_code = '!+'
-            else:
-                raise Exception("BNG generator does not support named monomers in rule pattern site conditions.")
-        else:
-            raise Exception("BNG generator does not support multi-monomer lists in rule pattern site conditions.")
+    # one or more unspecified bonds
+    elif state == pysb.ANY:
+        state_code = '!+'
     else:
         raise Exception("BNG generator has encountered an unknown element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)

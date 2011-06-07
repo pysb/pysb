@@ -279,24 +279,22 @@ class MonomerPattern(object):
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is None, integer, string, (string,integer), (string,WILD), Monomer, or list of Monomers
+        # ensure each value is one of: None, integer, list of integers, string, (string,integer), (string,WILD), ANY
         # FIXME: support state sites
         invalid_sites = []
         for (site, state) in site_conditions.items():
-            # convert singleton monomer to list
-            if isinstance(state, Monomer):
-                state = [state]
-                site_conditions[site] = state
             # pass through to next iteration if state type is ok
             if state == None:
                 continue
             elif type(state) == int:
                 continue
+            elif type(state) == list and all(isinstance(s, int) for s in state):
+                continue
             elif type(state) == str:
                 continue
             elif type(state) == tuple and type(state[0]) == str and (type(state[1]) == int or state[1] == WILD):
                 continue
-            elif type(state) == list and all([isinstance(s, Monomer) for s in state]):
+            elif state == ANY:
                 continue
             invalid_sites.append(site)
         if invalid_sites:
