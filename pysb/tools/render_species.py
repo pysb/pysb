@@ -8,12 +8,15 @@ import pysb.bng
 
 def run(model):
     pysb.bng.generate_equations(model)
-    graph = pygraphviz.AGraph()
+    graph = pygraphviz.AGraph(rankdir="LR")
     for si, cp in enumerate(model.species):
-        sgraph = graph.add_subgraph(name='cluster_s%d' % si, label='s%d' % si, color="none", fontsize="20")
+        sgraph = graph.add_subgraph(name='cluster_s%d' % si, label='s%d' % si,
+                                    color="gray75", fontsize="20")
         bonds = {}
         for mi, mp in enumerate(cp.monomer_patterns):
-            mgraph = sgraph.add_subgraph(name=sgraph.name + '_%d' % mi, label=mp.monomer.name, color="black", fontsize="12")
+            mgraph = sgraph.add_subgraph(name=sgraph.name + '_%d' % mi, label=mp.monomer.name,
+                                         fillcolor="gray90", style="filled",
+                                         fontsize="12")
             for site in mp.monomer.sites:
                 site_state = None
                 cond = mp.site_conditions[site]
@@ -24,7 +27,10 @@ def run(model):
                 site_label = site
                 if site_state is not None:
                     site_label += '=%s' % site_state
-                mgraph.add_node(mgraph.name + '_%s' % site, label=site_label)
+                mgraph.add_node(mgraph.name + '_%s' % site, label=site_label,
+                                fillcolor="white", color="transparent", style="filled",
+                                fontname="courier", fontsize=10,
+                                width=0.2, height=0.2, fixedsize=True)
             for site, value in mp.site_conditions.items():
                 site_bonds = []
                 if isinstance(value, int):
