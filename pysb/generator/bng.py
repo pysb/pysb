@@ -103,6 +103,8 @@ def format_complexpattern(cp):
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)
+    if cp.match_once:
+        ret = '{MatchOnce}' + ret
     return ret
 
 def format_monomerpattern(mp):

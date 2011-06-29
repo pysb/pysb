@@ -16,6 +16,11 @@ def Observe(*args):
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
 
+def MatchOnce(pattern):
+    cp = as_complex_pattern(pattern)._copy()
+    cp.match_once = True
+    return cp
+
 
 # FIXME: make this behavior toggleable
 class SelfExporter(object):
@@ -378,13 +383,14 @@ class ComplexPattern(object):
 
     clogger.debug('in ComplexPattern')
 
-    def __init__(self, monomer_patterns, compartment):
+    def __init__(self, monomer_patterns, compartment, match_once=False):
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
             raise Exception("compartment is not a Compartment object")
 
         self.monomer_patterns = monomer_patterns
         self.compartment = compartment
+        self.match_once = match_once
 
     def is_concrete(self):
         """Tests whether all sites in all of monomer_patterns are specified."""
@@ -408,7 +414,7 @@ class ComplexPattern(object):
 
         The new object will have references to the original compartment, and
         a _copy of the contents of monomer_patterns."""
-        return ComplexPattern([mp._copy() for mp in self.monomer_patterns], self.compartment)
+        return ComplexPattern([mp._copy() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
@@ -420,7 +426,7 @@ class ComplexPattern(object):
 
     def __mod__(self, other):
         if isinstance(other, MonomerPattern):
-            return ComplexPattern(self.monomer_patterns + [other], None)
+            return ComplexPattern(self.monomer_patterns + [other], None, self.match_once)
         else:
             return NotImplemented
 
@@ -448,6 +454,8 @@ class ComplexPattern(object):
         ret = ' % '.join([repr(p) for p in self.monomer_patterns])
         if self.compartment is not None:
             ret = '(%s) ** %s' % (ret, self.compartment.name)
+        if self.match_once:
+            ret = 'MatchOnce(%s)' % ret
         return ret
 
 
