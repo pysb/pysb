@@ -359,13 +359,16 @@ class MonomerPattern(object):
             return NotImplemented
 
     def __repr__(self):
-        return self.monomer.name + \
-            '(' + \
-            ', '.join([k + '=' + str(self.site_conditions[k])
-                       for k in self.monomer.sites
-                       if self.site_conditions.has_key(k)]) + \
-            ', compartment=' + (self.compartment and self.compartment.name or 'None') + \
-            ')'
+        value = '%s(' % self.monomer.name
+        value += ', '.join([
+                k + '=' + str(self.site_conditions[k])
+                for k in self.monomer.sites
+                if self.site_conditions.has_key(k)
+                ])
+        if self.compartment is not None:
+            value += ', compartment=' + self.compartment.name
+        value += ')'
+        return value
 
 
 
