@@ -4,6 +4,7 @@ import errno
 import warnings
 import logging
 import inspect
+import re
 
 logging.basicConfig()
 clogger = logging.getLogger("CoreFile")
@@ -15,6 +16,11 @@ def Observe(*args):
 
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
+
+def MatchOnce(pattern):
+    cp = as_complex_pattern(pattern)._copy()
+    cp.match_once = True
+    return cp
 
 
 # FIXME: make this behavior toggleable
@@ -54,8 +60,14 @@ class SelfExporter(object):
                 SelfExporter.target_module = inspect.getmodule(caller_frame)
                 SelfExporter.target_globals = caller_frame.f_globals
                 SelfExporter.default_model = self
-                # assign model's name from the module it lives in.  slightly sneaky.
-                self.name = SelfExporter.target_module.__name__
+                # assign model's name from the module it lives in. very sneaky and fragile.
+                if self.name is None:
+                    module_name = SelfExporter.target_module.__name__
+                    if module_name == '__main__':  # user ran model .py directly
+                        model_filename = inspect.getfile(sys.modules['__main__'])
+                        module_name = re.sub(r'\.py$', '', model_filename)
+                    self.name = module_name  # internal name for identification
+                    name = 'model'           # symbol name for export
             elif isinstance(self, (Monomer, Compartment, Parameter, Rule)):
                 if SelfExporter.default_model == None:
                     raise Exception("A Model must be declared before declaring any model components")
@@ -74,7 +86,7 @@ class Model(SelfExporter):
 
     clogger.debug('in Model')
 
-    def __init__(self, name='model', __export=True):
+    def __init__(self, name=None, __export=True):
         SelfExporter.__init__(self, name, __export)
         self.monomers = []
         self.compartments = []
@@ -278,24 +290,22 @@ class MonomerPattern(object):
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is None, integer, string, (string,integer), (string,WILD), Monomer, or list of Monomers
+        # ensure each value is one of: None, integer, list of integers, string, (string,integer), (string,WILD), ANY
         # FIXME: support state sites
         invalid_sites = []
         for (site, state) in site_conditions.items():
-            # convert singleton monomer to list
-            if isinstance(state, Monomer):
-                state = [state]
-                site_conditions[site] = state
             # pass through to next iteration if state type is ok
             if state == None:
                 continue
             elif type(state) == int:
                 continue
+            elif type(state) == list and all(isinstance(s, int) for s in state):
+                continue
             elif type(state) == str:
                 continue
             elif type(state) == tuple and type(state[0]) == str and (type(state[1]) == int or state[1] == WILD):
                 continue
-            elif type(state) == list and all([isinstance(s, Monomer) for s in state]):
+            elif state == ANY:
                 continue
             invalid_sites.append(site)
         if invalid_sites:
@@ -360,13 +370,16 @@ class MonomerPattern(object):
             return NotImplemented
 
     def __repr__(self):
-        return self.monomer.name + \
-            '(' + \
-            ', '.join([k + '=' + str(self.site_conditions[k])
-                       for k in self.monomer.sites
-                       if self.site_conditions.has_key(k)]) + \
-            ', compartment=' + (self.compartment and self.compartment.name or 'None') + \
-            ')'
+        value = '%s(' % self.monomer.name
+        value += ', '.join([
+                k + '=' + str(self.site_conditions[k])
+                for k in self.monomer.sites
+                if self.site_conditions.has_key(k)
+                ])
+        if self.compartment is not None:
+            value += ', compartment=' + self.compartment.name
+        value += ')'
+        return value
 
 
 
@@ -376,13 +389,14 @@ class ComplexPattern(object):
 
     clogger.debug('in ComplexPattern')
 
-    def __init__(self, monomer_patterns, compartment):
+    def __init__(self, monomer_patterns, compartment, match_once=False):
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
             raise Exception("compartment is not a Compartment object")
 
         self.monomer_patterns = monomer_patterns
         self.compartment = compartment
+        self.match_once = match_once
 
     def is_concrete(self):
         """Tests whether all sites in all of monomer_patterns are specified."""
@@ -406,7 +420,7 @@ class ComplexPattern(object):
 
         The new object will have references to the original compartment, and
         a _copy of the contents of monomer_patterns."""
-        return ComplexPattern([mp._copy() for mp in self.monomer_patterns], self.compartment)
+        return ComplexPattern([mp._copy() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
@@ -418,7 +432,7 @@ class ComplexPattern(object):
 
     def __mod__(self, other):
         if isinstance(other, MonomerPattern):
-            return ComplexPattern(self.monomer_patterns + [other], None)
+            return ComplexPattern(self.monomer_patterns + [other], None, self.match_once)
         else:
             return NotImplemented
 
@@ -446,6 +460,8 @@ class ComplexPattern(object):
         ret = ' % '.join([repr(p) for p in self.monomer_patterns])
         if self.compartment is not None:
             ret = '(%s) ** %s' % (ret, self.compartment.name)
+        if self.match_once:
+            ret = 'MatchOnce(%s)' % ret
         return ret
 
 
@@ -538,12 +554,15 @@ class Compartment(SelfExporter):
     """
     clogger.debug('in Compartment')
    
-    def __init__(self, name, parent=None, dimension=3, size=1, __export=True):
+    def __init__(self, name, parent=None, dimension=3, size=None, __export=True):
         SelfExporter.__init__(self, name, __export)
 
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
         #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
+
+        if size is not None and not isinstance(size, Parameter):
+            raise Exception("size must be a parameter (or omitted)")
 
         self.parent = parent
         self.dimension = dimension

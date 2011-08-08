@@ -4,3 +4,4 @@ parser.out
 bng_files/*
 build/*
 dist/*
+doc/_build
