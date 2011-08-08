@@ -4,6 +4,7 @@ import errno
 import warnings
 import logging
 import inspect
+import re
 
 logging.basicConfig()
 clogger = logging.getLogger("CoreFile")
@@ -59,9 +60,14 @@ class SelfExporter(object):
                 SelfExporter.target_module = inspect.getmodule(caller_frame)
                 SelfExporter.target_globals = caller_frame.f_globals
                 SelfExporter.default_model = self
-                # assign model's name from the module it lives in.  slightly sneaky.
+                # assign model's name from the module it lives in. very sneaky and fragile.
                 if self.name is None:
-                    self.name = SelfExporter.target_module.__name__
+                    module_name = SelfExporter.target_module.__name__
+                    if module_name == '__main__':  # user ran model .py directly
+                        model_filename = inspect.getfile(sys.modules['__main__'])
+                        module_name = re.sub(r'\.py$', '', model_filename)
+                    self.name = module_name  # internal name for identification
+                    name = 'model'           # symbol name for export
             elif isinstance(self, (Monomer, Compartment, Parameter, Rule)):
                 if SelfExporter.default_model == None:
                     raise Exception("A Model must be declared before declaring any model components")
@@ -80,7 +86,7 @@ class Model(SelfExporter):
 
     clogger.debug('in Model')
 
-    def __init__(self, name='model', __export=True):
+    def __init__(self, name=None, __export=True):
         SelfExporter.__init__(self, name, __export)
         self.monomers = []
         self.compartments = []
