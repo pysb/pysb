@@ -2,7 +2,7 @@
 
 from pysb import *
 
-SelfExporter.do_self_export = False
+SelfExporter.do_export = False
 SelfExporter.default_model = Model('dummy')
 
 model = Model('explicit')

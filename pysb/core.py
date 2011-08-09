@@ -2,14 +2,8 @@ import sys
 import os
 import errno
 import warnings
-import logging
 import inspect
 import re
-
-logging.basicConfig()
-clogger = logging.getLogger("CoreFile")
-
-clogger.info("INITIALIZING")
 
 def Observe(*args):
     return SelfExporter.default_model.add_observable(*args)
@@ -23,71 +17,87 @@ def MatchOnce(pattern):
     return cp
 
 
-# FIXME: make this behavior toggleable
+# Internal helper to implement the magic of making model components
+# appear in the calling module's namespace.  Do not construct any
+# instances; we just use the class for namespace containment.
 class SelfExporter(object):
-    """Expects a constructor paramter 'name', under which this object is
-    inserted into the namespace from which the Model constructor was called."""
 
-    clogger.debug('in SelfExporter')
-
-    do_self_export = True
+    do_export = True
     default_model = None
     target_globals = None   # the globals dict to which we'll export our symbols
     target_module = None    # the module to which we've exported
 
+    @staticmethod
+    def export(obj):
+        if not SelfExporter.do_export:
+            return
+        if not isinstance(obj, (Model, Component)):
+            raise Exception("%s is not a type that is understood by SelfExporter" % str(type(obj)))
+
+        # determine the module from which we were called (we need to do this here so we can
+        # calculate stacklevel for use in the warning at the bottom of this method)
+        cur_module = inspect.getmodule(inspect.currentframe())
+        caller_frame = inspect.currentframe()
+        # walk up through the stack until we hit a different module
+        stacklevel = 1
+        while inspect.getmodule(caller_frame) == cur_module:
+            stacklevel += 1
+            caller_frame = caller_frame.f_back
+
+        # use obj's name as the symbol to export it to (unless modified below)
+        export_name = obj.name
+
+        if isinstance(obj, Model):
+            if SelfExporter.default_model is not None:
+                warnings.warn("Redefining model! (You can probably ignore this if you are running"
+                              " code interactively)", ModelExistsWarning, stacklevel);
+                # delete previously exported symbols to prevent extra SymbolExistsWarnings
+                for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
+                    if name in SelfExporter.target_globals:
+                        del SelfExporter.target_globals[name]
+            SelfExporter.target_module = inspect.getmodule(caller_frame)
+            SelfExporter.target_globals = caller_frame.f_globals
+            SelfExporter.default_model = obj
+            # if not set, assign model's name from the module it lives in. very sneaky and fragile.
+            if obj.name is None:
+                if SelfExporter.target_module == sys.modules['__main__']:
+                    # user ran model .py directly
+                    model_filename = inspect.getfile(sys.modules['__main__'])
+                    module_name = re.sub(r'\.py$', '', model_filename)
+                elif SelfExporter.target_module is not None:
+                    # model is imported by some other script (typical case)
+                    module_name = SelfExporter.target_module.__name__
+                else:
+                    # user is defining a model interactively (not really supported, but we'll try)
+                    module_name = '<interactive>'
+                obj.name = module_name   # internal name for identification
+                export_name = 'model'    # symbol name for export
+        elif isinstance(obj, Component):
+            if SelfExporter.default_model == None:
+                raise Exception("A Model must be declared before declaring any model components")
+            SelfExporter.default_model.add_component(obj)
+
+        # load obj into target namespace under obj.name
+        # FIXME if name already used, add_component will succeed since it's done first.
+        #   this whole thing needs to be rethought, really.
+        if SelfExporter.target_globals.has_key(export_name):
+            warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
+        SelfExporter.target_globals[export_name] = obj
+
+
+class Component(object):
+    """The base class for all the things contained within a model."""
+
     def __init__(self, name, __export=True):
         self.name = name
-
-        if SelfExporter.do_self_export and __export: #isn't __export always True by the time we get here?
-
-            # determine the module from which we were called
-            cur_module = inspect.getmodule(inspect.currentframe())
-            caller_frame = inspect.currentframe()
-            # walk up through the stack until we hit a different module
-            stacklevel = 1
-            while inspect.getmodule(caller_frame) == cur_module:
-                stacklevel += 1
-                caller_frame = caller_frame.f_back
-
-            if isinstance(self, Model):
-                if SelfExporter.default_model is not None:
-                    warnings.warn("Redefining model! (You can probably ignore this if you are running"
-                                  " code interactively)", ModelExistsWarning, stacklevel);
-                    # delete previously exported symbols to prevent extra SymbolExistsWarnings
-                    for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
-                        if name in SelfExporter.target_globals:
-                            del SelfExporter.target_globals[name]
-                SelfExporter.target_module = inspect.getmodule(caller_frame)
-                SelfExporter.target_globals = caller_frame.f_globals
-                SelfExporter.default_model = self
-                # assign model's name from the module it lives in. very sneaky and fragile.
-                if self.name is None:
-                    module_name = SelfExporter.target_module.__name__
-                    if module_name == '__main__':  # user ran model .py directly
-                        model_filename = inspect.getfile(sys.modules['__main__'])
-                        module_name = re.sub(r'\.py$', '', model_filename)
-                    self.name = module_name  # internal name for identification
-                    name = 'model'           # symbol name for export
-            elif isinstance(self, (Monomer, Compartment, Parameter, Rule)):
-                if SelfExporter.default_model == None:
-                    raise Exception("A Model must be declared before declaring any model components")
-                SelfExporter.default_model.add_component(self)
-
-            # load self into target namespace under self.name
-            # FIXME if name already used, add_component will succeed since it's done first.
-            #   this whole thing needs to be rethought, really.
-            if SelfExporter.target_globals.has_key(name):
-                warnings.warn("'%s' already defined" % (name), SymbolExistsWarning, stacklevel)
-            SelfExporter.target_globals[name] = self
+        if __export:
+            SelfExporter.export(self)
 
 
-
-class Model(SelfExporter):
-
-    clogger.debug('in Model')
+class Model(object):
 
     def __init__(self, name=None, __export=True):
-        SelfExporter.__init__(self, name, __export)
+        self.name = name
         self.monomers = []
         self.compartments = []
         self.parameters = []
@@ -98,6 +108,8 @@ class Model(SelfExporter):
         self.observable_patterns = []
         self.observable_groups = {}  # values are tuples of factor,speciesnumber
         self.initial_conditions = []
+        if __export:
+            SelfExporter.export(self)
 
     def reload(self):
         # forcibly removes the .pyc file and reloads the model module
@@ -194,14 +206,12 @@ class Model(SelfExporter):
 
 
 
-class Monomer(SelfExporter):
+class Monomer(Component):
     """The Monomer class creates monomers with the specified sites, state-sites, and compartment
     """
 
-    clogger.debug('in Monomer')
-
     def __init__(self, name, sites=[], site_states={}, __export=True):
-        SelfExporter.__init__(self, name, __export)
+        Component.__init__(self, name, __export)
 
         # convert single site string to list
         if type(sites) == str:
@@ -246,11 +256,9 @@ class Monomer(SelfExporter):
 
 class MonomerAny(Monomer):
 
-    clogger.debug('in MonomerAny')
-
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
-        # SelfExporter stuff and has no user-accessible API
+        # Component stuff and has no user-accessible API
         self.name = 'ANY'
         self.sites = None
         self.sites_dict = {}
@@ -264,11 +272,9 @@ class MonomerAny(Monomer):
 
 class MonomerWild(Monomer):
 
-    clogger.debug('in MonomerWild')
-
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
-        # SelfExporter stuff and has no user-accessible API
+        # Component stuff and has no user-accessible API
         self.name = 'WILD'
         self.sites = None
         self.sites_dict = {}
@@ -281,8 +287,6 @@ class MonomerWild(Monomer):
 
 
 class MonomerPattern(object):
-
-    clogger.debug('in MonomerPattern')
 
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
@@ -323,7 +327,7 @@ class MonomerPattern(object):
         """Tests whether all sites and compartment are specified."""
         # assume __init__ did a thorough enough job of error checking that this is is all we need to do
         # FIXME accessing the model via SelfExporter.default_model is
-        #   a temporary hack - all model components (SelfExporter
+        #   a temporary hack - all model components (Component
         #   subclasses?) need weak refs to their parent model.
         return len(self.site_conditions) == len(self.monomer.sites) and \
             (len(SelfExporter.default_model.compartments) == 0 or self.compartment is not None)
@@ -386,8 +390,6 @@ class MonomerPattern(object):
 class ComplexPattern(object):
     """Represents a bound set of MonomerPatterns, i.e. a complex.  In
     BNG terms, a list of patterns combined with the '.' operator)."""
-
-    clogger.debug('in ComplexPattern')
 
     def __init__(self, monomer_patterns, compartment, match_once=False):
         # ensure compartment is a Compartment
@@ -471,8 +473,6 @@ class ReactionPattern(object):
     of a rule.  Essentially a thin wrapper around a list of
     ComplexPatterns."""
 
-    clogger.debug('in ReactionPattern')
-
     def __init__(self, complex_patterns):
         self.complex_patterns = complex_patterns
 
@@ -506,8 +506,6 @@ class ReactionPattern(object):
 def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
 
-    clogger.debug('in as_complex_pattern')
-
     if isinstance(v, ComplexPattern):
         return v
     elif isinstance(v, MonomerPattern):
@@ -520,8 +518,6 @@ def as_reaction_pattern(v):
     """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
     complete ReactionPattern."""
 
-    clogger.debug('in as_reaction_pattern')
-
     if isinstance(v, ReactionPattern):
         return v
     else:
@@ -532,12 +528,10 @@ def as_reaction_pattern(v):
 
 
 
-class Parameter(SelfExporter):
-
-    clogger.debug('in Parameter')
+class Parameter(Component):
 
     def __init__(self, name, value=float('nan'), __export=True):
-        SelfExporter.__init__(self, name, __export)
+        Component.__init__(self, name, __export)
         self.value = value
 
     def __repr__(self):
@@ -545,17 +539,16 @@ class Parameter(SelfExporter):
 
 
 
-class Compartment(SelfExporter):
+class Compartment(Component):
     """The Compartment class expects a "name", "parent", "dimension", and "size" variable from the
     compartment call. name is a string, "parent" should be the name of a defined parent, or None. 
     Dimension should be only 2 (e.g. membranes) or 3 (e.g. cytosol). The size units will depend in the
     manner in which the model variable units have been determined. Note, parent is the compartment object.
     example: Compartment('eCell', dimension=3, size=extraSize, parent=None)
     """
-    clogger.debug('in Compartment')
-   
+
     def __init__(self, name, parent=None, dimension=3, size=None, __export=True):
-        SelfExporter.__init__(self, name, __export)
+        Component.__init__(self, name, __export)
 
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
@@ -574,12 +567,10 @@ class Compartment(SelfExporter):
 
 
 
-class Rule(SelfExporter):
-
-    clogger.debug('in Rule')
+class Rule(Component):
 
     def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None, __export=True):
-        SelfExporter.__init__(self, name, __export)
+        Component.__init__(self, name, __export)
 
         # FIXME: This tuple thing is ugly (used to support >> and <> operators between ReactionPatterns).
         # This is how the reactant and product ReactionPatterns are passed, along with is_reversible.
