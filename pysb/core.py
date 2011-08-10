@@ -122,7 +122,16 @@ class Model(object):
             # ignore "no such file" errors, re-raise the rest
             if e.errno != errno.ENOENT:
                 raise
-        reload(SelfExporter.target_module)
+        try:
+            reload(SelfExporter.target_module)
+        except SystemError as e:
+            # This one specific SystemError occurs when using ipython to 'run' a model .py file
+            # directly, then reload()ing the model, which makes no sense anyway. (just re-run it)
+            if e.args == ('nameless module',):
+                raise Exception('Cannot reload a model which was executed directly in an interactive'
+                                'session. Please import the model file as a module instead.')
+            else:
+                raise
         # return self for "model = model.reload()" idiom, until a better solution can be found
         return SelfExporter.default_model
 
