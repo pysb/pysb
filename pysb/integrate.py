@@ -9,8 +9,7 @@ import re
 def odesolve(model, t):
     pysb.bng.generate_equations(model)
     
-    # FIXME code outside of model shouldn't have to handle parameter_overrides (same for initial_conditions below)
-    param_subs = dict([ (p.name, p.value) for p in model.parameters + model.parameter_overrides.values() ])
+    param_subs = dict([ (p.name, p.value) for p in model.parameters ])
     param_values = numpy.array([param_subs[p.name] for p in model.parameters])
     param_indices = dict( (p.name, i) for i, p in enumerate(model.parameters) )
 
@@ -22,9 +21,6 @@ def odesolve(model, t):
 
     y0 = numpy.zeros((len(model.odes),))
     for cp, ic_param in model.initial_conditions:
-        override = model.parameter_overrides.get(ic_param.name)
-        if override is not None:
-            ic_param = override
         si = model.get_species_index(cp)
         y0[si] = ic_param.value
 

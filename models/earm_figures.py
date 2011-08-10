@@ -8,8 +8,9 @@ from earm_1_0 import model
 Lsat = 6E4; 
 
 # relationship of ligand concentration in the model (in # molecules/cell) to actual TRAIL concentration (in ng/ml)
-Lfactor = model.parameter('L_0').value / 50;
+Lfactor = model.parameters['L_0'].value / 50;
 
+L_0_baseline = model.parameters['L_0'].value
 
 
 def fig_4a():
@@ -30,8 +31,7 @@ def fig_4a():
     Ts = empty_like(Ls)
     Td = empty_like(Ls)
     for i in range(len(Ls)):
-        model.reset_parameters()
-        model.set_parameter('L_0', Ls[i])
+        model.parameters['L_0'].value = Ls[i]
 
         print "integrating model"
         x = odesolve(model, t)
@@ -53,10 +53,11 @@ def fig_4a():
     a.set_xlim((min(Ls) / Lfactor, max(Ls) / Lfactor))
     a.set_ylim((0, 1000))
 
+    model.parameters['L_0'].value = L_0_baseline
+
 
 def fig_4b():
     t = linspace(0, 6*3600, 6*60+1)  # 6 hours
-    model.reset_parameters()
     x = odesolve(model, t)
 
     x_norm = array([x['Bid'], x['PARP'], x['mSmac']]).T

@@ -98,11 +98,10 @@ class Model(object):
 
     def __init__(self, name=None, __export=True):
         self.name = name
-        self.monomers = []
-        self.compartments = []
-        self.parameters = []
-        self.parameter_overrides = {}
-        self.rules = []
+        self.monomers = ComponentDict()
+        self.compartments = ComponentDict()
+        self.parameters = ComponentDict()
+        self.rules = ComponentDict()
         self.species = []
         self.odes = []
         self.observable_patterns = []
@@ -136,22 +135,22 @@ class Model(object):
         return SelfExporter.default_model
 
     def all_components(self):
-        return self.monomers + self.compartments + self.parameters + self.rules
+        components = []
+        for container in [self.monomers, self.compartments, self.parameters, self.rules]:
+            components += container.values()
+        return components
 
     def add_component(self, other):
-        if isinstance(other, Monomer):
-            self.monomers.append(other)
-        elif isinstance(other, Compartment):
-            self.compartments.append(other)
-        elif isinstance(other, Parameter):
-            self.parameters.append(other)
-            self.parameters.sort(key=lambda p: p.name)  # keep param list sorted
-        elif isinstance(other, Rule):
-            self.rules.append(other)
-        else:
-            raise Exception("Tried to add component of unknown type (%s) to model" % type(other))
+        # We have 4 containers for the 4 types of components. This code determines the right one
+        # based on the class of the object being added.  It tries to be defensive against reasonable
+        # errors, but still seems sort of fragile.
+        container_name = type(other).__name__.lower() + 's'
+        container = getattr(self, container_name, None)
+        if not isinstance(other, Component) or container is None:
+            raise Exception("Tried to add component of unknown type %s to model" % type(other))
+        container[other.name] = other
+        # FIXME: used to use a list, and we'd keep the param list sorted. maybe add params_sorted()?
 
-    # FIXME should this be named add_observable??
     def add_observable(self, name, reaction_pattern):
         try:
             reaction_pattern = as_reaction_pattern(reaction_pattern)
@@ -169,38 +168,6 @@ class Model(object):
         if not complex_pattern.is_concrete():
             raise Exception("Pattern must be concrete (all sites specified)")
         self.initial_conditions.append( (complex_pattern, value) )
-
-    def parameter(self, name):
-        # FIXME rename to get_parameter
-        # FIXME probably want to store params in a dict by name instead of a list
-        try:
-            return (p for p in self.parameters if p.name == name).next()
-        except StopIteration:
-            return None
-
-    def set_parameter(self, name, value):
-        """Overrides the baseline value of a parameter."""
-        if not self.parameter(name):
-            raise Exception("Model does not have a parameter named '%s'" % name)
-        self.parameter_overrides[name] = Parameter(name, value, False)
-
-    def reset_parameters(self):
-        """Resets all parameters back to the baseline defined in the model script."""
-        self.parameter_overrides = {}
-
-    def get_monomer(self, name):
-        # FIXME probably want to store monomers in a dict by name instead of a list
-        try:
-            return (m for m in self.monomers if m.name == name).next()
-        except StopIteration:
-            return None
-
-    def get_compartment(self, name):
-        # FIXME probably want to store compartments in a dict by name instead of a list
-        try:
-            return (c for c in self.compartments if c.name == name).next()
-        except StopIteration:
-            return None
 
     def get_species_index(self, complex_pattern):
         # FIXME I don't even want to think about the inefficiency of this, but at least it works
@@ -633,6 +600,12 @@ class ModelExistsWarning(UserWarning):
 class SymbolExistsWarning(UserWarning):
     """Issued by model component constructors when a name is reused."""
     pass
+
+class ComponentDict(dict):
+    """A dict subclass for storing model components.  Its iter() behavior is to iterate over values
+    instead of keys."""
+    def __iter__(self):
+        return self.itervalues()
 
 
 
