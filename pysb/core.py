@@ -210,8 +210,9 @@ class Model(object):
             return None
 
     def __repr__(self): 
-        return "%s( \\\n    monomers=%s \\\n    compartments=%s\\\n    parameters=%s\\\n    rules=%s\\\n)" % \
-            (self.__class__.__name__, repr(self.monomers), repr(self.compartments), repr(self.parameters), repr(self.rules))
+        return "<%s '%s' (monomers: %d, rules: %d, parameters: %d, compartments: %d) at 0x%x>" % \
+            (self.__class__.__name__, self.name, len(self.monomers), len(self.rules),
+             len(self.parameters), len(self.compartments), id(self))
 
 
 
