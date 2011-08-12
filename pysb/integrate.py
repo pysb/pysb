@@ -23,12 +23,16 @@ def odesolve(model, t):
     param_values = numpy.array([param_subs[p.name] for p in model.parameters])
     param_indices = dict( (p.name, i) for i, p in enumerate(model.parameters) )
 
-    if use_inline:
-        c_code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
-        c_code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), c_code_eqs)
-        for i, p in enumerate(model.parameters):
-            c_code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, c_code_eqs)
-        c_code = c_code_eqs
+    code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
+    code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+    for i, p in enumerate(model.parameters):
+        code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
+
+    # If we can't use weave.inline to run the C code, compile it as Python code instead for use with
+    # exec. Note: C code with array indexing, basic math operations, and pow() just happens to also
+    # be valid Python.  If the equations ever have more complex things in them, this might fail.
+    if not use_inline:
+        code_eqs_py = compile(code_eqs, '<%s odes>' % model.name, 'exec')
 
     y0 = numpy.zeros((len(model.odes),))
     for cp, ic_param in model.initial_conditions:
@@ -37,10 +41,11 @@ def odesolve(model, t):
 
     def rhs(t, y, p):
         ydot = numpy.empty_like(y)
+        # note that code_eqs sets ydot as a side effect
         if use_inline:
-            inline(c_code, ['y', 'ydot', 'p']); # sets ydot as a side effect
+            inline(code_eqs, ['ydot', 't', 'y', 'p']);
         else:
-            raise Exception("Pure-python RHS not yet implemented.")  # FIXME implement it
+            exec code_eqs_py in locals()
         return ydot
 
     nspecies = len(model.species)
