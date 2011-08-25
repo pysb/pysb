@@ -1,6 +1,7 @@
 import pysb.bng
 import numpy
 from scipy.integrate import ode
+from scipy.integrate.ode import IntegratorBase
 from scipy.weave import inline
 import distutils.errors
 import sympy
@@ -15,8 +16,19 @@ try:
 except distutils.errors.CompileError as e:
     pass
 
+# some sane default options for a few well-known integrators
+default_integrator_options = {
+    'vode': {
+        'method': 'bdf',
+        'with_jacobian': True,
+        },
+    'cvode': {
+        'method': 'bdf',
+        'with_jacobian': True,
+        },
+    }
 
-def odesolve(model, t):
+def odesolve(model, t, integrator='vode', **integrator_options):
     pysb.bng.generate_equations(model)
     
     param_subs = dict([ (p.name, p.value) for p in model.parameters ])
@@ -41,7 +53,7 @@ def odesolve(model, t):
 
     def rhs(t, y, p):
         ydot = numpy.empty_like(y)
-        # note that code_eqs sets ydot as a side effect
+        # note that the evaluated code sets ydot as a side effect
         if use_inline:
             inline(code_eqs, ['ydot', 't', 'y', 'p']);
         else:
@@ -53,10 +65,18 @@ def odesolve(model, t):
     rec_names = ['__s%d' % i for i in range(nspecies)] + obs_names
     yout = numpy.ndarray((len(t), len(rec_names)))
 
+    # build integrator options list from our defaults and any kwargs passed to this function
+    options = {}
+    try:
+        options.update(default_integrator_options[integrator])
+    except KeyError as e:
+        pass
+    options.update(integrator_options)
+
     # perform the actual integration
-    integrator = ode(rhs).set_integrator('vode', method='bdf', with_jacobian=True)
+    integrator = ode(rhs).set_integrator(integrator, **options)
     integrator.set_initial_value(y0, t[0]).set_f_params(param_values)
-    yout[0, :nspecies] = y0  # FIXME: questionable. first computed step not necessarily continuous from y0, is it?
+    yout[0, :nspecies] = y0
     i = 1
     while integrator.successful() and integrator.t < t[-1]:
         integrator.integrate(t[i])
@@ -70,3 +90,9 @@ def odesolve(model, t):
     dtype = zip(rec_names, (yout.dtype,) * len(rec_names))
     yrec = numpy.recarray((yout.shape[0],), dtype=dtype, buf=yout)
     return yrec
+
+
+class cvode(IntegratorBase):
+    pass
+
+IntegratorBase.integrator_classes.append(cvode)
