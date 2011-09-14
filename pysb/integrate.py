@@ -1,7 +1,7 @@
 import pysb.bng
 import numpy
 from scipy.integrate import ode
-from scipy.integrate.ode import IntegratorBase
+from scipy.integrate.ode import IntegratorBase, vode
 from scipy.weave import inline
 import distutils.errors
 import sympy
@@ -24,7 +24,7 @@ default_integrator_options = {
         },
     'cvode': {
         'method': 'bdf',
-        'with_jacobian': True,
+        'iteration': 'newton',
         },
     }
 
@@ -91,8 +91,54 @@ def odesolve(model, t, integrator='vode', **integrator_options):
     yrec = numpy.recarray((yout.shape[0],), dtype=dtype, buf=yout)
     return yrec
 
-
-class cvode(IntegratorBase):
+try:
+    from pysundials import cvode as _cvode, nvecserial as _nvecserial
+except ImportError as e:
     pass
 
-IntegratorBase.integrator_classes.append(cvode)
+class cvode(IntegratorBase):
+    valid_methods = {
+        'adams': _cvode.CV_ADAMS,
+        'bdf': _cvode.CV_BDF,
+        }
+    valid_iterations = {
+        'functional': _cvode.CV_FUNCTIONAL,
+        'newton': _cvode.CV_NEWTON,
+        }
+
+    def __init__(self, method='adams', iteration='functional', rtol=1.0e-7, atol=1.0e-11):
+        if method not in cvode.valid_methods:
+            raise Exception("%s is not a valid value for method -- please use one of the following: %s" %
+                            (method, [m for m in cvode.valid_methods]))
+        if iteration not in cvode.valid_iterations:
+            raise Exception("%s is not a valid value for iteration -- please use one of the following: %s" %
+                            (iteration, [m for m in cvode.valid_iterations]))
+        self.method = method
+        self.iteration = iteration
+        self.rtol = rtol
+        self.atol = atol
+        self.t0 = 0.0
+        self.y0 = None
+        self.first_step = True
+
+    def reset(self, n, has_jac):
+        if has_jac:
+            raise Exception("has_jac not supported")
+        self.y0 = numpy.empty(n)
+        self.first_step = True
+        # initialize the cvode memory object
+        self.cvode_mem = _cvode.CVodeCreate(cvode.valid_methods[self.method],
+                                            cvode.valid_iterations[self.iteration])
+
+    def run(self, f, jac, y0, t0, t1, f_params, jac_params):
+        if self.first_step:
+            def cvode_f(t, y, ydot, f_data):
+                ydot[:] = f(t, y, f_data)
+            # allocate memory for cvode
+            cvode.CVodeMalloc(self.cvode_mem, cvode_f, t0, _cvode.NVector(self.y0),
+                              _cvode.CV_SS, self.rtol, self.atol)
+            # link integrator with linear solver
+            cvodes.CVDense(cvodes_mem, len(self.y0))
+
+if _cvode:
+    IntegratorBase.integrator_classes.append(cvode)
