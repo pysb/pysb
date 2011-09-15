@@ -94,17 +94,18 @@ def odesolve(model, t, integrator='vode', **integrator_options):
 try:
     from pysundials import cvode as _cvode, nvecserial as _nvecserial
 except ImportError as e:
-    pass
+    _cvode = None
 
 class cvode(IntegratorBase):
-    valid_methods = {
-        'adams': _cvode.CV_ADAMS,
-        'bdf': _cvode.CV_BDF,
-        }
-    valid_iterations = {
-        'functional': _cvode.CV_FUNCTIONAL,
-        'newton': _cvode.CV_NEWTON,
-        }
+    if _cvode:
+        valid_methods = {
+            'adams': _cvode.CV_ADAMS,
+            'bdf': _cvode.CV_BDF,
+            }
+        valid_iterations = {
+            'functional': _cvode.CV_FUNCTIONAL,
+            'newton': _cvode.CV_NEWTON,
+            }
 
     def __init__(self, method='adams', iteration='functional', rtol=1.0e-7, atol=1.0e-11):
         if method not in cvode.valid_methods:
