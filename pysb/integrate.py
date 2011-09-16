@@ -35,7 +35,6 @@ default_integrator_options = {
     }
 
 def odesolve(model, t, integrator='vode', **integrator_options):
-    global rhs_count
     pysb.bng.generate_equations(model)
     
     param_subs = dict([ (p.name, p.value) for p in model.parameters ])
@@ -58,11 +57,7 @@ def odesolve(model, t, integrator='vode', **integrator_options):
         si = model.get_species_index(cp)
         y0[si] = ic_param.value
 
-    rhs_count = 0
-
     def rhs(t, y, p):
-        global rhs_count
-        rhs_count+=1
         ydot = numpy.empty_like(y)
         # note that the evaluated code sets ydot as a side effect
         if use_inline:
@@ -97,8 +92,6 @@ def odesolve(model, t, integrator='vode', **integrator_options):
     for i, name in enumerate(obs_names):
         factors, species = zip(*model.observable_groups[name])
         yout[:, nspecies + i] = (yout[:, species] * factors).sum(1)
-
-    print 'rhs: %d' % rhs_count
 
     dtype = zip(rec_names, (yout.dtype,) * len(rec_names))
     yrec = numpy.recarray((yout.shape[0],), dtype=dtype, buf=yout)
