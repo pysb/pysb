@@ -546,7 +546,9 @@ class Compartment(Component):
 
 class Rule(Component):
 
-    def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None, __export=True):
+    def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None,
+                 delete_molecules=False,
+                 __export=True):
         Component.__init__(self, name, __export)
 
         # FIXME: This tuple thing is ugly (used to support >> and <> operators between ReactionPatterns).
@@ -575,6 +577,7 @@ class Rule(Component):
         self.product_pattern = product_pattern
         self.rate_forward = rate_forward
         self.rate_reverse = rate_reverse
+        self.delete_molecules = delete_molecules
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
     def __repr__(self):
@@ -582,6 +585,8 @@ class Rule(Component):
             (self.__class__.__name__, repr(self.name), repr(self.reactant_pattern), repr(self.product_pattern), repr(self.rate_forward))
         if self.is_reversible:
             ret += ', rate_reverse=%s' % repr(self.rate_reverse)
+        if self.delete_molecules:
+            ret += ', delete_molecules=True'
         ret += ')'
         return ret
 
