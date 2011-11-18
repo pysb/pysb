@@ -26,19 +26,16 @@ Parameter('Bid_0'       , 100e3);  # Bid
 Monomer('L', ['b'])
 Monomer('pR', ['b', 'rf'])
 Monomer('FADD', ['rf', 'fe'])
-Monomer('DISC', ['b'])
 Monomer('flipL', ['b', 'fe', 'ee', 'D384'],
         {'D384': ['U','C']}
         )
 Monomer('flipS', ['b', 'fe', 'ee'])
-Monomer('p43Homo', ['b'])
-Monomer('p43Hetero', ['b'])
 Monomer('pC8', ['fe', 'ee', 'D384', 'D400'],
         {'D384': ['U','C'],
 	 'D400': ['U','C']}
         )
-Monomer('Bid', ['b']) #called Apoptosis substrat in Lavrik's model
-Monomer('tBid', ['b'])
+Monomer('Bid') #called Apoptosis substrat in Lavrik's model
+Monomer('tBid')
 
 flip_monomers = (flipL, flipS);
 
@@ -69,11 +66,16 @@ for flip_m, kf, kr, reversible in (zip(flip_monomers, (kf31,kf32), (kr31,kr32), 
         rule.is_reversible = False;
         rule.rate_reverse = None;
 
+pC8_HomoD   = pC8 (fe=ANY, ee=1, D384='U') % pC8   (fe=ANY, ee=1, D384='U')
+pC8_HeteroD = pC8 (fe=ANY, ee=1, D384='U') % flipL (fe=ANY, ee=1, D384='U')
+p43_HomoD   = pC8 (fe=ANY, ee=1, D384='C') % pC8   (fe=ANY, ee=1, D384='C')
+p43_HeteroD = pC8 (fe=ANY, ee=1, D384='C') % flipL (fe=ANY, ee=1, D384='C')
+
 #L:R:FADD:C8 dimerizes
 Parameter('kf33', 2.37162)
 Parameter('kr33', 0.1)
 Parameter('kc33', 1e-05)
-Rule('RLFADD_C8_C8_Binding', pC8 (fe=ANY, ee=None, D384='U') + pC8 (fe=ANY, ee=None, D384='U') <> pC8 (fe=ANY, ee=1, D384='U') % pC8 (fe=ANY, ee=1, D384='U'), kf33, kr33)
+Rule('RLFADD_C8_C8_Binding', pC8 (fe=ANY, ee=None, D384='U') + pC8 (fe=ANY, ee=None, D384='U') <> pC8_HomoD, kf33, kr33)
 
 #L:R:FADD:C8 L:R:FADD:FLIP(variants) dimerizes
 Parameter('kf34', 4.83692)
@@ -87,41 +89,29 @@ for flip_m, kf, kr, reversible in (zip(flip_monomers, (kf34,kf35), (kr34,kr35), 
         rule.is_reversible = False;
         rule.rate_reverse = None;
 
-#Homodimer catalyses Homodimer ?: no p18 is released. Only this "cleaved" p43 homoD is the product that will transform into a p18 + L:R:FADD in later reaction.
 Parameter('kc36', 0.223046e-3)
-Rule('HomoD_cat_HomoD', pC8 (fe=ANY, ee=1, D384='U') % pC8 (fe=ANY, ee=1, D384='U') + pC8 (fe=ANY, ee=2, D384='U') % pC8 (fe=ANY, ee=2, D384='U') >>
-     pC8 (fe=ANY, ee=1, D384='U') % pC8 (fe=ANY, ee=1,D384='U') + pC8 (fe=ANY, ee=2, D384='C') % pC8 (fe=ANY, ee=2, D384='C'), kc36)
-
+#Homodimer catalyses Homodimer ?: no p18 is released. Only this "cleaved" p43 homoD is the product that will transform into a p18 + L:R:FADD in later reaction.
+Rule('HomoD_cat_HomoD', pC8_HomoD + pC8_HomoD >> pC8_HomoD + p43_HomoD, kc36)
 #Homodimer catalyses Heterodimer ?????
-Rule('HomoD_cat_HeteroD', pC8 (fe=ANY, ee=1, D384='U') % pC8 (fe=ANY, ee=1, D384='U') + pC8 (fe=ANY, ee=2, D384='U') % flipL (fe=ANY, ee=2, D384='U')  >>
-     pC8 (fe=ANY, ee=1, D384='U') % pC8 (fe=ANY, ee=1, D384='U') + pC8 (fe=ANY, ee=2, D384='C') % flipL (fe=ANY, ee=2, D384='C'), kc36)
+Rule('HomoD_cat_HeteroD', pC8_HomoD + pC8_HeteroD >> pC8_HomoD + p43_HeteroD, kc36)
 
-#Heterodimer catalyses Heterodimer ?????
 Parameter('kc37', 0.805817e-3)
-Rule('HeteroD_cat_HeteroD', pC8 (fe=ANY, ee=2, D384='U') % flipL (fe=ANY, ee=2, D384='U') + pC8 (fe=ANY, ee=2, D384='U') % flipL (fe=ANY, ee=2, D384='U') >>
-     pC8 (fe=ANY, ee=2, D384='U') % flipL (fe=ANY, ee=2, D384='U') + pC8 (fe=ANY, ee=2, D384='C') % flipL (fe=ANY, ee=2, D384='C'), kc37)
-
+#Heterodimer catalyses Heterodimer ?????
+Rule('HeteroD_cat_HeteroD', pC8_HeteroD + pC8_HeteroD >> pC8_HeteroD + p43_HeteroD, kc37)
 #Heterodimer catalyses Homodimer ?????
-Rule('HeteroD_cat_HomoD', pC8 (fe=ANY, ee=1, D384='U') % flipL (fe=ANY, ee=1, D384='U') + pC8 (fe=ANY, ee=2, D384='U') % pC8 (fe=ANY, ee=2, D384='U') >>
-     pC8 (fe=ANY, ee=1, D384='U') % flipL (fe=ANY, ee=1, D384='U') + pC8 (fe=ANY, ee=2, D384='C') % pC8 (fe=ANY, ee=2, D384='C'), kc37)
+Rule('HeteroD_cat_HomoD', pC8_HeteroD + pC8_HomoD >> pC8_HeteroD + p43_HomoD, kc37)
 
-#Cleaved Homodimer catalyses Homodimer ?????
 Parameter('kc38', 1.4888e-3)
-Rule('Cl_HomoD_cat_HomoD', pC8 (fe=ANY, ee=2, D384='C') % pC8 (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='U') % pC8 (fe=ANY, ee=1, D384='U') >>
-     pC8 (fe=ANY, ee=2, D384='C') % pC8 (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='C') % pC8 (fe=ANY, ee=1, D384='C'), kc38)
-
+#Cleaved Homodimer catalyses Homodimer ?????
+Rule('Cl_HomoD_cat_HomoD', p43_HomoD + pC8_HomoD >> p43_HomoD + p43_HomoD, kc38)
 #Cleaved HomoD catalyses Heterodimer ?????
-Rule('Cl_HomoD_cat_HeteroD', pC8 (fe=ANY, ee=2, D384='C') % pC8 (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='U') % flipL (fe=ANY, ee=1, D384='U') >>
-     pC8 (fe=ANY, ee=2, D384='C') % pC8 (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='C') % flipL (fe=ANY, ee=1, D384='C'), kc38)
+Rule('Cl_HomoD_cat_HeteroD', p43_HomoD + pC8_HeteroD >> p43_HomoD + p43_HeteroD, kc38)
 
-#Cleaved HeteroD catalyses Homodimer ?????
 Parameter('kc39', 13.098e-3)
-Rule('Cl_heteroD_cat_HomoD', pC8 (fe=ANY, ee=2, D384='C') % flipL (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='U') % pC8 (fe=ANY, ee=1, D384='U') >>
-     pC8 (fe=ANY, ee=2, D384='C') % flipL (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='C') % pC8 (fe=ANY, ee=1, D384='C'), kc39)
-
+#Cleaved HeteroD catalyses Homodimer ?????
+Rule('Cl_heteroD_cat_HomoD', p43_HeteroD + pC8_HomoD >> p43_HeteroD + p43_HomoD, kc39)
 #Cleaved HeteroD catalyses Heterodimer ?????
-Rule('Cl_heteroD_cat_HeteroD', pC8 (fe=ANY, ee=2, D384='C') % flipL (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='U') % flipL (fe=ANY, ee=1, D384='U') >>
-     pC8 (fe=ANY, ee=2, D384='C') % flipL (fe=ANY, ee=2, D384='C') + pC8 (fe=ANY, ee=1, D384='C') % flipL (fe=ANY, ee=1, D384='C'), kc39)
+Rule('Cl_heteroD_cat_HeteroD', p43_HeteroD + pC8_HeteroD >> p43_HeteroD + p43_HeteroD, kc39)
 
 #Cleaved HomoD catalyses Cleaved HomoD to p18 and release L:R:FADD
 Parameter('kc40', 0.999273e-3)
@@ -130,7 +120,6 @@ Rule('Cl_HomoD_cat_Cl_HomoD', pC8 (fe=ANY, ee=1, D384='C', D400='U') % pC8 (fe=A
      pC8 (fe=ANY, ee=1, D384='C', D400='U') % pC8 (fe=ANY, ee=1, D384='C', D400='U') +
      FADD (rf=ANY, fe=None) + FADD (rf=ANY, fe=None) + pC8 (fe=None, ee=1, D384='C',D400='C') % pC8 (fe=None, ee=1, D384='C',D400='C'), 
      kc40)
-#Rule('p43Homo_p18_cat', p43Homo (b=None) + p43Homo (b=None) >> p43Homo (b=None) + p18 (b=None) , kc40)
 
 #Cleaved HeteroD catalyses Cleaved HomoD to p18 and release L:R:FADD
 Parameter('kc41', 0.982109e-3)
@@ -142,24 +131,24 @@ Rule('Cl_HeteroD_cat_Cl_HomoD', pC8 (fe=ANY, ee=1, D384='C', D400='U') % flipL (
  
 #Cleaved HomoD cleaves Bid ?????
 Parameter('kc42', 0.0697394e-3)
-Rule('Cl_Homo_cat_Bid', pC8 (fe=ANY, ee=1, D384='C', D400='U') % pC8 (fe=ANY, ee=1, D384='C', D400='U') + Bid (b=None) >>
-     pC8 (fe=ANY, ee=1, D384='C', D400='U') % pC8 (fe=ANY, ee=1, D384='C', D400='U') + tBid (b=None), kc42)
+Rule('Cl_Homo_cat_Bid', pC8 (fe=ANY, ee=1, D384='C', D400='U') % pC8 (fe=ANY, ee=1, D384='C', D400='U') + Bid () >>
+     pC8 (fe=ANY, ee=1, D384='C', D400='U') % pC8 (fe=ANY, ee=1, D384='C', D400='U') + tBid (), kc42)
 
 #Cleaved HeteroD cleaves Bid ?????
 Parameter('kc43', 0.0166747e-3)
-Rule('Cl_Hetero_cat_Bid', pC8 (fe=ANY, ee=1, D384='C', D400='U') % flipL (fe=ANY, ee=1, D384='C') + Bid (b=None) >>
-     pC8 (fe=ANY, ee=1, D384='C', D400='U') % flipL (fe=ANY, ee=1, D384='C') + tBid (b=None), kc43)
+Rule('Cl_Hetero_cat_Bid', pC8 (fe=ANY, ee=1, D384='C', D400='U') % flipL (fe=ANY, ee=1, D384='C') + Bid () >>
+     pC8 (fe=ANY, ee=1, D384='C', D400='U') % flipL (fe=ANY, ee=1, D384='C') + tBid (), kc43)
 
 #p18 cleaves Bid ?????
 Parameter('kc44', 0.0000479214e-3)
-Rule('p18_Bid_cat', pC8 (fe=None, ee=1, D384='C',D400='C') % pC8 (fe=None, ee=1, D384='C',D400='C') + Bid ( b=None) >> 
-	pC8 (fe=None, ee=1, D384='C',D400='C') % pC8 (fe=None, ee=1, D384='C',D400='C') + tBid ( b=None), kc44) 
+Rule('p18_Bid_cat', pC8 (fe=None, ee=1, D384='C',D400='C') % pC8 (fe=None, ee=1, D384='C',D400='C') + Bid () >> 
+	pC8 (fe=None, ee=1, D384='C',D400='C') % pC8 (fe=None, ee=1, D384='C',D400='C') + tBid (), kc44) 
 
 
 # Fig 4B
 
 Observe('p18', pC8(fe=None, ee=1, D384='C',D400='C') % pC8(fe=None, ee=1, D384='C',D400='C'))
-Observe('tBid', tBid(b=None) )
+Observe('tBid', tBid() )
 
 
 
