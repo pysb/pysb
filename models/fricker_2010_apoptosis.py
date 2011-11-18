@@ -5,7 +5,7 @@ from pysb import *
 # Fricker N, Beaudouin J, Richter P, Eils R, Krammer PH, Lavrik IN. J Cell Biol. 2010 Aug 9;190(3):377-89.
 # PMID: 20696707 
 #
-# by Jeremie Roux, Will Chen
+# by Jeremie Roux, Will Chen, Jeremy Muhlich
 
 
 Model()
@@ -175,3 +175,64 @@ if __name__ == '__main__':
     print run_export_net(model)
 
 
+
+
+####
+# some of the model definition from the supplemental materials, for reference:
+
+# ********** MODEL STATES
+# %% Protein amounts are given in thousand molecules per cell.
+# CD95L(0) = 1,500%% amount ligand
+# CD95R(0) = 170.999%% amount CD95
+# FADD(0) = 133.165%% amount FADD
+# C8(0) = 200.168%% amount Procaspase-8
+# FL(0) = 0.49995%% amount FLIP-Long
+# FS(0) = 0.422%% amount FLIP-Short
+# CD95RL(0) = 0%% amount of CD95–CD95L complexes
+# CD95FADD(0) = 0%% amount of CD95–FADD complexes
+# FADDC8(0) = 0%% amount Procaspase-8 bound to FADD
+# FADDFL(0) = 0%% amount c-FLIPL bound to FADD
+# FADDFS(0) = 0%% amount c-FLIPS bound to FADD
+# C8heterodimer(0) = 0%% amount Procaspase-8/c-FLIPL heterodimers
+# C8homodimer(0) = 0%% amount Procaspase-8 homodimers
+# C8FSdimer(0) =0%% amount Procaspase-8/c-FLIPS heterodimers
+# p43heterodimer(0) = 0%% amount p43/p41-Procaspase-8/p43-FLIP heterodimers
+# p43homodimer(0) = 0%% amount p43/p41-Procaspase-8 homodimers
+# p18(0)=0%% amount p18 formed
+# apoptosissubstrate(0)=100
+# cleavedsubstrate(0) = 0%% amount cleaved apoptosis substrate
+
+# ********** MODEL VARIABLES
+# p18total = 2 x p18
+# p43Casp8total = 2 x p43homodimer + p43heterodimer
+# procaspase8total = C8 + FADDC8 + C8heterodimer + 2 x C8homodimer + C8FSdimer
+# c8total = p43Casp8total + procaspase8total + 2 x p18
+# cleavedC8 = c8total - procaspase8total
+# celldeath = cleavedsubstrate / 0.10875%% Model readout: percentage of dead cells
+
+# ********** MODEL REACTIONS
+# RCD95LBindCD95R = 7.0980e-002 x CD95L x CD95R
+# RFADDBindCD95RL = 0.0844211 x CD95RL x FADD
+# RC8BindCD95FADD = 0.00319838 x CD95FADD x C8
+# RFLBindCD95FADD = 0.0693329 x CD95FADD x FL
+# RFSBindCD95FADD = 0.0694022 x CD95FADD x FS
+# RFADDC8Dissociate = 0.1 x FADDC8
+# RFADDFSDissociate = 0.08 x FADDFS
+# RFADDC8BindFADDC8 = 1.18581 x FADDC8 x FADDC8
+# RFADDFLBindFADDC8 = 4.83692 x FADDC8 x FADDFL
+# RFADDFSBindFADDC8 = 2.88545 x FADDC8 x FADDFS
+# RC8FSdimerDissociate = 1 x C8FSdimer
+# RC8homodimerDissociate = 0.1 x C8homodimer
+# RC8homodimerCleaveC8homodimer = 0.000223046 x C8homodimer x C8homodimer
+# RC8homodimerCleaveC8heterodimer = 0.000223046 x C8homodimer x C8heterodimer
+# RC8heterodimerCleaveC8heterodimer = 0.000805817 x C8heterodimer x C8heterodimer
+# RC8heterodimerCleaveC8homodimer = 0.000805817 x C8heterodimer x C8homodimer
+# Rp43homodimerCleaveC8homodimer = 0.0014888 x p43homodimer x C8homodimer
+# Rp43homodimerCleaveC8heterodimer = 0.0014888 x p43homodimer x C8heterodimer
+# Rp43heterodimerCleaveC8homodimer = 0.013098 x p43heterodimer x C8homodimer
+# Rp43heterodimerCleaveC8heterodimer = 0.013098 x p43heterodimer x C8heterodimer
+# Rp43homodimerCleavep43homodimer = 0.000999273 x p43homodimer x p43homodimer
+# Rp43heterodimerCleavep43homodimer = 0.000982109 x p43heterodimer x p43homodimer
+# Rp43heterodimerCleaveApoptosisSubstrate = 1.66747e-005 x p43heterodimer x apoptosissubstrate
+# Rp43homodimerCleaveApoptosisSubstrate = 6.97394e-005 x p43homodimer x apoptosissubstrate
+# Rp18CleaveApoptosisSubstrate = 4.79214e-08 x p18 x apoptosissubstrate
