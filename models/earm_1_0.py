@@ -273,7 +273,7 @@ Observe('cSmac', cSmac())
 
 # generate initial conditions from _0 parameter naming convention
 for m in model.monomers:
-    ic_param = model.parameter('%s_0' % m.name)
+    ic_param = model.parameters.get('%s_0' % m.name)
     if ic_param is not None:
         sites = {}
         for s in m.sites:

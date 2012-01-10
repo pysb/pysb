@@ -128,10 +128,10 @@ def _parse_species(model, line):
                 else:
                     site_name, condition = ss, None
                 site_conditions[site_name] = condition
-        monomer = model.get_monomer(monomer_name)
+        monomer = model.monomers[monomer_name]
         monomer_patterns.append(monomer(site_conditions))
 
-    compartment = model.get_compartment(compartment_name)
+    compartment = model.compartments.get(compartment_name)
     cp = pysb.ComplexPattern(monomer_patterns, compartment)
     model.species.append(cp)
 

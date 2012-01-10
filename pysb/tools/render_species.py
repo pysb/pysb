@@ -10,13 +10,18 @@ def run(model):
     pysb.bng.generate_equations(model)
     graph = pygraphviz.AGraph(rankdir="LR")
     for si, cp in enumerate(model.species):
-        sgraph = graph.add_subgraph(name='cluster_s%d' % si, label='s%d' % si,
+        sgraph_name = 'cluster_s%d' % si
+        sgraph = graph.add_subgraph(sgraph_name, label='s%d' % si,
                                     color="gray75", fontsize="20")
         bonds = {}
         for mi, mp in enumerate(cp.monomer_patterns):
-            mgraph = sgraph.add_subgraph(name=sgraph.name + '_%d' % mi, label=mp.monomer.name,
-                                         fillcolor="gray90", style="filled",
-                                         fontsize="12")
+            monomer_node = '%s_%d' % (sgraph_name, mi)
+            sgraph.add_node(monomer_node,
+                            label=mp.monomer.name,
+                            shape="rectangle",
+                            fillcolor="lightblue", style="filled",
+                            fontsize="12",
+                            width=".3", height=".3", margin="0.06,0")
             for site in mp.monomer.sites:
                 site_state = None
                 cond = mp.site_conditions[site]
@@ -27,10 +32,13 @@ def run(model):
                 site_label = site
                 if site_state is not None:
                     site_label += '=%s' % site_state
-                mgraph.add_node(mgraph.name + '_%s' % site, label=site_label,
-                                fillcolor="white", color="transparent", style="filled",
-                                fontname="courier", fontsize=10,
-                                width=0.2, height=0.2, fixedsize=True)
+                site_node = '%s_%s' % (monomer_node, site)
+                sgraph.add_node(site_node, label=site_label,
+                                fontname="courier", fontsize='10',
+                                fillcolor="yellow", style="filled", color="transparent",
+                                width=".2", height=".2", margin="0")
+                sgraph.add_edge(monomer_node, site_node,
+                                style="bold")
             for site, value in mp.site_conditions.items():
                 site_bonds = []
                 if isinstance(value, int):
@@ -40,9 +48,10 @@ def run(model):
                 elif isinstance(value, list):
                     site_bonds += value
                 for b in site_bonds:
-                    bonds.setdefault(b, []).append(mgraph.name + '_%s' % site)
+                    bonds.setdefault(b, []).append('%s_%s' % (monomer_node, site))
         for bi, sites in bonds.items():
-            sgraph.add_edge(sites, label=bi)
+            sgraph.add_edge(sites, label=str(bi),
+                            style="dotted")
     return graph.string()
 
 if __name__ == '__main__':

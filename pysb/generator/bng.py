@@ -63,6 +63,8 @@ class BngGenerator(object):
                 (label, reactants_code, arrow, products_code, r.rate_forward.name)
             if r.is_reversible:
                 self.__content += ', %s' % r.rate_reverse.name
+            if r.delete_molecules:
+                self.__content += ' DeleteMolecules'
             self.__content += "\n"
         self.__content += "end reaction rules\n\n"
 

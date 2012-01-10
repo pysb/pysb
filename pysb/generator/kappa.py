@@ -122,20 +122,16 @@ def format_site_condition(site, state):
         state_code = ''
     elif type(state) == int:
         state_code = '!' + str(state)
+    elif type(state) == list:
+        raise Exception("Kappa generator does not support multiple bonds to a single site.")
     elif type(state) == str:
         state_code = '~' + state
     elif type(state) == tuple:
         if state[1] == pysb.WILD:
             state = (state[0], '?')
         state_code = '~%s!%s' % state
-    elif type(state) == list:
-        if len(state) == 1:
-            if (state[0] == pysb.ANY):
-                state_code = '!_'
-            else:
-                raise Exception("BNG generator does not support named monomers in rule pattern site conditions.")
-        else:
-            raise Exception("BNG generator does not support multi-monomer lists in rule pattern site conditions.")
+    elif state == pysb.ANY:
+        state_code = '!_'
     else:
-        raise Exception("BNG generator has encountered an unknown element in a rule pattern site condition.")
+        raise Exception("Kappa generator has encountered an unknown element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
