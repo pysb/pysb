@@ -1,6 +1,5 @@
 import pysb
 
-
 class KappaGenerator(object):
 
     def __init__(self, model):
@@ -16,7 +15,7 @@ class KappaGenerator(object):
         self.__content = ''
         #self.generate_parameters()
         #self.generate_compartments()
-        #self.generate_molecule_types()
+        self.generate_molecule_types()
         self.generate_reaction_rules()
         self.generate_observables()
         self.generate_species()
@@ -38,33 +37,32 @@ class KappaGenerator(object):
     #        self.__content += ("  %s  %d  %f  %s\n") % (c.name, c.dimension, c.size, parent_name)
     #    self.__content += "end compartments\n\n"        
 
-    #def generate_molecule_types(self):
-    #    self.__content += "begin molecule types\n"
-    #    for m in self.model.monomers:
-    #        site_code = ','.join([format_monomer_site(m, s) for s in m.sites])
-    #        self.__content += "  %s(%s)\n" % (m.name, site_code)
-    #    self.__content += "end molecule types\n\n"
+    def generate_molecule_types(self):
+        for m in self.model.monomers:
+            site_code = ','.join([format_monomer_site(m, s) for s in m.sites])
+            self.__content += "%%agent: %s(%s)\n" % (m.name, site_code)
+        self.__content += "\n"
 
     def generate_reaction_rules(self):
         #self.__content += "begin reaction rules\n"
         #max_length = max(len(r.name) for r in self.model.rules) + 1  # +1 for the colon
         max_length = 0
         for r in self.model.rules:
-            #label = r.name + ':'
-            label = ''
+            label = '\'' + r.name + '\''
             reactants_code = format_reactionpattern(r.reactant_pattern)
             products_code  = format_reactionpattern(r.product_pattern)
             arrow = '->'
-            if r.is_reversible:
-                arrow = '<->'
-            self.__content += ("%-" + str(max_length) + "s  %s %s %s @ %s") % \
+            self.__content += ("%s %s %s %s @ %s") % \
                 (label, reactants_code, arrow, products_code, r.rate_forward.value)
-                #(label, reactants_code, arrow, products_code, r.rate_forward.name)
-            if r.is_reversible:
-                #self.__content += ', %s' % r.rate_reverse.name
-                self.__content += ', %s' % r.rate_reverse.value
             self.__content += "\n"
-        #self.__content += "end reaction rules\n\n"
+
+            if r.is_reversible:
+              label = '\'' + r.name + '_rev' + '\''
+              self.__content += ("%s %s %s %s @ %s") % \
+                (label, products_code, arrow, reactants_code, r.rate_reverse.value)
+              self.__content += "\n"
+
+        self.__content += "\n"
 
     def generate_observables(self):
         if not self.model.observable_patterns:
@@ -73,9 +71,10 @@ class KappaGenerator(object):
         max_length = 0
         #self.__content += "begin observables\n"
         for name, pattern in self.model.observable_patterns:
-            name = ''
+            name = '\'' + name + '\''
             observable_code = format_reactionpattern(pattern)
-            self.__content += ("%%obs:  %-" + str(max_length) + "s   %s\n") % (name, observable_code)
+            self.__content += ("%%obs: %s %s\n") % (name, observable_code)
+        self.__content += "\n"
         #self.__content += "end observables\n\n"
 
     def generate_species(self):
@@ -88,9 +87,8 @@ class KappaGenerator(object):
         for i, code in enumerate(species_codes):
             param = self.model.initial_conditions[i][1]
             #self.__content += ("%%init:  %-" + str(max_length) + "s   %s\n") % (code, param.name)
-            self.__content += ("%%init: %10g * %s\n") % (param.value, code)
-        #self.__content += "end species\n"
-
+            self.__content += ("%%init: %10g %s\n") % (param.value, code)
+        self.__content += "\n"
 
 
 def format_monomer_site(monomer, site):
