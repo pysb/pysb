@@ -247,9 +247,10 @@ def simple_bind_table(bindtable, parmlist, lmodel, site='bf'):
     bindtable is a list of lists denoting the reactions between two types of reactants
     as follows:
 
-    bindtable[0]: [                  reactypeA0(args), reactypeA1(args)... reactypeAN(args)]
-    bindtable[1]: [reactypeB0(args), 'parmfamA0B0',    'parmfamA1B0'...    'parmfamANB0'   ]
-    bindtable[2]: [reactypeB1(args), 'parmfamA0B1',    'parmfamA1B1'...    'parmfamANB1'   ]
+    bindtable[0]: [                     reactypeA0,       reactypeA1...          reactypeAN]
+    bindtable[1]: [                           args,             args...               args)]
+    bindtable[2]: [reactypeB0, args, 'parmfamA0B0',    'parmfamA1B0'...    'parmfamANB0'   ]
+    bindtable[3]: [reactypeB1, args, 'parmfamA0B1',    'parmfamA1B1'...    'parmfamANB1'   ]
 
     the variable 'lmodel' is the model passed for local lookup of parameter variables
     """
@@ -299,7 +300,74 @@ def simple_bind_table(bindtable, parmlist, lmodel, site='bf'):
     if pc != len(parmlist):
         print "WARNING, unassigned parameters from list", parmlist
         print "Assigned",pc,"parameter pairs from a total of", len(parmlist)
-    
+
+def multisite_bind_table(bindtable):
+    """This assumes that the monomers passed are in their desired state without
+    the sites which will be used for binding.
+    bindtable is a list of lists denoting the reactions between two types of reactants
+    as follows:
+
+    bindtable[0]: [                     reactypeA0,       reactypeA1...          reactypeAN]
+    bindtable[1]: [                           args,             args...               args)]
+    bindtable[2]: [reactypeB0, args, (Bs, As, fwdrate, revrate)',             ...                    ]
+    bindtable[3]: [reactypeB1, args,                 ,              ...                    ]
+
+    To indicate that no interaction occurs, simply enter None in the bind table
+    the variable 'lmodel' is the model passed for local lookup of parameter variables
+    """
+
+    # parse the list, extract reactants, products and parameter families
+    #first line is one set of reactants
+    react_rows = [row[0] for row in bindtable[2:]]
+    react_row_states = [row[1] for row in bindtable[2:]]
+    react_cols = bindtable[0]
+    react_col_states = bindtable[1]
+
+    # Notice this makes intrxns of size/index intrxns[react1][react0]
+    intrxns = [row[2:] for row in bindtable[2:]]
+
+    # loop over interactions
+    pc = 1 # parameter counter
+    rc = 1 # rule counter, easy way of making sure names don't clash #FIXME
+    for i in range(0, len(react_rows)):
+        for j in range(0, len(react_cols)):
+            if intrxns[i][j] is not None:
+
+                # Add the bf sites to the reactant states dict
+                # NOTE: this will reset the value if it is already set.
+                # Build the prod states dict from react dicts, change bf to 1
+                (react_row_site, react_col_site, kf_val, kr_val) = intrxns[i][j]
+
+                # get the parameters from the parmlist
+                #kf = parmlist[pc][0]
+                #kr = parmlist[pc][1]
+                react_row_state = react_row_states[i]
+                react_col_state = react_col_states[j]
+                prod_col_state = []
+                prod_row_state = []
+                # The binding sites of reactants should be unbound
+                react_row_state[react_row_site] = None
+                react_col_state[react_col_site] = None
+                # The state of the products should be unchanged except at the site
+                prod_row_state = react_row_state.copy()
+                prod_col_state = react_col_state.copy()
+                prod_row_state[react_row_site] = 1
+                prod_col_state[react_col_site] = 1
+
+                # Create the parameters
+                kf = Parameter('kf' + str(pc), kf_val)
+                kr = Parameter('kr' + str(pc), kr_val)
+
+                # Rule name
+                rname = 'cplx_%s_%s_%d' % (react_rows[i].name, react_cols[j].name, rc)
+                # Create the rule
+                #print "Generating  %s:%s complex"%(react1[i].name, react0[j].name)
+                Rule(rname, react_rows[i](react_row_state) + react_cols[j](react_col_state) <>
+                            react_rows[i](prod_row_state) % react_cols[j](prod_col_state),
+                    kf, kr)
+                pc += 1
+                rc += 1
+
 
 #-------------------------------------------------------------------------
 # Random little helper funcs that make it easier to interact w the model.
