@@ -12,7 +12,7 @@ def Initial(*args):
     return SelfExporter.default_model.initial(*args)
 
 def MatchOnce(pattern):
-    cp = as_complex_pattern(pattern)._copy()
+    cp = as_complex_pattern(pattern).copy()
     cp.match_once = True
     return cp
 
@@ -216,19 +216,14 @@ class Monomer(Component):
         self.sites_dict = dict.fromkeys(sites)
         self.site_states = site_states
 
-    def __call__(self, *dict_site_conditions, **named_site_conditions):
-        """Build a pattern object with convenient kwargs for the sites"""
-        site_conditions = named_site_conditions.copy()
-        # TODO: should key conflicts silently overwrite, or warn, or error?
-        # TODO: ensure all values are dicts or dict-like?
-        for condition_dict in dict_site_conditions:
-            if condition_dict is not None:
-                site_conditions.update(condition_dict)
-        return MonomerPattern(self, site_conditions, None)
+    def __call__(self, *args, **kwargs):
+        """Build a MonomerPattern object with convenient kwargs for the sites"""
+        return MonomerPattern(self, extract_site_conditions(*args, **kwargs), None)
 
     def __repr__(self):
         return  '%s(name=%s, sites=%s, site_states=%s)' % \
             (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states))
+
     
 
 class MonomerAny(Monomer):
@@ -309,12 +304,15 @@ class MonomerPattern(object):
         return len(self.site_conditions) == len(self.monomer.sites) and \
             (len(SelfExporter.default_model.compartments) == 0 or self.compartment is not None)
 
-    def _copy(self):
-        """Implement our own brand of semi-deep copy.
-
-        The new object will have references to the original monomer and compartment, and
-        a shallow copy of site_conditions."""
-        return MonomerPattern(self.monomer, self.site_conditions.copy(), self.compartment)
+    def __call__(self, *args, **kwargs):
+        """Build a new MonomerPattern with updated site conditions. Can be used
+        to obtain a shallow copy by passing an empty argument list."""
+        # The new object will have references to the original monomer and
+        # compartment, and a shallow copy of site_conditions which has been
+        # updated according to our args (as in Monomer.__call__).
+        site_conditions = self.site_conditions.copy()
+        site_conditions.update(extract_site_conditions(*args, **kwargs))
+        return MonomerPattern(self.monomer, site_conditions, self.compartment)
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
@@ -344,7 +342,7 @@ class MonomerPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
-            mp_new = self._copy()
+            mp_new = self()
             mp_new.compartment = other
             return mp_new
         else:
@@ -394,12 +392,12 @@ class ComplexPattern(object):
             sorted((mp.monomer, mp.site_conditions) for mp in self.monomer_patterns) == \
             sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
 
-    def _copy(self):
-        """Implement our own brand of semi-deep copy.
+    def copy(self):
+        """Implement our own brand of shallow copy.
 
         The new object will have references to the original compartment, and
-        a _copy of the contents of monomer_patterns."""
-        return ComplexPattern([mp._copy() for mp in self.monomer_patterns], self.compartment, self.match_once)
+        copies of the monomer_patterns."""
+        return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
@@ -429,7 +427,7 @@ class ComplexPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
-            cp_new = self._copy()
+            cp_new = self.copy()
             cp_new.compartment = other
             return cp_new
         else:
@@ -611,6 +609,21 @@ class ComponentDict(dict):
     instead of keys."""
     def __iter__(self):
         return self.itervalues()
+
+
+
+def extract_site_conditions(*args, **kwargs):
+    """Handle parsing of MonomerPattern site conditions.
+    """
+    # enforce site conditions as kwargs or a dict but not both
+    if (args and kwargs) or len(args) > 1:
+        raise Exception("Site conditions may be specified as EITHER keyword arguments OR a single dict")
+    # handle normal cases
+    elif args:
+        site_conditions = args[0].copy()
+    else:
+        site_conditions = kwargs
+    return site_conditions
 
 
 
