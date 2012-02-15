@@ -4,6 +4,7 @@ import errno
 import warnings
 import inspect
 import re
+import collections
 
 def Observe(*args):
     return SelfExporter.default_model.add_observable(*args)
@@ -98,10 +99,10 @@ class Model(object):
 
     def __init__(self, name=None, __export=True):
         self.name = name
-        self.monomers = ComponentDict()
-        self.compartments = ComponentDict()
-        self.parameters = ComponentDict()
-        self.rules = ComponentDict()
+        self.monomers = ComponentSet()
+        self.compartments = ComponentSet()
+        self.parameters = ComponentSet()
+        self.rules = ComponentSet()
         self.species = []
         self.odes = []
         self.observable_patterns = []
@@ -146,10 +147,9 @@ class Model(object):
         # errors, but still seems sort of fragile.
         container_name = type(other).__name__.lower() + 's'
         container = getattr(self, container_name, None)
-        if not isinstance(other, Component) or container is None:
-            raise Exception("Tried to add component of unknown type %s to model" % type(other))
-        container[other.name] = other
-        # FIXME: used to use a list, and we'd keep the param list sorted. maybe add params_sorted()?
+        if not isinstance(other, Component) or not isinstance(container, ComponentSet):
+            raise Exception("Tried to add component of unknown type '%s' to model" % type(other))
+        container.add(other)
 
     def add_observable(self, name, reaction_pattern):
         try:
@@ -604,12 +604,52 @@ class SymbolExistsWarning(UserWarning):
     """Issued by model component constructors when a name is reused."""
     pass
 
-class ComponentDict(dict):
-    """A dict subclass for storing model components.  Its iter() behavior is to iterate over values
-    instead of keys."""
-    def __iter__(self):
-        return self.itervalues()
 
+
+class ComponentSet(collections.MutableSet, collections.MutableMapping):
+    """A container for storing model Components. It behaves mostly like an ordered set, but
+    components can also be retrieved and deleted by name by using the [] operator (as in a dict
+    lookup)."""
+    # The implementation is based on a list instead of a linked list (as OrderedSet is), since the
+    # expected usage pattern is heavy on append and retrieve, and light on delete.
+
+    def __init__(self, iterable=[]):
+        self._elements = []
+        self._map = {}
+        for value in iterable:
+            self.add(value)
+
+    def __iter__(self):
+        return iter(self._elements)
+
+    def __contains__(self, value):
+        # O(n) but not expected to be called much
+        return value in self._elements
+
+    def __len__(self):
+        return len(self._elements)
+
+    def add(self, c):
+        if not isinstance(c, Component):
+            raise TypeError("Expected only Components, got a %s" % type(c))
+        if c.name not in self._map:
+            self._elements.append(c)
+            self._map[c.name] = c
+
+    def discard(self, c):
+        # TODO
+        raise NotImplementedError()
+
+    def __getitem__(self, key):
+        return self._map[key]
+
+    def __delitem__(self, key):
+        # TODO
+        raise NotImplementedError()
+
+    def __setitem__(self, key, value):
+        # TODO
+        raise NotImplementedError()
 
 
 def extract_site_conditions(*args, **kwargs):
