@@ -136,9 +136,9 @@ class Model(object):
         return SelfExporter.default_model
 
     def all_components(self):
-        components = []
-        for container in [self.monomers, self.compartments, self.parameters, self.rules]:
-            components += container.values()
+        components = ComponentSet()
+        for container in [self.monomers, self.compartments, self.rules, self.parameters]:
+            components |= container
         return components
 
     def add_component(self, other):
@@ -650,6 +650,32 @@ class ComponentSet(collections.MutableSet, collections.MutableMapping):
     def __setitem__(self, key, value):
         # TODO
         raise NotImplementedError()
+
+    def iterkeys(self):
+        for c in self:
+            yield c.name
+
+    def itervalues(self):
+        return self.__iter__()
+
+    def iteritems(self):
+        for c in self:
+            yield (c.name, c)
+
+    def keys(self):
+        return [c.name for c in self]
+
+    def values(self):
+        return [c for c in self]
+
+    def items(self):
+        return zip(self.keys(), self)
+
+    def __repr__(self):
+        return '{' + \
+            ',\n '.join("'%s': %s" % t for t in self.iteritems()) + \
+            '}'
+
 
 
 def extract_site_conditions(*args, **kwargs):
