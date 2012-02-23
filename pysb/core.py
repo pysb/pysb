@@ -4,6 +4,7 @@ import errno
 import warnings
 import inspect
 import re
+import collections
 
 def Observe(*args):
     return SelfExporter.default_model.add_observable(*args)
@@ -12,7 +13,7 @@ def Initial(*args):
     return SelfExporter.default_model.initial(*args)
 
 def MatchOnce(pattern):
-    cp = as_complex_pattern(pattern)._copy()
+    cp = as_complex_pattern(pattern).copy()
     cp.match_once = True
     return cp
 
@@ -98,10 +99,10 @@ class Model(object):
 
     def __init__(self, name=None, __export=True):
         self.name = name
-        self.monomers = ComponentDict()
-        self.compartments = ComponentDict()
-        self.parameters = ComponentDict()
-        self.rules = ComponentDict()
+        self.monomers = ComponentSet()
+        self.compartments = ComponentSet()
+        self.parameters = ComponentSet()
+        self.rules = ComponentSet()
         self.species = []
         self.odes = []
         self.observable_patterns = []
@@ -135,9 +136,9 @@ class Model(object):
         return SelfExporter.default_model
 
     def all_components(self):
-        components = []
-        for container in [self.monomers, self.compartments, self.parameters, self.rules]:
-            components += container.values()
+        components = ComponentSet()
+        for container in [self.monomers, self.compartments, self.rules, self.parameters]:
+            components |= container
         return components
 
     def add_component(self, other):
@@ -146,10 +147,9 @@ class Model(object):
         # errors, but still seems sort of fragile.
         container_name = type(other).__name__.lower() + 's'
         container = getattr(self, container_name, None)
-        if not isinstance(other, Component) or container is None:
-            raise Exception("Tried to add component of unknown type %s to model" % type(other))
-        container[other.name] = other
-        # FIXME: used to use a list, and we'd keep the param list sorted. maybe add params_sorted()?
+        if not isinstance(other, Component) or not isinstance(container, ComponentSet):
+            raise Exception("Tried to add component of unknown type '%s' to model" % type(other))
+        container.add(other)
 
     def add_observable(self, name, reaction_pattern):
         try:
@@ -216,19 +216,14 @@ class Monomer(Component):
         self.sites_dict = dict.fromkeys(sites)
         self.site_states = site_states
 
-    def __call__(self, *dict_site_conditions, **named_site_conditions):
-        """Build a pattern object with convenient kwargs for the sites"""
-        site_conditions = named_site_conditions.copy()
-        # TODO: should key conflicts silently overwrite, or warn, or error?
-        # TODO: ensure all values are dicts or dict-like?
-        for condition_dict in dict_site_conditions:
-            if condition_dict is not None:
-                site_conditions.update(condition_dict)
-        return MonomerPattern(self, site_conditions, None)
+    def __call__(self, *args, **kwargs):
+        """Build a MonomerPattern object with convenient kwargs for the sites"""
+        return MonomerPattern(self, extract_site_conditions(*args, **kwargs), None)
 
     def __repr__(self):
         return  '%s(name=%s, sites=%s, site_states=%s)' % \
             (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states))
+
     
 
 class MonomerAny(Monomer):
@@ -309,12 +304,15 @@ class MonomerPattern(object):
         return len(self.site_conditions) == len(self.monomer.sites) and \
             (len(SelfExporter.default_model.compartments) == 0 or self.compartment is not None)
 
-    def _copy(self):
-        """Implement our own brand of semi-deep copy.
-
-        The new object will have references to the original monomer and compartment, and
-        a shallow copy of site_conditions."""
-        return MonomerPattern(self.monomer, self.site_conditions.copy(), self.compartment)
+    def __call__(self, *args, **kwargs):
+        """Build a new MonomerPattern with updated site conditions. Can be used
+        to obtain a shallow copy by passing an empty argument list."""
+        # The new object will have references to the original monomer and
+        # compartment, and a shallow copy of site_conditions which has been
+        # updated according to our args (as in Monomer.__call__).
+        site_conditions = self.site_conditions.copy()
+        site_conditions.update(extract_site_conditions(*args, **kwargs))
+        return MonomerPattern(self.monomer, site_conditions, self.compartment)
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
@@ -344,7 +342,7 @@ class MonomerPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
-            mp_new = self._copy()
+            mp_new = self()
             mp_new.compartment = other
             return mp_new
         else:
@@ -394,12 +392,12 @@ class ComplexPattern(object):
             sorted((mp.monomer, mp.site_conditions) for mp in self.monomer_patterns) == \
             sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
 
-    def _copy(self):
-        """Implement our own brand of semi-deep copy.
+    def copy(self):
+        """Implement our own brand of shallow copy.
 
         The new object will have references to the original compartment, and
-        a _copy of the contents of monomer_patterns."""
-        return ComplexPattern([mp._copy() for mp in self.monomer_patterns], self.compartment, self.match_once)
+        copies of the monomer_patterns."""
+        return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
@@ -429,7 +427,7 @@ class ComplexPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
-            cp_new = self._copy()
+            cp_new = self.copy()
             cp_new.compartment = other
             return cp_new
         else:
@@ -606,11 +604,92 @@ class SymbolExistsWarning(UserWarning):
     """Issued by model component constructors when a name is reused."""
     pass
 
-class ComponentDict(dict):
-    """A dict subclass for storing model components.  Its iter() behavior is to iterate over values
-    instead of keys."""
+
+
+class ComponentSet(collections.MutableSet, collections.MutableMapping):
+    """A container for storing model Components. It behaves mostly like an ordered set, but
+    components can also be retrieved and deleted by name by using the [] operator (as in a dict
+    lookup)."""
+    # The implementation is based on a list instead of a linked list (as OrderedSet is), since the
+    # expected usage pattern is heavy on append and retrieve, and light on delete.
+
+    def __init__(self, iterable=[]):
+        self._elements = []
+        self._map = {}
+        for value in iterable:
+            self.add(value)
+
     def __iter__(self):
-        return self.itervalues()
+        return iter(self._elements)
+
+    def __contains__(self, value):
+        # O(n) but not expected to be called much
+        return value in self._elements
+
+    def __len__(self):
+        return len(self._elements)
+
+    def add(self, c):
+        if not isinstance(c, Component):
+            raise TypeError("Expected only Components, got a %s" % type(c))
+        if c.name not in self._map:
+            self._elements.append(c)
+            self._map[c.name] = c
+
+    def discard(self, c):
+        # TODO
+        raise NotImplementedError()
+
+    def __getitem__(self, key):
+        return self._map[key]
+
+    def __delitem__(self, key):
+        # TODO
+        raise NotImplementedError()
+
+    def __setitem__(self, key, value):
+        # TODO
+        raise NotImplementedError()
+
+    def iterkeys(self):
+        for c in self:
+            yield c.name
+
+    def itervalues(self):
+        return self.__iter__()
+
+    def iteritems(self):
+        for c in self:
+            yield (c.name, c)
+
+    def keys(self):
+        return [c.name for c in self]
+
+    def values(self):
+        return [c for c in self]
+
+    def items(self):
+        return zip(self.keys(), self)
+
+    def __repr__(self):
+        return '{' + \
+            ',\n '.join("'%s': %s" % t for t in self.iteritems()) + \
+            '}'
+
+
+
+def extract_site_conditions(*args, **kwargs):
+    """Handle parsing of MonomerPattern site conditions.
+    """
+    # enforce site conditions as kwargs or a dict but not both
+    if (args and kwargs) or len(args) > 1:
+        raise Exception("Site conditions may be specified as EITHER keyword arguments OR a single dict")
+    # handle normal cases
+    elif args:
+        site_conditions = args[0].copy()
+    else:
+        site_conditions = kwargs
+    return site_conditions
 
 
 
