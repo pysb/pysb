@@ -2,9 +2,11 @@ import pysb
 
 class KappaGenerator(object):
 
-    def __init__(self, model):
+    # Dialect can be either 'complx' or 'kasim' (default)
+    def __init__(self, model, dialect='kasim'):
         self.model = model
         self.__content = None
+        self.dialect = dialect
 
     def get_content(self):
         if self.__content == None:
@@ -15,7 +17,12 @@ class KappaGenerator(object):
         self.__content = ''
         #self.generate_parameters()
         #self.generate_compartments()
-        self.generate_molecule_types()
+
+        # Agent declarations appear to be required in kasim
+        # but prohibited in complx
+        if (self.dialect == 'kasim'):
+            self.generate_molecule_types() 
+
         self.generate_reaction_rules()
         self.generate_observables()
         self.generate_species()
@@ -87,7 +94,17 @@ class KappaGenerator(object):
         for i, code in enumerate(species_codes):
             param = self.model.initial_conditions[i][1]
             #self.__content += ("%%init:  %-" + str(max_length) + "s   %s\n") % (code, param.name)
-            self.__content += ("%%init: %10g %s\n") % (param.value, code)
+            if (self.dialect == 'kasim'):
+                # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
+                # for large integers
+                self.__content += ("%%init: %d %s\n") % (param.value, code)
+                #self.__content += ("%%init: %10g %s\n") % (param.value, code)
+            else:
+                # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
+                # for large integers
+                self.__content += ("%%init: %10d * %s\n") % (param.value, code)
+                #self.__content += ("%%init: %10g * %s\n") % (param.value, code)
+
         self.__content += "\n"
 
 
