@@ -1,6 +1,11 @@
 import inspect
 from pysb import *
 
+DEFAULT_UNI_KF = 1e6
+DEFAULT_BI_KF = 1e6
+DEFAULT_KR = 0.1
+DEFAULT_KC = 1
+
 def del_rule(model, rname):
     """delete rules by name 'rname'"""
     idx = [i for i,r in enumerate(model.rules) if r.name == rname][0]
@@ -20,51 +25,56 @@ def alias_model_components(model=None):
     components = dict((c.name, c) for c in model.all_components())
     caller_globals.update(components)
 
-def two_step_mod(Enz, Sub, Prod, klist=None, site='bf'):
+def two_step_mod_sites(enz, enz_site, sub, sub_site, prod, klist=None):
     """Automation of the Enz + Sub <> Enz:Sub >> Enz + Prod two-step catalytic reaction.
     This function assumes that there is a site named 'bf' (bind site for fxn)
     which it uses by default. This also assumes Enz returns to its original state.
     In an aim for simplicity, site 'bf' need not be passed when calling the function by
     the reactants, but THE FULL STATE OF THE PRODUCT must be specified"""
     
+    # FIXME: this will fail if the argument passed is a Complex object. 
+    r1_name = 'cplx_%s%s_%s%s' % (sub.monomer.name, ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
+                                     enz.monomer.name, ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+    r2_name = 'diss_%s%s_via_%s%s' % (prod.monomer.name, ''.join(filter(lambda a: a != None, prod.site_conditions.values())),
+                                         enz.monomer.name, ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+
     # Default names for the parameters
     if (not klist):
-         
+        kf = Parameter(r1_name + '_kf', DEFAULT_BI_KF)
+        kr = Parameter(r1_name + '_kr', DEFAULT_KR)
+        kc = Parameter(r2_name + '_kc', DEFAULT_KC)
     else:
         kf, kr, kc = klist #forward, reverse, catalytic
      
-    
-    # FIXME: this will fail if the argument passed is a Complex object. 
-
-    r1_name = 'cplx_%s%s_%s%s' % (Sub.monomer.name, ''.join(filter(lambda a: a != None, Sub.site_conditions.values())),
-                                     Enz.monomer.name, ''.join(filter(lambda a: a != None, Enz.site_conditions.values())))
-    r2_name = 'diss_%s%s_via_%s%s' % (Prod.monomer.name, ''.join(filter(lambda a: a != None, Prod.site_conditions.values())),
-                                         Enz.monomer.name, ''.join(filter(lambda a: a != None, Enz.site_conditions.values())))
-    
-    assert site in Enz.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site, Enz.monomer.name)
-    assert site in Sub.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site, Sub.monomer.name)
+    assert enz_site in enz.monomer.sites_dict, \
+        "Required site %s not present in %s as required"%(enz_site, Enz.monomer.name)
+    assert sub_site in sub.monomer.sites_dict, \
+        "Required site %s not present in %s as required"%(sub_site, Sub.monomer.name)
+    assert prod.is_concrete(), \
+        "The product %s is not a fully specified (concrete) pattern." % (prod) 
 
     # make the intermediate complex components
-    etmpdict = Enz.site_conditions.copy()
-    stmpdict = Sub.site_conditions.copy()
+    etmpdict = enz.site_conditions.copy()
+    stmpdict = sub.site_conditions.copy()
     
-    etmpdict[site] = 1
-    stmpdict[site] = 1
+    etmpdict[enz_site] = 1
+    stmpdict[sub_site] = 1
 
-    EnzCplx = Enz.monomer(etmpdict)
-    SubCplx = Sub.monomer(stmpdict)
+    enz_cplx = enz.monomer(etmpdict)
+    sub_cplx = sub.monomer(stmpdict)
 
     # add the 'bf' site to the patterns
-    Enz.site_conditions[site] = None
-    Sub.site_conditions[site] = None
+    enz.site_conditions[enz_site] = None
+    sub.site_conditions[sub_site] = None
 
     # now that we have the complex elements formed we can write the first step rule
-    Rule(r1_name, Enz + Sub <> EnzCplx % SubCplx, kf, kr)
+    Rule(r1_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
     
     # and finally the rule for the catalytic transformation
-    Rule(r2_name, EnzCplx % SubCplx >> Enz + Prod, kc)
+    Rule(r2_name, enz_cplx % sub_cplx >> enz + prod, kc)
+
+def two_step_mod(Enz, Sub, Prod, klist=None, site='bf'):
+    two_step_mod_sites(Enz, site, Sub, site, Prod, klist)
 
 def two_step_conv(Sub1, Sub2, Prod, klist, site='bf'):
     """Automation of the Sub1 + Sub2 <> Sub1:Sub2 >> Prod two-step reaction (i.e. dimerization).
@@ -73,7 +83,8 @@ def two_step_conv(Sub1, Sub2, Prod, klist, site='bf'):
 
     kf, kr, kc = klist
     
-    r1_name = 'cplx_%s_%s' % (Sub2.monomer.name, Sub1.monomer.name)
+    r1_name = 'cplx_%s%s_%s%s' % (Sub2.monomer.name, ''.join(filter(lambda a: a != None, Sub2.site_conditions.values())),
+                                     Sub1.monomer.name, ''.join(filter(lambda a: a != None, Sub1.site_conditions.values())))
 
     #FIXME: this is a bit dirty but it fixes the problem when prod is a pattern
     if isinstance(Prod, MonomerPattern):
@@ -233,8 +244,8 @@ def bind(Sub1, site1, Sub2, site2, klist=None):
         # Default parameter values
         # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies 100nM binding
         # FIXME get rid of these magic numbers!!!! Put in a global setting of some kind
-        kf = Parameter(r_name + '_kf', 1e6)
-        kr = Parameter(r_name + '_kr', 1e-1)
+        kf = Parameter(r_name + '_kf', DEFAULT_BI_KF)
+        kr = Parameter(r_name + '_kr', DEFAULT_KR)
     else: 
         kf, kr = klist
 
@@ -426,8 +437,8 @@ def reversibly_translocate(sub, loc1, loc2, klist=None, locname='loc'):
         # Default parameter values
         # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies 100nM binding
         # FIXME get rid of these magic numbers!!!! Put in a global setting of some kind
-        kf = Parameter(r_name_fwd + '_rate', 1e6)
-        kr = Parameter(r_name_rev + '_rate', 1e-1)
+        kf = Parameter(r_name_fwd + '_rate', DEFAULT_UNI_KF)
+        kr = Parameter(r_name_rev + '_rate', DEFAULT_KR)
     else: 
         kf, kr = klist
 
@@ -468,4 +479,6 @@ def plotoutput(simout, norm=True):
     
     for i in range(nplots): #assume simout[0] is time
         pass
+
+
         
