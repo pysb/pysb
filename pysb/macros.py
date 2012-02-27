@@ -20,14 +20,19 @@ def alias_model_components(model=None):
     components = dict((c.name, c) for c in model.all_components())
     caller_globals.update(components)
 
-def two_step_mod(Enz, Sub, Prod, klist,  site='bf'):
+def two_step_mod(Enz, Sub, Prod, klist=None, site='bf'):
     """Automation of the Enz + Sub <> Enz:Sub >> Enz + Prod two-step catalytic reaction.
     This function assumes that there is a site named 'bf' (bind site for fxn)
-    which it uses by default. This also assume Enz returns to its original state.
+    which it uses by default. This also assumes Enz returns to its original state.
     In an aim for simplicity, site 'bf' need not be passed when calling the function by
     the reactants, but THE FULL STATE OF THE PRODUCT must be specified"""
     
-    kf, kr, kc = klist #forward, reverse, catalytic
+    # Default names for the parameters
+    if (not klist):
+         
+    else:
+        kf, kr, kc = klist #forward, reverse, catalytic
+     
     
     # FIXME: this will fail if the argument passed is a Complex object. 
 
@@ -206,37 +211,57 @@ def one_step_conv(Sub1, Sub2, Prod, klist, site='bf'):
 
     # combine the monomers into a product step rule
     Rule(r1_name, Sub1 + Sub2 <> Prod, kf, kr)
+
+def bind(Sub1, site1, Sub2, site2, klist=None):
+    """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation, but allows
+    the binding sites of both species to be specified.
+    Note that it expects Sub1 and Sub2 to be MonomerPatterns (not Monomers), and site1
+    and site2 strings indicating the names of the binding sites.
+    klist is list of Parameter objects. If klist is not provided as an argument,
+    the bind function will generate default forward and reverse parameters.
+    """
+
+    # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
+    r_name = 'cplx_%s_%s' % (Sub1.monomer.name, Sub2.monomer.name)
     
-def simple_bind(Sub1, Sub2, klist, site='bf'):
-    """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation. 
-    This function assumes that there is a site named 'bf' which, for simplicity
-    need not be passed"""
-    
-    kf, kr = klist
-    
-    # FIXME: this will fail if the argument passed is a complex... 
-    r1_name = 'cplx_%s_%s' % (Sub1.monomer.name, Sub2.monomer.name)
-    
-    assert site in Sub1.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site, Sub1.monomer.name)
-    assert site in Sub2.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site, Sub2.monomer.name)
-    
+    assert site1 in Sub1.monomer.sites_dict, \
+        "Required site %s not present in %s as required"%(site1, Sub1.monomer.name)
+    assert site2 in Sub2.monomer.sites_dict, \
+        "Required site %s not present in %s as required"%(site2, Sub2.monomer.name)
+
+    if (not klist):
+        # Default parameter values
+        # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies 100nM binding
+        # FIXME get rid of these magic numbers!!!! Put in a global setting of some kind
+        kf = Parameter(r_name + '_kf', 1e6)
+        kr = Parameter(r_name + '_kr', 1e-1)
+    else: 
+        kf, kr = klist
+
     # create the site conditions for the complex
     s1tmpdict = Sub1.site_conditions.copy()
     s2tmpdict = Sub2.site_conditions.copy()
     
-    s1tmpdict[site] = 1
-    s2tmpdict[site] = 1
+    s1tmpdict[site1] = 1
+    s2tmpdict[site2] = 1
 
     Sub1Cplx = Sub1.monomer(s1tmpdict)
     Sub2Cplx = Sub2.monomer(s2tmpdict)
 
     # create the sites for the monomers
-    Sub1.site_conditions[site] = None
-    Sub2.site_conditions[site] = None
+    Sub1.site_conditions[site1] = None
+    Sub2.site_conditions[site2] = None
     # now that we have the complex elements formed we can write the first step rule
-    Rule(r1_name, Sub1 + Sub2 <> Sub1Cplx % Sub2Cplx, kf, kr)
+    Rule(r_name, Sub1 + Sub2 <> Sub1Cplx % Sub2Cplx, kf, kr)
+   
+ 
+def simple_bind(Sub1, Sub2, klist, site='bf'):
+    """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation. 
+    This function assumes that there is a site named 'bf' which, for simplicity
+    need not be passed. Invokes the bind function using the same name for
+    each site."""
+        
+    bind(Sub1, site, Sub2, site, klist)
 
 inhibit = simple_bind #alias for simplebind
 
@@ -369,6 +394,59 @@ def multisite_bind_table(bindtable):
                 rc += 1
 
 
+def reversibly_translocate(sub, loc1, loc2, klist=None, locname='loc'):
+    """Create fwd and reverse rules defining a reversible state transition for
+    the monomer given by the MonomerPattern sub from one localization state
+    to another.
+
+    Creates two rules with names following the pattern: 'monomer_loc1_to_loc2' and vice versa.
+
+    The function generates a rule with the name following the pattern 
+    --  sub is a MonomerPattern specifying the species that translocates. The localization
+        state should not be specified here.
+    --  loc1 and loc2 are strings specifying the names of the locations
+        (e.g., 'c' for cytoplasmic, 'm' for mitochondrial)
+    --  klist is a list of Parameter objects specifying the forward (loc1 to loc2)
+        and reverse (loc2 to loc1) rates. If not specified, the parameters are generated
+        according to the pattern 'sub_loc1_to_loc2_rate' and 'sub_loc2_to_loc1_rate'.
+    --  locname is an optional string specifying the name of the site that describes
+        the location. Defaults to 'loc'.
+    """
+
+    # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
+    r_name_fwd = '%s_%s_to_%s' % (sub.monomer.name, loc1, loc2)
+    r_name_rev = '%s_%s_to_%s' % (sub.monomer.name, loc2, loc1)
+    
+    # FIXME: ideally, we should also make sure that the localizations themselves
+    # have been declared, not just the name of the loc site
+    assert locname in sub.monomer.sites_dict, \
+        "Required site %s not present in %s as required"%(locname, sub.monomer.name)
+
+    if (not klist):
+        # Default parameter values
+        # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies 100nM binding
+        # FIXME get rid of these magic numbers!!!! Put in a global setting of some kind
+        kf = Parameter(r_name_fwd + '_rate', 1e6)
+        kr = Parameter(r_name_rev + '_rate', 1e-1)
+    else: 
+        kf, kr = klist
+
+    # create the site conditions for the complex
+    s1tmpdict = sub.site_conditions.copy()
+    s2tmpdict = sub.site_conditions.copy()
+ 
+    sub_loc1 = sub.monomer(s1tmpdict)
+    sub_loc2 = sub.monomer(s2tmpdict)
+
+    # specify the localizations for the monomers
+    sub_loc1.site_conditions[locname] = loc1
+    sub_loc2.site_conditions[locname] = loc2
+
+    # now that we have the complex elements formed we can write the first step rule
+    Rule(r_name_fwd, sub_loc1 >> sub_loc2, kf)
+    Rule(r_name_rev, sub_loc2 >> sub_loc1, kr)
+   
+ 
 #-------------------------------------------------------------------------
 # Random little helper funcs that make it easier to interact w the model.
 #-------------------------------------------------------------------------
