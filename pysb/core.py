@@ -79,8 +79,6 @@ class SelfExporter(object):
             SelfExporter.default_model.add_component(obj)
 
         # load obj into target namespace under obj.name
-        # FIXME if name already used, add_component will succeed since it's done first.
-        #   this whole thing needs to be rethought, really.
         if SelfExporter.target_globals.has_key(export_name):
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
@@ -92,7 +90,12 @@ class Component(object):
     def __init__(self, name, __export=True):
         self.name = name
         if __export:
-            SelfExporter.export(self)
+            try:
+                SelfExporter.export(self)
+            except ComponentDuplicateNameError as e:
+                # re-raise to hide the stack trace below this point -- it's irrelevant to the user
+                # and makes the error harder to understand
+                raise e
 
 
 class Model(object):
@@ -622,17 +625,18 @@ class ComponentSet(collections.MutableSet, collections.MutableMapping):
     def __iter__(self):
         return iter(self._elements)
 
-    def __contains__(self, value):
-        # O(n) but not expected to be called much
-        return value in self._elements
+    def __contains__(self, c):
+        if not isinstance(c, Component):
+            raise TypeError("Can only work with Components, got a %s" % type(c))
+        return c.name in self._map and self[c.name] is c
 
     def __len__(self):
         return len(self._elements)
 
     def add(self, c):
-        if not isinstance(c, Component):
-            raise TypeError("Expected only Components, got a %s" % type(c))
-        if c.name not in self._map:
+        if c not in self:
+            if c.name in self._map:
+                raise ComponentDuplicateNameError("Tried to add a component with a duplicate name: %s" % c.name)
             self._elements.append(c)
             self._map[c.name] = c
 
@@ -676,6 +680,11 @@ class ComponentSet(collections.MutableSet, collections.MutableMapping):
             ',\n '.join("'%s': %s" % t for t in self.iteritems()) + \
             '}'
 
+
+class ComponentDuplicateNameError(ValueError):
+    """Issued by ComponentSet.add when a component is added with the
+    same name as an existing one."""
+    pass
 
 
 def extract_site_conditions(*args, **kwargs):
