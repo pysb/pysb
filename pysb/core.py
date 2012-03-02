@@ -87,9 +87,9 @@ class SelfExporter(object):
 class Component(object):
     """The base class for all the things contained within a model."""
 
-    def __init__(self, name, __export=True):
+    def __init__(self, name, _export=True):
         self.name = name
-        if __export:
+        if _export:
             try:
                 SelfExporter.export(self)
             except ComponentDuplicateNameError as e:
@@ -100,7 +100,7 @@ class Component(object):
 
 class Model(object):
 
-    def __init__(self, name=None, __export=True):
+    def __init__(self, name=None, _export=True):
         self.name = name
         self.monomers = ComponentSet()
         self.compartments = ComponentSet()
@@ -111,7 +111,7 @@ class Model(object):
         self.observable_patterns = []
         self.observable_groups = {}  # values are tuples of factor,speciesnumber
         self.initial_conditions = []
-        if __export:
+        if _export:
             SelfExporter.export(self)
 
     def reload(self):
@@ -190,8 +190,8 @@ class Monomer(Component):
     """The Monomer class creates monomers with the specified sites, state-sites, and compartment
     """
 
-    def __init__(self, name, sites=[], site_states={}, __export=True):
-        Component.__init__(self, name, __export)
+    def __init__(self, name, sites=[], site_states={}, _export=True):
+        Component.__init__(self, name, _export)
 
         # convert single site string to list
         if type(sites) == str:
@@ -508,8 +508,8 @@ def as_reaction_pattern(v):
 
 class Parameter(Component):
 
-    def __init__(self, name, value=float('nan'), __export=True):
-        Component.__init__(self, name, __export)
+    def __init__(self, name, value=float('nan'), _export=True):
+        Component.__init__(self, name, _export)
         self.value = value
 
     def __repr__(self):
@@ -525,8 +525,8 @@ class Compartment(Component):
     example: Compartment('eCell', dimension=3, size=extraSize, parent=None)
     """
 
-    def __init__(self, name, parent=None, dimension=3, size=None, __export=True):
-        Component.__init__(self, name, __export)
+    def __init__(self, name, parent=None, dimension=3, size=None, _export=True):
+        Component.__init__(self, name, _export)
 
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
@@ -549,8 +549,8 @@ class Rule(Component):
 
     def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None,
                  delete_molecules=False,
-                 __export=True):
-        Component.__init__(self, name, __export)
+                 _export=True):
+        Component.__init__(self, name, _export)
 
         # FIXME: This tuple thing is ugly (used to support >> and <> operators between ReactionPatterns).
         # This is how the reactant and product ReactionPatterns are passed, along with is_reversible.
