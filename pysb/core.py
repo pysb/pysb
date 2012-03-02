@@ -609,12 +609,12 @@ class SymbolExistsWarning(UserWarning):
 
 
 
-class ComponentSet(collections.MutableSet, collections.MutableMapping):
-    """A container for storing model Components. It behaves mostly like an ordered set, but
-    components can also be retrieved and deleted by name by using the [] operator (as in a dict
-    lookup)."""
-    # The implementation is based on a list instead of a linked list (as OrderedSet is), since the
-    # expected usage pattern is heavy on append and retrieve, and light on delete.
+class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
+    """An add-and-read-only container for storing model Components. It behaves mostly like an
+    ordered set, but components can also be retrieved by name *or* index by using the [] operator
+    (like a dict or list). Components may not be removed or replaced."""
+    # The implementation is based on a list instead of a linked list (as OrderedSet is), since we
+    # only allow add and retrieve, not delete.
 
     def __init__(self, iterable=[]):
         self._elements = []
@@ -640,20 +640,22 @@ class ComponentSet(collections.MutableSet, collections.MutableMapping):
             self._elements.append(c)
             self._map[c.name] = c
 
-    def discard(self, c):
-        # TODO
-        raise NotImplementedError()
-
     def __getitem__(self, key):
-        return self._map[key]
+        # Must support both Sequence and Mapping behavior. This means stringified integer Mapping
+        # keys (like "0") are forbidden, but since all Component names must be valid Python
+        # identifiers, integers are ruled out anyway.
+        if isinstance(key, int) or isinstance(key, long):
+            return self._elements[key]
+        else:
+            return self._map[key]
 
-    def __delitem__(self, key):
-        # TODO
-        raise NotImplementedError()
-
-    def __setitem__(self, key, value):
-        # TODO
-        raise NotImplementedError()
+    def get(self, key, default=None):
+        if isinstance(key, (int, long)):
+            raise ValueError("Get is undefined for integer arguments, use [] instead")
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
     def iterkeys(self):
         for c in self:
