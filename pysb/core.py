@@ -197,6 +197,9 @@ class Model(object):
             raise Exception("Value must be a Parameter")
         if not complex_pattern.is_concrete():
             raise Exception("Pattern must be concrete (all sites specified)")
+        if any(complex_pattern.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
+            # FIXME until we get proper canonicalization this could produce false negatives
+            raise Exception("Duplicate initial condition")
         self.initial_conditions.append( (complex_pattern, value) )
 
     def get_species_index(self, complex_pattern):
