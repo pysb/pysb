@@ -137,15 +137,17 @@ def _parse_species(model, line):
 
 
 def _parse_group(model, line):
-    (number, name, combination) = line.strip().split()
+    # values are number (which we ignore), name, and species list
+    values = line.strip().split()
     group = []
-    # combination is a comma separated list of [factor*]speciesnumber
-    for product in combination.split(','):
-        terms = product.split('*')
-        # if no factor given (just species), insert a factor of 1
-        if len(terms) == 1:
-            terms.insert(0, 1)
-        factor = int(terms[0])
-        species = int(terms[1]) - 1  # -1 to change to 0-based indexing
-        group.append((factor, species))  
-    model.observable_groups[name] = group
+    if len(values) == 3:
+        # combination is a comma separated list of [factor*]speciesnumber
+        for product in values[2].split(','):
+            terms = product.split('*')
+            # if no factor given (just species), insert a factor of 1
+            if len(terms) == 1:
+                terms.insert(0, 1)
+            factor = int(terms[0])
+            species = int(terms[1]) - 1  # -1 to change to 0-based indexing
+            group.append((factor, species))  
+    model.observable_groups[values[1]] = group

@@ -29,6 +29,8 @@ class BngGenerator(object):
         self.__content += "end parameters\n\n"
 
     def generate_compartments(self):
+        if not self.model.compartments:
+            return
         self.__content += "begin compartments\n"
         for c in self.model.compartments:
             if c.parent is None:
@@ -50,6 +52,8 @@ class BngGenerator(object):
         self.__content += "end molecule types\n\n"
 
     def generate_reaction_rules(self):
+        if not self.model.rules:
+            return
         self.__content += "begin reaction rules\n"
         max_length = max(len(r.name) for r in self.model.rules) + 1  # +1 for the colon
         for r in self.model.rules:
