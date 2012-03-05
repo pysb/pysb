@@ -533,7 +533,7 @@ def as_reaction_pattern(v):
 
 class Parameter(Component):
 
-    def __init__(self, name, value=float('nan'), _export=True):
+    def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
         self.value = value
 
