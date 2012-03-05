@@ -144,6 +144,31 @@ class Model(object):
             components |= container
         return components
 
+    def parameters_rules(self):
+        """Returns a ComponentSet of the parameters used as rate constants in rules"""
+        # rate_reverse is None for irreversible rules, so we'll need to filter those out
+        cset = ComponentSet(p for r in self.rules for p in (r.rate_forward, r.rate_reverse)
+                            if p is not None)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
+    def parameters_initial_conditions(self):
+        """Returns a ComponentSet of the parameters used as initial conditions"""
+        cset = ComponentSet(ic[1] for ic in self.initial_conditions)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
+    def parameters_compartments(self):
+        """Returns a ComponentSet of the parameters used as compartment sizes"""
+        cset = ComponentSet(c.size for c in self.compartments)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
+    def parameters_unused(self):
+        """Returns a ComponentSet of the parameters not used in the model at all"""
+        cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
+        return self.parameters - cset_used
+
     def add_component(self, other):
         # We have 4 containers for the 4 types of components. This code determines the right one
         # based on the class of the object being added.  It tries to be defensive against reasonable
@@ -676,6 +701,24 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
 
     def items(self):
         return zip(self.keys(), self)
+
+    # We reimplement this because collections.Set's __and__ mixin iterates over other, not
+    # self. That implementation ends up retaining the ordering of other, but we'd like to keep the
+    # ordering of self instead. We require other to be a ComponentSet too so we know it will support
+    # "in" efficiently.
+    def __and__(self, other):
+        if not isinstance(other, ComponentSet):
+            return collections.Set.__and__(self, other)
+        return ComponentSet(value for value in self if value in other)
+
+    def __rand__(self, other):
+        return self.__and__(other)
+
+    def __ror__(self, other):
+        return self.__or__(other)
+
+    def __rxor__(self, other):
+        return self.__xor__(other)
 
     def __repr__(self):
         return '{' + \
