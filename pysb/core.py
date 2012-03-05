@@ -88,6 +88,8 @@ class Component(object):
     """The base class for all the things contained within a model."""
 
     def __init__(self, name, _export=True):
+        if not re.match(r'[_a-z][_a-z0-9]*\Z', name, re.IGNORECASE):
+            raise InvalidComponentNameError(name)
         self.name = name
         if _export:
             try:
@@ -631,6 +633,11 @@ class ModelExistsWarning(UserWarning):
 class SymbolExistsWarning(UserWarning):
     """Issued by model component constructors when a name is reused."""
     pass
+
+class InvalidComponentNameError(ValueError):
+    """Issued by Component.__init__ when the given name is not valid."""
+    def __init__(self, name):
+        ValueError.__init__(self, "Not a valid component name: '%s'" % name)
 
 
 
