@@ -5,7 +5,7 @@ Model()
 Compartment('extracellular', dimension=3)
 Compartment('membrane', parent=extracellular, dimension=2)
 
-Monomer('egf', 'R')
+Monomer('egf', ['R'])
 Monomer('egfr', ['L', 'D', 'C'])
 
 Parameter('Kf_egfr_egf', 1.2)

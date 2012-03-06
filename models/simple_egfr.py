@@ -38,7 +38,7 @@ Parameter('kdeg',          0.01)
 
 
 #  EGF(r)
-Monomer('EGF', 'r')
+Monomer('EGF', ['r'])
 
 #  EGFR(l, r, Y1068~U~P, Y1148~U~P)
 Monomer('EGFR',
@@ -54,7 +54,7 @@ Monomer('Grb2', ['SH2','SH3'])
 Monomer('Shc', ['PTB','Y317'], { 'Y317': ['U','P'] } )
 
 #  Sos(PR)
-Monomer('Sos', 'PR')
+Monomer('Sos', ['PR'])
 
 #  NULL()
 Monomer('NULL')
@@ -98,11 +98,9 @@ Rule('grb2_bind_egfr',
 
 # Grb2 binding to Sos
 #Grb2(SH2,SH3) + Sos(PR) <-> Grb2(SH2,SH3!1).Sos(PR!1) kp5,km5
-# using dict_site_condition as a test here, not actually useful in this case
-# (some of the tests are baroque on purpose :)
 Rule('grb2_bind_sos',
-     Grb2({'SH2':None}, SH3=None) + Sos(None, PR=None) <>
-     Grb2({'SH2':None, 'SH3':1})    % Sos({}, {}, None, {}, PR=1),
+     Grb2(SH2=None, SH3=None) + Sos(PR=None) <>
+     Grb2(SH2=None, SH3=1)    % Sos(PR=1),
      kp5, km5)
 
 

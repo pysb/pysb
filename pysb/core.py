@@ -223,9 +223,9 @@ class Monomer(Component):
     def __init__(self, name, sites=[], site_states={}, _export=True):
         Component.__init__(self, name, _export)
 
-        # convert single site string to list
-        if type(sites) == str:
-            sites = [sites]
+        # ensure sites is some kind of list (presumably of strings) but not a string itself
+        if not isinstance(sites, collections.Iterable) or isinstance(sites, basestring):
+            raise ValueError("sites must be a list of strings")
         
         # ensure no duplicate sites
         sites_seen = {}
@@ -245,7 +245,7 @@ class Monomer(Component):
         if invalid_sites:
             raise Exception("Non-string state values in site_states for sites: " + str(invalid_sites))
 
-        self.sites = sites
+        self.sites = list(sites)
         self.sites_dict = dict.fromkeys(sites)
         self.site_states = site_states
 

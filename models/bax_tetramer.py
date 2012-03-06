@@ -9,7 +9,7 @@ Model()
 # Each BAX-BAX bond must always involve a t1 site on one monomer and a
 # t2 site on the other.
 Monomer('BAX', ['t1', 't2', 'inh'])
-Monomer('MCL1', 'b')
+Monomer('MCL1', ['b'])
 
 # Two lone monomers form a dimer.
 Parameter('kdimf', 1e-6)
