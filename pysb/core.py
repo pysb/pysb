@@ -442,7 +442,11 @@ class ComplexPattern(object):
 
     def __mod__(self, other):
         if isinstance(other, MonomerPattern):
-            return ComplexPattern(self.monomer_patterns + [other], None, self.match_once)
+            return ComplexPattern(self.monomer_patterns + [other], self.compartment, self.match_once)
+        elif isinstance(other, ComplexPattern):
+            if self.compartment is not other.compartment:
+                raise ValueError("merged ComplexPatterns must be identical")
+            return ComplexPattern(self.monomer_patterns + other.monomer_patterns, self.compartment, self.match_once)
         else:
             return NotImplemented
 
