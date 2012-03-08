@@ -110,6 +110,7 @@ class Model(object):
         self.rules = ComponentSet()
         self.species = []
         self.odes = []
+        self.reactions = []
         self.observable_patterns = []
         self.observable_groups = {}  # values are tuples of factor,speciesnumber
         self.initial_conditions = []

@@ -74,16 +74,17 @@ def generate_equations(model):
             line = lines.next()
             if 'end reactions' in line: break
             (number, reactants, products, rate, rule) = line.strip().split()
-            reactants = reactants.split(',')
-            products = products.split(',')
+            # the -1 is to switch from one-based to zero-based indexing
+            reactants = [int(r) - 1 for r in reactants.split(',')]
+            products = [int(p) - 1 for p in products.split(',')]
             rate = rate.rsplit('*')
-            # note that the -1 here and below is to switch to zero-based indexing
-            r_names = ['s%d' % (int(r) - 1) for r in reactants]
+            r_names = ['s%d' % r for r in reactants]
             combined_rate = sympy.Mul(*[sympy.S(t) for t in r_names + rate]) 
+            model.reactions.append({'reactants': reactants, 'products': products, 'rate': combined_rate})
             for p in products:
-                model.odes[int(p) - 1] += combined_rate
+                model.odes[p] += combined_rate
             for r in reactants:
-                model.odes[int(r) - 1] -= combined_rate
+                model.odes[r] -= combined_rate
 
         while 'begin groups' not in lines.next():
             pass
