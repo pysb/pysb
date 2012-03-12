@@ -13,11 +13,13 @@ import pygraphviz
 def run(model):
     pysb.bng.generate_equations(model)
 
-    graph = pygraphviz.AGraph(rankdir="LR")
+    graph = pygraphviz.AGraph(directed=True, rankdir="LR")
     for i, cp in enumerate(model.species):
         species_node = 's%d' % i
+        slabel = re.sub(r'% ', r'%\\l', str(cp))
+        slabel += '\\l'
         graph.add_node(species_node,
-                       #label=str(cp),
+                       label=slabel,
                        shape="Mrecord",
                        fillcolor="#ccffcc", style="filled", color="transparent",
                        fontsize="12",
@@ -40,14 +42,16 @@ def run(model):
         for s in products:
             r_link(graph, s, i, _flip=True)
         for s in modifiers:
-            r_link(graph, s, i, style="dotted", arrowType="odot")
+            r_link(graph, s, i, arrowhead="odiamond")
     return graph.string()
 
-def r_link(graph, s, r, **kwargs):
+def r_link(graph, s, r, **attrs):
     nodes = ('s%d' % s, 'r%d' % r)
-    if kwargs.get('_flip'):
+    if attrs.get('_flip'):
+        del attrs['_flip']
         nodes = reversed(nodes)
-    graph.add_edge(*nodes, **kwargs)
+    attrs.setdefault('arrowhead', 'normal')
+    graph.add_edge(*nodes, **attrs)
 
 if __name__ == '__main__':
     # sanity checks on filename
