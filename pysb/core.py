@@ -197,7 +197,7 @@ class Model(object):
         if not isinstance(value, Parameter):
             raise Exception("Value must be a Parameter")
         if not complex_pattern.is_concrete():
-            raise Exception("Pattern must be concrete (all sites specified)")
+            raise Exception("Pattern must be concrete")
         if any(complex_pattern.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
             # FIXME until we get proper canonicalization this could produce false negatives
             raise Exception("Duplicate initial condition")
@@ -330,13 +330,27 @@ class MonomerPattern(object):
         self.compartment = compartment
 
     def is_concrete(self):
-        """Tests whether all sites and compartment are specified."""
+        """Return a bool indicating whether the pattern is 'concrete'.
+
+        'Concrete' means the pattern satisfies ALL of the following:
+        1. All sites have specified conditions
+        2. If the model uses compartments, the compartment is specified.
+
+        """
+        # 1.
+        sites_ok = self.is_site_concrete()
+        # 2.
+        # FIXME accessing the model via SelfExporter.default_model is a temporary hack - all model
+        #   components (Component subclasses?) need weak refs to their parent model.
+        compartment_ok = self.compartment is not None or not SelfExporter.default_model.compartments
+        return compartment_ok and sites_ok
+
+    def is_site_concrete(self):
+        """Return a bool indicating whether the pattern is 'site-concrete'.
+
+        'Site-concrete' means all sites have specified conditions."""
         # assume __init__ did a thorough enough job of error checking that this is is all we need to do
-        # FIXME accessing the model via SelfExporter.default_model is
-        #   a temporary hack - all model components (Component
-        #   subclasses?) need weak refs to their parent model.
-        return len(self.site_conditions) == len(self.monomer.sites) and \
-            (len(SelfExporter.default_model.compartments) == 0 or self.compartment is not None)
+        return len(self.site_conditions) == len(self.monomer.sites)
 
     def __call__(self, *args, **kwargs):
         """Build a new MonomerPattern with updated site conditions. Can be used
@@ -410,9 +424,19 @@ class ComplexPattern(object):
         self.match_once = match_once
 
     def is_concrete(self):
-        """Tests whether all sites in all of monomer_patterns are specified."""
-        # FIXME should we also check that self.compartment is None? (BNG rules seem to dictate it)
-        return all(mp.is_concrete() for mp in self.monomer_patterns)
+        """Return a bool indicating whether the pattern is 'concrete'.
+
+        'Concrete' means the pattern satisfies ANY of the following:
+        1. All monomer patterns are concrete
+        2. The compartment is specified AND all monomer patterns are site-concrete
+
+        """
+        # 1.
+        mp_concrete_ok = all(mp.is_concrete() for mp in self.monomer_patterns)
+        # 2.
+        compartment_ok = self.compartment is not None and \
+            all(mp.is_site_concrete() for mp in self.monomer_patterns)
+        return mp_concrete_ok or compartment_ok
 
     def is_equivalent_to(self, other):
         """Checks for equality with another ComplexPattern"""
