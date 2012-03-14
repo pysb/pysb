@@ -99,11 +99,12 @@ def generate_equations(model):
 
 
 def _parse_species(model, line):
-    (index, complex_string, value) = line.strip().split()
+    index, species, value = line.strip().split()
+    complex_compartment_name, complex_string = re.match(r'(?:@(\w+)::)?(.*)', species).groups()
     monomer_strings = complex_string.split('.')
     monomer_patterns = []
     for ms in monomer_strings:
-        compartment_name, monomer_name, site_strings = re.match(r'(?:@(\w+)::)?(\w+)\(([^)]*)\)', ms).groups()
+        monomer_name, site_strings, monomer_compartment_name = re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
         site_conditions = {}
         if len(site_strings):
             for ss in site_strings.split(','):
@@ -130,10 +131,12 @@ def _parse_species(model, line):
                     site_name, condition = ss, None
                 site_conditions[site_name] = condition
         monomer = model.monomers[monomer_name]
-        monomer_patterns.append(monomer(site_conditions))
+        monomer_compartment = model.compartments.get(monomer_compartment_name)
+        mp = pysb.MonomerPattern(monomer, site_conditions, monomer_compartment)
+        monomer_patterns.append(mp)
 
-    compartment = model.compartments.get(compartment_name)
-    cp = pysb.ComplexPattern(monomer_patterns, compartment)
+    complex_compartment = model.compartments.get(complex_compartment_name)
+    cp = pysb.ComplexPattern(monomer_patterns, complex_compartment)
     model.species.append(cp)
 
 
