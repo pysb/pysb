@@ -403,9 +403,9 @@ class MonomerPattern(object):
                 for k in self.monomer.sites
                 if self.site_conditions.has_key(k)
                 ])
-        if self.compartment is not None:
-            value += ', compartment=' + self.compartment.name
         value += ')'
+        if self.compartment is not None:
+            value += ' ** ' + self.compartment.name
         return value
 
 
