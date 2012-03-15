@@ -28,7 +28,8 @@ def run(model):
         ics[model.get_species_index(cp)][1] = ic_param.value
     output.write("        <listOfSpecies>\n")
     for i, (cp, value) in enumerate(ics):
-        output.write('            <species id="s%d" name="%s" compartment="default" initialAmount="%e"/>\n' % (i, str(cp), value));
+        name = str(cp).replace('% ', '._br_')  # CellDesigner does something weird with % in names
+        output.write('            <species id="s%d" name="%s" compartment="default" initialAmount="%e"/>\n' % (i, name, value));
     output.write("        </listOfSpecies>\n")
 
     output.write("        <listOfParameters>\n")
