@@ -70,17 +70,40 @@ def generate_equations(model):
         while 'begin reactions' not in lines.next():
             pass
         model.odes = [sympy.S(0)] * len(model.species)
+        reaction_cache = {}
         while True:
             line = lines.next()
             if 'end reactions' in line: break
             (number, reactants, products, rate, rule) = line.strip().split()
             # the -1 is to switch from one-based to zero-based indexing
-            reactants = [int(r) - 1 for r in reactants.split(',')]
-            products = [int(p) - 1 for p in products.split(',')]
+            reactants = tuple(int(r) - 1 for r in reactants.split(','))
+            products = tuple(int(p) - 1 for p in products.split(','))
             rate = rate.rsplit('*')
+            (rule_name, is_reverse) = re.match(r'#(\w+)(?:\((reverse)\))?', rule).groups()
+            is_reverse = bool(is_reverse)
             r_names = ['s%d' % r for r in reactants]
             combined_rate = sympy.Mul(*[sympy.S(t) for t in r_names + rate]) 
-            model.reactions.append({'reactants': reactants, 'products': products, 'rate': combined_rate})
+            rule = model.rules[rule_name]
+            reaction = {
+                'reactants': reactants,
+                'products': products,
+                'rate': combined_rate,
+                'rule': rule_name,
+                'reverse': is_reverse,
+                }
+            model.reactions.append(reaction)
+            if is_reverse:
+                # FIXME: sometimes reverse reaction comes before forward, so we get a KeyError here
+                reaction_bd = reaction_cache[(rule_name, products, reactants)]
+                reaction_bd['reversible'] = True
+                reaction_bd['rate'] -= combined_rate
+            else:
+                reaction_bd = dict(reaction)
+                del reaction_bd['reverse']
+                # default to false until we find a matching (reverse) reaction
+                reaction_bd['reversible'] = False
+                reaction_cache[(rule_name, reactants, products)] = reaction_bd
+                model.reactions_bidirectional.append(reaction_bd)
             for p in products:
                 model.odes[p] += combined_rate
             for r in reactants:

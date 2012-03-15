@@ -37,9 +37,9 @@ def run(model):
     output.write("        </listOfParameters>\n")
 
     output.write("        <listOfReactions>\n")
-    for i, reaction in enumerate(model.reactions):
-        # FIXME we should map reversible rules through to reversible reactions here
-        output.write('            <reaction id="r%d" name="r%d" reversible="false">\n' % (i, i));
+    for i, reaction in enumerate(model.reactions_bidirectional):
+        reversible = str(reaction['reversible']).lower()
+        output.write('            <reaction id="r%d" name="r%d" reversible="%s">\n' % (i, i, reversible));
         output.write('                <listOfReactants>\n');
         for species in reaction['reactants']:
             output.write('                    <speciesReference species="s%d"/>\n' % species)

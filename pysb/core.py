@@ -111,6 +111,7 @@ class Model(object):
         self.species = []
         self.odes = []
         self.reactions = []
+        self.reactions_bidirectional = []
         self.observable_patterns = []
         self.observable_groups = {}  # values are tuples of factor,speciesnumber
         self.initial_conditions = []
