@@ -92,18 +92,20 @@ def generate_equations(model):
                 'reverse': is_reverse,
                 }
             model.reactions.append(reaction)
-            if is_reverse:
-                # FIXME: sometimes reverse reaction comes before forward, so we get a KeyError here
-                reaction_bd = reaction_cache[(rule_name, products, reactants)]
-                reaction_bd['reversible'] = True
-                reaction_bd['rate'] -= combined_rate
-            else:
+            key = (rule_name, reactants, products)
+            key_reverse = (rule_name, products, reactants)
+            reaction_bd = reaction_cache.get(key_reverse)
+            if reaction_bd is None:
+                # make a copy of the reaction dict
                 reaction_bd = dict(reaction)
                 del reaction_bd['reverse']
-                # default to false until we find a matching (reverse) reaction
+                # default to false until we find a matching reverse reaction
                 reaction_bd['reversible'] = False
-                reaction_cache[(rule_name, reactants, products)] = reaction_bd
+                reaction_cache[key] = reaction_bd
                 model.reactions_bidirectional.append(reaction_bd)
+            else:
+                reaction_bd['reversible'] = True
+                reaction_bd['rate'] -= combined_rate
             for p in products:
                 model.odes[p] += combined_rate
             for r in reactants:
