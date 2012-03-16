@@ -98,7 +98,6 @@ def generate_equations(model):
             if reaction_bd is None:
                 # make a copy of the reaction dict
                 reaction_bd = dict(reaction)
-                del reaction_bd['reverse']
                 # default to false until we find a matching reverse reaction
                 reaction_bd['reversible'] = False
                 reaction_cache[key] = reaction_bd
@@ -110,6 +109,13 @@ def generate_equations(model):
                 model.odes[p] += combined_rate
             for r in reactants:
                 model.odes[r] -= combined_rate
+        # fix up reactions whose reverse version we saw first
+        for r in model.reactions_bidirectional:
+            if r['reverse']:
+                r['reactants'], r['products'] = r['products'], r['reactants']
+                r['rate'] *= -1
+            # now the 'reverse' value is no longer needed
+            del r['reverse']
 
         while 'begin groups' not in lines.next():
             pass
