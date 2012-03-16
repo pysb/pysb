@@ -49,8 +49,9 @@ def run(model):
         for species in reaction['products']:
             output.write('                    <speciesReference species="s%d"/>\n' % species)
         output.write('                </listOfProducts>\n');
-        formula = sympy.ccode(reaction['rate'])
-        output.write('                <kineticLaw formula="%s"/>\n' % formula);
+        mathml = '<math xmlns="http://www.w3.org/1998/Math/MathML">' \
+            + sympy.printing.mathml(reaction['rate']) + '</math>'
+        output.write('                <kineticLaw>' + mathml + '</kineticLaw>\n');
         output.write('            </reaction>\n');
     output.write("        </listOfReactions>\n")
 
