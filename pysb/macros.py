@@ -6,19 +6,8 @@ DEFAULT_BI_KF = 1e6
 DEFAULT_KR = 0.1
 DEFAULT_KC = 1
 
-def del_rule(model, rname):
-    """delete rules by name 'rname'"""
-    idx = [i for i,r in enumerate(model.rules) if r.name == rname][0]
-    model.rules.pop(idx)
-
-def report_extra_parms(model):
-    """report the parameters that are not involved in any rules"""
-    pass
-
-
 def alias_model_components(model=None):
-    """
-    """
+    """Make all model components visible as symbols in the caller's global namespace"""
     if model is None:
         model = SelfExporter.default_model
     caller_globals = inspect.currentframe().f_back.f_globals
@@ -456,29 +445,3 @@ def reversibly_translocate(sub, loc1, loc2, klist=None, locname='loc'):
     # now that we have the complex elements formed we can write the first step rule
     Rule(r_name_fwd, sub_loc1 >> sub_loc2, kf)
     Rule(r_name_rev, sub_loc2 >> sub_loc1, kr)
-   
- 
-#-------------------------------------------------------------------------
-# Random little helper funcs that make it easier to interact w the model.
-#-------------------------------------------------------------------------
-
-def get_param_num(model, name):
-    for i in range(len(model.parameters)):
-        if model.parameters[i].name == name:
-            print i, model.parameters[i]
-            break
-    return i
-
-def plotoutput(simout, norm=True):
-    """ Assume norm is true for now
-    """
-    pylab.ion()
-    pylab.figure()
-    nplots = len(simout.shape[0] -1)
-    
-    
-    for i in range(nplots): #assume simout[0] is time
-        pass
-
-
-        
