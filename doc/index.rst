@@ -12,7 +12,11 @@ Contents:
    :maxdepth: 2
 
    intro
+   installation
    tutorial
+   user_guide
+   mod_ref
+   about
 
 Indices and tables
 ==================
