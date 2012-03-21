@@ -114,6 +114,19 @@ components we can add to our model.
 Parameters
 ~~~~~~~~~~
 
+A ``Parameter`` is a named constant floating point number used as a
+reaction rate constant, compartment volume or initial (boundary)
+condition for a species (*parameter* in BNG). A parameter is defined
+using the keyword ``Parameter`` followed by its name and value. Here
+is how you would define a parameter named 'kf1' with the value
+:math:`4 \times 10^{-7}`::
+
+    Parameter('kf1', 4e-7)
+
+The second argument may be any numeric expression, but best practice
+is to use a floating-point literal in scientific notation as shown in
+the example above.
+
 Rules
 ~~~~~
 
