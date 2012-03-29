@@ -1,44 +1,14 @@
 #!/usr/bin/env python
 
 from pysb.generator.bng import BngGenerator
-from pysb.bng import generate_network_code, pkg_path
+from pysb.bng import generate_network
 import re
 import sys
 import os
-import random
-import subprocess
-from StringIO import StringIO
 
 
 def run(model):
-    gen = BngGenerator(model)
-    output = StringIO()
-    bng_filename = '%d_%d_temp.bngl' % (os.getpid(), random.randint(0, 10000))
-    net_filename = bng_filename.replace('.bngl', '.net')
-    # FIXME this should be factored out in bng.py instead of copy+pasted
-    try:
-        bng_file = open(bng_filename, 'w')
-        bng_file.write(gen.get_content())
-        bng_file.write(generate_network_code)
-        bng_file.close()
-        p = subprocess.Popen(['perl', pkg_path + '/Perl2/BNG2.pl', bng_filename],
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        p_stdout = p.communicate()[0]
-        if p.returncode:
-            raise Exception(p_stdout)
-        net_file = open(net_filename, 'r')
-        output.write("# BioNetGen output:\n#\n#")
-        output.write(re.sub(r'\n', r'\n# ', p_stdout))
-        output.write('\n')
-        output.write(net_file.read())
-        net_file.close()
-    except Exception as e:
-        raise Exception("problem running BNG: " + str(e))
-    finally:
-        for filename in [bng_filename, net_filename]:
-            if os.access(filename, os.F_OK):
-                os.unlink(filename)
-    return output.getvalue()
+    return generate_network(model, append_stdout=True)
 
 
 if __name__ == '__main__':

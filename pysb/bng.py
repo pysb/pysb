@@ -5,6 +5,7 @@ import subprocess
 import random
 import re
 import sympy
+from StringIO import StringIO
 
 # not ideal, but it will work for now during development
 pkg_path = None
@@ -21,11 +22,45 @@ if pkg_path is None:
         '\n    '.join(pkg_paths_to_check)
     raise Exception(msg)
 
+class GenerateNetworkError(RuntimeError):
+    pass
+
 generate_network_code = """
 begin actions
 generate_network({overwrite=>1});
 end actions
 """
+
+
+def generate_network(model, cleanup=True, append_stdout=False):
+    """Run a model through BNG's generate_network function and return
+    the content of the resulting .net file as a string"""
+    gen = BngGenerator(model)
+    bng_filename = '%s_%d_%d_temp.bngl' % (model.name, os.getpid(), random.randint(0, 10000))
+    net_filename = bng_filename.replace('.bngl', '.net')
+    output = StringIO()
+    try:
+        bng_file = open(bng_filename, 'w')
+        bng_file.write(gen.get_content())
+        bng_file.write(generate_network_code)
+        bng_file.close()
+        p = subprocess.Popen(['perl', pkg_path + '/Perl2/BNG2.pl', bng_filename],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (p_out, p_err) = p.communicate()
+        if p.returncode:
+            raise GenerateNetworkError(p_err.rstrip())
+        net_file = open(net_filename, 'r')
+        output.write(net_file.read())
+        if append_stdout:
+            output.write("#\n# BioNetGen execution log follows\n# ==========")
+            output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
+    finally:
+        if cleanup:
+            for filename in [bng_filename, net_filename]:
+                if os.access(filename, os.F_OK):
+                    os.unlink(filename)
+    return output.getvalue()
+
 
 def generate_equations(model):
     # only need to do this once
@@ -33,31 +68,7 @@ def generate_equations(model):
     #   or, use a separate "math model" object to contain ODEs
     if model.odes:
         return
-
-    gen = BngGenerator(model)
-
-    bng_filename = '%d_%d_temp.bngl' % (os.getpid(), random.randint(0, 10000))
-    net_filename = bng_filename.replace('.bngl', '.net')
-    try:
-        bng_file = open(bng_filename, 'w')
-        bng_file.write(gen.get_content())
-        bng_file.write(generate_network_code)
-        bng_file.close()
-        p = subprocess.Popen(['perl', pkg_path + '/Perl2/BNG2.pl', bng_filename],
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        p.communicate()
-        if p.returncode:
-            raise Exception(p.stdout.read())
-        net_file = open(net_filename, 'r')
-        lines = iter(net_file.readlines())
-        net_file.close()
-    except Exception as e:
-        raise Exception("problem running BNG: " + str(e))
-    finally:
-        for filename in [bng_filename, net_filename]:
-            if os.access(filename, os.F_OK):
-                os.unlink(filename)
-
+    lines = iter(generate_network(model).split('\n'))
     try:
         while 'begin species' not in lines.next():
             pass
