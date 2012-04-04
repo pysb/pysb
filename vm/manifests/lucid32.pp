@@ -1,33 +1,42 @@
-stage { "pre": before => Stage["main"] }
+class puppet-misc {
+    group { "puppet": ensure => "present"; }
+}
+
+class apt-update {
+    exec { "/usr/bin/apt-get -y update": }
+}
+
 class python {
     package {
         "build-essential": ensure => latest;
-        "python": ensure => "2.6.5-0ubuntu1";
-        "python-dev": ensure => "2.6.5-0ubuntu1";
-        "python-setuptools": ensure => installed;
+        "python": ensure => latest;
+        "python-dev": ensure => latest;
+        "python-setuptools": ensure => latest;
     }
     exec { "easy_install pip":
         path => "/usr/local/bin:/usr/bin:/bin",
         refreshonly => true,
         require => Package["python-setuptools"],
-        subscribe => Package["python-setuptools"],
+        subscribe => Package["python-setuptools"];
     }
 }
-class { "python": stage => "pre" }
-
 
 class pysb {
+    # ubuntu packages required to build the following python packages
     package {
         "libatlas-base-dev":
             ensure => "latest";
         "gfortran":
             ensure => "latest";
-        "libpng-dev":
+        "libpng12-dev":
             ensure => "latest";
         "python-gtk2-dev":
             ensure => "latest";
         "libfreetype6-dev":
             ensure => "latest";
+    }
+    # python packages
+    package {
         "numpy":
             ensure => "1.6.1",
             provider => "pip";
@@ -46,9 +55,10 @@ class pysb {
             ensure => "1.1.0",
             provider => "pip",
             require => [
-                Package["libpng-dev"],
+                Package["libpng12-dev"],
                 Package["python-gtk2-dev"],
-                Package["libfreetype6-dev"]
+                Package["libfreetype6-dev"],
+                Package["numpy"],
             ];
         "ipython":
             ensure => "0.12",
@@ -59,4 +69,12 @@ class pysb {
 #            provider => "pip";
     }
 }
+
+stage { "pre": before => Stage["main"] }
+
+class { "apt-update": stage => "pre" }
+class { "python": }
 class { "pysb": }
+class { "puppet-misc": }
+
+Class["python"] -> Package <| provider == pip |>
