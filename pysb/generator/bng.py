@@ -79,7 +79,7 @@ class BngGenerator(object):
         self.__content += "begin observables\n"
         for name, pattern in self.model.observable_patterns:
             observable_code = format_reactionpattern(pattern)
-            self.__content += ("  %-" + str(max_length) + "s   %s\n") % (name, observable_code)
+            self.__content += ("  Molecules %-" + str(max_length) + "s   %s\n") % (name, observable_code)
         self.__content += "end observables\n\n"
 
     def generate_species(self):

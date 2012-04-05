@@ -13,10 +13,12 @@ pkg_paths_to_check = [
     '/usr/local/share/BioNetGen',
     'c:/Program Files/BioNetGen'
     ]
-for test_path in pkg_paths_to_check:
-    if os.access(test_path + '/Perl2/BNG2.pl', os.F_OK):
-        pkg_path = test_path
-        break
+for check_path in pkg_paths_to_check:
+    for subdir in ('', 'Perl2'):
+        path = os.path.join(check_path, subdir)
+        if os.access(os.path.join(path, 'BNG2.pl'), os.F_OK):
+            pkg_path = path
+            break
 if pkg_path is None:
     msg = "Could not find BioNetGen installed in one of the following locations:\n    " + \
         '\n    '.join(pkg_paths_to_check)
@@ -44,7 +46,7 @@ def generate_network(model, cleanup=True, append_stdout=False):
         bng_file.write(gen.get_content())
         bng_file.write(generate_network_code)
         bng_file.close()
-        p = subprocess.Popen(['perl', pkg_path + '/Perl2/BNG2.pl', bng_filename],
+        p = subprocess.Popen(['perl', pkg_path + 'BNG2.pl', bng_filename],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (p_out, p_err) = p.communicate()
         if p.returncode:
