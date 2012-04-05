@@ -1,7 +1,3 @@
-class puppet-misc {
-    group { "puppet": ensure => "present"; }
-}
-
 class apt-update {
     exec { "/usr/bin/apt-get -y update": }
 }
@@ -21,7 +17,13 @@ class python {
     }
 }
 
-class pysb {
+class perl {
+    package {
+        "perl": ensure => latest;
+    }
+}
+
+class python-libs {
     # ubuntu packages required to build the following python packages
     package {
         "libatlas-base-dev":
@@ -33,6 +35,8 @@ class pysb {
         "python-gtk2-dev":
             ensure => "latest";
         "libfreetype6-dev":
+            ensure => "latest";
+        "libgraphviz-dev":
             ensure => "latest";
     }
     # python packages
@@ -58,23 +62,69 @@ class pysb {
                 Package["libpng12-dev"],
                 Package["python-gtk2-dev"],
                 Package["libfreetype6-dev"],
-                Package["numpy"],
+                Package["numpy"]
             ];
         "ipython":
             ensure => "0.12",
             provider => "pip";
-
-# TODO
-#        "pysb":
-#            provider => "pip";
+        "pygraphviz":
+            ensure => "1.1",
+            provider => "pip",
+            require => Package["libgraphviz-dev"];
     }
 }
 
-stage { "pre": before => Stage["main"] }
+class bionetgen {
+    package { "wget": ensure => present; }
+    exec { "/usr/bin/wget http://dl.dropbox.com/u/19644336/BioNetGen_2.1.8_rev597.tgz":
+        cwd => "/tmp",
+        creates => "/tmp/BioNetGen_2.1.8_rev597.tgz",
+        require => Package["wget"];
+    }
+    file { "/tmp/BioNetGen_2.1.8_rev597.tgz": }
+    exec { "/bin/tar xzf /tmp/BioNetGen_2.1.8_rev597.tgz":
+        cwd => "/home/demo",
+        user => demo,
+        group => demo,
+        creates => "/home/demo/BioNetGen",
+        require => [
+            File["/tmp/BioNetGen_2.1.8_rev597.tgz"],
+            File["/home/demo"],
+        ],
+    }
+    file { "/usr/local/share/BioNetGen":
+        ensure => link,
+        target => "/home/demo/BioNetGen";
+    }
+}
 
-class { "apt-update": stage => "pre" }
+class pysb {
+#    package {
+# TODO
+#        "pysb":
+#            provider => "pip";
+#    }
+    user { "demo": ensure => present }
+    file { "/home/demo":
+        ensure => directory,
+        source => "/etc/skel",
+        recurse => true,
+        owner => "demo",
+        group => "demo";
+    }
+}
+
+class puppet-misc {
+    group { "puppet": ensure => present; }
+}
+
+class { "apt-update": }
 class { "python": }
+class { "python-libs": }
+class { "perl": }
+class { "bionetgen": }
 class { "pysb": }
 class { "puppet-misc": }
 
 Class["python"] -> Package <| provider == pip |>
+Class["apt-update"] -> Package <| provider == apt |>
