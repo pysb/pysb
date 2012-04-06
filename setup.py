@@ -13,10 +13,28 @@ def main():
 
     setup(name='pysb',
           version=version,
-          description='Python Systems Biology modeling system',
+          description='Python Systems Biology modeling framework',
+          long_description='PySB (pronounced "Pie Ess Bee") is a framework ' + \
+              'for building rule-based mathematical models of biochemical ' + \
+              'systems. It works nicely with scientific Python libraries ' + \
+              'such as NumPy, SciPy and SymPy for model simulation and ' + \
+              'analysis.',
           author='Jeremy Muhlich',
           author_email='jmuhlich@bitflood.org',
-          packages=['pysb', 'pysb.generator', 'pysb.tools'],
+          url='http://pysb.org/',
+          packages=['pysb', 'pysb.generator', 'pysb.tools', 'pysb.examples'],
+          keywords=['systems', 'biology', 'model', 'rules'],
+          classifiers=[
+            'Development Status :: 4 - Beta',
+            'Environment :: Console',
+            'Intended Audience :: Science/Research',
+            'License :: OSI Approved :: BSD License',
+            'Operating System :: OS Independent',
+            'Programming Language :: Python :: 2',
+            'Topic :: Scientific/Engineering :: Bio-Informatics',
+            'Topic :: Scientific/Engineering :: Chemistry',
+            'Topic :: Scientific/Engineering :: Mathematics',
+            ],
           )
 
 class GitError(Exception):
