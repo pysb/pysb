@@ -6,10 +6,16 @@ import sys, subprocess, traceback, re
 def main():
 
     try:
+        version_file = file('RELEASE-VERSION', 'w+')
         version = get_version()
+        version_file.seek(0, 0)
+        version_file.write(version)
     except Exception as e:
-        sys.stderr.write(str(e))
-        return
+        try:
+            version = version_file.read()
+        except Exception as e:
+            sys.stderr.write(str(e))
+            return
 
     setup(name='pysb',
           version=version,
