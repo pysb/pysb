@@ -8,21 +8,22 @@ import sympy
 from StringIO import StringIO
 
 # not ideal, but it will work for now during development
-pkg_path = None
-pkg_paths_to_check = [
+bng_path = None
+bng_paths_to_check = [
     '/usr/local/share/BioNetGen',
     'c:/Program Files/BioNetGen'
     ]
-for check_path in pkg_paths_to_check:
+for check_path in bng_paths_to_check:
     for subdir in ('', 'Perl2'):
-        path = os.path.join(check_path, subdir)
-        if os.access(os.path.join(path, 'BNG2.pl'), os.F_OK):
-            pkg_path = path
+        path = os.path.join(check_path, subdir, 'BNG2.pl')
+        if os.access(path, os.F_OK):
+            bng_path = path
             break
-if pkg_path is None:
+if bng_path is None:
     msg = "Could not find BioNetGen installed in one of the following locations:\n    " + \
-        '\n    '.join(pkg_paths_to_check)
+        '\n    '.join(bng_paths_to_check)
     raise Exception(msg)
+print "bng_path:", bng_path
 
 class GenerateNetworkError(RuntimeError):
     pass
@@ -46,7 +47,7 @@ def generate_network(model, cleanup=True, append_stdout=False):
         bng_file.write(gen.get_content())
         bng_file.write(generate_network_code)
         bng_file.close()
-        p = subprocess.Popen(['perl', pkg_path + 'BNG2.pl', bng_filename],
+        p = subprocess.Popen(['perl', bng_path, bng_filename],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (p_out, p_err) = p.communicate()
         if p.returncode:
