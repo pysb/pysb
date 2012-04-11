@@ -82,6 +82,7 @@ def generate_network(model, cleanup=True, append_stdout=False):
             raise GenerateNetworkError(p_err.rstrip())
         net_file = open(net_filename, 'r')
         output.write(net_file.read())
+        net_file.close()
         if append_stdout:
             output.write("#\n# BioNetGen execution log follows\n# ==========")
             output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
