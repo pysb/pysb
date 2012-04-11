@@ -4,26 +4,54 @@ import os
 import subprocess
 import random
 import re
+import itertools
 import sympy
 from StringIO import StringIO
 
-# not ideal, but it will work for now during development
-bng_path = None
-bng_paths_to_check = [
-    '/usr/local/share/BioNetGen',
-    'c:/Program Files/BioNetGen'
-    ]
-for check_path in bng_paths_to_check:
-    for subdir in ('', 'Perl2'):
-        path = os.path.join(check_path, subdir, 'BNG2.pl')
-        if os.access(path, os.F_OK):
-            bng_path = path
-            break
-if bng_path is None:
-    msg = "Could not find BioNetGen installed in one of the following locations:\n    " + \
-        '\n    '.join(bng_paths_to_check)
-    raise Exception(msg)
-print "bng_path:", bng_path
+
+def _get_bng_path():
+    """Return the path to BioNetGen's BNG2.pl, based on either the BNGHOME
+    environment variable if it's set, or a few hard-coded standard locations."""
+
+    path_var = 'BNGHOME'
+    dist_dirs = [
+        '/usr/local/share/BioNetGen',
+        'c:/Program Files/BioNetGen',
+        ]
+    # BNG 2.1.8 moved BNG2.pl up out of the Perl2 subdirectory, so to be more
+    # compatible we check both the old and new locations.
+    script_subdirs = ['', 'Perl2']
+
+    def check_dist_dir(dist_dir):
+        # Return the full path to BNG2.pl inside a BioNetGen distribution
+        # directory, or False if directory does not contain a BNG2.pl in one of
+        # the expected places.
+        for subdir in script_subdirs:
+            script_path = os.path.join(dist_dir, subdir, 'BNG2.pl')
+            if os.access(script_path, os.F_OK):
+                return script_path
+        else:
+            return False
+
+    # First check the environment variable, which has the highest precedence
+    if path_var in os.environ:
+        script_path = check_dist_dir(os.environ[path_var])
+        if not script_path:
+            raise Exception('Environment variable %s is set but BNG2.pl could'
+                            ' not be found there' % path_var)
+    # If the environment variable isn't set, check the standard locations
+    else:
+        for dist_dir in dist_dirs:
+            script_path = check_dist_dir(dist_dir)
+            if script_path:
+                break
+        else:
+            raise Exception('Could not find BioNetGen installed in one of the '
+                            'following locations:' +
+                            ''.join('\n    ' + d for d in dist_dirs))
+    return script_path
+
+bng_path = _get_bng_path()
 
 class GenerateNetworkError(RuntimeError):
     pass
