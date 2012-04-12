@@ -1,15 +1,5 @@
 #!/usr/bin/env python
 
-# FIXME this should use libsbml if available
-
-# USAGE: render_reactions.py mymodel.py > mymodel.dot
-# dot mymodel.dot -Tpdf -O
-# This will create mymodel.dot.pdf
-#
-# This could also be done in a one line command such as:
-# python render_reactions.py mymodel.py | dot -Tpdf -omymodel.pdf  
-#
-
 import pysb
 import pysb.bng
 import sympy
@@ -67,10 +57,33 @@ def r_link(graph, s, r, **attrs):
     attrs.setdefault('arrowhead', 'normal')
     graph.add_edge(*nodes, **attrs)
 
+
+usage = """
+Usage: python -m pysb.tools.render_reactions mymodel.py > mymodel.dot
+
+Renders the reactions produced by a model into the "dot" graph format which can
+be visualized with Graphviz.
+
+To create a PDF from the .dot file, use the "dot" command from Graphviz:
+
+    dot mymodel.dot -T pdf -O
+
+This will create mymodel.dot.pdf. Alternately, the following "one-liner" may be
+convenient if you are making continuous changes to the model and need to run the
+tool repeatedly:
+
+    python -m pysb.tools.render_species mymodel.py | dot -T pdf -o mymodel.pdf
+
+Note that some PDF viewers will auto-reload a changed PDF, so you may not even
+need to manually reopen it every time you rerun the tool.
+"""
+usage = usage[1:]  # strip leading newline
+
 if __name__ == '__main__':
     # sanity checks on filename
     if len(sys.argv) <= 1:
-        raise Exception("You must specify the filename of a model script")
+        print usage,
+        exit()
     model_filename = sys.argv[1]
     if not os.path.exists(model_filename):
         raise Exception("File '%s' doesn't exist" % model_filename)
