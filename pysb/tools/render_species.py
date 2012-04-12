@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+# USAGE: render_species.py mymodel.py > mymodel.dot
+# dot mymodel.dot -Tpdf -O
+# This will create mymodel.dot.pdf
+#
+# This could also be done in a one line command such as:
+# python render_species.py mymodel.py | dot -Tpdf -omymodel.pdf 
+#
+
 import sys
 import os
 import re

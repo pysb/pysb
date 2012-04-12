@@ -2,6 +2,14 @@
 
 # FIXME this should use libsbml if available
 
+# USAGE: render_reactions.py mymodel.py > mymodel.dot
+# dot mymodel.dot -Tpdf -O
+# This will create mymodel.dot.pdf
+#
+# This could also be done in a one line command such as:
+# python render_reactions.py mymodel.py | dot -Tpdf -omymodel.pdf  
+#
+
 import pysb
 import pysb.bng
 import sympy
