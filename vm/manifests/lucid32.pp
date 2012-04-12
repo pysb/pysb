@@ -99,11 +99,10 @@ class bionetgen {
 }
 
 class pysb {
-#    package {
-# TODO
-#        "pysb":
-#            provider => "pip";
-#    }
+    package {
+        "pysb":
+            provider => "pip";
+    }
     user { "demo": ensure => present }
     file { "/home/demo":
         ensure => directory,
