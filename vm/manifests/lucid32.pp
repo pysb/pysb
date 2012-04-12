@@ -76,7 +76,7 @@ class python-libs {
 
 class bionetgen {
     package { "wget": ensure => present; }
-    exec { "/usr/bin/wget http://dl.dropbox.com/u/19644336/BioNetGen_2.1.8_rev597.tgz":
+    exec { "/usr/bin/wget https://github.com/downloads/jmuhlich/bionetgen/BioNetGen_2.1.8_rev597.tgz":
         cwd => "/tmp",
         creates => "/tmp/BioNetGen_2.1.8_rev597.tgz",
         require => Package["wget"];
