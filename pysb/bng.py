@@ -1,4 +1,4 @@
-import pysb
+import pysb.core
 from pysb.generator.bng import BngGenerator
 import os
 import subprocess
@@ -187,9 +187,9 @@ def _parse_species(model, line):
                     site_name, condition = ss.split('~')
                     state, bond = condition.split('!')
                     if bond == '?':
-                        bond = pysb.WILD
+                        bond = pysb.core.WILD
                     elif bond == '!':
-                        bond = pysb.ANY
+                        bond = pysb.core.ANY
                     else:
                         bond = int(bond)
                     condition = (state, bond)
@@ -206,11 +206,11 @@ def _parse_species(model, line):
                 site_conditions[site_name] = condition
         monomer = model.monomers[monomer_name]
         monomer_compartment = model.compartments.get(monomer_compartment_name)
-        mp = pysb.MonomerPattern(monomer, site_conditions, monomer_compartment)
+        mp = pysb.core.MonomerPattern(monomer, site_conditions, monomer_compartment)
         monomer_patterns.append(mp)
 
     complex_compartment = model.compartments.get(complex_compartment_name)
-    cp = pysb.ComplexPattern(monomer_patterns, complex_compartment)
+    cp = pysb.core.ComplexPattern(monomer_patterns, complex_compartment)
     model.species.append(cp)
 
 

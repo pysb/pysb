@@ -21,9 +21,11 @@ def pore_species(Subunit, site1, site2, size):
     elif size == 2:
         Pore = Subunit({site1: 1, site2: None}) % Subunit({site1: None, site2: 1})
     else:
-        Pore = ComplexPattern([], None, match_once=True)
-        for i in range(1, size+1):
-            Pore %= Subunit({site1: i, site2: i%size+1})
+        # build up a ComplexPattern, starting with a single subunit
+        Pore = Subunit({site1: 1, site2: 2})
+        for i in range(2, size + 1):
+            Pore %= Subunit({site1: i, site2: i % size + 1})
+        Pore.match_once = True
     return Pore
 
 def pore_assembly(Subunit, site1, site2, size, rates):

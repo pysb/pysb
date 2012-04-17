@@ -1,5 +1,6 @@
 import inspect
 from pysb import *
+import pysb.core
 
 DEFAULT_UNI_KF = 1e6
 DEFAULT_BI_KF = 1e6
@@ -9,7 +10,7 @@ DEFAULT_KC = 1
 def alias_model_components(model=None):
     """Make all model components visible as symbols in the caller's global namespace"""
     if model is None:
-        model = SelfExporter.default_model
+        model = pysb.core.SelfExporter.default_model
     caller_globals = inspect.currentframe().f_back.f_globals
     components = dict((c.name, c) for c in model.all_components())
     caller_globals.update(components)
@@ -76,9 +77,9 @@ def two_step_conv(Sub1, Sub2, Prod, klist, site='bf'):
                                      Sub1.monomer.name, ''.join(filter(lambda a: a != None, Sub1.site_conditions.values())))
 
     #FIXME: this is a bit dirty but it fixes the problem when prod is a pattern
-    if isinstance(Prod, MonomerPattern):
+    if isinstance(Prod, pysb.core.MonomerPattern):
         r2_name = 'cplx_%s_via_%s__%s' % (Prod.monomer.name, Sub1.monomer.name, Sub2.monomer.name)
-    elif isinstance(Prod, ComplexPattern):
+    elif isinstance(Prod, pysb.core.ComplexPattern):
         r2_name = 'cplx_%s_via_%s__%s' % (("_".join([sub.monomer.name for sub in Prod.monomer_patterns])),
                                           Sub1.monomer.name, Sub2.monomer.name)
     
@@ -131,18 +132,18 @@ def pore_species(Subunit, size):
 
     #FIXME: the sites here are hard-coded and named _bh3_ and _d2_
     #not generic and perhaps misleading?
-    M = Subunit.monomer
-    sc = Subunit.site_conditions
     if size == 0:
         raise ValueError("size must be an integer greater than 0")
     if size == 1:
-        Pore = M(sc, bh3=None, d2=None)
+        Pore = Subunit(bh3=None, d2=None)
     elif size == 2:
-        Pore = M(sc, bh3=1, d2=None) % M(sc, d2=1, bh3=None)
+        Pore = Subunit(bh3=1, d2=None) % Subunit(d2=1, bh3=None)
     else:
-        Pore = ComplexPattern([], None, match_once=True)
-        for i in range(1, size+1):
-            Pore %= M(sc, bh3=i, d2=i%size+1)
+        # build up a ComplexPattern, starting with a single subunit
+        Pore = Subunit(bh3=1, d2=2)
+        for i in range(2, size + 1):
+            Pore %= Subunit(bh3 = i, d2 = i % size + 1)
+        Pore.match_once = True
     return Pore
 
 def pore_assembly(Subunit, size, rates):
