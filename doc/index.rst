@@ -14,8 +14,8 @@ Contents:
    intro
    installation
    tutorial
-   user_guide
-   mod_ref
+   modules/index
+   internals
    about
 
 Indices and tables

@@ -85,6 +85,7 @@ class SelfExporter(object):
 
 
 class Component(object):
+
     """The base class for all the things contained within a model."""
 
     def __init__(self, name, _export=True):
@@ -101,6 +102,8 @@ class Component(object):
 
 
 class Model(object):
+
+    """Container for monomers, compartments, parameters, and rules."""
 
     def __init__(self, name=None, _export=True):
         self.name = name
@@ -219,8 +222,8 @@ class Model(object):
 
 
 class Monomer(Component):
-    """The Monomer class creates monomers with the specified sites, state-sites, and compartment
-    """
+
+    """Model component representing a protein or other molecule."""
 
     def __init__(self, name, sites=[], site_states={}, _export=True):
         Component.__init__(self, name, _export)
@@ -263,6 +266,12 @@ class Monomer(Component):
 
 class MonomerAny(Monomer):
 
+    """
+    A wildcard monomer which matches any species.
+
+    This is only needed where you would use a '+' in BNG.
+    """
+
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
         # Component stuff and has no user-accessible API
@@ -279,6 +288,12 @@ class MonomerAny(Monomer):
 
 class MonomerWild(Monomer):
 
+    """
+    A wildcard monomer which matches any species, or nothing (no bond).
+
+    This is only needed where you would use a '?' in BNG.
+    """
+
     def __init__(self):
         # don't call Monomer.__init__ since this doesn't want
         # Component stuff and has no user-accessible API
@@ -294,6 +309,9 @@ class MonomerWild(Monomer):
 
 
 class MonomerPattern(object):
+
+    """A pattern which matches instances of a given monomer, possibly with
+    restrictions on the state of certain sites."""
 
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
@@ -336,7 +354,6 @@ class MonomerPattern(object):
         'Concrete' means the pattern satisfies ALL of the following:
         1. All sites have specified conditions
         2. If the model uses compartments, the compartment is specified.
-
         """
         # 1.
         sites_ok = self.is_site_concrete()
@@ -412,8 +429,12 @@ class MonomerPattern(object):
 
 
 class ComplexPattern(object):
-    """Represents a bound set of MonomerPatterns, i.e. a complex.  In
-    BNG terms, a list of patterns combined with the '.' operator)."""
+
+    """
+    A bound set of MonomerPatterns, i.e. a pattern to match a complex.
+
+    In BNG terms, a list of patterns combined with the '.' operator.
+    """
 
     def __init__(self, monomer_patterns, compartment, match_once=False):
         # ensure compartment is a Compartment
@@ -430,7 +451,6 @@ class ComplexPattern(object):
         'Concrete' means the pattern satisfies ANY of the following:
         1. All monomer patterns are concrete
         2. The compartment is specified AND all monomer patterns are site-concrete
-
         """
         # 1.
         mp_concrete_ok = all(mp.is_concrete() for mp in self.monomer_patterns)
@@ -452,10 +472,12 @@ class ComplexPattern(object):
             sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
 
     def copy(self):
-        """Implement our own brand of shallow copy.
+        """
+        Implement our own brand of shallow copy.
 
         The new object will have references to the original compartment, and
-        copies of the monomer_patterns."""
+        copies of the monomer_patterns.
+        """
         return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
     def __add__(self, other):
@@ -509,9 +531,13 @@ class ComplexPattern(object):
 
 
 class ReactionPattern(object):
-    """Represents a complete pattern for the product or reactant side
-    of a rule.  Essentially a thin wrapper around a list of
-    ComplexPatterns."""
+    """
+    A pattern for the entire product or reactant side of a rule.
+
+    Essentially a thin wrapper around a list of ComplexPatterns. In BNG terms, a
+    list of complex patterns combined with the '+' operator.
+
+    """
 
     def __init__(self, complex_patterns):
         self.complex_patterns = complex_patterns
@@ -570,6 +596,13 @@ def as_reaction_pattern(v):
 
 class Parameter(Component):
 
+    """
+    Model component representing a named constant floating point number.
+
+    Parameters are used as reaction rate constants, compartment volumes and
+    initial (boundary) conditions for species.
+    """
+
     def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
         self.value = value
@@ -580,14 +613,21 @@ class Parameter(Component):
 
 
 class Compartment(Component):
-    """The Compartment class expects a "name", "parent", "dimension", and "size" variable from the
-    compartment call. name is a string, "parent" should be the name of a defined parent, or None. 
-    Dimension should be only 2 (e.g. membranes) or 3 (e.g. cytosol). The size units will depend in the
-    manner in which the model variable units have been determined. Note, parent is the compartment object.
-    example: Compartment('eCell', dimension=3, size=extraSize, parent=None)
-    """
+    """Model component representing a bounded reaction volume."""
 
     def __init__(self, name, parent=None, dimension=3, size=None, _export=True):
+        """
+        Requires name, accepts optional parent, dimension and size. name is a
+        string. parent should be the parent compartment, except for the root
+        compartment which should omit the parent argument. dimension may be 2
+        (for membranes) or 3 (for volumes). size is a parameter which defines
+        the compartment volume (the appropriate units will depend on the units
+        of the reaction rate constants).
+
+        Examples:
+        Compartment('cytosol', dimension=3, size=cyto_vol, parent=ec_membrane)
+        """
+
         Component.__init__(self, name, _export)
 
         if parent != None and isinstance(parent, Compartment) == False:
