@@ -5,3 +5,5 @@ bng_files/*
 build/*
 dist/*
 doc/_build
+MANIFEST
+RELEASE-VERSION

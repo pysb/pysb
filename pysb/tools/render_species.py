@@ -54,10 +54,34 @@ def run(model):
                             style="dotted")
     return graph.string()
 
+
+usage = """
+Usage: python -m pysb.tools.render_species mymodel.py > mymodel.dot
+
+Renders the species from a model into the "dot" graph format which can be
+visualized with Graphviz.
+
+To create a PDF from the .dot file, use the "neato" command from Graphviz:
+
+    neato mymodel.dot -T pdf -O
+
+This will create mymodel.dot.pdf. You can also try "dot" instead of "neato" for
+a different type of layout. Alternately, the following "one-liner" may be
+convenient if you are making continuous changes to the model and need to run the
+tool repeatedly:
+
+    python -m pysb.tools.render_species mymodel.py | neato -T pdf -o mymodel.pdf
+
+Note that some PDF viewers will auto-reload a changed PDF, so you may not even
+need to manually reopen it every time you rerun the tool.
+"""
+usage = usage[1:]  # strip leading newline
+
 if __name__ == '__main__':
     # sanity checks on filename
     if len(sys.argv) <= 1:
-        raise Exception("You must specify the filename of a model script")
+        print usage,
+        exit()
     model_filename = sys.argv[1]
     if not os.path.exists(model_filename):
         raise Exception("File '%s' doesn't exist" % model_filename)

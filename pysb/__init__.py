@@ -1,5 +1,5 @@
-from pysb.core import *
-
+from pysb.core import Observe, Initial, MatchOnce, Model, Monomer, Parameter, \
+    Compartment, Rule, ANY, WILD
 
 try:
     import reinteract         # fails if reinteract not installed

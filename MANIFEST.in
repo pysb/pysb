@@ -1,0 +1,3 @@
+include RELEASE-VERSION
+include LICENSE.txt
+include README.rst

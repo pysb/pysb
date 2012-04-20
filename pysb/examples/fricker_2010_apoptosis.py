@@ -188,8 +188,8 @@ if __name__ == '__main__':
 # C8(0) = 200.168%% amount Procaspase-8
 # FL(0) = 0.49995%% amount FLIP-Long
 # FS(0) = 0.422%% amount FLIP-Short
-# CD95RL(0) = 0%% amount of CD95–CD95L complexes
-# CD95FADD(0) = 0%% amount of CD95–FADD complexes
+# CD95RL(0) = 0%% amount of CD95-CD95L complexes
+# CD95FADD(0) = 0%% amount of CD95-FADD complexes
 # FADDC8(0) = 0%% amount Procaspase-8 bound to FADD
 # FADDFL(0) = 0%% amount c-FLIPL bound to FADD
 # FADDFS(0) = 0%% amount c-FLIPS bound to FADD

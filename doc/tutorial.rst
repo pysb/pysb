@@ -65,14 +65,11 @@ sites.  We'll get to state sites a bit later.
 Let's define two monomers in our model, corresponding to EGF
 (epidermal growth factor) and EGFR (the EGF receptor)::
 
-    Monomer('EGF', 'r')
+    Monomer('EGF', ['r'])
     Monomer('EGFR', ['l', 'd'])
 
-Note that the EGF monomer only has one site 'r', and we have left out
-the square brackets and just passed the string ``'r'`` as the second
-argument.  PySB provides this convenience shortcut for single-site
-monomers, but for two or more sites you must always use the square
-brackets.
+Note that although the EGF monomer only has one site 'r', you must
+still use the square brackets.
 
 Now our model file should look like this::
 
@@ -80,7 +77,7 @@ Now our model file should look like this::
 
     Model()
 
-    Monomer('EGF', 'r')
+    Monomer('EGF', ['r'])
     Monomer('EGFR', ['l', 'd'])
 
 We can run ``python mymodel.py`` again and verify there are no errors,
@@ -110,12 +107,25 @@ with a certain syntax, then pass that text file through the tool in
 order to perform some task and produce an output file.  In PySB on the
 other hand we write Python code defining our model in a regular Python
 module, and the elements we define in that module can be inspected and
-operated on as Python objects. We'll explore this concept more fully
+manipulated as Python objects. We'll explore this concept more fully
 in the next section, but for now let's cover the other types of
 components we can add to our model.
 
 Parameters
 ~~~~~~~~~~
+
+A ``Parameter`` is a named constant floating point number used as a
+reaction rate constant, compartment volume or initial (boundary)
+condition for a species (*parameter* in BNG). A parameter is defined
+using the keyword ``Parameter`` followed by its name and value. Here
+is how you would define a parameter named 'kf1' with the value
+:math:`4 \times 10^{-7}`::
+
+    Parameter('kf1', 4e-7)
+
+The second argument may be any numeric expression, but best practice
+is to use a floating-point literal in scientific notation as shown in
+the example above.
 
 Rules
 ~~~~~

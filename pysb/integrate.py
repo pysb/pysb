@@ -90,8 +90,13 @@ def odesolve(model, t, integrator='vode', **integrator_options):
         i += 1
 
     for i, name in enumerate(obs_names):
-        factors, species = zip(*model.observable_groups[name])
-        yout[:, nspecies + i] = (yout[:, species] * factors).sum(1)
+        obs_group = model.observable_groups[name]
+        if obs_group:
+            factors, species = zip(*obs_group)
+            obs_values = (yout[:, species] * factors).sum(1)
+        else:
+            obs_values = numpy.zeros(yout.shape[0])
+        yout[:, nspecies + i] = obs_values
 
     dtype = zip(rec_names, (yout.dtype,) * len(rec_names))
     yrec = numpy.recarray((yout.shape[0],), dtype=dtype, buf=yout)
