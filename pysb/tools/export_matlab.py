@@ -17,13 +17,12 @@ def run(model):
   output.write('function out = %s_odes(t, input, param)' % model_name)
   output.write("\n\n")
 
-  c_code_consts = '\n'.join(['%% %s = param(%d) = %s;' % (p.name, i+1, p.value) for i, p in
+  c_code_consts = '\n'.join(['param(%d) = %s %% %s;' % (i+1, p.value, p.name) for i, p in
       enumerate(model.parameters)])
   c_code_eqs = '\n'.join(['out(%d,1) = %s;' % (i+1, sympy.ccode(model.odes[i])) for i in
       range(len(model.odes))])
   c_code_eqs = re.sub(r's(\d+)', lambda m: 'input(%s)' % (int(m.group(1))+1), c_code_eqs)
   c_code_eqs = re.sub(r'pow\(', 'power(', c_code_eqs)
-  #c_code = c_code_consts + '\n\n' + c_code_eqs
   c_code = c_code_eqs
 
   c_code_species = '\n'.join(['%% input(%d) = %s;' % (i+1, s) for i, s in
