@@ -63,7 +63,8 @@ class SelfExporter(object):
             if obj.name is None:
                 if SelfExporter.target_module == sys.modules['__main__']:
                     # user ran model .py directly
-                    model_filename = inspect.getfile(sys.modules['__main__'])
+                    model_path = inspect.getfile(sys.modules['__main__'])
+                    model_filename = os.path.basename(model_path)
                     module_name = re.sub(r'\.py$', '', model_filename)
                 elif SelfExporter.target_module is not None:
                     # model is imported by some other script (typical case)
