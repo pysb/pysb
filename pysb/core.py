@@ -5,6 +5,7 @@ import warnings
 import inspect
 import re
 import collections
+import weakref
 
 def Observe(*args):
     return SelfExporter.default_model.add_observable(*args)
@@ -93,6 +94,7 @@ class Component(object):
         if not re.match(r'[_a-z][_a-z0-9]*\Z', name, re.IGNORECASE):
             raise InvalidComponentNameError(name)
         self.name = name
+        self.model = None  # to be set in Model.add_component
         if _export:
             try:
                 SelfExporter.export(self)
@@ -186,6 +188,7 @@ class Model(object):
         if not isinstance(other, Component) or not isinstance(container, ComponentSet):
             raise Exception("Tried to add component of unknown type '%s' to model" % type(other))
         container.add(other)
+        other.model = weakref.proxy(self)
 
     def add_observable(self, name, reaction_pattern):
         try:
@@ -358,9 +361,7 @@ class MonomerPattern(object):
         # 1.
         sites_ok = self.is_site_concrete()
         # 2.
-        # FIXME accessing the model via SelfExporter.default_model is a temporary hack - all model
-        #   components (Component subclasses?) need weak refs to their parent model.
-        compartment_ok = self.compartment is not None or not SelfExporter.default_model.compartments
+        compartment_ok = not self.monomer.model.compartments or self.compartment
         return compartment_ok and sites_ok
 
     def is_site_concrete(self):
