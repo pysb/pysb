@@ -321,7 +321,6 @@ class MonomerPattern(object):
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
         # ensure each value is one of: None, integer, list of integers, string, (string,integer), (string,WILD), ANY
-        # FIXME: support state sites
         invalid_sites = []
         for (site, state) in site_conditions.items():
             # pass through to next iteration if state type is ok
