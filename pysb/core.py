@@ -183,6 +183,7 @@ class Model(object):
         # We have 4 containers for the 4 types of components. This code determines the right one
         # based on the class of the object being added.  It tries to be defensive against reasonable
         # errors, but still seems sort of fragile.
+        # FIXME: this breaks for subclasses of the Component classes
         container_name = type(other).__name__.lower() + 's'
         container = getattr(self, container_name, None)
         if not isinstance(other, Component) or not isinstance(container, ComponentSet):
@@ -397,13 +398,13 @@ class MonomerPattern(object):
 
     def __rshift__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, False)
+            return RuleExpression(self, other, False)
         else:
             return NotImplemented
 
     def __ne__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, True)
+            return RuleExpression(self, other, True)
         else:
             return NotImplemented
 
@@ -503,13 +504,13 @@ class ComplexPattern(object):
 
     def __rshift__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, False)
+            return RuleExpression(self, other, False)
         else:
             return NotImplemented
 
     def __ne__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, True)
+            return RuleExpression(self, other, True)
         else:
             return NotImplemented
 
@@ -532,6 +533,7 @@ class ComplexPattern(object):
 
 
 class ReactionPattern(object):
+
     """
     A pattern for the entire product or reactant side of a rule.
 
@@ -554,14 +556,14 @@ class ReactionPattern(object):
     def __rshift__(self, other):
         """Irreversible reaction"""
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, False)
+            return RuleExpression(self, other, False)
         else:
             return NotImplemented
 
     def __ne__(self, other):
         """Reversible reaction"""
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, True)
+            return RuleExpression(self, other, True)
         else:
             return NotImplemented
 
@@ -570,9 +572,34 @@ class ReactionPattern(object):
 
 
 
+class RuleExpression(object):
+
+    """
+    A container for the reactant and product patterns of a rule expression.
+
+    Contains one ReactionPattern for each of reactants and products, and a
+    boolean indicating reversibility. This is a temporary object used to
+    implement syntactic sugar through operator overloading. The Rule constructor
+    takes an instance of this class as its first argument, but simply extracts
+    its fields and discards the object itself.
+
+    """
+
+    def __init__(self, reactant_pattern, product_pattern, is_reversible):
+        try:
+            self.reactant_pattern = as_reaction_pattern(reactant_pattern)
+        except InvalidReactionPatternException as e:
+            raise type(e)("Reactant does not look like a reaction pattern")
+        try:
+            self.product_pattern = as_reaction_pattern(product_pattern)
+        except InvalidReactionPatternException as e:
+            raise type(e)("Product does not look like a reaction pattern")
+        self.is_reversible = is_reversible
+
+
+
 def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
-
     if isinstance(v, ComplexPattern):
         return v
     elif isinstance(v, MonomerPattern):
@@ -584,7 +611,6 @@ def as_complex_pattern(v):
 def as_reaction_pattern(v):
     """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
     complete ReactionPattern."""
-
     if isinstance(v, ReactionPattern):
         return v
     else:
@@ -650,35 +676,19 @@ class Compartment(Component):
 
 class Rule(Component):
 
-    def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None,
+    def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
                  delete_molecules=False,
                  _export=True):
         Component.__init__(self, name, _export)
-
-        # FIXME: This tuple thing is ugly (used to support >> and <> operators between ReactionPatterns).
-        # This is how the reactant and product ReactionPatterns are passed, along with is_reversible.
-        if not isinstance(reaction_pattern_set, tuple) and len(reaction_pattern_set) != 3:
-            raise Exception("reaction_pattern_set must be a tuple of (ReactionPattern, ReactionPattern, Boolean)")
-
-        try:
-            reactant_pattern = as_reaction_pattern(reaction_pattern_set[0])
-        except InvalidReactionPatternException as e:
-            raise type(e)("Reactant does not look like a reaction pattern")
-
-        try:
-            product_pattern = as_reaction_pattern(reaction_pattern_set[1])
-        except InvalidReactionPatternException as e:
-            raise type(e)("Product does not look like a reaction pattern")
-
-        self.is_reversible = reaction_pattern_set[2]
-
+        if not isinstance(rule_expression, RuleExpression):
+            raise Exception("rule_expression is not a RuleExpression object")
         if not isinstance(rate_forward, Parameter):
             raise Exception("Forward rate must be a Parameter")
-        if self.is_reversible and not isinstance(rate_reverse, Parameter):
+        if rule_expression.is_reversible and not isinstance(rate_reverse, Parameter):
             raise Exception("Reverse rate must be a Parameter")
-
-        self.reactant_pattern = reactant_pattern
-        self.product_pattern = product_pattern
+        self.reactant_pattern = rule_expression.reactant_pattern
+        self.product_pattern = rule_expression.product_pattern
+        self.is_reversible = rule_expression.is_reversible
         self.rate_forward = rate_forward
         self.rate_reverse = rate_reverse
         self.delete_molecules = delete_molecules
