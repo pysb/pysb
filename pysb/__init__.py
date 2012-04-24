@@ -1,5 +1,7 @@
-from pysb.core import Observe, Initial, MatchOnce, Model, Monomer, Parameter, \
-    Compartment, Rule, ANY, WILD
+from pysb.core import *
+
+__all__ = ['Observe', 'Initial', 'MatchOnce', 'Model', 'Monomer',
+           'Parameter', 'Compartment', 'Rule', 'ANY', 'WILD']
 
 try:
     import reinteract         # fails if reinteract not installed
