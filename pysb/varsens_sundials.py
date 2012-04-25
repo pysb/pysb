@@ -335,10 +335,10 @@ def genCmtx(sobmtxA, sobmtxB):
     and returns the C matrix for simulations.
     See e.g. Saltelli, Ratto, Andres, Campolongo, Cariboni, Gatelli, Saisana, Tarantola Global Sensitivity Analysis"""
 
-    nparams = sobmtxA.shape[1]
+    nparams = sobmtxA.shape[1] # shape 1 should be the number of params
 
     # allocate the space for the C matrix
-    sobmtxC = numpy.array([sobmtxB]*nparams) # shape 1 should be the number of params
+    sobmtxC = numpy.array([sobmtxB]*nparams) 
 
     # Now we have nparams copies of sobmtxB. replace the i_th column of sobmtxC with the i_th column of sobmtxA
     for i in range(nparams):
@@ -347,8 +347,8 @@ def genCmtx(sobmtxA, sobmtxB):
     return sobmtxC
 
 
-def sobolfxn(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist, ic=True, norm=True, vardata=False, useparams = None, fileobj=None):
-    ''' Sobolfxn calculates the yA, yB, and yC_i arrays needed for variance-based global sensitivity analysis
+def parmeval(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist, ic=True, norm=True, vardata=False, useparams = None, fileobj=None):
+    ''' Function parmeval calculates the yA, yB, and yC_i arrays needed for variance-based global sensitivity analysis
     as prescribed by Saltelli and derived from the work by Sobol.
     '''
     # 
@@ -426,20 +426,20 @@ def sobolfxn(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist
     
     return yA, yB, yC
 
-def getvarsens(yA, yB, yC):
+def getvarsensOLD(yA, yB, yC):
     """Calculate the array of S_i and ST_i for each parameter given yA, yB, yC matrices
-    from the multi-sampling runs. Calculate S_i and ST_i as follows:
+from the multi-sampling runs. Calculate S_i and ST_i as follows:
 
 
-           yA.yC_i - f_0^2
-     S_i = ---------------
-            yA.yA - f_0^2
+yA.yC_i - f_0^2
+S_i = ---------------
+yA.yA - f_0^2
 
-                  yB.yC_i - f_0^2
-     ST_i = 1 -  -----------------
-                   yA.yA - f_0^2
+yB.yC_i - f_0^2
+ST_i = 1 - -----------------
+yA.yA - f_0^2
 
-    """
+"""
     nparms = yC.shape[0]
     nobs = yC.shape[-1]
 
@@ -452,13 +452,65 @@ def getvarsens(yA, yB, yC):
     yAd = yAd.mean(axis=0)
 
     #allocate the S_i and ST_i arrays
-    Sens  =  numpy.zeros((nparms,nobs))
+    Sens = numpy.zeros((nparms,nobs))
     SensT = numpy.zeros((nparms,nobs))
 
     
     for i in range(nparms):
         Sens[i] = ((yA * yC[i]).mean(axis=0) - f02)/(yAd - f02)
         SensT[i] = 1.0 - ((yB * yC[i]).mean(axis=0) - f02)/(yAd - f02)
+
+    return Sens, SensT
+
+def getvarsens(yA, yB, yC):
+    """Calculate the array of S_i and ST_i for each parameter given yA, yB, yC matrices
+    from the multi-sampling runs. Calculate S_i and ST_i as follows:
+    
+    Parameter sensitivity:
+    ----------------------
+            U_j - E^2 
+    S_j = ------------
+               V(y)
+ 
+    U_j = 1/n \sum yA * yC_j
+
+    E^2 = 1/n \sum yA * 1/n \sum yB
+
+    Total effect sensitivity (i.e. non additive part):
+    --------------------------------------------------
+                  U_-j - E^2
+     ST_j = 1 - -------------
+                      V(y)
+
+    U_-j = 1/n \sum yB * yC_j
+
+    E^2 = { 1/n \sum yB * yB }^2
+
+
+    In both cases, calculate V(y) from yA and yB
+
+
+    """
+    nparms = yC.shape[0] # should be the number of parameters
+    nsamples = yC.shape[1] # should be the number of samples from the original matrix
+    nobs = yC.shape[-1]    # the number of observables (this is linked to BNG usage, generalize?)
+
+    #first get V(y) from yA and yB
+
+    vary = numpy.max((numpy.var(yA, axis=0), numpy.var(yB, axis=0)), axis=0)
+
+    # now get the E^2 values for the S and ST calculations
+    E_s  = numpy.average((yA * yB), axis=0)
+    E_st = numpy.average((yB * yB), axis=0) 
+
+    #allocate the S_i and ST_i arrays
+    Sens = numpy.zeros((nparms,nobs))
+    SensT = numpy.zeros((nparms,nobs))
+
+    # now get the U_j and U_-j values and store them 
+    for i in range(nparms):
+        Sens[i]  = (((yA * yC[i]).sum(axis=0)/(nsamples-1)) - E_s) / vary
+        SensT[i] = (vary - (((yB * yC[i]).sum(axis=0)/(nsamples-1)) - E_st)) / vary
 
     return Sens, SensT
         
