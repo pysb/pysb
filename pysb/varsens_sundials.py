@@ -426,42 +426,6 @@ def parmeval(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist
     
     return yA, yB, yC
 
-def getvarsensOLD(yA, yB, yC):
-    """Calculate the array of S_i and ST_i for each parameter given yA, yB, yC matrices
-from the multi-sampling runs. Calculate S_i and ST_i as follows:
-
-
-yA.yC_i - f_0^2
-S_i = ---------------
-yA.yA - f_0^2
-
-yB.yC_i - f_0^2
-ST_i = 1 - -----------------
-yA.yA - f_0^2
-
-"""
-    nparms = yC.shape[0]
-    nobs = yC.shape[-1]
-
-    # first get f_0^2, it only depends on yA. Notice this is an array of size n_observables
-    f02 = yA.mean(axis=0)
-    f02 = numpy.multiply(f02, f02)
-
-    # now get the denominator term for yA
-    yAd = numpy.multiply(yA, yA)
-    yAd = yAd.mean(axis=0)
-
-    #allocate the S_i and ST_i arrays
-    Sens = numpy.zeros((nparms,nobs))
-    SensT = numpy.zeros((nparms,nobs))
-
-    
-    for i in range(nparms):
-        Sens[i] = ((yA * yC[i]).mean(axis=0) - f02)/(yAd - f02)
-        SensT[i] = 1.0 - ((yB * yC[i]).mean(axis=0) - f02)/(yAd - f02)
-
-    return Sens, SensT
-
 def getvarsens(yA, yB, yC):
     """Calculate the array of S_i and ST_i for each parameter given yA, yB, yC matrices
     from the multi-sampling runs. Calculate S_i and ST_i as follows:
