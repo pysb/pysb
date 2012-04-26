@@ -497,11 +497,12 @@ def getvarsens(yA, yB, yC):
 
     #first get V(y) from yA and yB
 
-    vary = numpy.max((numpy.var(yA, axis=0), numpy.var(yB, axis=0)), axis=0)
+    varyA = numpy.var(yA, axis=0, ddof=1)
+    varyB = numpy.var(yB, axis=0, ddof=1)
 
     # now get the E^2 values for the S and ST calculations
     E_s  = numpy.average((yA * yB), axis=0)
-    E_st = numpy.average((yB * yB), axis=0) 
+    E_st = numpy.average(yB, axis=0) ** 2
 
     #allocate the S_i and ST_i arrays
     Sens = numpy.zeros((nparms,nobs))
@@ -509,8 +510,8 @@ def getvarsens(yA, yB, yC):
 
     # now get the U_j and U_-j values and store them 
     for i in range(nparms):
-        Sens[i]  = (((yA * yC[i]).sum(axis=0)/(nsamples-1)) - E_s) / vary
-        SensT[i] = (vary - (((yB * yC[i]).sum(axis=0)/(nsamples-1)) - E_st)) / vary
+        Sens[i]  =        (((yA * yC[i]).sum(axis=0)/(nsamples-1.)) - E_s ) / varyA
+        SensT[i] = 1.0 - ((((yB * yC[i]).sum(axis=0)/(nsamples-1.)) - E_st) / varyB)
 
     return Sens, SensT
         
