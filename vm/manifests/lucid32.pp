@@ -65,25 +65,16 @@ class python-libs {
 
 class bionetgen {
   package { "wget": ensure => present; }
-  exec { "/usr/bin/wget https://github.com/downloads/jmuhlich/bionetgen/BioNetGen_2.1.8_rev597.tgz":
+  exec { "/usr/bin/wget -c https://github.com/downloads/jmuhlich/bionetgen/BioNetGen_2.1.8_rev597.tgz":
     cwd => "/tmp",
     creates => "/tmp/BioNetGen_2.1.8_rev597.tgz",
     require => Package["wget"];
   }
   file { "/tmp/BioNetGen_2.1.8_rev597.tgz": }
   exec { "/bin/tar xzf /tmp/BioNetGen_2.1.8_rev597.tgz":
-    cwd => "/home/demo",
-    user => demo,
-    group => demo,
-    creates => "/home/demo/BioNetGen",
-    require => [
-                File["/tmp/BioNetGen_2.1.8_rev597.tgz"],
-                File["/home/demo"],
-                ],
-  }
-  file { "/usr/local/share/BioNetGen":
-    ensure => link,
-    target => "/home/demo/BioNetGen";
+    cwd => "/usr/local/share",
+    creates => "/usr/local/share/BioNetGen",
+    require => File["/tmp/BioNetGen_2.1.8_rev597.tgz"],
   }
 }
 
@@ -92,7 +83,9 @@ class pysb {
     "pysb":
       provider => "pip";
   }
-  user { "demo": ensure => present }
+  user { "demo":
+    ensure => present;
+  }
   file { "/home/demo":
     ensure => directory,
     source => "/etc/skel",
@@ -100,11 +93,38 @@ class pysb {
     owner => "demo",
     group => "demo";
   }
+  file { "/home/demo/pysb":
+    ensure => link,
+    target => "/usr/local/lib/python2.6/dist-packages/pysb";
+  }
+  file { "/home/demo/BioNetGen":
+    ensure => link,
+    target => "/usr/local/share/BioNetGen";
+  }
+}
+
+class x11 {
+  package {
+    ["xserver-xorg-video-dummy", "x11-xserver-utils", "gdm", "gnome-core",
+     "human-theme", "gtk2-engines", "gksu"]:
+       ensure => present;
+  }
+}
+
+class kernel-stuff {
+  package {
+    ["linux-headers-generic", "zerofree"]:
+      ensure => present;
+  }
 }
 
 class puppet-misc {
   group { "puppet": ensure => present; }
 }
+
+# todo:
+# elevator=noop
+# emacs23
 
 class { "apt-update": }
 class { "python": }
@@ -112,6 +132,8 @@ class { "python-libs": }
 class { "perl": }
 class { "bionetgen": }
 class { "pysb": }
+class { "x11": }
+class { "kernel-stuff": }
 class { "puppet-misc": }
 
 Class["python"] -> Package <| provider == pip |>
