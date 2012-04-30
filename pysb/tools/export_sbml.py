@@ -27,7 +27,7 @@ def run(model):
 
     output.write(
         """<?xml version="1.0" encoding="UTF-8"?>
-<sbml xmlns="http://www.sbml.org/sbml/level2/version4" level="2" version="4">
+<sbml xmlns="http://www.sbml.org/sbml/level2" level="2" version="1">
     <model>
         <listOfCompartments>
             <compartment id="default" name="default" spatialDimensions="0"/>
