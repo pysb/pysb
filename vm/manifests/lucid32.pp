@@ -25,7 +25,7 @@ class python-libs {
   # ubuntu packages required to build the following python packages
   package {
     ["libatlas-base-dev", "gfortran", "libpng12-dev", "python-gtk2-dev",
-     "libfreetype6-dev", "libgraphviz-dev"]:
+     "libfreetype6-dev", "libgraphviz-dev", "graphviz"]:
        ensure => present;
   }
   # python packages
@@ -106,7 +106,7 @@ class pysb {
 class x11 {
   package {
     ["xserver-xorg-video-dummy", "x11-xserver-utils", "gdm", "gnome-core",
-     "human-theme", "gtk2-engines", "gksu"]:
+     "human-theme", "gtk2-engines", "gksu", "evince"]:
        ensure => present;
   }
 }
