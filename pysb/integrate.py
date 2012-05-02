@@ -19,7 +19,6 @@ except distutils.errors.CompileError as e:
 try:
     import pysb.pysundials_helpers
 except ImportError as e:
-    print e
     pass
 
 # some sane default options for a few well-known integrators
