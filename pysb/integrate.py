@@ -66,7 +66,7 @@ def odesolve(model, t, integrator='vode', **integrator_options):
         return ydot
 
     nspecies = len(model.species)
-    obs_names = [name for name, rp in model.observable_patterns]
+    obs_names = model.observables.keys()
     rec_names = ['__s%d' % i for i in range(nspecies)] + obs_names
     yout = numpy.ndarray((len(t), len(rec_names)))
 
@@ -88,11 +88,9 @@ def odesolve(model, t, integrator='vode', **integrator_options):
         yout[i, :nspecies] = integrator.y
         i += 1
 
-    for i, name in enumerate(obs_names):
-        obs_group = model.observable_groups[name]
-        if obs_group:
-            factors, species = zip(*obs_group)
-            obs_values = (yout[:, species] * factors).sum(1)
+    for i, obs in enumerate(model.observables):
+        if obs.species:
+            obs_values = (yout[:, obs.species] * obs.coefficients).sum(1)
         else:
             obs_values = numpy.zeros(yout.shape[0])
         yout[:, nspecies + i] = obs_values

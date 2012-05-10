@@ -7,9 +7,6 @@ import re
 import collections
 import weakref
 
-def Observe(*args):
-    return SelfExporter.default_model.add_observable(*args)
-
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
 
@@ -114,12 +111,11 @@ class Model(object):
         self.compartments = ComponentSet()
         self.parameters = ComponentSet()
         self.rules = ComponentSet()
+        self.observables = ComponentSet()
         self.species = []
         self.odes = []
         self.reactions = []
         self.reactions_bidirectional = []
-        self.observable_patterns = []
-        self.observable_groups = {}  # values are tuples of factor,speciesnumber
         self.initial_conditions = []
         if _export:
             SelfExporter.export(self)
@@ -190,13 +186,6 @@ class Model(object):
             raise Exception("Tried to add component of unknown type '%s' to model" % type(other))
         container.add(other)
         other.model = weakref.proxy(self)
-
-    def add_observable(self, name, reaction_pattern):
-        try:
-            reaction_pattern = as_reaction_pattern(reaction_pattern)
-        except InvalidReactionPatternException as e:
-            raise type(e)("Observable pattern does not look like a ReactionPattern")
-        self.observable_patterns.append( (name, reaction_pattern) )
 
     def initial(self, complex_pattern, value):
         try:
@@ -703,6 +692,26 @@ class Rule(Component):
             ret += ', delete_molecules=True'
         ret += ')'
         return ret
+
+
+
+class Observable(Component):
+
+    """
+    Model component representing a linear combination of species.
+
+    May be used in rate law expressions.
+    """
+
+    def __init__(self, name, reaction_pattern, _export=True):
+        try:
+            reaction_pattern = as_reaction_pattern(reaction_pattern)
+        except InvalidReactionPatternException as e:
+            raise type(e)("Observable pattern does not look like a ReactionPattern")
+        Component.__init__(self, name, _export)
+        self.reaction_pattern = reaction_pattern
+        self.species = []
+        self.coefficients = []
 
 
 

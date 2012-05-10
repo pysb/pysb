@@ -36,8 +36,8 @@ def fig_4a():
         print "integrating model"
         x = odesolve(model, t)
 
-        fs[i] = (x['PARP'][0] - x['PARP'][-1]) / x['PARP'][0]
-        dP = 60 * (x['PARP'][:-1] - x['PARP'][1:]) / (dt * x['PARP'][0])  # in minutes
+        fs[i] = (x['PARP_unbound'][0] - x['PARP_unbound'][-1]) / x['PARP_unbound'][0]
+        dP = 60 * (x['PARP_unbound'][:-1] - x['PARP_unbound'][1:]) / (dt * x['PARP_unbound'][0])  # in minutes
         ttn = argmax(dP)
         dPmax = dP[ttn]
         Ts[i] = 1 / dPmax  # minutes
@@ -60,11 +60,11 @@ def fig_4b():
     t = linspace(0, 6*3600, 6*60+1)  # 6 hours
     x = odesolve(model, t)
 
-    x_norm = array([x['Bid'], x['PARP'], x['mSmac']]).T
+    x_norm = array([x['Bid_unbound'], x['PARP_unbound'], x['mSmac_unbound']]).T
     x_norm = 1 - x_norm / x_norm[0, :]  # gets away without max() since first values are largest
 
     # this is what I originally thought 4B was plotting.  oddly it's very close.
-    #x_norm = array([x['tBid'], x['CPARP'], x['cSmac']]).T
+    #x_norm = array([x['tBid_total'], x['CPARP_total'], x['cSmac_total']]).T
     #x_norm /= x_norm.max(0)
 
     tp = t / 3600  # x axis as hours

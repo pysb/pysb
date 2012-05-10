@@ -38,10 +38,10 @@ Rule('egfr_endocytosis',
      (egfr(L=1) % egf(R=1)) ** endo_membrane,
      K_egfr_endo)
 
-Observe('egfr_total', egfr())
-Observe('egfr_egf_endo', (egfr(L=1) % egf(R=1)) ** endo_membrane)
-Observe('egfr_ec_mem', (egfr(L=1) % egf(R=1)) ** ec_membrane)
-Observe('egfr_unbound', egfr(L=None))
+Observable('egfr_total', egfr())
+Observable('egfr_egf_endo', (egfr(L=1) % egf(R=1)) ** endo_membrane)
+Observable('egfr_ec_mem', (egfr(L=1) % egf(R=1)) ** ec_membrane)
+Observable('egfr_unbound', egfr(L=None))
 
 Parameter('egf_0', 1e4)
 Parameter('egfr_0', 5e2)

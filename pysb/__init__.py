@@ -1,6 +1,6 @@
 from pysb.core import *
 
-__all__ = ['Observe', 'Initial', 'MatchOnce', 'Model', 'Monomer',
+__all__ = ['Observable', 'Initial', 'MatchOnce', 'Model', 'Monomer',
            'Parameter', 'Compartment', 'Rule', 'ANY', 'WILD']
 
 try:
