@@ -10,18 +10,43 @@ from pysundials import cvode
 # These set of functions set up the system for annealing runs
 # and provide the runner function as input to annealing
 
-def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 1000, itermaxstep = None):
-    '''
-    must be run to set up the environment for annealing with pysundials
-    '''
+def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 20000, itermaxstep = None):
+    """
+    annlinit initializes the environment for simulations using CVODE
+    INPUT:
+    -------
+    model: a PySB model object
+    abstol: absolute tolerance for CVODE integrator
+    reltol: relative tolerance for CVODE integrator
+    nsteps: number of time steps of integration (depends on the units of the parameters)
+    itermaxstep: maximum number of iteration steps
+
+    OUTPUT:
+    -------
+    a list object containing:
+    [f, rhs_exprs, y, odesize, data, xout, yout, nsteps, cvode_mem, yzero, reltol, abstol]
+       f: the function called by cvodes calls that returns dy
+       rhs_exprs: the python expression for the right hand side (list of strings)
+       y: a CVode NVector object with the initial values for all species
+       odesize: the number of odes
+       data: a ctypes data structure (for Sundials) containing the parameter values (floats)
+       xout: the numpy array where the time values will be put
+       yout: the numpy array where the integrated timeseries will be put
+       nsteps: the number of time steps
+       cvode_mem: cvode memory object defining the step method
+       yzero: a numpy array of the initial conditions
+       paramarray: a numpy array containing the parameter values (floats). (same contents as data, but different datatype)
+       reltol: integrator relative tolerance (float)
+       abstol: integrator absolute tolerance (float)
+
+    paramarray, a parameter array
+    """
+
     # Generate equations
     pysb.bng.generate_equations(model)
-    # Get the size of the ODE array
     odesize = len(model.odes)
     
-    # init the arrays we need
     yzero = numpy.zeros(odesize)  #initial values for yzero
-    
     # assign the initial conditions
     for cplxptrn, ic_param in model.initial_conditions:
         speci = model.get_species_index(cplxptrn)
@@ -34,39 +59,31 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 1000, itermaxstep = N
     # replace the kxxxx constants with elements from the params array
     rhs_exprs = []
     for i in range(0,odesize):
-        # first get the function string from sympy, replace the the "sN" with y[N]
+        # get the function string from sympy, replace the the "sN" with y[N]
         tempstring = re.sub(r's(\d+)', lambda m: 'y[%s]'%(int(m.group(1))), str(model.odes[i]))
-        # now replace the constants with 'p' array names; cycle through the whole list
-        #for j in range(0, numparams):
-        #    tempstring = re.sub('(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])'%(model.parameters[j].name),'p[%d]'%(j), tempstring)
+
+        # replace the constants with 'p' array names; cycle through the whole list
         for j, parameter in enumerate(model.parameters):
             tempstring = re.sub('(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])' % parameter.name, 'p[%d]' % j, tempstring)
+
         # make a list of compiled rhs expressions which will be run by the integrator
         # use the ydots to build the function for analysis
         # (second arg is the "filename", useful for exception/debug output)
         rhs_exprs.append(compile(tempstring, '<ydot[%s]>' % i, 'eval'))
     
-    # Create the structure to hold the parameters when calling the function
-    # This results in a generic "p" array
+    # Create a generic "p" array to hold the parameters when calling the function
     numparams = len(model.parameters)
     class UserData(ctypes.Structure):
         _fields_ = [('p', cvode.realtype*numparams)] # parameters
     PUserData = ctypes.POINTER(UserData)
     data = UserData() 
 
-    #paramlist for annealing feeder function
-    #paramlist = []
-    #for i in range(0, numparams):
-    #    # notice: p[i] ~ model.parameters[i].name ~ model.parameters[i].value
-    #    data.p[i] = model.parameters[i].value
-    #    paramlist.append(model.parameters[i].value)
-    #paramarray = numpy.asarray(paramlist)
-
+    # Create the paramarray to hold the parameters and pass them from C to Python
+    # FIXME: could prob do this directly from data.p
     data.p[:] = [p.value for p in model.parameters]
     paramarray = numpy.array([p.value for p in model.parameters])
     
-    # if no sensitivity analysis is needed allocate the "p" array as a 
-    # pointer array that can be called by sundials "f" as needed
+    # allocate "p" as a pointer array that can be called by sundials "f" as needed
     def f(t, y, ydot, f_data):
         data = ctypes.cast(f_data, PUserData).contents
         rhs_locals = {'y': y, 'p': data.p}
@@ -74,17 +91,15 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 1000, itermaxstep = N
             ydot[i] = eval(rhs_exprs[i], rhs_locals)
         return 0
     
-    # CVODE STUFF
     # initialize the cvode memory object, use BDF and Newton for stiff
     cvode_mem = cvode.CVodeCreate(cvode.CV_BDF, cvode.CV_NEWTON)
-    # allocate the cvode memory as needed, pass the function and the init ys
+    # allocate the cvode memory as needed, pass the function and the initial ys
     cvode.CVodeMalloc(cvode_mem, f, 0.0, y, cvode.CV_SS, reltol, abstol)
     # point the parameters to the correct array
-    # if the params are changed later this does not need to be reassigned (???)
     cvode.CVodeSetFdata(cvode_mem, ctypes.pointer(data))
     # link integrator with linear solver
     cvode.CVDense(cvode_mem, odesize)
-    #stepsize
+    # maximum iteration steps
     if itermaxstep != None:
         cvode.CVodeSetMaxStep(cvode_mem, itermaxstep)
 
@@ -93,8 +108,7 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 1000, itermaxstep = N
     yout = numpy.zeros([nsteps, odesize])
 
     #initialize the arrays
-    #print "Initial parameter values:", y
-    xout[0] = 0.0 #CHANGE IF NEEDED
+    xout[0] = 0.0 # FIXME: this assumes that the integration starts at zero... CHANGE IF NEEDED
     #first step in yout
     for i in range(0, odesize):
         yout[0][i] = y[i]
@@ -143,11 +157,6 @@ def annlodesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic
 
     # update yzero if initial conditions are being modified as part of the parameters
     # did it this way b/c yzero and data.p may not always want to be modified at the same time
-    # FIXME: this is not the best way to do this.
-    # the params list should NOT contain the initial conditions if they are not
-    # to be used in the annealing... so this is a hack based on the fact that the
-    # initial conditions are contained as part of the model.parameters list.
-    # FIXME
     #
     if ic is True:
         for cplxptrn, ic_param in model.initial_conditions:
@@ -164,11 +173,6 @@ def annlodesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic
 
     t = cvode.realtype(tinit)
     tout = tinit + tadd
-    
-    #print "Beginning integration"
-    #print "TINIT:", tinit, "TFINAL:", tfinal, "TADD:", tadd, "ODESIZE:", odesize
-    #print "Integrating Parameters:\n", params
-    #print "y0:", yzero
 
     for step in range(1, nsteps):
         ret = cvode.CVode(cvode_mem, tout, y, ctypes.byref(t), cvode.CV_NORMAL)
@@ -191,51 +195,23 @@ def annlodesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic
     #sum up the correct entities
     for i, name in enumerate(obs_names):
         factors, species = zip(*model.observable_groups[name])
-        yobs[i] = (yout[:, species] * factors).sum(1)
+        yobs[i] = (yout[:, species] * factors).sum(axis = 1)
 
-    #transpose yobs to make it easy to plot
-    #yobs.T
-
-    #merge the x and y arrays for easy analysis
+    #merge the x and y arrays for easy visualization
     xyobs = numpy.vstack((xout, yobs))
 
     return (xyobs,xout,yout, yobs)
-
-def read_csv_array(xpfname):
-    """returns the first string and a numpy array from a csv set of data
-    xpfname is a string with the file name"""
-
-    #get the experimental data needed for annealing
-    fp = open(xpfname, "r")
-
-    reader = csv.reader(fp)
-    templist = []
-    #read in the lists
-    for row in reader:
-        templist.append(row)
-    #remove empty spaces
-    for i in range(0, len(templist)):
-        templist[i] = filter(None, templist[i])
-    headstring = templist.pop(0)
-    #Now put these into a numpy array, assume they are all floats
-    converters = tuple([float]*len(templist[0]))
-    darray = numpy.zeros((len(templist), len(templist[0])))
-    for i, item in enumerate(templist):
-        darray[i] = numpy.asarray(templist[i], dtype=darray.dtype)    
-   
-    #transpose to ease analysis
-    darray = darray.T
-    return (darray, headstring)
 
 def compare_data(xparray, simarray, xspairlist, vardata=False):
     """Compares two arrays of different size and returns the X^2 between them.
     Uses the X axis as the unit to re-grid both arrays. 
     xparray: experimental data
-    xparrayaxis: which axis of xparray to use for simulation
     simarray: simulation data
-    simarrayaxis: which axis of simarray to use for simulation
+    xspairlist: list of pairs of xp data and sim data that go together
+    vardata: TRUE if xparray contains variance data
+    
     """
-    # this expects arrays of the form array([time, measurement1, measurement2, ...])
+    # expects arrays of the form array([time, measurement1, measurement2, ...])
     # the time is assumed to be roughly the same for both and the 
     # shortest time will be taken as reference to regrid the data
     # the regridding is done using a b-spline interpolation
@@ -373,6 +349,7 @@ def annealfxn(params, useparams, time, model, envlist, xpdata, xspairlist, lb, u
     # 
     #
 
+    
     if numpy.greater_equal(params, lb).all() and numpy.less_equal(params, ub).all():
         print "Integrating..."
         outlist = annlodesolve(model, time, envlist, params, useparams)
