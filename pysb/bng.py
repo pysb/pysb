@@ -243,7 +243,6 @@ def generate_equations(model):
 
         while 'begin groups' not in lines.next():
             pass
-        model.observable_groups = {}
         while True:
             line = lines.next()
             if 'end groups' in line: break
@@ -298,15 +297,14 @@ def _parse_species(model, line):
 def _parse_group(model, line):
     # values are number (which we ignore), name, and species list
     values = line.strip().split()
-    group = []
+    obs = model.observables[values[1]]
     if len(values) == 3:
-        # combination is a comma separated list of [factor*]speciesnumber
+        # combination is a comma separated list of [coeff*]speciesnumber
         for product in values[2].split(','):
             terms = product.split('*')
-            # if no factor given (just species), insert a factor of 1
+            # if no coeff given (just species), insert a coeff of 1
             if len(terms) == 1:
                 terms.insert(0, 1)
-            factor = int(terms[0])
-            species = int(terms[1]) - 1  # -1 to change to 0-based indexing
-            group.append((factor, species))  
-    model.observable_groups[values[1]] = group
+            obs.coefficients.append(int(terms[0]))
+            # -1 to change to 0-based indexing
+            obs.species.append(int(terms[1]) - 1)

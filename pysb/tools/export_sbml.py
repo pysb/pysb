@@ -5,10 +5,21 @@
 import pysb
 import pysb.bng
 import sympy
+from sympy.printing.mathml import MathMLPrinter
 import re
 import sys
 import os
 from StringIO import StringIO
+
+class MathMLContentPrinter(MathMLPrinter):
+    """Prints an expression to MathML without presentation markup"""
+    def _print_Symbol(self, sym):
+        ci = self.dom.createElement(self.mathml_tag(sym))
+        ci.appendChild(self.dom.createTextNode(sym.name))
+        return ci
+
+def print_mathml(expr, **settings):
+    return MathMLContentPrinter(settings).doprint(expr)
 
 def run(model):
     output = StringIO()
@@ -16,7 +27,7 @@ def run(model):
 
     output.write(
         """<?xml version="1.0" encoding="UTF-8"?>
-<sbml xmlns="http://www.sbml.org/sbml/level2/version4" level="2" version="4">
+<sbml xmlns="http://www.sbml.org/sbml/level2" level="2" version="1">
     <model>
         <listOfCompartments>
             <compartment id="default" name="default" spatialDimensions="0"/>
@@ -50,7 +61,7 @@ def run(model):
             output.write('                    <speciesReference species="s%d"/>\n' % species)
         output.write('                </listOfProducts>\n');
         mathml = '<math xmlns="http://www.w3.org/1998/Math/MathML">' \
-            + sympy.printing.mathml(reaction['rate']) + '</math>'
+            + print_mathml(reaction['rate']) + '</math>'
         output.write('                <kineticLaw>' + mathml + '</kineticLaw>\n');
         output.write('            </reaction>\n');
     output.write("        </listOfReactions>\n")

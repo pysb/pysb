@@ -1,121 +1,130 @@
 class apt-update {
-    exec { "/usr/bin/apt-get -y update": }
+  exec { "/usr/bin/apt-get -y update": }
 }
 
 class python {
-    package {
-        "build-essential": ensure => latest;
-        "python": ensure => latest;
-        "python-dev": ensure => latest;
-        "python-setuptools": ensure => latest;
-    }
-    exec { "easy_install pip":
-        path => "/usr/local/bin:/usr/bin:/bin",
-        refreshonly => true,
-        require => Package["python-setuptools"],
-        subscribe => Package["python-setuptools"];
-    }
+  package {
+    ["build-essential", "python", "python-dev", "python-setuptools"]:
+      ensure => present;
+  }
+  exec { "easy_install pip":
+    path => "/usr/local/bin:/usr/bin:/bin",
+    refreshonly => true,
+    require => Package["python-setuptools"],
+    subscribe => Package["python-setuptools"];
+  }
 }
 
 class perl {
-    package {
-        "perl": ensure => latest;
-    }
+  package {
+    "perl": ensure => present;
+  }
 }
 
 class python-libs {
-    # ubuntu packages required to build the following python packages
-    package {
-        "libatlas-base-dev":
-            ensure => "latest";
-        "gfortran":
-            ensure => "latest";
-        "libpng12-dev":
-            ensure => "latest";
-        "python-gtk2-dev":
-            ensure => "latest";
-        "libfreetype6-dev":
-            ensure => "latest";
-        "libgraphviz-dev":
-            ensure => "latest";
-    }
-    # python packages
-    package {
-        "numpy":
-            ensure => "1.6.1",
-            provider => "pip";
-        "scipy":
-            ensure => "0.10.1",
-            provider => "pip",
-            require => [
-                Package["gfortran"],
-                Package["libatlas-base-dev"],
-                Package["numpy"]
-            ];
-        "sympy":
-            ensure => "0.7.1",
-            provider => "pip";
-        "matplotlib":
-            ensure => "1.1.0",
-            provider => "pip",
-            require => [
-                Package["libpng12-dev"],
-                Package["python-gtk2-dev"],
-                Package["libfreetype6-dev"],
-                Package["numpy"]
-            ];
-        "ipython":
-            ensure => "0.12",
-            provider => "pip";
-        "pygraphviz":
-            ensure => "1.1",
-            provider => "pip",
-            require => Package["libgraphviz-dev"];
-    }
+  # ubuntu packages required to build the following python packages
+  package {
+    ["libatlas-base-dev", "gfortran", "libpng12-dev", "python-gtk2-dev",
+     "libfreetype6-dev", "libgraphviz-dev", "graphviz"]:
+       ensure => present;
+  }
+  # python packages
+  package {
+    "numpy":
+      ensure => "1.6.1",
+      provider => "pip";
+    "scipy":
+      ensure => "0.10.1",
+      provider => "pip",
+      require => [
+                  Package["gfortran"],
+                  Package["libatlas-base-dev"],
+                  Package["numpy"],
+                 ];
+    "sympy":
+      ensure => "0.7.1",
+      provider => "pip";
+    "matplotlib":
+      ensure => "1.1.0",
+      provider => "pip",
+      require => [
+                  Package["libpng12-dev"],
+                  Package["python-gtk2-dev"],
+                  Package["libfreetype6-dev"],
+                  Package["numpy"]
+                 ];
+    "ipython":
+      ensure => "0.12",
+      provider => "pip";
+    "pygraphviz":
+      ensure => "1.1",
+      provider => "pip",
+      require => Package["libgraphviz-dev"];
+  }
 }
 
 class bionetgen {
-    package { "wget": ensure => present; }
-    exec { "/usr/bin/wget https://github.com/downloads/jmuhlich/bionetgen/BioNetGen_2.1.8_rev597.tgz":
-        cwd => "/tmp",
-        creates => "/tmp/BioNetGen_2.1.8_rev597.tgz",
-        require => Package["wget"];
-    }
-    file { "/tmp/BioNetGen_2.1.8_rev597.tgz": }
-    exec { "/bin/tar xzf /tmp/BioNetGen_2.1.8_rev597.tgz":
-        cwd => "/home/demo",
-        user => demo,
-        group => demo,
-        creates => "/home/demo/BioNetGen",
-        require => [
-            File["/tmp/BioNetGen_2.1.8_rev597.tgz"],
-            File["/home/demo"],
-        ],
-    }
-    file { "/usr/local/share/BioNetGen":
-        ensure => link,
-        target => "/home/demo/BioNetGen";
-    }
+  package { "wget": ensure => present; }
+  exec { "/usr/bin/wget -c https://github.com/downloads/jmuhlich/bionetgen/BioNetGen_2.1.8_rev597.tgz":
+    cwd => "/tmp",
+    creates => "/tmp/BioNetGen_2.1.8_rev597.tgz",
+    require => Package["wget"];
+  }
+  file { "/tmp/BioNetGen_2.1.8_rev597.tgz": }
+  exec { "/bin/tar xzf /tmp/BioNetGen_2.1.8_rev597.tgz":
+    cwd => "/usr/local/share",
+    creates => "/usr/local/share/BioNetGen",
+    require => File["/tmp/BioNetGen_2.1.8_rev597.tgz"],
+  }
 }
 
 class pysb {
-    package {
-        "pysb":
-            provider => "pip";
-    }
-    user { "demo": ensure => present }
-    file { "/home/demo":
-        ensure => directory,
-        source => "/etc/skel",
-        recurse => true,
-        owner => "demo",
-        group => "demo";
-    }
+  package {
+    "pysb":
+      provider => "pip";
+  }
+  user { "demo":
+    ensure => present;
+  }
+  file { "/home/demo":
+    ensure => directory,
+    source => "/etc/skel",
+    recurse => true,
+    owner => "demo",
+    group => "demo";
+  }
+  file { "/home/demo/pysb":
+    ensure => link,
+    target => "/usr/local/lib/python2.6/dist-packages/pysb";
+  }
+  file { "/home/demo/BioNetGen":
+    ensure => link,
+    target => "/usr/local/share/BioNetGen";
+  }
+}
+
+class x11 {
+  package {
+    ["xserver-xorg-video-dummy", "x11-xserver-utils", "gdm", "gnome-core",
+     "human-theme", "gtk2-engines", "gksu", "evince"]:
+       ensure => present;
+  }
+}
+
+class kernel-stuff {
+  package {
+    ["linux-headers-generic", "zerofree"]:
+      ensure => present;
+  }
 }
 
 class puppet-misc {
-    group { "puppet": ensure => present; }
+  group { "puppet": ensure => present; }
 }
+
+# todo:
+# elevator=noop
+# emacs23
 
 class { "apt-update": }
 class { "python": }
@@ -123,6 +132,8 @@ class { "python-libs": }
 class { "perl": }
 class { "bionetgen": }
 class { "pysb": }
+class { "x11": }
+class { "kernel-stuff": }
 class { "puppet-misc": }
 
 Class["python"] -> Package <| provider == pip |>

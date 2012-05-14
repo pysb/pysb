@@ -19,7 +19,6 @@ except distutils.errors.CompileError as e:
 try:
     import pysb.pysundials_helpers
 except ImportError as e:
-    print e
     pass
 
 # some sane default options for a few well-known integrators
@@ -34,12 +33,20 @@ default_integrator_options = {
         },
     }
 
-def odesolve(model, t, integrator='vode', **integrator_options):
+def odesolve(model, t, param_values=None, integrator='vode', **integrator_options):
     pysb.bng.generate_equations(model)
     
-    param_subs = dict([ (p.name, p.value) for p in model.parameters ])
-    param_values = numpy.array([param_subs[p.name] for p in model.parameters])
-    param_indices = dict( (p.name, i) for i, p in enumerate(model.parameters) )
+    # need explicit None check or numpy.ndarray will complain
+    if param_values is not None:
+        # accept vector of parameter values as an argument
+        if len(param_values) != len(model.parameters):
+            raise Exception("param_values must be the same length as model.parameters")
+        if not isinstance(param_values, numpy.ndarray):
+            param_values = numpy.array(param_values)
+    else:
+        # create parameter vector from the values in the model
+        param_subs = dict([ (p.name, p.value) for p in model.parameters ])
+        param_values = numpy.array([param_subs[p.name] for p in model.parameters])
 
     code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
     code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
@@ -67,7 +74,7 @@ def odesolve(model, t, integrator='vode', **integrator_options):
         return ydot
 
     nspecies = len(model.species)
-    obs_names = [name for name, rp in model.observable_patterns]
+    obs_names = model.observables.keys()
     rec_names = ['__s%d' % i for i in range(nspecies)] + obs_names
     yout = numpy.ndarray((len(t), len(rec_names)))
 
@@ -89,11 +96,9 @@ def odesolve(model, t, integrator='vode', **integrator_options):
         yout[i, :nspecies] = integrator.y
         i += 1
 
-    for i, name in enumerate(obs_names):
-        obs_group = model.observable_groups[name]
-        if obs_group:
-            factors, species = zip(*obs_group)
-            obs_values = (yout[:, species] * factors).sum(1)
+    for i, obs in enumerate(model.observables):
+        if obs.species:
+            obs_values = (yout[:, obs.species] * obs.coefficients).sum(1)
         else:
             obs_values = numpy.zeros(yout.shape[0])
         yout[:, nspecies + i] = obs_values

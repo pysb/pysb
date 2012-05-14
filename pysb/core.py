@@ -5,9 +5,7 @@ import warnings
 import inspect
 import re
 import collections
-
-def Observe(*args):
-    return SelfExporter.default_model.add_observable(*args)
+import weakref
 
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
@@ -63,7 +61,8 @@ class SelfExporter(object):
             if obj.name is None:
                 if SelfExporter.target_module == sys.modules['__main__']:
                     # user ran model .py directly
-                    model_filename = inspect.getfile(sys.modules['__main__'])
+                    model_path = inspect.getfile(sys.modules['__main__'])
+                    model_filename = os.path.basename(model_path)
                     module_name = re.sub(r'\.py$', '', model_filename)
                 elif SelfExporter.target_module is not None:
                     # model is imported by some other script (typical case)
@@ -92,6 +91,7 @@ class Component(object):
         if not re.match(r'[_a-z][_a-z0-9]*\Z', name, re.IGNORECASE):
             raise InvalidComponentNameError(name)
         self.name = name
+        self.model = None  # to be set in Model.add_component
         if _export:
             try:
                 SelfExporter.export(self)
@@ -111,12 +111,11 @@ class Model(object):
         self.compartments = ComponentSet()
         self.parameters = ComponentSet()
         self.rules = ComponentSet()
+        self.observables = ComponentSet()
         self.species = []
         self.odes = []
         self.reactions = []
         self.reactions_bidirectional = []
-        self.observable_patterns = []
-        self.observable_groups = {}  # values are tuples of factor,speciesnumber
         self.initial_conditions = []
         if _export:
             SelfExporter.export(self)
@@ -180,18 +179,13 @@ class Model(object):
         # We have 4 containers for the 4 types of components. This code determines the right one
         # based on the class of the object being added.  It tries to be defensive against reasonable
         # errors, but still seems sort of fragile.
+        # FIXME: this breaks for subclasses of the Component classes
         container_name = type(other).__name__.lower() + 's'
         container = getattr(self, container_name, None)
         if not isinstance(other, Component) or not isinstance(container, ComponentSet):
             raise Exception("Tried to add component of unknown type '%s' to model" % type(other))
         container.add(other)
-
-    def add_observable(self, name, reaction_pattern):
-        try:
-            reaction_pattern = as_reaction_pattern(reaction_pattern)
-        except InvalidReactionPatternException as e:
-            raise type(e)("Observable pattern does not look like a ReactionPattern")
-        self.observable_patterns.append( (name, reaction_pattern) )
+        other.model = weakref.proxy(self)
 
     def initial(self, complex_pattern, value):
         try:
@@ -320,7 +314,6 @@ class MonomerPattern(object):
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
         # ensure each value is one of: None, integer, list of integers, string, (string,integer), (string,WILD), ANY
-        # FIXME: support state sites
         invalid_sites = []
         for (site, state) in site_conditions.items():
             # pass through to next iteration if state type is ok
@@ -358,9 +351,7 @@ class MonomerPattern(object):
         # 1.
         sites_ok = self.is_site_concrete()
         # 2.
-        # FIXME accessing the model via SelfExporter.default_model is a temporary hack - all model
-        #   components (Component subclasses?) need weak refs to their parent model.
-        compartment_ok = self.compartment is not None or not SelfExporter.default_model.compartments
+        compartment_ok = not self.monomer.model.compartments or self.compartment
         return compartment_ok and sites_ok
 
     def is_site_concrete(self):
@@ -396,13 +387,13 @@ class MonomerPattern(object):
 
     def __rshift__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, False)
+            return RuleExpression(self, other, False)
         else:
             return NotImplemented
 
     def __ne__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, True)
+            return RuleExpression(self, other, True)
         else:
             return NotImplemented
 
@@ -502,13 +493,13 @@ class ComplexPattern(object):
 
     def __rshift__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, False)
+            return RuleExpression(self, other, False)
         else:
             return NotImplemented
 
     def __ne__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, True)
+            return RuleExpression(self, other, True)
         else:
             return NotImplemented
 
@@ -531,6 +522,7 @@ class ComplexPattern(object):
 
 
 class ReactionPattern(object):
+
     """
     A pattern for the entire product or reactant side of a rule.
 
@@ -553,14 +545,14 @@ class ReactionPattern(object):
     def __rshift__(self, other):
         """Irreversible reaction"""
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, False)
+            return RuleExpression(self, other, False)
         else:
             return NotImplemented
 
     def __ne__(self, other):
         """Reversible reaction"""
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return (self, other, True)
+            return RuleExpression(self, other, True)
         else:
             return NotImplemented
 
@@ -569,9 +561,34 @@ class ReactionPattern(object):
 
 
 
+class RuleExpression(object):
+
+    """
+    A container for the reactant and product patterns of a rule expression.
+
+    Contains one ReactionPattern for each of reactants and products, and a
+    boolean indicating reversibility. This is a temporary object used to
+    implement syntactic sugar through operator overloading. The Rule constructor
+    takes an instance of this class as its first argument, but simply extracts
+    its fields and discards the object itself.
+
+    """
+
+    def __init__(self, reactant_pattern, product_pattern, is_reversible):
+        try:
+            self.reactant_pattern = as_reaction_pattern(reactant_pattern)
+        except InvalidReactionPatternException as e:
+            raise type(e)("Reactant does not look like a reaction pattern")
+        try:
+            self.product_pattern = as_reaction_pattern(product_pattern)
+        except InvalidReactionPatternException as e:
+            raise type(e)("Product does not look like a reaction pattern")
+        self.is_reversible = is_reversible
+
+
+
 def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
-
     if isinstance(v, ComplexPattern):
         return v
     elif isinstance(v, MonomerPattern):
@@ -583,7 +600,6 @@ def as_complex_pattern(v):
 def as_reaction_pattern(v):
     """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
     complete ReactionPattern."""
-
     if isinstance(v, ReactionPattern):
         return v
     else:
@@ -649,35 +665,19 @@ class Compartment(Component):
 
 class Rule(Component):
 
-    def __init__(self, name, reaction_pattern_set, rate_forward, rate_reverse=None,
+    def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
                  delete_molecules=False,
                  _export=True):
         Component.__init__(self, name, _export)
-
-        # FIXME: This tuple thing is ugly (used to support >> and <> operators between ReactionPatterns).
-        # This is how the reactant and product ReactionPatterns are passed, along with is_reversible.
-        if not isinstance(reaction_pattern_set, tuple) and len(reaction_pattern_set) != 3:
-            raise Exception("reaction_pattern_set must be a tuple of (ReactionPattern, ReactionPattern, Boolean)")
-
-        try:
-            reactant_pattern = as_reaction_pattern(reaction_pattern_set[0])
-        except InvalidReactionPatternException as e:
-            raise type(e)("Reactant does not look like a reaction pattern")
-
-        try:
-            product_pattern = as_reaction_pattern(reaction_pattern_set[1])
-        except InvalidReactionPatternException as e:
-            raise type(e)("Product does not look like a reaction pattern")
-
-        self.is_reversible = reaction_pattern_set[2]
-
+        if not isinstance(rule_expression, RuleExpression):
+            raise Exception("rule_expression is not a RuleExpression object")
         if not isinstance(rate_forward, Parameter):
             raise Exception("Forward rate must be a Parameter")
-        if self.is_reversible and not isinstance(rate_reverse, Parameter):
+        if rule_expression.is_reversible and not isinstance(rate_reverse, Parameter):
             raise Exception("Reverse rate must be a Parameter")
-
-        self.reactant_pattern = reactant_pattern
-        self.product_pattern = product_pattern
+        self.reactant_pattern = rule_expression.reactant_pattern
+        self.product_pattern = rule_expression.product_pattern
+        self.is_reversible = rule_expression.is_reversible
         self.rate_forward = rate_forward
         self.rate_reverse = rate_reverse
         self.delete_molecules = delete_molecules
@@ -692,6 +692,26 @@ class Rule(Component):
             ret += ', delete_molecules=True'
         ret += ')'
         return ret
+
+
+
+class Observable(Component):
+
+    """
+    Model component representing a linear combination of species.
+
+    May be used in rate law expressions.
+    """
+
+    def __init__(self, name, reaction_pattern, _export=True):
+        try:
+            reaction_pattern = as_reaction_pattern(reaction_pattern)
+        except InvalidReactionPatternException as e:
+            raise type(e)("Observable pattern does not look like a ReactionPattern")
+        Component.__init__(self, name, _export)
+        self.reaction_pattern = reaction_pattern
+        self.species = []
+        self.coefficients = []
 
 
 

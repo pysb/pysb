@@ -261,13 +261,13 @@ inhibit(cSmac, XIAP, kf28, kr28)
 
 
 # Fig 4B
-Observe('Bid',   Bid(b=None))
-Observe('PARP',  PARP(b=None))
-Observe('mSmac', mSmac(b=None))
+Observable('Bid_unbound',   Bid(b=None))
+Observable('PARP_unbound',  PARP(b=None))
+Observable('mSmac_unbound', mSmac(b=None))
 # this is what I originally thought 4B was actually plotting
-Observe('tBid',  tBid())
-Observe('CPARP', CPARP())
-Observe('cSmac', cSmac())
+Observable('tBid_total',  tBid())
+Observable('CPARP_total', CPARP())
+Observable('cSmac_total', cSmac())
 
 
 
