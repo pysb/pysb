@@ -58,16 +58,9 @@ def run(model):
     observables = "function [ode_observables, kd_values, kd_index, "
     observables += "ic_index, dividing_factor] = %s_observables()\n\n" % model.name
   
-    for i, obs_name in enumerate(model.observable_groups):
-        obs_spec_list = "["
-        obs_coeff_list = "[" 
-
-        for j, obs_tuple in enumerate(model.observable_groups[obs_name]):
-            obs_spec_list += " %d " % obs_tuple[1]
-            obs_coeff_list += " %d " % obs_tuple[0]
-
-        obs_spec_list += "]"
-        obs_coeff_list += "]" 
+    for i, obs in enumerate(model.observables):
+        obs_spec_list = "[" + ' '.join(str(s) for s in obs.species) + "]"
+        obs_coeff_list = "[" + ' '.join(str(c) for c in obs.coefficients) + "]"
 
         observables += "ode_observables{%d, 1} = %s;\n" % (i+1, obs_spec_list)
         observables += "ode_observables{%d, 2} = %s;\n" % (i+1, obs_coeff_list)
