@@ -746,6 +746,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     def __init__(self, iterable=[]):
         self._elements = []
         self._map = {}
+        self._index_map = {}
         for value in iterable:
             self.add(value)
 
@@ -766,6 +767,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
                 raise ComponentDuplicateNameError("Tried to add a component with a duplicate name: %s" % c.name)
             self._elements.append(c)
             self._map[c.name] = c
+            self._index_map[c.name] = len(self._elements) - 1
 
     def __getitem__(self, key):
         # Must support both Sequence and Mapping behavior. This means stringified integer Mapping
@@ -803,6 +805,13 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
 
     def items(self):
         return zip(self.keys(), self)
+
+    # We can implement this in O(1) ourselves, whereas the Sequence mixin
+    # implements it in O(n).
+    def index(self, c):
+        if not c in self:
+            raise ValueError
+        return self._index_map[c.name]
 
     # We reimplement this because collections.Set's __and__ mixin iterates over other, not
     # self. That implementation ends up retaining the ordering of other, but we'd like to keep the
