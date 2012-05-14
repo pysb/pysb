@@ -10,43 +10,18 @@ from pysundials import cvode
 # These set of functions set up the system for annealing runs
 # and provide the runner function as input to annealing
 
-def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 20000, itermaxstep = None):
-    """
-    annlinit initializes the environment for simulations using CVODE
-    INPUT:
-    -------
-    model: a PySB model object
-    abstol: absolute tolerance for CVODE integrator
-    reltol: relative tolerance for CVODE integrator
-    nsteps: number of time steps of integration (depends on the units of the parameters)
-    itermaxstep: maximum number of iteration steps
-
-    OUTPUT:
-    -------
-    a list object containing:
-    [f, rhs_exprs, y, odesize, data, xout, yout, nsteps, cvode_mem, yzero, reltol, abstol]
-       f: the function called by cvodes calls that returns dy
-       rhs_exprs: the python expression for the right hand side (list of strings)
-       y: a CVode NVector object with the initial values for all species
-       odesize: the number of odes
-       data: a ctypes data structure (for Sundials) containing the parameter values (floats)
-       xout: the numpy array where the time values will be put
-       yout: the numpy array where the integrated timeseries will be put
-       nsteps: the number of time steps
-       cvode_mem: cvode memory object defining the step method
-       yzero: a numpy array of the initial conditions
-       paramarray: a numpy array containing the parameter values (floats). (same contents as data, but different datatype)
-       reltol: integrator relative tolerance (float)
-       abstol: integrator absolute tolerance (float)
-
-    paramarray, a parameter array
-    """
-
+def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 1000, itermaxstep = None):
+    '''
+    must be run to set up the environment for annealing with pysundials
+    '''
     # Generate equations
     pysb.bng.generate_equations(model)
+    # Get the size of the ODE array
     odesize = len(model.odes)
     
+    # init the arrays we need
     yzero = numpy.zeros(odesize)  #initial values for yzero
+    
     # assign the initial conditions
     for cplxptrn, ic_param in model.initial_conditions:
         speci = model.get_species_index(cplxptrn)
@@ -59,31 +34,39 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 20000, itermaxstep = 
     # replace the kxxxx constants with elements from the params array
     rhs_exprs = []
     for i in range(0,odesize):
-        # get the function string from sympy, replace the the "sN" with y[N]
+        # first get the function string from sympy, replace the the "sN" with y[N]
         tempstring = re.sub(r's(\d+)', lambda m: 'y[%s]'%(int(m.group(1))), str(model.odes[i]))
-
-        # replace the constants with 'p' array names; cycle through the whole list
+        # now replace the constants with 'p' array names; cycle through the whole list
+        #for j in range(0, numparams):
+        #    tempstring = re.sub('(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])'%(model.parameters[j].name),'p[%d]'%(j), tempstring)
         for j, parameter in enumerate(model.parameters):
             tempstring = re.sub('(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])' % parameter.name, 'p[%d]' % j, tempstring)
-
         # make a list of compiled rhs expressions which will be run by the integrator
         # use the ydots to build the function for analysis
         # (second arg is the "filename", useful for exception/debug output)
         rhs_exprs.append(compile(tempstring, '<ydot[%s]>' % i, 'eval'))
     
-    # Create a generic "p" array to hold the parameters when calling the function
+    # Create the structure to hold the parameters when calling the function
+    # This results in a generic "p" array
     numparams = len(model.parameters)
     class UserData(ctypes.Structure):
         _fields_ = [('p', cvode.realtype*numparams)] # parameters
     PUserData = ctypes.POINTER(UserData)
     data = UserData() 
 
-    # Create the paramarray to hold the parameters and pass them from C to Python
-    # FIXME: could prob do this directly from data.p
+    #paramlist for annealing feeder function
+    #paramlist = []
+    #for i in range(0, numparams):
+    #    # notice: p[i] ~ model.parameters[i].name ~ model.parameters[i].value
+    #    data.p[i] = model.parameters[i].value
+    #    paramlist.append(model.parameters[i].value)
+    #paramarray = numpy.asarray(paramlist)
+
     data.p[:] = [p.value for p in model.parameters]
     paramarray = numpy.array([p.value for p in model.parameters])
     
-    # allocate "p" as a pointer array that can be called by sundials "f" as needed
+    # if no sensitivity analysis is needed allocate the "p" array as a 
+    # pointer array that can be called by sundials "f" as needed
     def f(t, y, ydot, f_data):
         data = ctypes.cast(f_data, PUserData).contents
         rhs_locals = {'y': y, 'p': data.p}
@@ -91,15 +74,17 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 20000, itermaxstep = 
             ydot[i] = eval(rhs_exprs[i], rhs_locals)
         return 0
     
+    # CVODE STUFF
     # initialize the cvode memory object, use BDF and Newton for stiff
     cvode_mem = cvode.CVodeCreate(cvode.CV_BDF, cvode.CV_NEWTON)
-    # allocate the cvode memory as needed, pass the function and the initial ys
+    # allocate the cvode memory as needed, pass the function and the init ys
     cvode.CVodeMalloc(cvode_mem, f, 0.0, y, cvode.CV_SS, reltol, abstol)
     # point the parameters to the correct array
+    # if the params are changed later this does not need to be reassigned (???)
     cvode.CVodeSetFdata(cvode_mem, ctypes.pointer(data))
     # link integrator with linear solver
     cvode.CVDense(cvode_mem, odesize)
-    # maximum iteration steps
+    #stepsize
     if itermaxstep != None:
         cvode.CVodeSetMaxStep(cvode_mem, itermaxstep)
 
@@ -108,7 +93,8 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 20000, itermaxstep = 
     yout = numpy.zeros([nsteps, odesize])
 
     #initialize the arrays
-    xout[0] = 0.0 # FIXME: this assumes that the integration starts at zero... CHANGE IF NEEDED
+    #print "Initial parameter values:", y
+    xout[0] = 0.0 #CHANGE IF NEEDED
     #first step in yout
     for i in range(0, odesize):
         yout[0][i] = y[i]
@@ -130,33 +116,31 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 20000, itermaxstep = 
 
 
 # reltol of 1.0e-3, relative error of ~1%. abstol of 1.0e-2, enough for values that oscillate in the hundreds to thousands
-def annlodesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic=True):
+def annlodesolve(model, tfinal, envlist, params, tinit = 0.0, ic=True):
     '''
     the ODE equation solver tailored to work with the annealing algorithm
     model: the model object
     envlist: the list returned from annlinit
     params: the list of parameters that are being optimized with annealing 
-    useparams: the parameter number to which params[i] corresponds
     tinit: initial time
     reltol: relative tolerance
     abstol: absolute tolerance
-    ic: reinitialize initial conditions to a value in params or useparams
+    ic: reinitialize initial conditions to a value in params 
     '''
     (f, rhs_exprs, y, odesize, data, xout, yout, nsteps, cvode_mem, yzero, reltol, abstol) = envlist
 
     #set the initial values and params in each run
-    #all parameters are used in annealing. initial conditions are not, here
-    if useparams is None:
-        for i in range(len(params)):
-            data.p[i] = params[i]
-    else:
-        #only a subset of parameters are used for annealing
-        for i in range(len(useparams)):
-            #print "changing parameter", model.parameters[useparams[i]],"data.p", data.p[useparams[i]],"to", params[i]
-            data.p[useparams[i]] = params[i]
-
+    #all parameters are used in annealing. 
+    for i in range(len(params)):
+        data.p[i] = params[i]
+        
     # update yzero if initial conditions are being modified as part of the parameters
     # did it this way b/c yzero and data.p may not always want to be modified at the same time
+    # FIXME: this is not the best way to do this.
+    # the params list should NOT contain the initial conditions if they are not
+    # to be used in the annealing... so this is a hack based on the fact that the
+    # initial conditions are contained as part of the model.parameters list.
+    # FIXME
     #
     if ic is True:
         for cplxptrn, ic_param in model.initial_conditions:
@@ -173,6 +157,11 @@ def annlodesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic
 
     t = cvode.realtype(tinit)
     tout = tinit + tadd
+    
+    #print "Beginning integration"
+    #print "TINIT:", tinit, "TFINAL:", tfinal, "TADD:", tadd, "ODESIZE:", odesize
+    #print "Integrating Parameters:\n", params
+    #print "y0:", yzero
 
     for step in range(1, nsteps):
         ret = cvode.CVode(cvode_mem, tout, y, ctypes.byref(t), cvode.CV_NORMAL)
@@ -195,9 +184,12 @@ def annlodesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic
     #sum up the correct entities
     for i, name in enumerate(obs_names):
         factors, species = zip(*model.observable_groups[name])
-        yobs[i] = (yout[:, species] * factors).sum(axis = 1)
+        yobs[i] = (yout[:, species] * factors).sum(1)
 
-    #merge the x and y arrays for easy visualization
+    #transpose yobs to make it easy to plot
+    #yobs.T
+
+    #merge the x and y arrays for easy analysis
     xyobs = numpy.vstack((xout, yobs))
 
     return (xyobs,xout,yout, yobs)
@@ -206,12 +198,11 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
     """Compares two arrays of different size and returns the X^2 between them.
     Uses the X axis as the unit to re-grid both arrays. 
     xparray: experimental data
+    xparrayaxis: which axis of xparray to use for simulation
     simarray: simulation data
-    xspairlist: list of pairs of xp data and sim data that go together
-    vardata: TRUE if xparray contains variance data
-    
+    simarrayaxis: which axis of simarray to use for simulation
     """
-    # expects arrays of the form array([time, measurement1, measurement2, ...])
+    # this expects arrays of the form array([time, measurement1, measurement2, ...])
     # the time is assumed to be roughly the same for both and the 
     # shortest time will be taken as reference to regrid the data
     # the regridding is done using a b-spline interpolation
@@ -291,69 +282,66 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
     print "OBJOUT(total):", objout
     return objout
 
-def getgenparambounds(params, omag=1, N=1000., useparams=[], usemag=None, useN=None ):
-    # params must be a numpy array
-    # from: http://projects.scipy.org/scipy/ticket/1126
-    # The input-parameters "lower" and "upper" do not refer to global bounds of the
-    # parameter space but to 'maximum' displacements in the MC scheme AND
-    # in addition they determine the initial point!! 
-    # The initial value that you provide for the parameter vector seems to have no influence.
-    # This is how I call anneal with my desired functionality
-    # p=[a,b,c] #my initial values
-    # lb=array([a0,b0,c0]) #my lower bounds (absolute values)
-    # ub=array([a1,b1,c1]) #my upper bounds
-    # N=100 #determines the size of displacements; the more N, the smaller steps and the longer time to convergence
-    # dx=(ub-lb)/N #displacements--you could get from ub to lb in N steps
-    # lower=array(p)-dx/2 #the "lower bound" of the anneal routine (upper and lower step bounds relative to the current values of p)
-    # upper=array(p)+dx/2 #the "upper bound" of the anneal routine
-    # f=lambda var: costfunction(p,lb,ub) #my cost function that is made very high if not lb < p < ub
-    # pbest=scipy.optimize.anneal(f,p,lower=lower,upper=upper)
-    # This ensures a MC search that starts of close to my initial value and makes steps of dx in its search.
+def logparambounds(params, omag=1, useparams=[], usemag=None):
     ub = numpy.zeros(len(params))
     lb = numpy.zeros(len(params))
-    dx = numpy.zeros(len(params))
     # set upper/lower bounds for generic problem
     for i in range(len(params)):
         if i in useparams:
             ub[i] = params[i] * pow(10,usemag)
             lb[i] = params[i] / pow(10,usemag)
-            dx[i] = (ub[i] - lb[i])/useN
         else:
             ub[i] = params[i] * pow(10, omag)
             lb[i] = params[i] / pow(10, omag)
-            dx[i] = (ub[i] - lb[i])/N
-    #print dx
-    lower = params - dx/2
-    lower[numpy.where(lower<0.)] = 0.0 #make sure we don't go negative on parameters
-    upper = params + dx/2
+    return lb, ub
 
-    return lb, ub, lower, upper
+def linparambounds(params, fact=.25, useparams=[], usefact=None):
+    ub = numpy.zeros(len(params))
+    lb = numpy.zeros(len(params))
+    # set upper/lower bounds for generic problem
+    for i in range(len(params)):
+        if i in useparams:
+            ub[i] = params[i] + (params[i] * fact)
+            lb[i] = params[i] - (params[i] * fact)
+        else:
+            ub[i] = params[i] + (params[i] * usefact)
+            lb[i] = params[i] - (params[i] * usefact)
+    lb[numpy.where(lower<0.)] = 0.0 #make sure we don't go negative on parameters...
+    return lb, ub
 
-def annealfxn(params, useparams, time, model, envlist, xpdata, xspairlist, lb, ub, norm=False, vardata=False, fileobj=None):
-    ''' Feeder function for scipy.optimize.anneal
-    '''
-    #annlout = scipy.optimize.anneal(pysb.anneal_sundials.annealfxn, paramarr, 
-    #                                args=(None, 20000, model, envlist, xpnormdata, 
-    #                                [(2,1),(4,2),(7,3)], lb, ub, True, True), 
-    #                                lower=lower, upper=upper, full_output=1)
-    # sample anneal call full model:
-    # params: parameters to be optimized, at their values for the given annealing step
-    # lower,upper: arrays from get array function or something similar from getgenparambounds
-    # lb, ub: lower bound and upper bound for function from getgenparambounds
-    #
-    # sample anneal call, optimization of some parameters
-    #   annlout = scipy.optimize.anneal(pysb.anneal_sundials.annealfxn, smacprm, args=(smacnum, 25000, model, envlist, xpdata,
-    #            [(2,2), (3,3)], lower=lower, upper=upper, full_output=1)
-    #
-    # sample anneal call, optimization for ALL parameters
-    # 
-    #
-
+def mapprms(nums01, lb, ub, scaletype="log", scaleval):
+    """given an upper bound(ub), lower bound(lb), and a sample between zero and one (zosample)
+    return a set of parameters within the lb, ub range. 
+    nums01: array of numbers between zero and 1
+    lb: array of lower bound for each parameter
+    ub: arary of upper bound for each parameter
+    """
+    params = numpy.zeros_like(nums01)
     
+    if scaletype = "log":
+        params = lb*(ub/lb)**nums01 # map the [0..1] sobol array to values sampled over their omags
+    else if scaletype = "lin"
+        params = (nums01*(ub-lb)) + lb
+
+    return params
+
+def annealfxn(params, useparams, time, model, envlist, xpdata, xspairlist, lb, ub, scaletype, scaleval, norm=False, vardata=False, fileobj=None):
+    """Feeder function for scipy.optimize.anneal
+
+    """
+
+    # convert of linear values from [0,1) to desired sampling distrib
+    paramarr = getprms(params, lb, ub, scaletype="log", scaleval="1.0")
+
+    #debug
+    print params
+    print paramarr
+
+    # eliminate values outside the boundaries, i.e. those outside [0,1)
     if numpy.greater_equal(params, lb).all() and numpy.less_equal(params, ub).all():
-        print "Integrating..."
         outlist = annlodesolve(model, time, envlist, params, useparams)
-        # specify that this is normalized data
+
+        # normalized data needs a bit more tweaking before objfxn calculation
         if norm is True:
             print "Normalizing data"
             datamax = numpy.max(outlist[0], axis = 1)
@@ -361,7 +349,7 @@ def annealfxn(params, useparams, time, model, envlist, xpdata, xspairlist, lb, u
             outlistnorm = ((outlist[0].T - datamin)/(datamax-datamin)).T
             # xpdata[0] should be time, get from original array
             outlistnorm[0] = outlist[0][0].copy()
-            # xpdata here is normalized, and so is outlistnorm
+            # xpdata here should be normalized, and so is outlistnorm
             objout = compare_data(xpdata, outlistnorm, xspairlist, vardata)
         else:
             objout = compare_data(xpdata, outlist[0], xspairlist, vardata)
@@ -373,6 +361,7 @@ def annealfxn(params, useparams, time, model, envlist, xpdata, xspairlist, lb, u
         objout = 1.0e300 # the largest FP in python is 1.0e308, otherwise it is just Inf
 
     # save the params and temps for analysis
+
     # FIXME If a parameter is out of bounds, outlist and outlistnorm will be undefined and this will cause an error
     if fileobj:
         if norm:
