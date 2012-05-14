@@ -666,7 +666,7 @@ class Compartment(Component):
 class Rule(Component):
 
     def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
-                 delete_molecules=False,
+                 delete_molecules=False, move_connected=False,
                  _export=True):
         Component.__init__(self, name, _export)
         if not isinstance(rule_expression, RuleExpression):
@@ -681,6 +681,7 @@ class Rule(Component):
         self.rate_forward = rate_forward
         self.rate_reverse = rate_reverse
         self.delete_molecules = delete_molecules
+        self.move_connected = move_connected
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
     def __repr__(self):
@@ -690,6 +691,8 @@ class Rule(Component):
             ret += ', rate_reverse=%s' % repr(self.rate_reverse)
         if self.delete_molecules:
             ret += ', delete_molecules=True'
+        if self.move_connected:
+            ret += ', move_connected=True'
         ret += ')'
         return ret
 

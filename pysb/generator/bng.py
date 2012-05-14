@@ -69,6 +69,8 @@ class BngGenerator(object):
                 self.__content += ', %s' % r.rate_reverse.name
             if r.delete_molecules:
                 self.__content += ' DeleteMolecules'
+            if r.move_connected:
+                self.__content += ' MoveConnected'
             self.__content += "\n"
         self.__content += "end reaction rules\n\n"
 
