@@ -36,7 +36,6 @@ default_integrator_options = {
 def odesolve(model, t, param_values=None, integrator='vode', **integrator_options):
     pysb.bng.generate_equations(model)
     
-    # need explicit None check or numpy.ndarray will complain
     if param_values is not None:
         # accept vector of parameter values as an argument
         if len(param_values) != len(model.parameters):
@@ -61,8 +60,9 @@ def odesolve(model, t, param_values=None, integrator='vode', **integrator_option
 
     y0 = numpy.zeros((len(model.odes),))
     for cp, ic_param in model.initial_conditions:
+        pi = model.parameters.index(ic_param)
         si = model.get_species_index(cp)
-        y0[si] = ic_param.value
+        y0[si] = param_values[pi]
 
     def rhs(t, y, p):
         ydot = numpy.empty_like(y)
