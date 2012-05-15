@@ -224,8 +224,6 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
    
     for i in range(len(xspairlist)):
         # create a b-spline of the sim data and fit it to desired range
-        # import code
-        # code.interact(local=locals())
         
         #some error checking
         #print "xspairlist length:", len(xspairlist[i])
@@ -273,9 +271,6 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
                 # print objarray
                 objarray[i] = 1e-100 #zero enough
 
-        #import code
-        #code.interact(local=locals())
-
         objout += objarray.sum()
         print "OBJOUT(%d,%d):%f  |\t\tOBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout)
 
@@ -309,7 +304,7 @@ def linparambounds(params, fact=.25, useparams=[], usefact=None):
     lb[numpy.where(lower<0.)] = 0.0 #make sure we don't go negative on parameters...
     return lb, ub
 
-def mapprms(nums01, lb, ub, scaletype="log", scaleval):
+def mapprms(nums01, lb, ub, scaletype="log"):
     """given an upper bound(ub), lower bound(lb), and a sample between zero and one (zosample)
     return a set of parameters within the lb, ub range. 
     nums01: array of numbers between zero and 1
@@ -318,28 +313,29 @@ def mapprms(nums01, lb, ub, scaletype="log", scaleval):
     """
     params = numpy.zeros_like(nums01)
     
-    if scaletype = "log":
+    if scaletype == "log":
         params = lb*(ub/lb)**nums01 # map the [0..1] sobol array to values sampled over their omags
-    else if scaletype = "lin"
+    elif scaletype == "lin":
         params = (nums01*(ub-lb)) + lb
 
     return params
 
-def annealfxn(params, useparams, time, model, envlist, xpdata, xspairlist, lb, ub, scaletype, scaleval, norm=False, vardata=False, fileobj=None):
+def annealfxn(params, time, model, envlist, xpdata, xspairlist, lb, ub, scaletype="log", norm=False, vardata=False, fileobj=None):
     """Feeder function for scipy.optimize.anneal
 
     """
 
     # convert of linear values from [0,1) to desired sampling distrib
-    paramarr = getprms(params, lb, ub, scaletype="log", scaleval="1.0")
+    paramarr = mapprms(params, lb, ub, scaletype="log")
 
     #debug
-    print params
-    print paramarr
+    #print params
+    #print paramarr
 
     # eliminate values outside the boundaries, i.e. those outside [0,1)
-    if numpy.greater_equal(params, lb).all() and numpy.less_equal(params, ub).all():
-        outlist = annlodesolve(model, time, envlist, params, useparams)
+    if numpy.greater_equal(paramarr, lb).all() and numpy.less_equal(paramarr, ub).all():
+        print "integrating... "
+        outlist = annlodesolve(model, time, envlist, params)
 
         # normalized data needs a bit more tweaking before objfxn calculation
         if norm is True:
@@ -354,10 +350,10 @@ def annealfxn(params, useparams, time, model, envlist, xpdata, xspairlist, lb, u
         else:
             objout = compare_data(xpdata, outlist[0], xspairlist, vardata)
     else:
-        print "======>VALUE OUT OF BOUNDS NOTED"
+        print "======> VALUE OUT OF BOUNDS NOTED"
         temp = numpy.where((numpy.logical_and(numpy.greater_equal(params, lb), numpy.less_equal(params, ub)) * 1) == 0)
         for i in temp:
-            print "======>",i, params[i]
+            print "======>",i,"\n======", params[i],"\n"
         objout = 1.0e300 # the largest FP in python is 1.0e308, otherwise it is just Inf
 
     # save the params and temps for analysis
