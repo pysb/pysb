@@ -48,7 +48,6 @@ class SelfExporter(object):
 
         if isinstance(obj, Model):
             new_target_module = inspect.getmodule(caller_frame)
-            print "new:", new_target_module, "old:", SelfExporter.target_module
             if SelfExporter.default_model is not None \
                     and new_target_module is SelfExporter.target_module:
                 warnings.warn("Redefining model! (You can probably ignore this if you are running"
