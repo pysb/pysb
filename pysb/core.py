@@ -47,14 +47,17 @@ class SelfExporter(object):
         export_name = obj.name
 
         if isinstance(obj, Model):
-            if SelfExporter.default_model is not None:
+            new_target_module = inspect.getmodule(caller_frame)
+            print "new:", new_target_module, "old:", SelfExporter.target_module
+            if SelfExporter.default_model is not None \
+                    and new_target_module is SelfExporter.target_module:
                 warnings.warn("Redefining model! (You can probably ignore this if you are running"
                               " code interactively)", ModelExistsWarning, stacklevel);
                 # delete previously exported symbols to prevent extra SymbolExistsWarnings
                 for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
                     if name in SelfExporter.target_globals:
                         del SelfExporter.target_globals[name]
-            SelfExporter.target_module = inspect.getmodule(caller_frame)
+            SelfExporter.target_module = new_target_module
             SelfExporter.target_globals = caller_frame.f_globals
             SelfExporter.default_model = obj
             # if not set, assign model's name from the module it lives in. very sneaky and fragile.
