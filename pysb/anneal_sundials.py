@@ -320,53 +320,6 @@ def mapprms(nums01, lb, ub, scaletype="log"):
 
     return params
 
-def annealfxn(params, time, model, envlist, xpdata, xspairlist, lb, ub, scaletype="log", norm=False, vardata=False, fileobj=None):
-    """Feeder function for scipy.optimize.anneal
-
-    """
-
-    # convert of linear values from [0,1) to desired sampling distrib
-    paramarr = mapprms(params, lb, ub, scaletype="log")
-
-    #debug
-    #print params
-    #print paramarr
-
-    # eliminate values outside the boundaries, i.e. those outside [0,1)
-    if numpy.greater_equal(paramarr, lb).all() and numpy.less_equal(paramarr, ub).all():
-        print "integrating... "
-        outlist = annlodesolve(model, time, envlist, params)
-
-        # normalized data needs a bit more tweaking before objfxn calculation
-        if norm is True:
-            print "Normalizing data"
-            datamax = numpy.max(outlist[0], axis = 1)
-            datamin = numpy.min(outlist[0], axis = 1)
-            outlistnorm = ((outlist[0].T - datamin)/(datamax-datamin)).T
-            # xpdata[0] should be time, get from original array
-            outlistnorm[0] = outlist[0][0].copy()
-            # xpdata here should be normalized, and so is outlistnorm
-            objout = compare_data(xpdata, outlistnorm, xspairlist, vardata)
-        else:
-            objout = compare_data(xpdata, outlist[0], xspairlist, vardata)
-    else:
-        print "======> VALUE OUT OF BOUNDS NOTED"
-        temp = numpy.where((numpy.logical_and(numpy.greater_equal(params, lb), numpy.less_equal(params, ub)) * 1) == 0)
-        for i in temp:
-            print "======>",i,"\n======", params[i],"\n"
-        objout = 1.0e300 # the largest FP in python is 1.0e308, otherwise it is just Inf
-
-    # save the params and temps for analysis
-
-    # FIXME If a parameter is out of bounds, outlist and outlistnorm will be undefined and this will cause an error
-    if fileobj:
-        if norm:
-            writetofile(fileobj, params, outlistnorm, objout)
-        else:
-            writetofile(fileobj, params, outlist, objout)
-    
-    return objout
-
 def writetofile(fout, simparms, simdata, temperature):
     imax, jmax = simdata.shape
     nparms = len(simparms)
@@ -392,9 +345,6 @@ def writetofile(fout, simparms, simdata, temperature):
     fout.write('#-------------------------------------------------------------------------------------------------\n')
     return
 
-# FIXME
-# FIXME: THESE FUNCTIONS SHOULD PROBABLY NOT BE INCLUDED IN THE FINAL VERSION OF THE ANNEAL SUNDIALS FUNCTION
-# FIXME
 
 def tenninetycomp(outlistnorm, arglist, xpsamples=1.0):
     """ Determine Td and Ts. Td calculated at time when signal goes up to 10%.
@@ -437,22 +387,24 @@ def tenninetycomp(outlistnorm, arglist, xpsamples=1.0):
 
     return obj    
 
+def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, scaletype="log", norm=True, vardata=False, tn = [], fileobj=None):
+    """Feeder function for scipy.optimize.anneal
 
-def annealfxncust(params, useparams, time, model, envlist, xpdata, xspairlist, tenninetylist, lb, ub, norm=False, vardata=False, fileobj = False):
-    ''' Feeder function for scipy.optimize.anneal
-    '''
-    # Customized anneal function for the case when Smac is not fit to a function. Here we
-    # measure the Smac output from the model and use a 10-90 criterion to extract Td and Ts.
-    # We then use a chi-square comparison to these two values for the Smac contribution to the 
-    # data fitting. 
-    #
-    # 
-    #
+    """
 
-    if numpy.greater_equal(params, lb).all() and numpy.less_equal(params, ub).all():
-        print "Integrating..."
-        outlist = annlodesolve(model, time, envlist, params, useparams)
-        # specify that this is normalized data
+    # convert of linear values from [0,1) to desired sampling distrib
+    paramarr = mapprms(zoparams, lb, ub, scaletype="log")
+
+    #debug
+    #print zerooneparms
+    #print paramarr
+
+    # eliminate values outside the boundaries, i.e. those outside [0,1)
+    if numpy.greater_equal(paramarr, lb).all() and numpy.less_equal(paramarr, ub).all():
+        print "integrating... "
+        outlist = annlodesolve(model, time, envlist, paramarr)
+
+        # normalized data needs a bit more tweaking before objfxn calculation
         if norm is True:
             print "Normalizing data"
             datamax = numpy.max(outlist[0], axis = 1)
@@ -460,34 +412,34 @@ def annealfxncust(params, useparams, time, model, envlist, xpdata, xspairlist, t
             outlistnorm = ((outlist[0].T - datamin)/(datamax-datamin)).T
             # xpdata[0] should be time, get from original array
             outlistnorm[0] = outlist[0][0].copy()
-            # xpdata here is normalized, and so is outlistnorm
+            # xpdata here should be normalized
             objout = compare_data(xpdata, outlistnorm, xspairlist, vardata)
-            # This takes care of the IC/EC-RP comparisons
-            # Now SMAC
-            tn = tenninetycomp(outlistnorm, tenninetylist,len(xpdata[0]))
-            objout += tn 
+            if tn:
+                tn = tenninetycomp(outlistnorm, tn, len(xpdata[0]))
+                objout += tn 
             print "objout TOT:", objout
         else:
             objout = compare_data(xpdata, outlist[0], xspairlist, vardata)
-            tn = tenninetycomp(outlistnorm, tenninetylist)
+            if tn:
+                tn = tenninetycomp(outlist[0], tn)
             objout += tn 
+            print "objout TOT:", objout
     else:
-        print "======>VALUE OUT OF BOUNDS NOTED"
-        temp = numpy.where((numpy.logical_and(numpy.greater_equal(params, lb), numpy.less_equal(params, ub)) * 1) == 0)
+        print "======> VALUE OUT OF BOUNDS NOTED"
+        temp = numpy.where((numpy.logical_and(numpy.greater_equal(paramarr, lb), numpy.less_equal(paramarr, ub)) * 1) == 0)
         for i in temp:
-            print "======>",i, params[i]
+            print "======>",i,"\n======", paramarr[i],"\n"
         objout = 1.0e300 # the largest FP in python is 1.0e308, otherwise it is just Inf
+
+    # save the params and temps for analysis
+
+    # FIXME If a parameter is out of bounds, outlist and outlistnorm will be undefined and this will cause an error
+    if fileobj:
+        if norm:
+            writetofile(fileobj, paramarr, outlistnorm, objout)
+        else:
+            writetofile(fileobj, paramarr, outlist, objout)
+    
     return objout
-
-    
-
-
-
-
-
-    
-
-
-
 
 
