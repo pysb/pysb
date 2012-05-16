@@ -146,7 +146,8 @@ class Model(object):
 
     def all_components(self):
         components = ComponentSet()
-        for container in [self.monomers, self.compartments, self.rules, self.parameters]:
+        for container in [self.monomers, self.compartments, self.rules,
+                          self.parameters, self.observables]:
             components |= container
         return components
 
