@@ -118,7 +118,6 @@ def run_ssa(model, t_end=10, n_steps=100, cleanup=True):
     ssa_filename = bng_filename.replace('.bngl', '_ssa.gdat')
     output = StringIO()
 
-
     try:
         bng_file = open(bng_filename, 'w')
         bng_file.write(gen.get_content())
