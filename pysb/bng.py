@@ -91,34 +91,37 @@ def _parse_bng_outfile(out_filename):
         arr = numpy.loadtxt(out_filename, dtype=dt, skiprows=1)
     
     except Exception as e:
-        raise Exception("problem parsing BNG outfile: " + str(e)) # FIXME special Exception/Error?
+        # FIXME special Exception/Error?
+        raise Exception("problem parsing BNG outfile: " + str(e)) 
     
     return arr
 
 
-def run_ssa(model, t_end=10, n_steps=100, cleanup=True):
+def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
     """Run a model through BNG's SSA simulator and return
     the simulation data as a numpy record array.
-
-    The "suffix" argument to the simulate_ssa() function species
-    that a "_ssa" suffix is appended to the filename before the .gdat
-    or .cdat extension. This is encoded in the specification of the
-    ssa_filename.
     """
 
     run_ssa_code = """
     begin actions
     generate_network({overwrite=>1});
-    simulate_ssa({suffix=>ssa,t_end=>%f, n_steps=>%d});\n
+    simulate_ssa({t_end=>%f, n_steps=>%d});\n
     end actions
     """ % (t_end, n_steps)
     
     gen = BngGenerator(model)
-    bng_filename = '%s_%d_%d_temp.bngl' % (model.name, os.getpid(), random.randint(0, 10000))
-    ssa_filename = bng_filename.replace('.bngl', '_ssa.gdat')
+    bng_filename = '%s_%d_%d_temp.bngl' % (model.name,
+                            os.getpid(), random.randint(0, 10000))
+    gdat_filename = bng_filename.replace('.bngl', '.gdat')
+    cdat_filename = bng_filename.replace('.bngl', '.cdat')
+    net_filename = bng_filename.replace('.bngl', '.net')
+
     output = StringIO()
 
     try:
+        #import pdb; pdb.set_trace()
+        working_dir = os.getcwd()
+        os.chdir(output_dir)
         bng_file = open(bng_filename, 'w')
         bng_file.write(gen.get_content())
         bng_file.write(run_ssa_code)
@@ -129,7 +132,7 @@ def run_ssa(model, t_end=10, n_steps=100, cleanup=True):
         if p.returncode:
             raise GenerateNetworkError(p_err.rstrip())
 
-        output_arr = _parse_bng_outfile(ssa_filename)
+        output_arr = _parse_bng_outfile(gdat_filename)
         #ssa_file = open(ssa_filename, 'r')
         #output.write(ssa_file.read())
         #net_file.close()
@@ -138,9 +141,11 @@ def run_ssa(model, t_end=10, n_steps=100, cleanup=True):
         #    output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
     finally:
         if cleanup:
-            for filename in [bng_filename, ssa_filename]:
+            for filename in [bng_filename, gdat_filename,
+                             cdat_filename, net_filename]:
                 if os.access(filename, os.F_OK):
                     os.unlink(filename)
+        os.chdir(working_dir)
     return output_arr
 
 def generate_network(model, cleanup=True, append_stdout=False):
