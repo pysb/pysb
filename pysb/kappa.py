@@ -71,8 +71,7 @@ def run_complx(gen, kappa_filename, args):
 
 
 # Runs kasim, which
-def run_kasim(model, time=10000, points=200, output_dir='/tmp',
-              cleanup=True):
+def run_kasim(model, time=10000, points=200, output_dir='/tmp'):
   gen = KappaGenerator(model)
   #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
 
@@ -99,12 +98,12 @@ def run_kasim(model, time=10000, points=200, output_dir='/tmp',
 
   except Exception as e:
     raise Exception("problem running KaSim: " + str(e))
-  finally:
-    if cleanup:
-      for filename in [kappa_filename, im_filename,
-                       fm_filename, out_filename]:
-        if os.access(filename, os.F_OK):
-          os.unlink(filename)
+  #finally:
+    #if cleanup:
+    #  for filename in [kappa_filename, im_filename,
+    #                   fm_filename, out_filename]:
+    #    if os.access(filename, os.F_OK):
+    #      os.unlink(filename)
 
   output_dict = {'out':out_filename, 'im':im_filename, 'fm':'flux.dot'}
   return output_dict
