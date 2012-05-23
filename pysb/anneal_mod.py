@@ -1,6 +1,7 @@
 # Original Author: Travis Oliphant 2002
 # Bug-fixes in 2006 by Tim Leslie
-
+# Bug-fixes and changes by Carlos Lopez 2012
+#
 
 import numpy
 from numpy import asarray, tan, exp, ones, squeeze, sign, \

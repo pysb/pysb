@@ -253,8 +253,7 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         else:
         # assume a default variance
             xparrayvar = numpy.ones(xparray.shape[1])
-            xparrayvar = xparray[xparrayaxis]*.341 # 1 stdev w/in 1 sigma of the experimental data... 
-            xparrayvar = xparrayvar * xparrayvar
+            xparrayvar = xparray[xparrayaxis]*.25 #assume a coeff of variation of .25 = sigma/mean (from Chen, Gaudet...)
             # Remove any zeros in the variance array # FIXME
             for i in range(0, len(xparrayvar)):
                 if (xparrayvar[i] == 0):
@@ -387,7 +386,7 @@ def tenninetycomp(outlistnorm, arglist, xpsamples=1.0):
 
     return obj    
 
-def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, scaletype="log", norm=True, vardata=False, tn = [], fileobj=None):
+def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, tn = [], scaletype="log", norm=True, vardata=False, fileobj=None):
     """Feeder function for scipy.optimize.anneal
 
     """
@@ -396,7 +395,7 @@ def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, scalet
     paramarr = mapprms(zoparams, lb, ub, scaletype="log")
 
     #debug
-    #print zerooneparms
+    #print "ZOPARAMS:\n", zoparams,"\n"
     #print paramarr
 
     # eliminate values outside the boundaries, i.e. those outside [0,1)
@@ -428,7 +427,7 @@ def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, scalet
         print "======> VALUE OUT OF BOUNDS NOTED"
         temp = numpy.where((numpy.logical_and(numpy.greater_equal(paramarr, lb), numpy.less_equal(paramarr, ub)) * 1) == 0)
         for i in temp:
-            print "======>",i,"\n======", paramarr[i],"\n"
+            print "======>",i,"\n======", paramarr[i],"\n", zoparams[i],"\n"
         objout = 1.0e300 # the largest FP in python is 1.0e308, otherwise it is just Inf
 
     # save the params and temps for analysis
