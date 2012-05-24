@@ -84,6 +84,20 @@ class SelfExporter(object):
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
 
+    @staticmethod
+    def rename(obj, new_name):
+        """Rename a previously exported symbol"""
+        if new_name in SelfExporter.target_globals:
+            msg = "'%s' already defined" % new_name
+            warnings.warn(msg, SymbolExistsWarning, 2)
+        if obj.name in SelfExporter.target_globals:
+            obj = SelfExporter.target_globals[obj.name]
+            SelfExporter.target_globals[new_name] = obj
+            del SelfExporter.target_globals[obj.name]
+        else:
+            raise ValueError("Could not find object in global namespace by its"
+                             "name '%s'" % obj.name)
+
 
 class Component(object):
 
@@ -94,7 +108,8 @@ class Component(object):
             raise InvalidComponentNameError(name)
         self.name = name
         self.model = None  # to be set in Model.add_component
-        if _export:
+        self._export = _export
+        if self._export:
             try:
                 SelfExporter.export(self)
             except ComponentDuplicateNameError as e:
@@ -102,120 +117,11 @@ class Component(object):
                 # and makes the error harder to understand
                 raise e
 
-
-class Model(object):
-
-    """Container for monomers, compartments, parameters, and rules."""
-
-    def __init__(self, name=None, _export=True):
-        self.name = name
-        self.monomers = ComponentSet()
-        self.compartments = ComponentSet()
-        self.parameters = ComponentSet()
-        self.rules = ComponentSet()
-        self.observables = ComponentSet()
-        self.species = []
-        self.odes = []
-        self.reactions = []
-        self.reactions_bidirectional = []
-        self.initial_conditions = []
-        if _export:
-            SelfExporter.export(self)
-
-    def reload(self):
-        # forcibly removes the .pyc file and reloads the model module
-        model_pyc = SelfExporter.target_module.__file__
-        if model_pyc[-3:] == '.py':
-            model_pyc += 'c'
-        try:
-            os.unlink(model_pyc)
-        except OSError as e:
-            # ignore "no such file" errors, re-raise the rest
-            if e.errno != errno.ENOENT:
-                raise
-        try:
-            reload(SelfExporter.target_module)
-        except SystemError as e:
-            # This one specific SystemError occurs when using ipython to 'run' a model .py file
-            # directly, then reload()ing the model, which makes no sense anyway. (just re-run it)
-            if e.args == ('nameless module',):
-                raise Exception('Cannot reload a model which was executed directly in an interactive'
-                                'session. Please import the model file as a module instead.')
-            else:
-                raise
-        # return self for "model = model.reload()" idiom, until a better solution can be found
-        return SelfExporter.default_model
-
-    def all_components(self):
-        components = ComponentSet()
-        for container in [self.monomers, self.compartments, self.rules,
-                          self.parameters, self.observables]:
-            components |= container
-        return components
-
-    def parameters_rules(self):
-        """Returns a ComponentSet of the parameters used as rate constants in rules"""
-        # rate_reverse is None for irreversible rules, so we'll need to filter those out
-        cset = ComponentSet(p for r in self.rules for p in (r.rate_forward, r.rate_reverse)
-                            if p is not None)
-        # intersect with original parameter list to retain ordering
-        return self.parameters & cset
-
-    def parameters_initial_conditions(self):
-        """Returns a ComponentSet of the parameters used as initial conditions"""
-        cset = ComponentSet(ic[1] for ic in self.initial_conditions)
-        # intersect with original parameter list to retain ordering
-        return self.parameters & cset
-
-    def parameters_compartments(self):
-        """Returns a ComponentSet of the parameters used as compartment sizes"""
-        cset = ComponentSet(c.size for c in self.compartments)
-        # intersect with original parameter list to retain ordering
-        return self.parameters & cset
-
-    def parameters_unused(self):
-        """Returns a ComponentSet of the parameters not used in the model at all"""
-        cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
-        return self.parameters - cset_used
-
-    def add_component(self, other):
-        # We have 4 containers for the 4 types of components. This code determines the right one
-        # based on the class of the object being added.  It tries to be defensive against reasonable
-        # errors, but still seems sort of fragile.
-        # FIXME: this breaks for subclasses of the Component classes
-        container_name = type(other).__name__.lower() + 's'
-        container = getattr(self, container_name, None)
-        if not isinstance(other, Component) or not isinstance(container, ComponentSet):
-            raise Exception("Tried to add component of unknown type '%s' to model" % type(other))
-        container.add(other)
-        other.model = weakref.proxy(self)
-
-    def initial(self, complex_pattern, value):
-        try:
-            complex_pattern = as_complex_pattern(complex_pattern)
-        except InvalidComplexPatternException as e:
-            raise type(e)("Initial condition species does not look like a ComplexPattern")
-        if not isinstance(value, Parameter):
-            raise Exception("Value must be a Parameter")
-        if not complex_pattern.is_concrete():
-            raise Exception("Pattern must be concrete")
-        if any(complex_pattern.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
-            # FIXME until we get proper canonicalization this could produce false negatives
-            raise Exception("Duplicate initial condition")
-        self.initial_conditions.append( (complex_pattern, value) )
-
-    def get_species_index(self, complex_pattern):
-        # FIXME I don't even want to think about the inefficiency of this, but at least it works
-        try:
-            return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
-        except StopIteration:
-            return None
-
-    def __repr__(self): 
-        return "<%s '%s' (monomers: %d, rules: %d, parameters: %d, compartments: %d) at 0x%x>" % \
-            (self.__class__.__name__, self.name, len(self.monomers), len(self.rules),
-             len(self.parameters), len(self.compartments), id(self))
-
+    def rename(self, new_name):
+        self.model._rename_component(self, new_name)
+        if self._export:
+            SelfExporter.rename(self, new_name)
+        self.name = new_name
 
 
 class Monomer(Component):
@@ -721,6 +627,144 @@ class Observable(Component):
 
 
 
+class Model(object):
+
+    """Container for monomers, compartments, parameters, and rules."""
+
+    _component_types = (Monomer, Compartment, Parameter, Rule, Observable)
+
+    def __init__(self, name=None, _export=True):
+        self.name = name
+        self.monomers = ComponentSet()
+        self.compartments = ComponentSet()
+        self.parameters = ComponentSet()
+        self.rules = ComponentSet()
+        self.observables = ComponentSet()
+        self.species = []
+        self.odes = []
+        self.reactions = []
+        self.reactions_bidirectional = []
+        self.initial_conditions = []
+        self._export = _export
+        if self._export:
+            SelfExporter.export(self)
+
+    def reload(self):
+        # forcibly removes the .pyc file and reloads the model module
+        model_pyc = SelfExporter.target_module.__file__
+        if model_pyc[-3:] == '.py':
+            model_pyc += 'c'
+        try:
+            os.unlink(model_pyc)
+        except OSError as e:
+            # ignore "no such file" errors, re-raise the rest
+            if e.errno != errno.ENOENT:
+                raise
+        try:
+            reload(SelfExporter.target_module)
+        except SystemError as e:
+            # This one specific SystemError occurs when using ipython to 'run' a model .py file
+            # directly, then reload()ing the model, which makes no sense anyway. (just re-run it)
+            if e.args == ('nameless module',):
+                raise Exception('Cannot reload a model which was executed directly in an interactive'
+                                'session. Please import the model file as a module instead.')
+            else:
+                raise
+        # return self for "model = model.reload()" idiom, until a better solution can be found
+        return SelfExporter.default_model
+
+    def all_component_sets(self):
+        """Return a list of all ComponentSet objects"""
+        set_names = [t.__name__.lower() + 's' for t in Model._component_types]
+        sets = [getattr(self, name) for name in set_names]
+        return sets
+
+    def all_components(self):
+        cset_all = ComponentSet()
+        for cset in self.all_component_sets():
+            cset_all |= cset
+        return cset_all
+
+    def parameters_rules(self):
+        """Returns a ComponentSet of the parameters used as rate constants in rules"""
+        # rate_reverse is None for irreversible rules, so we'll need to filter those out
+        cset = ComponentSet(p for r in self.rules for p in (r.rate_forward, r.rate_reverse)
+                            if p is not None)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
+    def parameters_initial_conditions(self):
+        """Returns a ComponentSet of the parameters used as initial conditions"""
+        cset = ComponentSet(ic[1] for ic in self.initial_conditions)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
+    def parameters_compartments(self):
+        """Returns a ComponentSet of the parameters used as compartment sizes"""
+        cset = ComponentSet(c.size for c in self.compartments)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
+    def parameters_unused(self):
+        """Returns a ComponentSet of the parameters not used in the model at all"""
+        cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
+        return self.parameters - cset_used
+
+    def add_component(self, other):
+        # We have a container for each type of component. This code determines
+        # the right one based on the class of the object being added.
+        for t, cset in zip(Model._component_types, self.all_component_sets()):
+            if isinstance(other, t):
+                cset.add(other)
+                other.model = weakref.proxy(self)
+                break
+        else:
+            raise Exception("Tried to add component of unknown type '%s' to"
+                            "model" % type(other))
+
+    def _rename_component(self, component, new_name):
+        for cset in self.all_component_sets():
+            if component in cset:
+                cset.rename(component, new_name)
+
+    def initial(self, complex_pattern, value):
+        try:
+            complex_pattern = as_complex_pattern(complex_pattern)
+        except InvalidComplexPatternException as e:
+            raise type(e)("Initial condition species does not look like a ComplexPattern")
+        if not isinstance(value, Parameter):
+            raise Exception("Value must be a Parameter")
+        if not complex_pattern.is_concrete():
+            raise Exception("Pattern must be concrete")
+        if any(complex_pattern.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
+            # FIXME until we get proper canonicalization this could produce false negatives
+            raise Exception("Duplicate initial condition")
+        self.initial_conditions.append( (complex_pattern, value) )
+
+    def get_species_index(self, complex_pattern):
+        # FIXME I don't even want to think about the inefficiency of this, but at least it works
+        try:
+            return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
+        except StopIteration:
+            return None
+
+    def reset_equations(self):
+        """Clear out anything generated by bng.generate_equations or the like"""
+        self.species = []
+        self.odes = []
+        self.reactions = []
+        self.reactions_bidirectional = []
+        for obs in self.observables:
+            obs.species = []
+            obs.coefficients = []
+
+    def __repr__(self):
+        return "<%s '%s' (monomers: %d, rules: %d, parameters: %d, compartments: %d) at 0x%x>" % \
+            (self.__class__.__name__, self.name, len(self.monomers), len(self.rules),
+             len(self.parameters), len(self.compartments), id(self))
+
+
+
 class InvalidComplexPatternException(Exception):
     pass
 
@@ -841,6 +885,12 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         return '{' + \
             ',\n '.join("'%s': %s" % t for t in self.iteritems()) + \
             '}'
+
+    def rename(self, c, new_name):
+        """Change a component's name in our data structures"""
+        for m in self._map, self._index_map:
+            m[new_name] = m[c.name]
+            del m[c.name]
 
 
 class ComponentDuplicateNameError(ValueError):
