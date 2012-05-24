@@ -1,10 +1,14 @@
-from pysb import *
+"""
+EARM 1.0 (extrinsic apoptosis reaction model)
 
-# Albeck JG, Burke JM, Spencer SL, Lauffenburger DA, Sorger PK, 2008
-# Modeling a Snap-Action, Variable-Delay Switch Controlling Extrinsic
-# Cell Death. PLoS Biol 6(12): e299. doi:10.1371/journal.pbio.0060299
-#
-# http://www.plosbiology.org/article/info:doi/10.1371/journal.pbio.0060299
+Albeck JG, Burke JM, Spencer SL, Lauffenburger DA, Sorger PK, 2008
+Modeling a Snap-Action, Variable-Delay Switch Controlling Extrinsic
+Cell Death. PLoS Biol 6(12): e299. doi:10.1371/journal.pbio.0060299
+
+http://www.plosbiology.org/article/info:doi/10.1371/journal.pbio.0060299
+"""
+
+from pysb import *
 
 Model()
 
