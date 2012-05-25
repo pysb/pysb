@@ -60,26 +60,24 @@ class KappaGenerator(object):
             products_code  = format_reactionpattern(r.product_pattern)
             arrow = '->'
             self.__content += ("%s %s %s %s @ %s") % \
-                (label, reactants_code, arrow, products_code, r.rate_forward.value)
+                (label, reactants_code, arrow, products_code, float(r.rate_forward))
             self.__content += "\n"
 
             if r.is_reversible:
               label = '\'' + r.name + '_rev' + '\''
               self.__content += ("%s %s %s %s @ %s") % \
-                (label, products_code, arrow, reactants_code, r.rate_reverse.value)
+                (label, products_code, arrow, reactants_code, float(r.rate_reverse))
               self.__content += "\n"
 
         self.__content += "\n"
 
     def generate_observables(self):
-        if not self.model.observable_patterns:
+        if not self.model.observables:
             return
-        #max_length = max(len(name) for name, pattern in self.model.observable_patterns)
-        max_length = 0
         #self.__content += "begin observables\n"
-        for name, pattern in self.model.observable_patterns:
-            name = '\'' + name + '\''
-            observable_code = format_reactionpattern(pattern)
+        for obs in self.model.observables:
+            name = '\'' + obs.name + '\''
+            observable_code = format_reactionpattern(obs.reaction_pattern)
             self.__content += ("%%obs: %s %s\n") % (name, observable_code)
         self.__content += "\n"
         #self.__content += "end observables\n\n"
@@ -97,12 +95,12 @@ class KappaGenerator(object):
             if (self.dialect == 'kasim'):
                 # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
                 # for large integers
-                self.__content += ("%%init: %d %s\n") % (param.value, code)
+                self.__content += ("%%init: %d %s\n") % (float(param), code)
                 #self.__content += ("%%init: %10g %s\n") % (param.value, code)
             else:
                 # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
                 # for large integers
-                self.__content += ("%%init: %10d * %s\n") % (param.value, code)
+                self.__content += ("%%init: %10d * %s\n") % (float(param.value), code)
                 #self.__content += ("%%init: %10g * %s\n") % (param.value, code)
 
         self.__content += "\n"

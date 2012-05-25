@@ -1,9 +1,10 @@
 # example of a model defined without SelfExporter
 
 from pysb import *
+import pysb.core
 
-SelfExporter.do_export = False
-SelfExporter.default_model = Model('dummy')
+pysb.core.SelfExporter.do_export = False
+pysb.core.SelfExporter.default_model = Model('dummy')
 
 model = Model('explicit')
 

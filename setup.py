@@ -6,7 +6,7 @@ import sys, subprocess, traceback, re
 def main():
 
     try:
-        version_file = file('RELEASE-VERSION', 'w+')
+        version_file = open('RELEASE-VERSION', 'r+')
         version = get_version()
         version_file.seek(0, 0)
         version_file.write(version)

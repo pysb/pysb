@@ -271,9 +271,9 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
                 objarray[i] = 1e-100 #zero enough
 
         objout += objarray.sum()
-        print "OBJOUT(%d,%d):%f  |\t\tOBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout)
+        #print "OBJOUT(%d,%d):%f  |\t\tOBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout)
 
-    print "OBJOUT(total):", objout
+    #print "OBJOUT(total):", objout
     return objout
 
 def logparambounds(params, omag=1, useparams=[], usemag=None):

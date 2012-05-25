@@ -72,10 +72,10 @@ def run(model):
 
   ## OBSERVABLES
   c_code_obs = ''
-  for obs_name in model.observable_groups:
-    c_code_obs += obs_name + ' = '
-    groups = model.observable_groups[obs_name]
-    c_code_obs += '+'.join(['s%s[t]' % (g[1]) for g in groups]) 
+  for obs in model.observables:
+    c_code_obs += obs.name + ' = '
+    #groups = model.observable_groups[obs_name]
+    c_code_obs += ' + '.join(['(s%s[t] * %d)' % (s, c) for s, c in zip(obs.species, obs.coefficients)])
     c_code_obs += ' /. soln\n' 
   
   # Add comments identifying the species

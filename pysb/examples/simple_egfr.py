@@ -105,15 +105,15 @@ Rule('grb2_bind_sos',
 
 
 #  D        EGFR(l!+)
-Observe('D', EGFR(l=ANY))
+Observable('D', EGFR(l=ANY))
 #  RP	   EGFR(Y1068~P!?)
-Observe('RP', EGFR(Y1068=('P',WILD)))
+Observable('RP', EGFR(Y1068=('P',WILD)))
 #  R_Grb2   EGFR(Y1068!1).Grb2(SH2!1)
-Observe('R_Grb2', EGFR(Y1068=1) % Grb2(SH2=1))
+Observable('R_Grb2', EGFR(Y1068=1) % Grb2(SH2=1))
 #  Sos_act  EGFR(Y1068!1).Grb2(SH2!1,SH3!2).Sos(PR!2)
-Observe('Sos_act', EGFR(Y1068=1) % Grb2(SH2=1, SH3=2) % Sos(PR=2))
+Observable('Sos_act', EGFR(Y1068=1) % Grb2(SH2=1, SH3=2) % Sos(PR=2))
 #  EGFR_tot EGFR()
-Observe('EGFR_tot', EGFR())
+Observable('EGFR_tot', EGFR())
 
 
 # generate initial conditions from _0 parameter naming convention

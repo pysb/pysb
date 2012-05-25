@@ -69,17 +69,19 @@ class BngGenerator(object):
                 self.__content += ', %s' % r.rate_reverse.name
             if r.delete_molecules:
                 self.__content += ' DeleteMolecules'
+            if r.move_connected:
+                self.__content += ' MoveConnected'
             self.__content += "\n"
         self.__content += "end reaction rules\n\n"
 
     def generate_observables(self):
-        if not self.model.observable_patterns:
+        if not self.model.observables:
             return
-        max_length = max(len(name) for name, pattern in self.model.observable_patterns)
+        max_length = max(len(name) for name in self.model.observables.keys())
         self.__content += "begin observables\n"
-        for name, pattern in self.model.observable_patterns:
-            observable_code = format_reactionpattern(pattern)
-            self.__content += ("  Molecules %-" + str(max_length) + "s   %s\n") % (name, observable_code)
+        for obs in self.model.observables:
+            observable_code = format_reactionpattern(obs.reaction_pattern)
+            self.__content += ("  Molecules %-" + str(max_length) + "s   %s\n") % (obs.name, observable_code)
         self.__content += "end observables\n\n"
 
     def generate_species(self):

@@ -147,8 +147,8 @@ Rule('p18_Bid_cat', pC8 (fe=None, ee=1, D384='C',D400='C') % pC8 (fe=None, ee=1,
 
 # Fig 4B
 
-Observe('p18', pC8(fe=None, ee=1, D384='C',D400='C') % pC8(fe=None, ee=1, D384='C',D400='C'))
-Observe('tBid', tBid() )
+Observable('p18', pC8(fe=None, ee=1, D384='C',D400='C') % pC8(fe=None, ee=1, D384='C',D400='C'))
+Observable('tBid_total', tBid() )
 
 
 

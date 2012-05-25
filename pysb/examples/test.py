@@ -15,9 +15,9 @@ Rule('egfr_egf',
      egfr(L=1)    % egf(R=1),
      Kf_egfr_egf, Kr_egfr_egf)
 
-Observe('free_egf', egf(R=None))
-Observe('free_egfr', egfr(L=None))
-Observe('bound', egf(R=1) % egfr(L=1))
+Observable('free_egf', egf(R=None))
+Observable('free_egfr', egfr(L=None))
+Observable('bound', egf(R=1) % egfr(L=1))
 
 Parameter('egf_0', 6.0)
 Parameter('egfr_0', 10.0)

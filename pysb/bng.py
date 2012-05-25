@@ -6,6 +6,7 @@ import random
 import re
 import itertools
 import sympy
+import numpy
 from StringIO import StringIO
 
 
@@ -62,6 +63,86 @@ generate_network({overwrite=>1});
 end actions
 """
 
+
+def _parse_bng_outfile(out_filename):
+    """Parse a .gdat or .cdat outputfile produced by the ODE or SSA
+       algorithm run by BNG.
+       The format of the output files is an initial line of the form
+       #   time   obs1    obs2    obs3  ...
+       The column headers are separated by a differing number of spaces
+       (not tabs). This function parses out the column names and then
+       uses the numpy.loadtxt method to load the outputfile into a
+       numpy record array.
+    """
+
+    try:
+        out_file = open(out_filename, 'r')
+
+        line = out_file.readline().strip() # Get the first line
+        out_file.close()
+        line = line[2:]  # strip off opening '# '
+        raw_names = re.split('\s*', line)
+        column_names = [raw_name for raw_name in raw_names if not raw_name == '']
+
+        # Create the dtype argument for the numpy record array
+        dt = zip(column_names, ('float',)*len(column_names))
+
+        # Load the output file as a numpy record array, skip the name row
+        arr = numpy.loadtxt(out_filename, dtype=dt, skiprows=1)
+    
+    except Exception as e:
+        raise Exception("problem parsing BNG outfile: " + str(e)) # FIXME special Exception/Error?
+    
+    return arr
+
+
+def run_ssa(model, t_end=10, n_steps=100, cleanup=True):
+    """Run a model through BNG's SSA simulator and return
+    the simulation data as a numpy record array.
+
+    The "suffix" argument to the simulate_ssa() function species
+    that a "_ssa" suffix is appended to the filename before the .gdat
+    or .cdat extension. This is encoded in the specification of the
+    ssa_filename.
+    """
+
+    run_ssa_code = """
+    begin actions
+    generate_network({overwrite=>1});
+    simulate_ssa({suffix=>ssa,t_end=>%f, n_steps=>%d});\n
+    end actions
+    """ % (t_end, n_steps)
+    
+    gen = BngGenerator(model)
+    bng_filename = '%s_%d_%d_temp.bngl' % (model.name, os.getpid(), random.randint(0, 10000))
+    ssa_filename = bng_filename.replace('.bngl', '_ssa.gdat')
+    output = StringIO()
+
+
+    try:
+        bng_file = open(bng_filename, 'w')
+        bng_file.write(gen.get_content())
+        bng_file.write(run_ssa_code)
+        bng_file.close()
+        p = subprocess.Popen(['perl', bng_path, bng_filename],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (p_out, p_err) = p.communicate()
+        if p.returncode:
+            raise GenerateNetworkError(p_err.rstrip())
+
+        output_arr = _parse_bng_outfile(ssa_filename)
+        #ssa_file = open(ssa_filename, 'r')
+        #output.write(ssa_file.read())
+        #net_file.close()
+        #if append_stdout:
+        #    output.write("#\n# BioNetGen execution log follows\n# ==========")
+        #    output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
+    finally:
+        if cleanup:
+            for filename in [bng_filename, ssa_filename]:
+                if os.access(filename, os.F_OK):
+                    os.unlink(filename)
+    return output_arr
 
 def generate_network(model, cleanup=True, append_stdout=False):
     """Run a model through BNG's generate_network function and return
@@ -162,7 +243,6 @@ def generate_equations(model):
 
         while 'begin groups' not in lines.next():
             pass
-        model.observable_groups = {}
         while True:
             line = lines.next()
             if 'end groups' in line: break
@@ -217,15 +297,14 @@ def _parse_species(model, line):
 def _parse_group(model, line):
     # values are number (which we ignore), name, and species list
     values = line.strip().split()
-    group = []
+    obs = model.observables[values[1]]
     if len(values) == 3:
-        # combination is a comma separated list of [factor*]speciesnumber
+        # combination is a comma separated list of [coeff*]speciesnumber
         for product in values[2].split(','):
             terms = product.split('*')
-            # if no factor given (just species), insert a factor of 1
+            # if no coeff given (just species), insert a coeff of 1
             if len(terms) == 1:
                 terms.insert(0, 1)
-            factor = int(terms[0])
-            species = int(terms[1]) - 1  # -1 to change to 0-based indexing
-            group.append((factor, species))  
-    model.observable_groups[values[1]] = group
+            obs.coefficients.append(int(terms[0]))
+            # -1 to change to 0-based indexing
+            obs.species.append(int(terms[1]) - 1)
