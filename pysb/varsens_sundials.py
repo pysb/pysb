@@ -168,13 +168,14 @@ def odesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic=Tru
     #print "Integration finished"
 
     #now deal with observables
-    obs_names = [name for name, rp in model.observable_patterns]
-    yobs = numpy.zeros([len(obs_names), nsteps])
+    #obs_names = [name for name, rp in model.observable_patterns]
+    yobs = numpy.zeros([len(model.observables), nsteps])
     
     #sum up the correct entities
-    for i, name in enumerate(obs_names):
-        factors, species = zip(*model.observable_groups[name])
-        yobs[i] = (yout[:, species] * factors).sum(1)
+    for i, obs in enumerate(model.observables):
+        coeffs = obs.coefficients
+        specs  = obs.species
+        yobs[i] = (yout[:, specs] * coeffs).sum(1)
 
     #merge the x and y arrays for easy analysis
     xyobs = numpy.vstack((xout, yobs))

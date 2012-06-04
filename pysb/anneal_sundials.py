@@ -178,16 +178,13 @@ def annlodesolve(model, tfinal, envlist, params, tinit = 0.0, ic=True):
     #print "Integration finished"
 
     #now deal with observables
-    obs_names = [name for name, rp in model.observable_patterns]
-    yobs = numpy.zeros([len(obs_names), nsteps])
+    yobs = numpy.zeros([len(model.observables), nsteps])
     
     #sum up the correct entities
-    for i, name in enumerate(obs_names):
-        factors, species = zip(*model.observable_groups[name])
-        yobs[i] = (yout[:, species] * factors).sum(1)
-
-    #transpose yobs to make it easy to plot
-    #yobs.T
+    for i, obs in enumerate(model.observables):
+        coeffs = obs.coefficients
+        specs  = obs.species
+        yobs[i] = (yout[:, specs] * coeffs).sum(1)
 
     #merge the x and y arrays for easy analysis
     xyobs = numpy.vstack((xout, yobs))
