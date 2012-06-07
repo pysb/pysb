@@ -1,6 +1,8 @@
 import inspect
 from pysb import *
 import pysb.core
+from pysb.core import ComponentSet
+import numbers
 
 DEFAULT_UNI_KF = 1e6 # In units of sec^-1
 DEFAULT_BI_KF = 1e-4 # In units of nM^-1 sec^-1
@@ -14,6 +16,12 @@ def alias_model_components(model=None):
     caller_globals = inspect.currentframe().f_back.f_globals
     components = dict((c.name, c) for c in model.all_components())
     caller_globals.update(components)
+
+
+def monomer_pattern_label(mp):
+    """Return a reasonable string label for a MonomerPattern."""
+    site_values = [str(x) for x in mp.site_conditions.values() if x is not None]
+    return mp.monomer.name + ''.join(site_values)
 
 
 def two_step_conv(Sub1, Sub2, Prod, klist, site='bf'):
@@ -225,80 +233,108 @@ def simple_bind_table(bindtable, parmlist, lmodel, site='bf'):
         print "WARNING, unassigned parameters from list", parmlist
         print "Assigned",pc,"parameter pairs from a total of", len(parmlist)
 
-#-------------------------------------------------------------------------
-# John B Macro Funcs
-#-------------------------------------------------------------------------
+def catalyze(enz, enz_site, sub, sub_site, prod, klist=None):
+    """Generate the two-step catalytic reaction enz + sub <> enz:sub >> enz +
+    prod.
 
-def two_step_mod_sites(enz, enz_site, sub, sub_site, prod, klist=None):
-    """Automation of the Enz + Sub <> Enz:Sub >> Enz + Prod two-step catalytic
-    reaction.
-    Assumes Enz returns to its original state after dissociation.
+    Returns a list of the generated components: two rules (bidirectional
+    complex formation and unidirectional product dissociation) and optionally
+    three parameters (see documentation for klist below).
 
-    In an aim for simplicity, site 'bf' need not be passed when calling the
-    function by the reactants, but THE FULL STATE OF THE PRODUCT must be
-    specified"""
+    Arguments
+    ---------
+    enz : Monomer or MonomerPattern
+        The enzyme.
+    enz_site : string
+        The name of the site on enz where it binds to sub to form the
+        complex. When passing a MonomerPattern for enz, do not include this
+        site.
+    sub : Monomer or MonomerPattern
+        The substrate.
+    sub_site : string
+        The name of the site on sub where it binds to enz to form the
+        complex. When passing a MonomerPattern for sub, do not include this
+        site.
+    prod : Monomer or MonomerPattern
+        The product.
+    klist : [ list of 3 Parameters | list of 3 numbers ]
+        Forward, reverse and catalytic rate constants (in that order). If
+        Parameters are passed, they will be used directly in the generated
+        Rules. If numbers are passed, Parameters will be created with
+        automatically generated names based on the names and states of enz, sub
+        and prod and these parameters will be included at the end of the
+        returned component list.
+
+    Examples
+    --------
+    Using distinct Monomers for substrate and product::
+
+        Model()
+        Monomer('E', ['b'])
+        Monomer('S', ['b'])
+        Monomer('P')
+        catalyze(E, 'b', S, 'b', P, (1e-4, 1e-1, 1))
+
+    Using a single Monomer for substrate and product with a state change::
+
+        Monomer('Kinase', ['b'])
+        Monomer('Sub', ['b', 'y'], {'y': ('U', 'P')})
+        catalyze(Kinase, 'b', Sub(y='U'), 'b', Sub(y='P'), (1e-4, 1e-1, 1))
+
+    """
     
+    # turn any Monomers into MonomerPatterns
+    sub = sub()
+    enz = enz()
+    prod = prod()
+
+    # verify that sites are valid
+    if enz_site not in enz.monomer.sites_dict:
+        raise ValueError("enz_site '%s' not present in monomer '%s'" %
+                         (enz_site, Enz.monomer.name))
+    if sub_site not in sub.monomer.sites_dict:
+        raise ValueError("sub_site '%s' not present in monomer '%s'" %
+                         (sub_site, sub.monomer.name))
+
+    # generate the rule names
     # FIXME: this will fail if the argument passed is a Complex object. 
-    r1_name = 'cplx_%s%s_%s%s' % (sub.monomer.name,
-            ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
-            enz.monomer.name,
-            ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
-    r2_name = 'diss_%s%s_via_%s%s' % (prod.monomer.name,
-            ''.join(filter(lambda a: a != None, prod.site_conditions.values())),
-            enz.monomer.name,
-            ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+    sub_name = monomer_pattern_label(sub)
+    enz_name = monomer_pattern_label(enz)
+    prod_name = monomer_pattern_label(prod)
+    rc_name = 'complex_%s_%s' % (sub_name, enz_name)
+    rd_name = 'dissociate_%s_from_%s' % (prod_name, enz_name)
 
-    # If no parameters are provided, create defaults
-    if (not klist):
-        kf = Parameter(r1_name + '_kf', DEFAULT_BI_KF)
-        kr = Parameter(r1_name + '_kr', DEFAULT_KR)
-        kc = Parameter(r2_name + '_kc', DEFAULT_KC)
+    # set up some aliases to the patterns we'll use in the rules
+    enz_free = enz({enz_site: None})
+    sub_free = sub({sub_site: None})
+    cplx = enz({enz_site: 1}) % sub({sub_site: 1})
+    # if prod is actually a variant of sub, we need to explicitly say that it is
+    # no longer bound to enz
+    if prod.monomer is sub.monomer:
+        prod = prod({enz_site: None})
+
+    if all(isinstance(x, Parameter) for x in klist):
+        kf, kr, kc = klist
+        params_created = False
+    elif all(isinstance(x, numbers.Real) for x in klist):
+        # if klist is numbers, generate the Parameters
+        kf = Parameter(rc_name + '_kf', klist[0])
+        kr = Parameter(rc_name + '_kr', klist[1])
+        kc = Parameter(rd_name + '_kc', klist[2])
+        params_created = True
     else:
-        kf, kr, kc = klist #forward, reverse, catalytic
+        raise ValueError("klist must contain parameters or bare numbers")
      
-    assert enz_site in enz.monomer.sites_dict, \
-        "Required site %s not present in %s as required" % \
-        (enz_site, Enz.monomer.name)
-    assert sub_site in sub.monomer.sites_dict, \
-        "Required site %s not present in %s as required" % \
-        (sub_site, Sub.monomer.name)
+    # create the rules
+    rc = Rule(rc_name, enz_free + sub_free <> cplx, kf, kr)
+    rd = Rule(rd_name, cplx >> enz_free + prod, kc)
 
-    #assert prod.is_concrete(), \
-    #    "The product %s is not a fully specified (concrete) pattern." % (prod) 
+    # build a set of components that were created
+    components = ComponentSet([rc, rd])
+    if params_created:
+        components |= ComponentSet([kf, kr, kc])
 
-    # Make the intermediate complex components
-    etmpdict = enz.site_conditions.copy()
-    stmpdict = sub.site_conditions.copy()
-    
-    etmpdict[enz_site] = 1
-    stmpdict[sub_site] = 1
-
-    enz_cplx = enz.monomer(etmpdict)
-    sub_cplx = sub.monomer(stmpdict)
-
-    # Specify the unbound state of the target enzyme and substrate sites
-    enz.site_conditions[enz_site] = None
-    sub.site_conditions[sub_site] = None
-
-    # Now that we have the complex elements formed we can write the first
-    # step rule
-    r1 = Rule(r1_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
-    
-    # and finally the rule for the catalytic transformation
-    r2 = Rule(r2_name, enz_cplx % sub_cplx >> enz + prod, kc)
-
-    # Return the components created by this function
-    if not klist:
-        components_created = [r1, r2, kf, kr, kc]
-    else:
-        components_created = [r1, r2]
-
-    return components_created
-
-def two_step_mod(enz, sub, prod, klist=None, site='bf'):
-    """This function assumes that there is a site named 'bf' (binding site for
-       fxn) which it uses by default."""
-    two_step_mod_sites(enz, site, sub, site, prod, klist)
+    return components
 
 def one_step_mod(enz, sub, prod, kf=None):
     """Automation of the Enz + Sub >> Enz + Prod one-step catalytic
