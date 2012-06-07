@@ -233,37 +233,35 @@ def simple_bind_table(bindtable, parmlist, lmodel, site='bf'):
         print "WARNING, unassigned parameters from list", parmlist
         print "Assigned",pc,"parameter pairs from a total of", len(parmlist)
 
-def catalyze(enzyme, e_site, substrate, s_site, product, klist=None):
-    """Generate the two-step catalytic reaction enzyme + substrate <>
-    enzyme:substrate >> enzyme + product.
+def catalyze(enzyme, e_site, substrate, s_site, product, klist):
+    """Generate the two-step catalytic reaction E + S <> E:S >> E + P.
 
-    Returns a list of the generated components: two rules (bidirectional complex
-    formation and unidirectional product dissociation) and optionally three
-    parameters (see documentation for klist below).
-
-    Arguments
-    ---------
-    enzyme : Monomer or MonomerPattern
-        The enzyme.
-    e_site : string
-        The name of the site on enzyme where it binds to substrate to form the
-        complex. When passing a MonomerPattern for enzyme, do not include this
-        site.
-    substrate : Monomer or MonomerPattern
-        The substrate.
-    s_site : string
-        The name of the site on substrate where it binds to enzyme to form the
-        complex. When passing a MonomerPattern for substrate, do not include
-        this site.
-    product : Monomer or MonomerPattern
-        The product.
-    klist : [ list of 3 Parameters | list of 3 numbers ]
+    Parameters
+    ----------
+    enzyme, substrate, product : Monomer or MonomerPattern
+        E, S and P in the above reaction.
+    e_site, s_site : string
+        The names of the sites on `enzyme` and `substrate` (respectively) where
+        they bind each other to form the E:S complex.
+    klist : list of 3 Parameters or list of 3 numbers
         Forward, reverse and catalytic rate constants (in that order). If
         Parameters are passed, they will be used directly in the generated
         Rules. If numbers are passed, Parameters will be created with
         automatically generated names based on the names and states of enzyme,
         substrate and product and these parameters will be included at the end
         of the returned component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains two Rules (bidirectional complex
+        formation and unidirectional product dissociation), and optionally three
+        Parameters if klist was given as plain numbers.
+
+    Notes
+    -----
+    When passing a MonomerPattern for `enzyme` or `substrate`, do not include
+    `e_site` or `s_site` in the respective patterns. The macro will handle this.
 
     Examples
     --------
@@ -278,8 +276,9 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist=None):
     Using a single Monomer for substrate and product with a state change::
 
         Monomer('Kinase', ['b'])
-        Monomer('Sub', ['b', 'y'], {'y': ('U', 'P')})
-        catalyze(Kinase, 'b', Sub(y='U'), 'b', Sub(y='P'), (1e-4, 1e-1, 1))
+        Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
+        catalyze(Kinase, 'b', Substrate(y='U'), 'b', Substrate(y='P'),
+                 (1e-4, 1e-1, 1))
 
     """
     
@@ -504,15 +503,16 @@ def two_state_equilibrium(sub, state1, state2, klist=None, sitename='loc'):
     Creates two rules with names following the pattern: 'monomer_state1_to_state2' and vice versa.
 
     The function generates a rule with the name following the pattern 
-    --  sub is a MonomerPattern specifying the species that translocates. The localization
-        state should not be specified here.
-    --  state1 and state2 are strings specifying the names of the locations
-        (e.g., 'c' for cytoplasmic, 'm' for mitochondrial)
-    --  klist is a list of Parameter objects specifying the forward (state1 to state2)
-        and reverse (state2 to state1) rates. If not specified, the parameters are generated
-        according to the pattern 'sub_state1_to_state2_rate' and 'sub_state2_to_state1_rate'.
-    --  sitename is an optional string specifying the name of the site that describes
-        the location. Defaults to 'loc'.
+
+    * sub is a MonomerPattern specifying the species that translocates. The localization
+      state should not be specified here.
+    * state1 and state2 are strings specifying the names of the locations
+      (e.g., 'c' for cytoplasmic, 'm' for mitochondrial)
+    * klist is a list of Parameter objects specifying the forward (state1 to state2)
+      and reverse (state2 to state1) rates. If not specified, the parameters are generated
+      according to the pattern 'sub_state1_to_state2_rate' and 'sub_state2_to_state1_rate'.
+    * sitename is an optional string specifying the name of the site that describes
+      the location. Defaults to 'loc'.
     """
 
     # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
@@ -559,15 +559,16 @@ def direct_catalysis_reversible(sub, enz, prod, klist=None):
 
     Creates two rules with names following the pattern: 'cat_sub_to_prod' and 'prod_to_sub'.
 
-    The function generates a rule with the name following the pattern 
-    --  sub is a MonomerPattern specifying the species that is acted upon.
-    --  enz is a MonomerPattern specifying the species that determines the rate of the reaction.
-        NO BINDING OCCURS BETWEEN THE SPECIES.
-    --  prod is a MonomerPattern specifying the state of the sites of sub after catalysis.
-        ANY SITES THAT ARE SPECIFIED IN SUB SHOULD BE SPECIFIED FOR PROD AND VICE VERSA.
-    --  klist is a list of Parameter objects specifying the forward (sub to prod) and
-        reverse (prod to sub) rates. If not specified, the parameters are generated
-        according to the pattern 'cat_sub_to_prod_rate' and 'prod_to_sub_rate'.
+    The function generates a rule with the name following the pattern
+
+    * sub is a MonomerPattern specifying the species that is acted upon.
+    * enz is a MonomerPattern specifying the species that determines the rate of the reaction.
+      NO BINDING OCCURS BETWEEN THE SPECIES.
+    * prod is a MonomerPattern specifying the state of the sites of sub after catalysis.
+      ANY SITES THAT ARE SPECIFIED IN SUB SHOULD BE SPECIFIED FOR PROD AND VICE VERSA.
+    * klist is a list of Parameter objects specifying the forward (sub to prod) and
+      reverse (prod to sub) rates. If not specified, the parameters are generated
+      according to the pattern 'cat_sub_to_prod_rate' and 'prod_to_sub_rate'.
     """
 
     # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
