@@ -230,19 +230,25 @@ def simple_bind_table(bindtable, parmlist, lmodel, site='bf'):
 #-------------------------------------------------------------------------
 
 def two_step_mod_sites(enz, enz_site, sub, sub_site, prod, klist=None):
-    """Automation of the Enz + Sub <> Enz:Sub >> Enz + Prod two-step catalytic reaction.
-    This function assumes that there is a site named 'bf' (bind site for fxn)
-    which it uses by default. This also assumes Enz returns to its original state.
-    In an aim for simplicity, site 'bf' need not be passed when calling the function by
-    the reactants, but THE FULL STATE OF THE PRODUCT must be specified"""
+    """Automation of the Enz + Sub <> Enz:Sub >> Enz + Prod two-step catalytic
+    reaction.
+    Assumes Enz returns to its original state after dissociation.
+
+    In an aim for simplicity, site 'bf' need not be passed when calling the
+    function by the reactants, but THE FULL STATE OF THE PRODUCT must be
+    specified"""
     
     # FIXME: this will fail if the argument passed is a Complex object. 
-    r1_name = 'cplx_%s%s_%s%s' % (sub.monomer.name, ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
-                                     enz.monomer.name, ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
-    r2_name = 'diss_%s%s_via_%s%s' % (prod.monomer.name, ''.join(filter(lambda a: a != None, prod.site_conditions.values())),
-                                         enz.monomer.name, ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+    r1_name = 'cplx_%s%s_%s%s' % (sub.monomer.name,
+            ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
+            enz.monomer.name,
+            ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+    r2_name = 'diss_%s%s_via_%s%s' % (prod.monomer.name,
+            ''.join(filter(lambda a: a != None, prod.site_conditions.values())),
+            enz.monomer.name,
+            ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
 
-    # Default names for the parameters
+    # If no parameters are provided, create defaults
     if (not klist):
         kf = Parameter(r1_name + '_kf', DEFAULT_BI_KF)
         kr = Parameter(r1_name + '_kr', DEFAULT_KR)
@@ -251,13 +257,16 @@ def two_step_mod_sites(enz, enz_site, sub, sub_site, prod, klist=None):
         kf, kr, kc = klist #forward, reverse, catalytic
      
     assert enz_site in enz.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(enz_site, Enz.monomer.name)
+        "Required site %s not present in %s as required" % \
+        (enz_site, Enz.monomer.name)
     assert sub_site in sub.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(sub_site, Sub.monomer.name)
+        "Required site %s not present in %s as required" % \
+        (sub_site, Sub.monomer.name)
+
     #assert prod.is_concrete(), \
     #    "The product %s is not a fully specified (concrete) pattern." % (prod) 
 
-    # make the intermediate complex components
+    # Make the intermediate complex components
     etmpdict = enz.site_conditions.copy()
     stmpdict = sub.site_conditions.copy()
     
@@ -267,42 +276,89 @@ def two_step_mod_sites(enz, enz_site, sub, sub_site, prod, klist=None):
     enz_cplx = enz.monomer(etmpdict)
     sub_cplx = sub.monomer(stmpdict)
 
-    # add the 'bf' site to the patterns
+    # Specify the unbound state of the target enzyme and substrate sites
     enz.site_conditions[enz_site] = None
     sub.site_conditions[sub_site] = None
 
-    # now that we have the complex elements formed we can write the first step rule
-    Rule(r1_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
+    # Now that we have the complex elements formed we can write the first
+    # step rule
+    r1 = Rule(r1_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
     
     # and finally the rule for the catalytic transformation
-    Rule(r2_name, enz_cplx % sub_cplx >> enz + prod, kc)
+    r2 = Rule(r2_name, enz_cplx % sub_cplx >> enz + prod, kc)
 
-def two_step_mod(Enz, Sub, Prod, klist=None, site='bf'):
-    two_step_mod_sites(Enz, site, Sub, site, Prod, klist)
+    # Return the components created by this function
+    if not klist:
+        components_created = [r1, r2, kf, kr, kc]
+    else:
+        components_created = [r1, r2]
+
+    return components_created
+
+def two_step_mod(enz, sub, prod, klist=None, site='bf'):
+    """This function assumes that there is a site named 'bf' (binding site for
+       fxn) which it uses by default."""
+    two_step_mod_sites(enz, site, sub, site, prod, klist)
+
+def one_step_mod(enz, sub, prod, kf=None):
+    """Automation of the Enz + Sub >> Enz + Prod one-step catalytic
+    reaction. Assumes state of Enz is unchanged.
+
+    enz, sub and prod are MonomerPatterns.
+    kf is a Parameter object.
+    """
+
+    r_name = 'cat_%s%s_%s%s' % (sub.monomer.name,
+            ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
+            enz.monomer.name,
+            ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+
+    # If no parameters are provided, create defaults
+    if (not kf):
+        kf = Parameter(r1_name + '_kf', DEFAULT_UNI_KF)
+     
+    # Write the rule
+    r = Rule(r_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
+    
+    # Return the components created by this function
+    if not kf:
+        components_created = [r, kf]
+    else:
+        components_created = [r]
+
+    return components_created
 
 
 def bind(Sub1, site1, Sub2, site2, klist=None):
-    """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation, but allows
-    the binding sites of both species to be specified.
-    Note that it expects Sub1 and Sub2 to be MonomerPatterns (not Monomers), and site1
-    and site2 strings indicating the names of the binding sites.
+    """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation,
+    but allows the binding sites of both species to be specified. Note that it
+    expects Sub1 and Sub2 to be MonomerPatterns (not Monomers), and site1
+    and site2 to be strings indicating the names of the binding sites.
     klist is list of Parameter objects. If klist is not provided as an argument,
     the bind function will generate default forward and reverse parameters.
     """
 
-    # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
-    r_name = 'cplx_%s%s_%s%s' % (Sub1.monomer.name, ''.join(filter(lambda a: a != None, Sub1.site_conditions.values())),
-                                     Sub2.monomer.name, ''.join(filter(lambda a: a != None, Sub2.site_conditions.values())))
+    # FIXME: this will fail if the argument passed is a complex, or a Monomer
+    # object... 
+    r_name = 'cplx_%s%s_%s%s' % (Sub1.monomer.name,
+             ''.join(filter(lambda a: a != None,
+             Sub1.site_conditions.values())), Sub2.monomer.name,
+             ''.join(filter(lambda a: a != None,
+             Sub2.site_conditions.values())))
     
     assert site1 in Sub1.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site1, Sub1.monomer.name)
+        "Required site %s not present in %s as required" % \
+        (site1, Sub1.monomer.name)
     assert site2 in Sub2.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site2, Sub2.monomer.name)
+        "Required site %s not present in %s as required" % \
+        (site2, Sub2.monomer.name)
 
     if (not klist):
         # Default parameter values
-        # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies 100nM binding
-        # FIXME get rid of these magic numbers!!!! Put in a global setting of some kind
+        # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies
+        # 100nM binding
+        # FIXME get rid of these magic numbers!!!! Put in a global setting
+        # of some kind
         kf = Parameter(r_name + '_kf', DEFAULT_BI_KF)
         kr = Parameter(r_name + '_kr', DEFAULT_KR)
     else: 
@@ -318,12 +374,11 @@ def bind(Sub1, site1, Sub2, site2, klist=None):
     Sub1Cplx = Sub1.monomer(s1tmpdict)
     Sub2Cplx = Sub2.monomer(s2tmpdict)
 
-    # create the sites for the monomers
+    # Create the sites for the monomers
     Sub1.site_conditions[site1] = None
     Sub2.site_conditions[site2] = None
-    # now that we have the complex elements formed we can write the first step rule
+    # Now that we have the complex elements formed we can write the rule
     Rule(r_name, Sub1 + Sub2 <> Sub1Cplx % Sub2Cplx, kf, kr)
-   
  
 def simple_bind(Sub1, Sub2, klist, site='bf'):
     """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation. 
