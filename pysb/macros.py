@@ -233,37 +233,37 @@ def simple_bind_table(bindtable, parmlist, lmodel, site='bf'):
         print "WARNING, unassigned parameters from list", parmlist
         print "Assigned",pc,"parameter pairs from a total of", len(parmlist)
 
-def catalyze(enz, enz_site, sub, sub_site, prod, klist=None):
-    """Generate the two-step catalytic reaction enz + sub <> enz:sub >> enz +
-    prod.
+def catalyze(enzyme, e_site, substrate, s_site, product, klist=None):
+    """Generate the two-step catalytic reaction enzyme + substrate <>
+    enzyme:substrate >> enzyme + product.
 
-    Returns a list of the generated components: two rules (bidirectional
-    complex formation and unidirectional product dissociation) and optionally
-    three parameters (see documentation for klist below).
+    Returns a list of the generated components: two rules (bidirectional complex
+    formation and unidirectional product dissociation) and optionally three
+    parameters (see documentation for klist below).
 
     Arguments
     ---------
-    enz : Monomer or MonomerPattern
+    enzyme : Monomer or MonomerPattern
         The enzyme.
-    enz_site : string
-        The name of the site on enz where it binds to sub to form the
-        complex. When passing a MonomerPattern for enz, do not include this
+    e_site : string
+        The name of the site on enzyme where it binds to substrate to form the
+        complex. When passing a MonomerPattern for enzyme, do not include this
         site.
-    sub : Monomer or MonomerPattern
+    substrate : Monomer or MonomerPattern
         The substrate.
-    sub_site : string
-        The name of the site on sub where it binds to enz to form the
-        complex. When passing a MonomerPattern for sub, do not include this
-        site.
-    prod : Monomer or MonomerPattern
+    s_site : string
+        The name of the site on substrate where it binds to enzyme to form the
+        complex. When passing a MonomerPattern for substrate, do not include
+        this site.
+    product : Monomer or MonomerPattern
         The product.
     klist : [ list of 3 Parameters | list of 3 numbers ]
         Forward, reverse and catalytic rate constants (in that order). If
         Parameters are passed, they will be used directly in the generated
         Rules. If numbers are passed, Parameters will be created with
-        automatically generated names based on the names and states of enz, sub
-        and prod and these parameters will be included at the end of the
-        returned component list.
+        automatically generated names based on the names and states of enzyme,
+        substrate and product and these parameters will be included at the end
+        of the returned component list.
 
     Examples
     --------
@@ -284,34 +284,34 @@ def catalyze(enz, enz_site, sub, sub_site, prod, klist=None):
     """
     
     # turn any Monomers into MonomerPatterns
-    sub = sub()
-    enz = enz()
-    prod = prod()
+    substrate = substrate()
+    enzyme = enzyme()
+    product = product()
 
     # verify that sites are valid
-    if enz_site not in enz.monomer.sites_dict:
-        raise ValueError("enz_site '%s' not present in monomer '%s'" %
-                         (enz_site, Enz.monomer.name))
-    if sub_site not in sub.monomer.sites_dict:
-        raise ValueError("sub_site '%s' not present in monomer '%s'" %
-                         (sub_site, sub.monomer.name))
+    if e_site not in enzyme.monomer.sites_dict:
+        raise ValueError("e_site '%s' not present in monomer '%s'" %
+                         (e_site, enzyme.monomer.name))
+    if s_site not in substrate.monomer.sites_dict:
+        raise ValueError("s_site '%s' not present in monomer '%s'" %
+                         (s_site, substrate.monomer.name))
 
     # generate the rule names
     # FIXME: this will fail if the argument passed is a Complex object. 
-    sub_name = monomer_pattern_label(sub)
-    enz_name = monomer_pattern_label(enz)
-    prod_name = monomer_pattern_label(prod)
-    rc_name = 'complex_%s_%s' % (sub_name, enz_name)
-    rd_name = 'dissociate_%s_from_%s' % (prod_name, enz_name)
+    substrate_name = monomer_pattern_label(substrate)
+    enzyme_name = monomer_pattern_label(enzyme)
+    product_name = monomer_pattern_label(product)
+    rc_name = 'complex_%s_%s' % (substrate_name, enzyme_name)
+    rd_name = 'dissociate_%s_from_%s' % (product_name, enzyme_name)
 
     # set up some aliases to the patterns we'll use in the rules
-    enz_free = enz({enz_site: None})
-    sub_free = sub({sub_site: None})
-    cplx = enz({enz_site: 1}) % sub({sub_site: 1})
-    # if prod is actually a variant of sub, we need to explicitly say that it is
-    # no longer bound to enz
-    if prod.monomer is sub.monomer:
-        prod = prod({enz_site: None})
+    enzyme_free = enzyme({e_site: None})
+    substrate_free = substrate({s_site: None})
+    es_complex = enzyme({e_site: 1}) % substrate({s_site: 1})
+    # if product is actually a variant of substrate, we need to explicitly say
+    # that it is no longer bound to enzyme
+    if product.monomer is substrate.monomer:
+        product = product({e_site: None})
 
     if all(isinstance(x, Parameter) for x in klist):
         kf, kr, kc = klist
@@ -323,11 +323,11 @@ def catalyze(enz, enz_site, sub, sub_site, prod, klist=None):
         kc = Parameter(rd_name + '_kc', klist[2])
         params_created = True
     else:
-        raise ValueError("klist must contain parameters or bare numbers")
+        raise ValueError("klist must contain Parameters objects or numbers")
      
     # create the rules
-    rc = Rule(rc_name, enz_free + sub_free <> cplx, kf, kr)
-    rd = Rule(rd_name, cplx >> enz_free + prod, kc)
+    rc = Rule(rc_name, enzyme_free + substrate_free <> es_complex, kf, kr)
+    rd = Rule(rd_name, es_complex >> enzyme_free + product, kc)
 
     # build a set of components that were created
     components = ComponentSet([rc, rd])
