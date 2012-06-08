@@ -458,6 +458,41 @@ def multisite_bind_table(bindtable):
                 pc += 1
                 rc += 1
 
+def bind_table(bindtable, row_site, col_site):
+    """This assumes that the monomers passed are in their desired state without
+    the sites which will be used for binding.
+    bindtable is a list of lists denoting the reactions between two types of reactants
+    as follows:
+
+    bindtable[0]: [                     reactypeA0,  reactypeA1, ...,  reactypeAN]
+    bindtable[1]: [reactypeB0,  (fwdrate, revrate),            , ...,            ]
+    bindtable[2]: [reactypeB1,                 ,               , ...,            ]
+
+    To indicate that no interaction occurs, simply enter None in the bind table.
+
+    """
+
+    # parse the list, extract reactants, products and parameter families
+    #first line is one set of reactants
+    react_cols = bindtable[0]
+    react_rows = [row[0] for row in bindtable[1:]]
+
+    # Notice this makes intrxns indexed by intrxns[row][col]
+    intrxns = [row[1:] for row in bindtable[1:]]
+
+    # loop over interactions
+    pc = 1 # parameter counter
+    rc = 1 # rule counter, easy way of making sure names don't clash #FIXME
+    for i in range(0, len(react_rows)):
+        for j in range(0, len(react_cols)):
+            if intrxns[i][j] is not None:
+                kf, kr = intrxns[i][j]
+                row_mpattern = react_rows[i]()
+                col_mpattern = react_cols[j]()
+                kf_parm = Parameter('bt%d%d_kf' % (i, j), kf)
+                kr_parm = Parameter('bt%d%d_kr' % (i, j), kr)
+
+                bind(react_rows[i](), row_site, react_cols[j](), col_site, [kf_parm, kr_parm])
 
 
 def two_state_equilibrium(sub, state1, state2, klist=None, sitename='loc'):
