@@ -36,6 +36,7 @@ at https://github.com/pysb/pysb.git\n""" % rv_filename)
           author_email='jmuhlich@bitflood.org',
           url='http://pysb.org/',
           packages=['pysb', 'pysb.generator', 'pysb.tools', 'pysb.examples'],
+          requires=['numpy', 'scipy', 'sympy'],
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
             'Development Status :: 4 - Beta',
