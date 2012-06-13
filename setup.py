@@ -5,17 +5,24 @@ import sys, subprocess, traceback, re
 
 def main():
 
+    rv_filename = 'RELEASE-VERSION'
     try:
-        version_file = open('RELEASE-VERSION', 'r+')
         version = get_version()
-        version_file.seek(0, 0)
+        version_file = open(rv_filename, 'w')
         version_file.write(version)
-    except Exception as e:
+        version_file.close() # ensure sdist build process sees new contents
+    except Exception:
         try:
+            version_file = open(rv_filename, 'r')
             version = version_file.read()
-        except Exception as e:
-            sys.stderr.write(str(e))
-            return
+        except IOError as e:
+            if e.errno == 2 and e.filename == rv_filename:
+                sys.stderr.write(
+"""This does not appear to be a git repository, and the file %s is not
+present. In order to build or install PySB, please either download a
+distribution from http://pypi.python.org/pypi/pysb or clone the git repository
+at https://github.com/pysb/pysb.git\n""" % rv_filename)
+                sys.exit(1)
 
     setup(name='pysb',
           version=version,
