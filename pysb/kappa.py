@@ -18,29 +18,29 @@ import numpy as np
 #
 # Returns the kasim simulation data as a numpy array, which can be
 # plotted using the plot command.
-def get_kasim_data(model, **kwargs):
+def run_simulation(model, **kwargs):
   outs = run_kasim(model, **kwargs)
-  return parse_kasim_outfile(outs['out'])
+  return _parse_kasim_outfile(outs['out'])
 
 
 # Runs Kasim with no simulation events, which generates the influence map,
 # and then displays it using GraphViz (assumes that GraphViz is set up and is the
 # default program for opening .gv files)
-def show_influence_map(model):
-  kasim_dict = run_kasim(model, time=0, points=0)
+def show_influence_map(model, **kwargs):
+  kasim_dict = run_kasim(model, time=0, points=0, **kwargs)
   im_filename = kasim_dict['im']
   open_file(im_filename)
 
 
 # Runs complx with the appropriate arguments for generating the contact map.
 # DOESN'T WORK: WHY???
-def show_contact_map(model):
+def show_contact_map(model, **kwargs):
   gen = KappaGenerator(model, dialect='complx')
   #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
   kappa_filename = '%s.ka' % model.name
   jpg_filename = kappa_filename.replace('.ka', '.jpg')
   args = ['--output-high-res-contact-map-jpg', jpg_filename]
-  run_complx(gen, kappa_filename, args)
+  run_complx(gen, kappa_filename, args, **kwargs)
   open_file(jpg_filename)
 
 
@@ -71,7 +71,7 @@ def run_complx(gen, kappa_filename, args):
 
 
 # Runs kasim, which
-def run_kasim(model, time=10000, points=200, output_dir='/tmp'):
+def run_kasim(model, time=10000, points=200, output_dir='.'):
   gen = KappaGenerator(model)
   #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
 
@@ -89,6 +89,8 @@ def run_kasim(model, time=10000, points=200, output_dir='/tmp'):
     kappa_file = open(kappa_filename, 'w')
     kappa_file.write(gen.get_content())
     kappa_file.close()
+    # FIXME
+    print "Running kasim"
     p = subprocess.Popen(['KaSim'] + args)
                             #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     p.communicate()
@@ -111,8 +113,8 @@ def run_kasim(model, time=10000, points=200, output_dir='/tmp'):
 # end run_kasim
 
 
-# Parses the outputfile produced by kasim, which has the form
-def parse_kasim_outfile(out_filename):
+# Parses the outputfile produced by kasim
+def _parse_kasim_outfile(out_filename):
   try:
     out_file = open(out_filename, 'r')
 
