@@ -9,15 +9,6 @@ DEFAULT_BI_KF = 1e-4 # In units of nM^-1 sec^-1
 DEFAULT_KR = 0.1     # In units of sec^-1
 DEFAULT_KC = 1       # In units of sec^-1
 
-def alias_model_components(model=None):
-    """Make all model components visible as symbols in the caller's global namespace"""
-    if model is None:
-        model = pysb.core.SelfExporter.default_model
-    caller_globals = inspect.currentframe().f_back.f_globals
-    components = dict((c.name, c) for c in model.all_components())
-    caller_globals.update(components)
-
-
 def monomer_pattern_label(mp):
     """Return a reasonable string label for a MonomerPattern."""
     site_values = [str(x) for x in mp.site_conditions.values() if x is not None]
