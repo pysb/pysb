@@ -1,8 +1,0 @@
-"environment" packages for specific types of modeling
-=====
-* make base classes more general
-* provide helper classes to adapt naming (and behavior?) to specific domains
-* rename "Monomer" to "Agent" or something
-* pysb.env.signaling would define an alias "Monomer" to "Agent"
-* pysb.env.pkpd would define an alias "Compartment" to "Agent"
-
