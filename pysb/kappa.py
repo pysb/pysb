@@ -6,7 +6,7 @@ import random
 import re
 import sympy
 import numpy as np
-import pygraphviz as pgv
+#import pygraphviz as pgv
 
 ### "PUBLIC" Functions ################################################
 # i.e., functions that are most useful to be called externally
