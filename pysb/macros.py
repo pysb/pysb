@@ -43,7 +43,8 @@ def two_state_equilibrium(s1, s2, klist):
     s2 = s2()
 
     # generate the rule names
-    # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
+    # FIXME: this will fail if the argument passed is a complex,
+    # or a Monomer object... 
     s1_name = monomer_pattern_label(s1)
     s2_name = monomer_pattern_label(s2)
     r_name = 'equilibrate_%s_%s' % (s1_name, s2_name)
@@ -132,15 +133,14 @@ def bind(s1, site1, s2, site2, klist):
 def bind_table(bindtable, row_site, col_site):
     """This assumes that the monomers passed are in their desired state without
     the sites which will be used for binding.
-    bindtable is a list of lists denoting the reactions between two types of reactants
-    as follows:
+    bindtable is a list of lists denoting the reactions between two types of
+    reactants as follows:
 
-    bindtable[0]: [                     reactypeA0,  reactypeA1, ...,  reactypeAN]
-    bindtable[1]: [reactypeB0,  (fwdrate, revrate),            , ...,            ]
-    bindtable[2]: [reactypeB1,                 ,               , ...,            ]
+    bindtable[0]: [                     reactypeA0,  ...,  reactypeAN]
+    bindtable[1]: [reactypeB0,  (fwdrate, revrate),  ...,            ]
+    bindtable[2]: [reactypeB1,                 ,     ...,            ]
 
     To indicate that no interaction occurs, simply enter None in the bind table.
-
     """
 
     # TODO return created components
@@ -167,7 +167,8 @@ def bind_table(bindtable, row_site, col_site):
                 kf_parm = Parameter('bt%d%d_kf' % (i, j), kf)
                 kr_parm = Parameter('bt%d%d_kr' % (i, j), kr)
 
-                bind(react_rows[i](), row_site, react_cols[j](), col_site, [kf_parm, kr_parm])
+                bind(react_rows[i](), row_site, react_cols[j](), col_site,
+                     [kf_parm, kr_parm])
 
 
 ## Catalysis
@@ -314,18 +315,23 @@ def catalyze_one_step_reversible(sub, enz, prod, klist=None):
         A + B -> A + C
             C -> A
 
-    Creates two rules with names following the pattern: 'cat_sub_to_prod' and 'prod_to_sub'.
+    Creates two rules with names following the pattern: 'cat_sub_to_prod'
+    and 'prod_to_sub'.
 
     The function generates a rule with the name following the pattern
 
     * sub is a MonomerPattern specifying the species that is acted upon.
-    * enz is a MonomerPattern specifying the species that determines the rate of the reaction.
+    * enz is a MonomerPattern specifying the species that determines the rate
+      of the reaction.
       NO BINDING OCCURS BETWEEN THE SPECIES.
-    * prod is a MonomerPattern specifying the state of the sites of sub after catalysis.
-      ANY SITES THAT ARE SPECIFIED IN SUB SHOULD BE SPECIFIED FOR PROD AND VICE VERSA.
-    * klist is a list of Parameter objects specifying the forward (sub to prod) and
-      reverse (prod to sub) rates. If not specified, the parameters are generated
-      according to the pattern 'cat_sub_to_prod_rate' and 'prod_to_sub_rate'.
+    * prod is a MonomerPattern specifying the state of the sites of sub after
+      catalysis.
+      ANY SITES THAT ARE SPECIFIED IN SUB SHOULD BE SPECIFIED FOR PROD AND
+      VICE VERSA.
+    * klist is a list of Parameter objects specifying the forward (sub to prod)
+      and reverse (prod to sub) rates. If not specified, the parameters are
+      generated according to the pattern 'cat_sub_to_prod_rate' and
+      'prod_to_sub_rate'.
     """
 
     # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
@@ -352,7 +358,8 @@ def catalyze_one_step_reversible(sub, enz, prod, klist=None):
     #sub_loc1.site_conditions[locname] = loc1
     #sub_loc2.site_conditions[locname] = loc2
 
-    # now that we have the complex elements formed we can write the first step rule
+    # now that we have the complex elements formed we can write the first
+    # step rule
     Rule(r_name_fwd, sub + enz >> prod + enz, kf)
     Rule(r_name_rev, prod >> sub, kr)
 
@@ -377,7 +384,8 @@ def pore_species(subunit, site1, site2, size):
     if size == 1:
         pore = subunit({site1: None, site2: None})
     elif size == 2:
-        pore = subunit({site1: 1, site2: None}) % subunit({site1: None, site2: 1})
+        pore = subunit({site1: 1, site2: None}) % \
+               subunit({site1: None, site2: 1})
     else:
         # build up a ComplexPattern, starting with a single subunit
         pore = subunit({site1: 1, site2: 2})
@@ -470,8 +478,10 @@ def transport_pore(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         cpore = pore._copy()
         source_bonds = range(i+1, i+1+i)
         for b in range(i):
-            cpore.monomer_patterns[b].site_conditions[sc_site] = source_bonds[b]
+            cpore.monomer_patterns[b].site_conditions[sc_site] = \
+                                                            source_bonds[b]
         sc_complex = cpore % csource({c_site: source_bonds})
-        Rule(rc_name, pore + csource({c_site: None}) <> sc_complex, *rule_rates[0:2])
+        Rule(rc_name, pore + csource({c_site: None}) <> sc_complex,
+             *rule_rates[0:2])
         Rule(rd_name, sc_complex >> pore + cdest({c_site: None}), rule_rates[2])
    
