@@ -1,6 +1,8 @@
 from pysb import ComponentSet
 import pysb.core
 import inspect
+import numpy
+from pysb.integrate import odesolve
 
 __all__ = ['alias_model_components', 'rules_using_parameter']
 
@@ -19,3 +21,12 @@ def rules_using_parameter(model, parameter):
         if rule.rate_forward is parameter or rule.rate_reverse is parameter:
             cset.add(rule)
     return cset
+
+
+def synthetic_data(model, tspan, obs_list=None, sigma=0.1, seed=None):
+    random = numpy.random.RandomState(seed)
+    ysim = odesolve(model, tspan)
+    ysim_array = ysim.view().reshape(len(tspan), len(ysim.dtype))
+    ysim_array *= (random.randn(*ysim_array.shape) * sigma + 1);
+    return ysim
+
