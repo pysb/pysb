@@ -273,6 +273,11 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     return components
 
+def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
+                   state1, state2, klist):
+    return catalyze(enzyme, e_site, substrate({mod_site: state1}),
+                    s_site, substrate({mod_site: state2}), klist)
+
 def catalyze_table():
     pass
 
