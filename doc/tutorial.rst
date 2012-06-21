@@ -1,29 +1,60 @@
+.. _BioNetGen: http://bionetgen.org/index.php/Documentation
+.. _Kappa: http://www.kappalanguage.org/documentation
+
 Tutorial
 ========
 
 This tutorial will walk you through the creation of your first PySB
-model.  First we will learn how to use basic rule-based modeling
-constructs, then take a deeper look at some simulation and analysis
-tools available through PySB, and finally explore PySB's most unique
-feature, so-called "higher-order" rules.
+model. It will cover the basics, provide a guide through the different
+programming constructs and finally deal with more complex
+rule-building. Users should be able to write simple programs and
+follow the programs in the example sections after finishing this
+section. 
 
-.. note:: We assume a basic understanding of rule-based modeling,
-   specifically the formalism known as the Kappa calculus.  We will be
-   referencing concepts from the BioNetGen (BNG) implementation of
-   this formalism. `Section 1 of the BNG tutorial
-   <http://bionetgen.org/index.php/BioNetGen_Tutorial#Structure_of_the_Input_File>`_
-   serves as a good introduction to the language.
+.. note:: Familiarity with rules-based biomodel encoding tools such as
+   `BioNetGen`_ or `Kappa`_ would be useful to users unfamiliar with
+   *Rules-based* approaches to modeling. Although we start from the
+   basics in this tutorial, some familiarity with these tools will be
+   useful.
 
-Basic rule-based modeling
--------------------------
+.. warning:: A basic understanding of the Python programming language
+   is essential for the use of PySB. Although the user can go through
+   this tutorial and develop an understanding of the PySB tools,
+   advanced programming with PySB will require understanding of
+   Python. Some useful tutorials/guides include the `Official Python
+   Tutorial <http://docs.python.org/tutorial/>`_, `Dive into Python
+   <http://www.diveintopython.net/>`_, `Numerical Python (NumPy)
+   <http://numpy.scipy.org/>`_, and `Scientific Python (SciPy)
+   <http://scipy.org/Getting_Started>`_.
 
-First steps
-~~~~~~~~~~~
 
-Let's create our model, which we'll call ``mymodel``. Open your
+Basic rule-based modeling and PySB ==================================
+In rules-based modeling, units that undergo transformations such as
+proteins, small molecules, protein complexes, etc are termed
+*species*. The interactions among these *species* are then represented
+using structured objects that describe the interactions between the
+*species* and constitute what we describe as *rules*. The specific
+details of how species and rules are specified can vary across
+different rules-based modeling approaches. In PySB we have chosen to
+ascribe to the approaches found in `BioNetGen`_ and `Kappa`_, but
+other approaches are certainly possible for advanced users interested
+in modifying the source code. Each rule, describing the interaction
+between *species* or sets of *species* must be assigned a set of
+*parameters* associated with the nature of the *rule*. Given that
+`BioNetGen`_ and `Kappa`_ both describe interactions using a
+mass-action kinetics formalism, the *parameters* will necessarily
+consist of reaction rates. In what follows we describe how a model can
+be instantiated in PySB, how *species* and *rules* are specified, and
+how to run a simple simulation.
+
+
+The Empty Model
+---------------
+
+We begin by creating a model, which we will call ``mymodel``. Open your
 favorite Python code editor and create a file called
-:file:`mymodel.py`.  The first two lines of every model must be as
-follows, so copy them into your file and save it::
+:file:`mymodel.py`. The first lines of a PySB program must contain
+these lines so you can type them or paste them in your editor::
 
     from pysb import *
 
@@ -37,22 +68,28 @@ typing the following command at your command prompt::
 
    python mymodel.py
 
-If all went well, you will not see any output. This is to be expected,
-because a PySB model script *defines* a model but doesn't *do*
-anything with it. We'll revisit this issue once we've added some more
-components to our model to make it more interesting.
+If all went well, you should not see any output. This is to be
+expected, because this PySB script *defines* a model but does not
+execute any contents. We will revisit these concepts once we have
+added some components to our model.
 
 Monomers
-~~~~~~~~
+--------
 
-The first type of component we'll typically add to a new model is a
-``Monomer``, which represents a protein or other molecule in the
-system being modeled (*molecule type* in BNG).  A monomer is defined
-using the keyword ``Monomer`` followed by the name you'd like to
-assign to the monomer and any sites it may have.  Here is how you
-would declare a monomer named 'EGFR' with two sites 'l' and 'd'::
+Chemical *species* in PySB, whether they are small molecules,
+proteins, or representations of many molecules are all composed of
+*Monomers*. *Monomers* are the subunit that defines how a *species*
+can be defined and used. A *Monomer* is defined using the keyword
+``Monomer`` followed by the desired *monomer* name and the *sites*
+relevant to that monomer. In PySB, like in `BioNetGen`_ or `Kappa`_,
+there are two types of *sites*, namely bond-making/breaking sites (aka
+transformation sites) and state sites. The former allow for the
+description of bonds between *species* while the latter allow for the
+assignment of *states* to species. Following the first lines of code
+entered into your model in the previous section we will add a
+*monomer* named 'Bid' with a bond site 'b' and a state site 's'::
 
-    Monomer('EGFR', ['l', 'd'])
+    Monomer('Bid', ['b', 's'])
 
 Note that this looks like a Python function call.  This is because it
 *is* in fact a Python function call! [#func]_ The first argument to
@@ -112,7 +149,7 @@ in the next section, but for now let's cover the other types of
 components we can add to our model.
 
 Parameters
-~~~~~~~~~~
+----------
 
 A ``Parameter`` is a named constant floating point number used as a
 reaction rate constant, compartment volume or initial (boundary)
@@ -128,16 +165,16 @@ is to use a floating-point literal in scientific notation as shown in
 the example above.
 
 Rules
-~~~~~
+-----
 
 Compartments
-~~~~~~~~~~~~
+------------
 
 Initial conditions
-~~~~~~~~~~~~~~~~~~
+------------------
 
 Observables
-~~~~~~~~~~~
+-----------
 
 
 Simulation and analysis
