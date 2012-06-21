@@ -392,7 +392,6 @@ def one_step_mod(enz, sub, prod, kf=None):
 
     return components_created
 
-
 def bind(s1, site1, s2, site2, klist):
     """Automation of the s1 + s2 <> s1:s2 one-step complex formation,
     but allows the binding sites of both species to be specified. Note that it
@@ -452,7 +451,6 @@ def bind(s1, site1, s2, site2, klist):
 
     return components
 
- 
 def simple_bind(s1, s2, site, klist):
     """Automation of the s1 + s2 <> s1:s2 one-step complex
     formation.  Invokes the bind function using the same name for each
@@ -563,7 +561,6 @@ def bind_table(bindtable, row_site, col_site):
 
                 bind(react_rows[i](), row_site, react_cols[j](), col_site, [kf_parm, kr_parm])
 
-
 def two_state_equilibrium(s1, s2, klist):
     """Generate unimolecular reversible equilibrium reaction S1 <-> S2.
 
@@ -618,7 +615,6 @@ def two_state_equilibrium(s1, s2, klist):
 
     return components
 
-   
 def direct_catalysis_reversible(sub, enz, prod, klist=None):
     """Create fwd and reverse rules for catalysis of the form:
         A + B -> A + C
@@ -666,28 +662,3 @@ def direct_catalysis_reversible(sub, enz, prod, klist=None):
     Rule(r_name_fwd, sub + enz >> prod + enz, kf)
     Rule(r_name_rev, prod >> sub, kr)
    
- 
-#-------------------------------------------------------------------------
-# Random little helper funcs that make it easier to interact w the model.
-#-------------------------------------------------------------------------
-
-def get_param_num(model, name):
-    for i in range(len(model.parameters)):
-        if model.parameters[i].name == name:
-            print i, model.parameters[i]
-            break
-    return i
-
-def plotoutput(simout, norm=True):
-    """ Assume norm is true for now
-    """
-    pylab.ion()
-    pylab.figure()
-    nplots = len(simout.shape[0] -1)
-    
-    
-    for i in range(nplots): #assume simout[0] is time
-        pass
-
-
-        
