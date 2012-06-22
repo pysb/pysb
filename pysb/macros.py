@@ -9,6 +9,12 @@ DEFAULT_BI_KF = 1e-4 # In units of nM^-1 sec^-1
 DEFAULT_KR = 0.1     # In units of sec^-1
 DEFAULT_KC = 1       # In units of sec^-1
 
+def complex_pattern_label(cp):
+    """Return a string label for a ComplexPattern."""
+    mp_labels = [monomer_pattern_label(mp) for mp in cp.monomer_patterns]
+    return ''.join(mp_labels)
+        
+# TODO: Check to make sure it's a monomer
 def monomer_pattern_label(mp):
     """Return a reasonable string label for a MonomerPattern."""
     site_values = [str(x) for x in mp.site_conditions.values() if x is not None]
@@ -35,7 +41,6 @@ def two_state_equilibrium(s1, s2, klist):
     components : ComponentSet
         The generated components. Contains one reversible Rule and optionally
         two Parameters if klist was given as plain numbers.
-
     """
     
     # turn any Monomers into MonomerPatterns
@@ -71,6 +76,7 @@ def two_state_equilibrium(s1, s2, klist):
     return components
 
 ## Binding
+#TODO: Finish writing docstring
 def bind(s1, site1, s2, site2, klist):
     """Automation of the s1 + s2 <> s1:s2 one-step complex formation,
     but allows the binding sites of both species to be specified. Note that it
@@ -130,6 +136,7 @@ def bind(s1, site1, s2, site2, klist):
 
     return components
 
+#TODO: Refactor
 def bind_table(bindtable, row_site, col_site):
     """This assumes that the monomers passed are in their desired state without
     the sites which will be used for binding.
@@ -274,39 +281,240 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     return components
 
+def _macro_rule(rule_base_name, rule_expression, klist, knames):
+    # Get reactant pattern
+    react_p = rule_expression.reactant_pattern
+    prod_p = rule_expression.product_pattern
+    # Build the rule_name
+    lhs_label = [complex_pattern_label(cp) for cp in react_p.complex_patterns]
+    lhs_label = '_'.join(lhs_label)
+    rhs_label = [complex_pattern_label(cp) for cp in prod_p.complex_patterns]
+    rhs_label = '_'.join(lhs_label)
+    r_name = '%s_%s_to_%s' % (rule_base_name, lhs_label, rhs_label)
+
+    # If rule is unidirectional, make sure we only have one parameter
+    if (not rule_expression.is_reversible):
+        if not (len(klist) == 1 and len(knames) == 1):
+            raise ValueError("A unidirectional rule must have one parameter.")
+    # If rule is bidirectional, make sure we have two parameters
+    else:
+        if not (len(klist) == 2 and len(knames) == 2):
+            raise ValueError("A bidirectional rule must have two parameters.")
+
+    if all(isinstance(x, Parameter) for x in klist):
+        k1 = klist[0]
+        if rule_expression.is_reversible:
+            k2 = klist[1]
+        params_created = ComponentSet([])
+    # if klist is numbers, generate the Parameters
+    elif all(isinstance(x, numbers.Real) for x in klist):
+        k1 = Parameter(r_name + knames[0], klist[0])
+        params_created = ComponentSet([k1]) 
+        if rule_expression.is_reversible:
+            k2 = Parameter(r_name + knames[1], klist[1])
+            params_created |= ComponentSet([k2])
+    else:
+        raise ValueError("klist must contain Parameters objects or numbers")
+
+    if rule_expression.is_reversible:
+        r = Rule(r_name, rule_expression, k1, k2)
+    else:
+        r = Rule(r_name, rule_expression, k1)
+
+    # Build a set of components that were created
+    return ComponentSet([r]) | params_created
+
+"""
+rx1, rx2, prod1, prod2
+"str_rx1_rx2_to_prod1_prod2"
+
+
+catalyze(e, e_site, s, s_site, prod, klist)
+    convert all to MPs by apply(label, monomers)
+    check s_site on s, e_site on e
+    make rulepatterns
+    for each rulepattern
+        comps += macro_me(basename, rulepattern?)
+    return comps 
+
+def macro_me(basename, rule):
+    iterate over mps, generate names for each
+    generate r_name from basename and mp.monomer.names
+    do param creation by iterating over klist, with passed name
+    Rule!
+    return created components   
+    
+"""
+
+
+
 def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
                    state1, state2, klist):
+    """Generate the two-step catalytic reaction E + S <> E:S >> E + P.
+    A wrapper around catalyze() with a signature specifying the state change
+    of the substrate that resulting from catalysis.
+
+    Parameters
+    ----------
+    enzyme : Monomer or MonomerPattern
+        E in the above reaction.
+    substrate : Monomer or MonomerPattern
+        S and P in the above reaction. The product species is assumed to be
+        identical to the substrate species in all respects except the state
+        of the modification site. The state of the modification site should
+        not be specified in the MonomerPattern for the substrate.
+    e_site, s_site : string
+        The names of the sites on `enzyme` and `substrate` (respectively) where
+        they bind each other to form the E:S complex.
+    mod_site : string
+        The name of the site on the substrate that is modified by catalysis.
+    state1, state2 : strings
+        The states of the modification site (mod_site) on the substrate before
+        (state1) and after (state2) catalysis.
+    klist : list of 3 Parameters or list of 3 numbers
+        Forward, reverse and catalytic rate constants (in that order). If
+        Parameters are passed, they will be used directly in the generated
+        Rules. If numbers are passed, Parameters will be created with
+        automatically generated names based on the names and states of enzyme,
+        substrate and product and these parameters will be included at the end
+        of the returned component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains two Rules (bidirectional complex
+        formation and unidirectional product dissociation), and optionally three
+        Parameters if klist was given as plain numbers.
+
+    Notes
+    -----
+    When passing a MonomerPattern for `enzyme` or `substrate`, do not include
+    `e_site` or `s_site` in the respective patterns. In addition, do not
+    include the state of the modification site on the substrate. The macro
+    will handle this.
+
+    Examples
+    --------
+    Using a single Monomer for substrate and product with a state change::
+
+        Monomer('Kinase', ['b'])
+        Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
+        catalyze_state(Kinase, 'b', Substrate, 'b', 'y', 'U', 'P',
+                 (1e-4, 1e-1, 1))
+    """
+
     return catalyze(enzyme, e_site, substrate({mod_site: state1}),
                     s_site, substrate({mod_site: state2}), klist)
 
+#TODO: Implement
 def catalyze_table():
     pass
 
-def catalyze_one_step(enz, sub, prod, kf=None):
-    """Automation of the Enz + Sub >> Enz + Prod one-step catalytic
-    reaction. Assumes state of Enz is unchanged.
+def catalyze_one_step(enzyme, substrate, product, kf):
+    """Automation of the Enz + Sub >> Enz + Prod one-step catalytic reaction.
+    Assumes state of Enz is unchanged.
 
-    enz, sub and prod are MonomerPatterns.
-    kf is a Parameter object.
+    Parameters
+    ----------
+    enzyme, substrate, product : Monomer or MonomerPattern
+        E, S and P in the above reaction.
+    kf : a Parameter or a number
+        Forward rate constant for the reaction. If a
+        Parameter is passed, it will be used directly in the generated
+        Rules. If a number is passed, a Parameter will be created with an
+        automatically generated name based on the names and states of the
+        enzyme, substrate and product and this parameter will be included
+        at the end of the returned component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains the unidirectional reaction Rule
+        and optionally the forward rate Parameter if klist was given as a
+        number.
+
+    Notes
+    -----
+    In this macro, there is no direct binding between enzyme and substrate,
+    so binding sites do not have to be specified. This represents an
+    approximation for the case when the enzyme is operating in its linear
+    range. However, if catalysis is nevertheless contingent on the enzyme or
+    substrate being unbound on some site, then that information must be encoded
+    in the MonomerPattern for the enzyme or substrate. See the examples, below.
+
+    Examples
+    --------
+    Using distinct Monomers for substrate and product::
+
+        Model()
+        Monomer('E', ['b'])
+        Monomer('S', ['b'])
+        Monomer('P')
+        catalyze_one_step(E, S, P, 1e-4)
+
+    If the ability of the enzyme E to catalyze this reaction is dependent
+    on the site 'b' of E being unbound, then this macro must be called as
+
+        catalyze_one_step(E(b=None), S, P, 1e-4)
+        
+    and similarly if the substrate must be unbound.
+
+    Using a single Monomer for substrate and product with a state change::
+
+        Monomer('Kinase', ['b'])
+        Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
+        catalyze(Kinase, Substrate(y='U'), Substrate(y='P'), 1e-4)
+
     """
+    # Turn any Monomers into MonomerPatterns
+    substrate = substrate()
+    enzyme = enzyme()
+    product = product()
 
-    r_name = 'cat_%s%s_%s%s' % (sub.monomer.name,
-            ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
-            enz.monomer.name,
-            ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+    # Generate the rule names
+    # FIXME: this will fail if the argument passed is a Complex object. 
+    substrate_name = monomer_pattern_label(substrate)
+    enzyme_name = monomer_pattern_label(enzyme)
+    product_name = monomer_pattern_label(product)
 
-    # If no parameters are provided, create defaults
-    if (not kf):
-        kf = Parameter(r1_name + '_kf', DEFAULT_UNI_KF)
-     
-    # Write the rule
-    r = Rule(r_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
-    
-    # Return the components created by this function
-    if not kf:
-        components_created = [r, kf]
+    r_name = 'one_step_%s_to_%s_by_%s' % (substrate_name, product_name, enzyme_name)
+
+    # 
+    if all(isinstance(x, Parameter) for x in klist):
+        kf, kr, kc = klist
+        params_created = False
+    elif all(isinstance(x, numbers.Real) for x in klist):
+        # if klist is numbers, generate the Parameters
+        kf = Parameter(rc_name + '_kf', klist[0])
+        kr = Parameter(rc_name + '_kr', klist[1])
+        kc = Parameter(rd_name + '_kc', klist[2])
+        params_created = True
     else:
-        components_created = [r]
+        raise ValueError("klist must contain Parameters objects or numbers")
+     
+    # if kf is a number, generate the Parameter
+    if isinstance(kf, Parameter):
+        params_created = False
+    elif isinstance(kf, numbers.Real):
+        kf = Parameter(r_name + '_kf', kf)
+        params_created = True
+    else:
+        raise ValueError("klist must contain Parameters objects or numbers")
+
+    # Write the rule
+    r = Rule(r_name, enzyme + substrate >> enzyme + product, kf)
+   
+    # build a set of components that were created
+    components = ComponentSet([rc, rd])
+    if params_created:
+        components |= ComponentSet([kf, kr, kc])
+
+    return components
+ 
+    # Return the components created by this function
+    components = ComponentSet([r])
+    if params_created:
+        components |= ComponentSet([kf])
 
     return components_created
 
@@ -369,7 +577,6 @@ def synthesize_and_degrade():
 
 def synthesize_and_degrade_table():
     pass
-
 
 ## Pore assembly
 def pore_species(subunit, site1, site2, size):
