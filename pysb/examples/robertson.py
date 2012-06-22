@@ -61,6 +61,10 @@ Initial(A(), A_0)
 Initial(B(), B_0)
 Initial(C(), C_0)
 
+Observable('A_total', A())
+Observable('B_total', B())
+Observable('C_total', C())
+
 
 if __name__ == '__main__':
     from pysb.bng import generate_equations

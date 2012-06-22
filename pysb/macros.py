@@ -1,19 +1,18 @@
 import inspect
 from pysb import *
 import pysb.core
+from pysb.core import ComponentSet
+import numbers
 
 DEFAULT_UNI_KF = 1e6 # In units of sec^-1
 DEFAULT_BI_KF = 1e-4 # In units of nM^-1 sec^-1
 DEFAULT_KR = 0.1     # In units of sec^-1
 DEFAULT_KC = 1       # In units of sec^-1
 
-def alias_model_components(model=None):
-    """Make all model components visible as symbols in the caller's global namespace"""
-    if model is None:
-        model = pysb.core.SelfExporter.default_model
-    caller_globals = inspect.currentframe().f_back.f_globals
-    components = dict((c.name, c) for c in model.all_components())
-    caller_globals.update(components)
+def monomer_pattern_label(mp):
+    """Return a reasonable string label for a MonomerPattern."""
+    site_values = [str(x) for x in mp.site_conditions.values() if x is not None]
+    return mp.monomer.name + ''.join(site_values)
 
 
 def two_step_conv(Sub1, Sub2, Prod, klist, site='bf'):
@@ -73,77 +72,115 @@ def simple_dim(Sub, Prod, klist, site='bf'):
     # combine the monomers into a product step rule
     Rule(r1_name, Sub + Sub <> Prod, kf, kr)
 
-def pore_species(Subunit, size):
+def pore_species(subunit, site1, site2, size):
     """
     Generate a single species representing a homomeric pore, composed
     of <size> copies of <Subunit> bound together in a ring, with bonds
-    formed between bh3 of one unit and d2 of the next.
+    formed between <site1> of one unit and <site2> of the next.
     """
 
-    #FIXME: the sites here are hard-coded and named _bh3_ and _d2_
-    #not generic and perhaps misleading?
-    if size == 0:
+    if size <= 0:
         raise ValueError("size must be an integer greater than 0")
     if size == 1:
-        Pore = Subunit(bh3=None, d2=None)
+        pore = subunit({site1: None, site2: None})
     elif size == 2:
-        Pore = Subunit(bh3=1, d2=None) % Subunit(d2=1, bh3=None)
+        pore = subunit({site1: 1, site2: None}) % subunit({site1: None, site2: 1})
     else:
         # build up a ComplexPattern, starting with a single subunit
-        Pore = Subunit(bh3=1, d2=2)
+        pore = subunit({site1: 1, site2: 2})
         for i in range(2, size + 1):
-            Pore %= Subunit(bh3 = i, d2 = i % size + 1)
-        Pore.match_once = True
-    return Pore
+            pore %= subunit({site1: i, site2: i % size + 1})
+        pore.match_once = True
+    return pore
 
-def pore_assembly(Subunit, size, rates):
+def assemble_pore_sequential(subunit, site1, site2, size, klist):
     """
     Generate rules to chain identical MonomerPatterns <Subunit> into
-    increasingly larger pores of up to <size> units, using sites bh3
-    and d2 to bind the units to each other.
+    increasingly larger pores of up to <size> units, using sites <site1>
+    and <site2> to bind the units to each other.
     """
-    rules = []
+    if size != len(klist):
+        raise ValueError("size and len(klist) must be equal")
+
+    subunit = subunit()
+
+    subunit_name = monomer_pattern_label(subunit)
+    r_name_pattern = 'assemble_pore_sequential_%s_%%d' % (subunit_name)
+
+    klist_clean = []
+    params_created = ComponentSet()
+    for i, sublist in enumerate(klist):
+        r_name = r_name_pattern % (i + 2)
+        if all(isinstance(x, Parameter) for x in sublist):
+            kf, kr = sublist
+        elif all(isinstance(x, numbers.Real) for x in sublist):
+            # if sublist is numbers, generate the Parameters
+            kf = Parameter(r_name + '_kf', sublist[0])
+            kr = Parameter(r_name + '_kr', sublist[1])
+            params_created.add(kf)
+            params_created.add(kr)
+        else:
+            raise ValueError("klist must contain Parameters objects or numbers")
+        klist_clean.append([kf, kr])
+
+    rules = ComponentSet()
     for i in range(2, size + 1):
-        M = pore_species(Subunit, 1)
-        S1 = pore_species(Subunit, i-1)
-        S2 = pore_species(Subunit, i)
-        rules.append(Rule('%s_pore_assembly_%d' % (Subunit.monomer.name, i),
-                          M + S1 <> S2, *rates[i-2]))
-    return rules
+        M = pore_species(subunit, site1, site2, 1)
+        S1 = pore_species(subunit, site1, site2, i-1)
+        S2 = pore_species(subunit, site1, site2, i)
+        r = Rule(r_name_pattern % i, M + S1 <> S2, *klist_clean[i-2])
+        rules.add(r)
 
-def pore_transport(Subunit, Source, Dest, min_size, max_size, rates, site='bf'):
+    return rules | params_created
+
+def transport_pore(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
+                   csource, cdest, c_site, klist):
     """
-    Generate rules to transport MonomerPattern <Source> to <Dest>
-    through any of a series of pores of at least <min_size> and at
-    most <max_size> subunits, as defined by pore_assembly.  Implicitly
-    uses site 'bf' on both Subunit and Source to bind to each other.
+    Generate rules to transport MonomerPattern <csource> to <cdest> (cargo)
+    through any of a series of pores of at least <min_size> and at most
+    <max_size> subunits binding on <spsite1> and <spsite2>. Subunit and cargo
+    bind at sites scsite and csite, respectively.
     """
-    assert site in Source.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site, Source.monomer.name)
-    assert site in Dest.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site, Dest.monomer.name)
 
-    for i in range(min_size, max_size+1):
-        Pore = pore_species(Subunit, i)
-        # require all pore subunit bf sites to be empty for Pore match
-        for mp in Pore.monomer_patterns:
-            mp.site_conditions[site] = None
-        SM = Source.monomer
-        ssc = Source.site_conditions
-        DM = Dest.monomer
-        dsc = Dest.site_conditions
+    # turn any Monomers into MonomerPatterns
+    subunit = subunit()
+    csource = csource()
+    cdest = cdest()
 
-        r1_name = '%s_pore_%d_transport_%s_cplx' % (SM.name, i, Subunit.monomer.name)
-        r2_name = '%s_pore_%d_transport_%s_dssc' % (SM.name, i, Subunit.monomer.name)
+    # verify that sites are valid
+    if sc_site not in csource.monomer.sites_dict:
+        raise ValueError("sc_site '%s' not present in csource '%s'" %
+                         (sc_site, csource.monomer.name))
+    if sc_site not in cdest.monomer.sites_dict:
+        raise ValueError("sc_site '%s' not present in cdest '%s'" %
+                         (sc_site, cdest.monomer.name))
+
+    subunit_name = monomer_pattern_label(subunit)
+    csource_name = monomer_pattern_label(csource)
+    cdest_name = monomer_pattern_label(cdest)
+
+    rc_name_pattern = 'transport_complex_%s_pore_%%d_%s' % \
+                      (subunit_name, csource_name)
+    rd_name_pattern = 'transport_dissociate_%s_pore_%%d_from_%s' % \
+                      (subunit_name, cdest_name)
+
+    for i in range(min_size, max_size + 1):
+        pore = pore_species(subunit, sp_site1, sp_site2, i)
+        # require all pore subunit sites to be empty for match
+        for mp in pore.monomer_patterns:
+            mp.site_conditions[sc_site] = None
+
+        rc_name = rc_name_pattern % i
+        rd_name = rd_name_pattern % i
 
         rule_rates = rates[i-min_size]
-        CPore = Pore._copy()
+        cpore = pore._copy()
         source_bonds = range(i+1, i+1+i)
         for b in range(i):
-            CPore.monomer_patterns[b].site_conditions[site] = source_bonds[b]
-        Complex = CPore % SM(ssc, bf=source_bonds)
-        Rule(r1_name, Pore + SM(ssc, bf=None) <> Complex, *rule_rates[0:2])
-        Rule(r2_name, Complex >> Pore + DM(dsc, bf=None), rule_rates[2])
+            cpore.monomer_patterns[b].site_conditions[sc_site] = source_bonds[b]
+        sc_complex = cpore % csource({c_site: source_bonds})
+        Rule(rc_name, pore + csource({c_site: None}) <> sc_complex, *rule_rates[0:2])
+        Rule(rd_name, sc_complex >> pore + cdest({c_site: None}), rule_rates[2])
 
 def one_step_conv(Sub1, Sub2, Prod, klist, site='bf'):
     """ Convert two Sub species into one Prod species:
@@ -225,116 +262,203 @@ def simple_bind_table(bindtable, parmlist, lmodel, site='bf'):
         print "WARNING, unassigned parameters from list", parmlist
         print "Assigned",pc,"parameter pairs from a total of", len(parmlist)
 
-#-------------------------------------------------------------------------
-# John B Macro Funcs
-#-------------------------------------------------------------------------
+def catalyze(enzyme, e_site, substrate, s_site, product, klist):
+    """Generate the two-step catalytic reaction E + S <> E:S >> E + P.
 
-def two_step_mod_sites(enz, enz_site, sub, sub_site, prod, klist=None):
-    """Automation of the Enz + Sub <> Enz:Sub >> Enz + Prod two-step catalytic reaction.
-    This function assumes that there is a site named 'bf' (bind site for fxn)
-    which it uses by default. This also assumes Enz returns to its original state.
-    In an aim for simplicity, site 'bf' need not be passed when calling the function by
-    the reactants, but THE FULL STATE OF THE PRODUCT must be specified"""
+    Parameters
+    ----------
+    enzyme, substrate, product : Monomer or MonomerPattern
+        E, S and P in the above reaction.
+    e_site, s_site : string
+        The names of the sites on `enzyme` and `substrate` (respectively) where
+        they bind each other to form the E:S complex.
+    klist : list of 3 Parameters or list of 3 numbers
+        Forward, reverse and catalytic rate constants (in that order). If
+        Parameters are passed, they will be used directly in the generated
+        Rules. If numbers are passed, Parameters will be created with
+        automatically generated names based on the names and states of enzyme,
+        substrate and product and these parameters will be included at the end
+        of the returned component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains two Rules (bidirectional complex
+        formation and unidirectional product dissociation), and optionally three
+        Parameters if klist was given as plain numbers.
+
+    Notes
+    -----
+    When passing a MonomerPattern for `enzyme` or `substrate`, do not include
+    `e_site` or `s_site` in the respective patterns. The macro will handle this.
+
+    Examples
+    --------
+    Using distinct Monomers for substrate and product::
+
+        Model()
+        Monomer('E', ['b'])
+        Monomer('S', ['b'])
+        Monomer('P')
+        catalyze(E, 'b', S, 'b', P, (1e-4, 1e-1, 1))
+
+    Using a single Monomer for substrate and product with a state change::
+
+        Monomer('Kinase', ['b'])
+        Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
+        catalyze(Kinase, 'b', Substrate(y='U'), 'b', Substrate(y='P'),
+                 (1e-4, 1e-1, 1))
+
+    """
     
+    # turn any Monomers into MonomerPatterns
+    substrate = substrate()
+    enzyme = enzyme()
+    product = product()
+
+    # verify that sites are valid
+    if e_site not in enzyme.monomer.sites_dict:
+        raise ValueError("e_site '%s' not present in monomer '%s'" %
+                         (e_site, enzyme.monomer.name))
+    if s_site not in substrate.monomer.sites_dict:
+        raise ValueError("s_site '%s' not present in monomer '%s'" %
+                         (s_site, substrate.monomer.name))
+
+    # generate the rule names
     # FIXME: this will fail if the argument passed is a Complex object. 
-    r1_name = 'cplx_%s%s_%s%s' % (sub.monomer.name, ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
-                                     enz.monomer.name, ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
-    r2_name = 'diss_%s%s_via_%s%s' % (prod.monomer.name, ''.join(filter(lambda a: a != None, prod.site_conditions.values())),
-                                         enz.monomer.name, ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+    substrate_name = monomer_pattern_label(substrate)
+    enzyme_name = monomer_pattern_label(enzyme)
+    product_name = monomer_pattern_label(product)
+    rc_name = 'complex_%s_%s' % (substrate_name, enzyme_name)
+    rd_name = 'dissociate_%s_from_%s' % (product_name, enzyme_name)
 
-    # Default names for the parameters
-    if (not klist):
-        kf = Parameter(r1_name + '_kf', DEFAULT_BI_KF)
-        kr = Parameter(r1_name + '_kr', DEFAULT_KR)
-        kc = Parameter(r2_name + '_kc', DEFAULT_KC)
+    # set up some aliases to the patterns we'll use in the rules
+    enzyme_free = enzyme({e_site: None})
+    substrate_free = substrate({s_site: None})
+    es_complex = enzyme({e_site: 1}) % substrate({s_site: 1})
+    # if product is actually a variant of substrate, we need to explicitly say
+    # that it is no longer bound to enzyme
+    if product.monomer is substrate.monomer:
+        product = product({e_site: None})
+
+    if all(isinstance(x, Parameter) for x in klist):
+        kf, kr, kc = klist
+        params_created = False
+    elif all(isinstance(x, numbers.Real) for x in klist):
+        # if klist is numbers, generate the Parameters
+        kf = Parameter(rc_name + '_kf', klist[0])
+        kr = Parameter(rc_name + '_kr', klist[1])
+        kc = Parameter(rd_name + '_kc', klist[2])
+        params_created = True
     else:
-        kf, kr, kc = klist #forward, reverse, catalytic
+        raise ValueError("klist must contain Parameters objects or numbers")
      
-    assert enz_site in enz.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(enz_site, Enz.monomer.name)
-    assert sub_site in sub.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(sub_site, Sub.monomer.name)
-    #assert prod.is_concrete(), \
-    #    "The product %s is not a fully specified (concrete) pattern." % (prod) 
+    # create the rules
+    rc = Rule(rc_name, enzyme_free + substrate_free <> es_complex, kf, kr)
+    rd = Rule(rd_name, es_complex >> enzyme_free + product, kc)
 
-    # make the intermediate complex components
-    etmpdict = enz.site_conditions.copy()
-    stmpdict = sub.site_conditions.copy()
-    
-    etmpdict[enz_site] = 1
-    stmpdict[sub_site] = 1
+    # build a set of components that were created
+    components = ComponentSet([rc, rd])
+    if params_created:
+        components |= ComponentSet([kf, kr, kc])
 
-    enz_cplx = enz.monomer(etmpdict)
-    sub_cplx = sub.monomer(stmpdict)
+    return components
 
-    # add the 'bf' site to the patterns
-    enz.site_conditions[enz_site] = None
-    sub.site_conditions[sub_site] = None
+def one_step_mod(enz, sub, prod, kf=None):
+    """Automation of the Enz + Sub >> Enz + Prod one-step catalytic
+    reaction. Assumes state of Enz is unchanged.
 
-    # now that we have the complex elements formed we can write the first step rule
-    Rule(r1_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
-    
-    # and finally the rule for the catalytic transformation
-    Rule(r2_name, enz_cplx % sub_cplx >> enz + prod, kc)
-
-def two_step_mod(Enz, Sub, Prod, klist=None, site='bf'):
-    two_step_mod_sites(Enz, site, Sub, site, Prod, klist)
-
-
-def bind(Sub1, site1, Sub2, site2, klist=None):
-    """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation, but allows
-    the binding sites of both species to be specified.
-    Note that it expects Sub1 and Sub2 to be MonomerPatterns (not Monomers), and site1
-    and site2 strings indicating the names of the binding sites.
-    klist is list of Parameter objects. If klist is not provided as an argument,
-    the bind function will generate default forward and reverse parameters.
+    enz, sub and prod are MonomerPatterns.
+    kf is a Parameter object.
     """
 
-    # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
-    r_name = 'cplx_%s%s_%s%s' % (Sub1.monomer.name, ''.join(filter(lambda a: a != None, Sub1.site_conditions.values())),
-                                     Sub2.monomer.name, ''.join(filter(lambda a: a != None, Sub2.site_conditions.values())))
+    r_name = 'cat_%s%s_%s%s' % (sub.monomer.name,
+            ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
+            enz.monomer.name,
+            ''.join(filter(lambda a: a != None, enz.site_conditions.values())))
+
+    # If no parameters are provided, create defaults
+    if (not kf):
+        kf = Parameter(r1_name + '_kf', DEFAULT_UNI_KF)
+     
+    # Write the rule
+    r = Rule(r_name, enz + sub <> enz_cplx % sub_cplx, kf, kr)
     
-    assert site1 in Sub1.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site1, Sub1.monomer.name)
-    assert site2 in Sub2.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(site2, Sub2.monomer.name)
+    # Return the components created by this function
+    if not kf:
+        components_created = [r, kf]
+    else:
+        components_created = [r]
 
-    if (not klist):
-        # Default parameter values
-        # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies 100nM binding
-        # FIXME get rid of these magic numbers!!!! Put in a global setting of some kind
-        kf = Parameter(r_name + '_kf', DEFAULT_BI_KF)
-        kr = Parameter(r_name + '_kr', DEFAULT_KR)
-    else: 
-        kf, kr = klist
+    return components_created
 
-    # create the site conditions for the complex
-    s1tmpdict = Sub1.site_conditions.copy()
-    s2tmpdict = Sub2.site_conditions.copy()
-    
-    s1tmpdict[site1] = 1
-    s2tmpdict[site2] = 1
 
-    Sub1Cplx = Sub1.monomer(s1tmpdict)
-    Sub2Cplx = Sub2.monomer(s2tmpdict)
+def bind(s1, site1, s2, site2, klist):
+    """Automation of the s1 + s2 <> s1:s2 one-step complex formation,
+    but allows the binding sites of both species to be specified. Note that it
+    expects s1 and s2 to be MonomerPatterns (not Monomers), and site1
+    and site2 to be strings indicating the names of the binding sites.
+    klist is list of Parameter objects or numbers.
+    """
 
-    # create the sites for the monomers
-    Sub1.site_conditions[site1] = None
-    Sub2.site_conditions[site2] = None
-    # now that we have the complex elements formed we can write the first step rule
-    Rule(r_name, Sub1 + Sub2 <> Sub1Cplx % Sub2Cplx, kf, kr)
-   
+    # FIXME: this will fail if the argument passed is a complex
+    # turn any Monomers into MonomerPatterns
+    s1 = s1()
+    s2 = s2()
+
+    # verify that sites are valid
+    if site1 not in s1.monomer.sites_dict:
+        raise ValueError("site1 '%s' not present in s1 '%s'" %
+                         (site1, s1.monomer.name))
+    if site2 not in s2.monomer.sites_dict:
+        raise ValueError("site2 '%s' not present in s2 '%s'" %
+                         (site2, s2.monomer.name))
+
+    # generate the rule names
+    # FIXME: this will fail if the argument passed is a Complex object. 
+    s1_name = monomer_pattern_label(s1)
+    s2_name = monomer_pattern_label(s2)
+    rc_name = 'bind_%s_%s' % (s1_name, s2_name)
+
+    # set up some aliases to the patterns we'll use in the rules
+    enzyme_free = enzyme({e_site: None})
+    substrate_free = substrate({s_site: None})
+    es_complex = enzyme({e_site: 1}) % substrate({s_site: 1})
+    # if product is actually a variant of substrate, we need to explicitly say
+    # that it is no longer bound to enzyme
+    if product.monomer is substrate.monomer:
+        product = product({e_site: None})
+
+    if all(isinstance(x, Parameter) for x in klist):
+        kf, kr, kc = klist
+        params_created = False
+    elif all(isinstance(x, numbers.Real) for x in klist):
+        # if klist is numbers, generate the Parameters
+        kf = Parameter(rc_name + '_kf', klist[0])
+        kr = Parameter(rc_name + '_kr', klist[1])
+        kc = Parameter(rd_name + '_kc', klist[2])
+        params_created = True
+    else:
+        raise ValueError("klist must contain Parameters objects or numbers")
+     
+    # create the rules
+    rc = Rule(rc_name, enzyme_free + substrate_free <> es_complex, kf, kr)
+    rd = Rule(rd_name, es_complex >> enzyme_free + product, kc)
+
+    # build a set of components that were created
+    components = ComponentSet([rc, rd])
+    if params_created:
+        components |= ComponentSet([kf, kr, kc])
+
+    return components
+
  
-def simple_bind(Sub1, Sub2, klist, site='bf'):
-    """Automation of the Sub1 + Sub2 <> Sub1:Sub2 one-step complex formation. 
-    This function assumes that there is a site named 'bf' which, for simplicity
-    need not be passed. Invokes the bind function using the same name for
-    each site."""
+def simple_bind(s1, s2, site, klist):
+    """Automation of the s1 + s2 <> s1:s2 one-step complex
+    formation.  Invokes the bind function using the same name for each
+    site."""
         
-    bind(Sub1, site, Sub2, site, klist)
-
-inhibit = simple_bind #alias for simplebind
-
+    return bind(s1, site, s2, site, klist)
 
 def multisite_bind_table(bindtable):
     """This assumes that the monomers passed are in their desired state without
@@ -403,63 +527,97 @@ def multisite_bind_table(bindtable):
                 pc += 1
                 rc += 1
 
+def bind_table(bindtable, row_site, col_site):
+    """This assumes that the monomers passed are in their desired state without
+    the sites which will be used for binding.
+    bindtable is a list of lists denoting the reactions between two types of reactants
+    as follows:
 
+    bindtable[0]: [                     reactypeA0,  reactypeA1, ...,  reactypeAN]
+    bindtable[1]: [reactypeB0,  (fwdrate, revrate),            , ...,            ]
+    bindtable[2]: [reactypeB1,                 ,               , ...,            ]
 
-def two_state_equilibrium(sub, state1, state2, klist=None, sitename='loc'):
-    """Create fwd and reverse rules defining a reversible state transition for
-    the monomer given by the MonomerPattern sub from one localization state
-    to another.
+    To indicate that no interaction occurs, simply enter None in the bind table.
 
-    Creates two rules with names following the pattern: 'monomer_state1_to_state2' and vice versa.
-
-    The function generates a rule with the name following the pattern 
-    --  sub is a MonomerPattern specifying the species that translocates. The localization
-        state should not be specified here.
-    --  state1 and state2 are strings specifying the names of the locations
-        (e.g., 'c' for cytoplasmic, 'm' for mitochondrial)
-    --  klist is a list of Parameter objects specifying the forward (state1 to state2)
-        and reverse (state2 to state1) rates. If not specified, the parameters are generated
-        according to the pattern 'sub_state1_to_state2_rate' and 'sub_state2_to_state1_rate'.
-    --  sitename is an optional string specifying the name of the site that describes
-        the location. Defaults to 'loc'.
     """
 
-    # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
-    r_name_fwd = '%s%s_%s_%s_to_%s' % (sub.monomer.name,
-                                       ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
-                                       sitename, state1, state2)
-    r_name_rev = '%s%s_%s_%s_to_%s' % (sub.monomer.name,
-                                       ''.join(filter(lambda a: a != None, sub.site_conditions.values())),
-                                       sitename, state2, state1)
+    # parse the list, extract reactants, products and parameter families
+    #first line is one set of reactants
+    react_cols = bindtable[0]
+    react_rows = [row[0] for row in bindtable[1:]]
+
+    # Notice this makes intrxns indexed by intrxns[row][col]
+    intrxns = [row[1:] for row in bindtable[1:]]
+
+    # loop over interactions
+    pc = 1 # parameter counter
+    rc = 1 # rule counter, easy way of making sure names don't clash #FIXME
+    for i in range(0, len(react_rows)):
+        for j in range(0, len(react_cols)):
+            if intrxns[i][j] is not None:
+                kf, kr = intrxns[i][j]
+                row_mpattern = react_rows[i]()
+                col_mpattern = react_cols[j]()
+                kf_parm = Parameter('bt%d%d_kf' % (i, j), kf)
+                kr_parm = Parameter('bt%d%d_kr' % (i, j), kr)
+
+                bind(react_rows[i](), row_site, react_cols[j](), col_site, [kf_parm, kr_parm])
+
+
+def two_state_equilibrium(s1, s2, klist):
+    """Generate unimolecular reversible equilibrium reaction S1 <-> S2.
+
+    Parameters
+    ----------
+    s1, s2 : Monomer or MonomerPattern
+        S1 and S2 in the above reaction.
+    klist : list of 2 Parameters or list of 2 numbers
+        Forward (S1 -> S2) and reverse rate constants (in that order). If
+        Parameters are passed, they will be used directly in the generated
+        Rules. If numbers are passed, Parameters will be created with
+        automatically generated names based on the names and states of S1 and S2
+        and these parameters will be included at the end of the returned
+        component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains one reversible Rule and optionally
+        two Parameters if klist was given as plain numbers.
+
+    """
     
-    # FIXME: ideally, we should also make sure that the localizations themselves
-    # have been declared, not just the name of the loc site
-    assert sitename in sub.monomer.sites_dict, \
-        "Required site %s not present in %s as required"%(sitename, sub.monomer.name)
+    # turn any Monomers into MonomerPatterns
+    s1 = s1()
+    s2 = s2()
 
-    if (not klist):
-        # Default parameter values
-        # Diffusion limited on rate of 1e6 and offrate of 1e-1 implies 100nM binding
-        # FIXME get rid of these magic numbers!!!! Put in a global setting of some kind
-        kf = Parameter(r_name_fwd + '_rate', DEFAULT_UNI_KF)
-        kr = Parameter(r_name_rev + '_rate', DEFAULT_KR)
-    else: 
+    # generate the rule names
+    # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 
+    s1_name = monomer_pattern_label(s1)
+    s2_name = monomer_pattern_label(s2)
+    r_name = 'equilibrate_%s_%s' % (s1_name, s2_name)
+    
+    if all(isinstance(x, Parameter) for x in klist):
         kf, kr = klist
+        params_created = False
+    elif all(isinstance(x, numbers.Real) for x in klist):
+        # if klist is numbers, generate the Parameters
+        kf = Parameter(r_name + '_kf', klist[0])
+        kr = Parameter(r_name + '_kr', klist[1])
+        params_created = True
+    else:
+        raise ValueError("klist must contain Parameters objects or numbers")
 
-    # create the site conditions for the complex
-    s1tmpdict = sub.site_conditions.copy()
-    s2tmpdict = sub.site_conditions.copy()
- 
-    sub_state1 = sub.monomer(s1tmpdict)
-    sub_state2 = sub.monomer(s2tmpdict)
+    # create the rule
+    r = Rule(r_name, s1 <> s2, kf, kr)
 
-    # specify the localizations for the monomers
-    sub_state1.site_conditions[sitename] = state1
-    sub_state2.site_conditions[sitename] = state2
+    # build a set of components that were created
+    components = ComponentSet([r])
+    if params_created:
+        components |= ComponentSet([kf, kr])
 
-    # now that we have the complex elements formed we can write the first step rule
-    Rule(r_name_fwd, sub_state1 >> sub_state2, kf)
-    Rule(r_name_rev, sub_state2 >> sub_state1, kr)
+    return components
+
    
 def direct_catalysis_reversible(sub, enz, prod, klist=None):
     """Create fwd and reverse rules for catalysis of the form:
@@ -468,15 +626,16 @@ def direct_catalysis_reversible(sub, enz, prod, klist=None):
 
     Creates two rules with names following the pattern: 'cat_sub_to_prod' and 'prod_to_sub'.
 
-    The function generates a rule with the name following the pattern 
-    --  sub is a MonomerPattern specifying the species that is acted upon.
-    --  enz is a MonomerPattern specifying the species that determines the rate of the reaction.
-        NO BINDING OCCURS BETWEEN THE SPECIES.
-    --  prod is a MonomerPattern specifying the state of the sites of sub after catalysis.
-        ANY SITES THAT ARE SPECIFIED IN SUB SHOULD BE SPECIFIED FOR PROD AND VICE VERSA.
-    --  klist is a list of Parameter objects specifying the forward (sub to prod) and
-        reverse (prod to sub) rates. If not specified, the parameters are generated
-        according to the pattern 'cat_sub_to_prod_rate' and 'prod_to_sub_rate'.
+    The function generates a rule with the name following the pattern
+
+    * sub is a MonomerPattern specifying the species that is acted upon.
+    * enz is a MonomerPattern specifying the species that determines the rate of the reaction.
+      NO BINDING OCCURS BETWEEN THE SPECIES.
+    * prod is a MonomerPattern specifying the state of the sites of sub after catalysis.
+      ANY SITES THAT ARE SPECIFIED IN SUB SHOULD BE SPECIFIED FOR PROD AND VICE VERSA.
+    * klist is a list of Parameter objects specifying the forward (sub to prod) and
+      reverse (prod to sub) rates. If not specified, the parameters are generated
+      according to the pattern 'cat_sub_to_prod_rate' and 'prod_to_sub_rate'.
     """
 
     # FIXME: this will fail if the argument passed is a complex, or a Monomer object... 

@@ -6,7 +6,7 @@ import random
 import re
 import sympy
 import numpy as np
-import pygraphviz as pgv
+#import pygraphviz as pgv
 
 ### "PUBLIC" Functions ################################################
 # i.e., functions that are most useful to be called externally
@@ -18,29 +18,29 @@ import pygraphviz as pgv
 #
 # Returns the kasim simulation data as a numpy array, which can be
 # plotted using the plot command.
-def get_kasim_data(model, time=10000, points=1000):
-  outs = run_kasim(model, time, points)
-  return parse_kasim_outfile(outs['out'])
+def run_simulation(model, **kwargs):
+  outs = run_kasim(model, **kwargs)
+  return _parse_kasim_outfile(outs['out'])
 
 
 # Runs Kasim with no simulation events, which generates the influence map,
 # and then displays it using GraphViz (assumes that GraphViz is set up and is the
 # default program for opening .gv files)
-def show_influence_map(model):
-  kasim_dict = run_kasim(model, time=0, points=0)
+def show_influence_map(model, **kwargs):
+  kasim_dict = run_kasim(model, time=0, points=0, **kwargs)
   im_filename = kasim_dict['im']
   open_file(im_filename)
 
 
 # Runs complx with the appropriate arguments for generating the contact map.
 # DOESN'T WORK: WHY???
-def show_contact_map(model):
+def show_contact_map(model, **kwargs):
   gen = KappaGenerator(model, dialect='complx')
   #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
   kappa_filename = '%s.ka' % model.name
   jpg_filename = kappa_filename.replace('.ka', '.jpg')
   args = ['--output-high-res-contact-map-jpg', jpg_filename]
-  run_complx(gen, kappa_filename, args)
+  run_complx(gen, kappa_filename, args, **kwargs)
   open_file(jpg_filename)
 
 
@@ -49,35 +49,35 @@ def show_contact_map(model):
 # Generalized method for passing arguments to the complx executable.
 def run_complx(gen, kappa_filename, args):
   try:
-      kappa_file = open(kappa_filename, 'w')
-      kappa_file.write(gen.get_content())
-      kappa_file.close()
-      cmd = 'complx ' + ' '.join(args) + ' ' + kappa_filename
-      print "Command: " + cmd
-      p = subprocess.Popen(['complx'] + args + [kappa_filename],
+    kappa_file = open(kappa_filename, 'w')
+    kappa_file.write(gen.get_content())
+    kappa_file.close()
+    cmd = 'complx ' + ' '.join(args) + ' ' + kappa_filename
+    print "Command: " + cmd
+    p = subprocess.Popen(['complx'] + args + [kappa_filename],
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      #p.communicate()
-      p.wait()
+    #p.communicate()
+    p.wait()
 
-      if p.returncode:
-          #raise Exception(p.stdout.read())
-          raise Exception(p.stderr.read())
+    if p.returncode:
+      #raise Exception(p.stdout.read())
+      raise Exception(p.stderr.read())
 
       #contact_map = pgv.AGraph(dot_filename)
       #contact_map.layout()
       #contact_map.draw(kappa_filename.replace('.ka', '.png'))
   except Exception as e:
-      raise Exception("problem running complx: " + str(e))
-
-
-
+    raise Exception("problem running complx: " + str(e))
 
 
 # Runs kasim, which
-def run_kasim(model, time=10000, points=200):
+def run_kasim(model, time=10000, points=200, output_dir='.'):
   gen = KappaGenerator(model)
   #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
-  kappa_filename = '%s.ka' % model.name
+
+  kappa_filename = '%s/%s_%d_%d_temp.ka' % (output_dir,
+                        model.name, os.getpid(), random.randint(0, 10000))
+    
   im_filename = kappa_filename.replace('.ka', '_im.gv')
   fm_filename = kappa_filename.replace('.ka', '_fm.gv')
   out_filename = kappa_filename.replace('.ka', '.out')
@@ -86,22 +86,26 @@ def run_kasim(model, time=10000, points=200):
           '-o', out_filename, '-im', im_filename, '-flux', fm_filename]
 
   try:
-      kappa_file = open(kappa_filename, 'w')
-      kappa_file.write(gen.get_content())
-      kappa_file.close()
-      p = subprocess.Popen(['KaSim'] + args)
+    kappa_file = open(kappa_filename, 'w')
+    kappa_file.write(gen.get_content())
+    kappa_file.close()
+    # FIXME
+    print "Running kasim"
+    p = subprocess.Popen(['KaSim'] + args)
                             #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-      p.communicate()
+    p.communicate()
 
-      if p.returncode:
-          raise Exception(p.stdout.read())
+    if p.returncode:
+      raise Exception(p.stdout.read())
 
   except Exception as e:
-      raise Exception("problem running KaSim: " + str(e))
+    raise Exception("problem running KaSim: " + str(e))
   #finally:
-      #for filename in [kappa_filename, dot_filename]:
-      #    if os.access(filename, os.F_OK):
-      #        os.unlink(filename)
+    #if cleanup:
+    #  for filename in [kappa_filename, im_filename,
+    #                   fm_filename, out_filename]:
+    #    if os.access(filename, os.F_OK):
+    #      os.unlink(filename)
 
   output_dict = {'out':out_filename, 'im':im_filename, 'fm':'flux.dot'}
   return output_dict
@@ -109,8 +113,8 @@ def run_kasim(model, time=10000, points=200):
 # end run_kasim
 
 
-# Parses the outputfile produced by kasim, which has the form
-def parse_kasim_outfile(out_filename):
+# Parses the outputfile produced by kasim
+def _parse_kasim_outfile(out_filename):
   try:
     out_file = open(out_filename, 'r')
 
@@ -141,14 +145,14 @@ def parse_kasim_outfile(out_filename):
 # Utility function for opening files for display (jpg, gv, dot, etc.)
 def open_file(filename):
   try:
-      p = subprocess.Popen(['open'] + [filename],
+    p = subprocess.Popen(['open'] + [filename],
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      #p.communicate()
-      p.wait()
-      if p.returncode:
-          raise Exception(p.stderr.read())
+    #p.communicate()
+    p.wait()
+    if p.returncode:
+      raise Exception(p.stderr.read())
   except Exception as e:
-      raise Exception("Problem opening file: ", e)
+    raise Exception("Problem opening file: ", e)
 
 
 # DEPRECATED! Since Kasim always generates the flux and influence maps when run

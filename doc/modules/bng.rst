@@ -1,4 +1,5 @@
 BioNetGen integration
 =====================
 
-.. module:: pysb.bng
+.. automodule:: pysb.bng
+    :members:
