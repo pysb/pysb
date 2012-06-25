@@ -9,16 +9,74 @@ DEFAULT_BI_KF = 1e-4 # In units of nM^-1 sec^-1
 DEFAULT_KR = 0.1     # In units of sec^-1
 DEFAULT_KC = 1       # In units of sec^-1
 
+
 def complex_pattern_label(cp):
     """Return a string label for a ComplexPattern."""
     mp_labels = [monomer_pattern_label(mp) for mp in cp.monomer_patterns]
     return ''.join(mp_labels)
-        
+
 # TODO: Check to make sure it's a monomer
 def monomer_pattern_label(mp):
     """Return a reasonable string label for a MonomerPattern."""
     site_values = [str(x) for x in mp.site_conditions.values() if x is not None]
     return mp.monomer.name + ''.join(site_values)
+
+def _macro_rule(rule_basename, rule_expression, klist):
+    """
+    TODO: Write comment
+    """
+
+    # Get reactant pattern
+    react_p = rule_expression.reactant_pattern
+    prod_p = rule_expression.product_pattern
+    # Build the rule_name
+    lhs_label = [complex_pattern_label(cp) for cp in react_p.complex_patterns]
+    print lhs_label
+    lhs_label = '_'.join(lhs_label)
+    print lhs_label
+    rhs_label = [complex_pattern_label(cp) for cp in prod_p.complex_patterns]
+    print rhs_label
+    rhs_label = '_'.join(rhs_label)
+    print rhs_label
+    r_name = '%s_%s_to_%s' % (rule_basename, lhs_label, rhs_label)
+
+    # If rule is unidirectional, make sure we only have one parameter
+    if (not rule_expression.is_reversible):
+        if len(klist) != 1:
+            raise ValueError("A unidirectional rule must have one parameter.")
+    # If rule is bidirectional, make sure we have two parameters
+    else:
+        if len(klist) != 2:
+            raise ValueError("A bidirectional rule must have two parameters.")
+
+    if all(isinstance(x, Parameter) for x in klist):
+        k1 = klist[0]
+        if rule_expression.is_reversible:
+            k2 = klist[1]
+        params_created = ComponentSet([])
+    # if klist is numbers, generate the Parameters
+    elif (isinstance(klist, dict) and
+         all(isinstance(x, str) for x in klist.keys()) and
+         all(isinstance(x, numbers.Real) for x in klist.values())):
+        k1 = Parameter('%s_%s' % (r_name, klist.keys()[0]), klist.values()[0])
+        params_created = ComponentSet([k1]) 
+        if rule_expression.is_reversible:
+            k2 = Parameter('%s_%s' % (r_name, klist.keys()[1]),
+                           klist.values()[1])
+            params_created |= ComponentSet([k2])
+    else:
+        raise ValueError("klist must contain Parameter objects or " +
+            "a dict of names and numbers")
+
+    if rule_expression.is_reversible:
+        r = Rule(r_name, rule_expression, k1, k2)
+    else:
+        r = Rule(r_name, rule_expression, k1)
+
+    # Build a set of components that were created
+    return ComponentSet([r]) | params_created
+
+
 
 ## Unimolecular patterns
 def two_state_equilibrium(s1, s2, klist):
@@ -281,54 +339,8 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     return components
 
-def _macro_rule(rule_base_name, rule_expression, klist, knames):
-    # Get reactant pattern
-    react_p = rule_expression.reactant_pattern
-    prod_p = rule_expression.product_pattern
-    # Build the rule_name
-    lhs_label = [complex_pattern_label(cp) for cp in react_p.complex_patterns]
-    lhs_label = '_'.join(lhs_label)
-    rhs_label = [complex_pattern_label(cp) for cp in prod_p.complex_patterns]
-    rhs_label = '_'.join(lhs_label)
-    r_name = '%s_%s_to_%s' % (rule_base_name, lhs_label, rhs_label)
-
-    # If rule is unidirectional, make sure we only have one parameter
-    if (not rule_expression.is_reversible):
-        if not (len(klist) == 1 and len(knames) == 1):
-            raise ValueError("A unidirectional rule must have one parameter.")
-    # If rule is bidirectional, make sure we have two parameters
-    else:
-        if not (len(klist) == 2 and len(knames) == 2):
-            raise ValueError("A bidirectional rule must have two parameters.")
-
-    if all(isinstance(x, Parameter) for x in klist):
-        k1 = klist[0]
-        if rule_expression.is_reversible:
-            k2 = klist[1]
-        params_created = ComponentSet([])
-    # if klist is numbers, generate the Parameters
-    elif all(isinstance(x, numbers.Real) for x in klist):
-        k1 = Parameter(r_name + knames[0], klist[0])
-        params_created = ComponentSet([k1]) 
-        if rule_expression.is_reversible:
-            k2 = Parameter(r_name + knames[1], klist[1])
-            params_created |= ComponentSet([k2])
-    else:
-        raise ValueError("klist must contain Parameters objects or numbers")
-
-    if rule_expression.is_reversible:
-        r = Rule(r_name, rule_expression, k1, k2)
-    else:
-        r = Rule(r_name, rule_expression, k1)
-
-    # Build a set of components that were created
-    return ComponentSet([r]) | params_created
 
 """
-rx1, rx2, prod1, prod2
-"str_rx1_rx2_to_prod1_prod2"
-
-
 catalyze(e, e_site, s, s_site, prod, klist)
     convert all to MPs by apply(label, monomers)
     check s_site on s, e_site on e
@@ -336,14 +348,6 @@ catalyze(e, e_site, s, s_site, prod, klist)
     for each rulepattern
         comps += macro_me(basename, rulepattern?)
     return comps 
-
-def macro_me(basename, rule):
-    iterate over mps, generate names for each
-    generate r_name from basename and mp.monomer.names
-    do param creation by iterating over klist, with passed name
-    Rule!
-    return created components   
-    
 """
 
 
