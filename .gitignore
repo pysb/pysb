@@ -1,4 +1,6 @@
 *~
+.DS_Store
+*.swp
 *.pyc
 parser.out
 bng_files/*
@@ -7,3 +9,4 @@ dist/*
 doc/_build
 MANIFEST
 RELEASE-VERSION
+.idea
