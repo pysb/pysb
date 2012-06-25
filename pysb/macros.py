@@ -107,7 +107,7 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes):
         k1 = klist[0]
         if rule_expression.is_reversible:
             k2 = klist[1]
-        params_created = ComponentSet([])
+        params_created = ComponentSet()
     # if klist is numbers, generate the Parameters
     elif all(isinstance(x, numbers.Real) for x in klist):
         k1 = Parameter('%s_%s' % (r_name, ksuffixes[0]), klist[0])
@@ -219,46 +219,33 @@ def bind(s1, site1, s2, site2, klist):
                        s1({site1: 1}) % s2({site2: 1}),
                        klist, ['kf', 'kr'])
 
-#TODO: Refactor
+#TODO: Docstring
 def bind_table(bindtable, row_site, col_site):
     """This assumes that the monomers passed are in their desired state without
     the sites which will be used for binding.
-    bindtable is a list of lists denoting the reactions between two types of
-    reactants as follows:
 
-    bindtable[0]: [                     reactypeA0,  ...,  reactypeAN]
-    bindtable[1]: [reactypeB0,  (fwdrate, revrate),  ...,            ]
-    bindtable[2]: [reactypeB1,                 ,     ...,            ]
+        bindtable[0]: [          B1, ...,     Bn]
+        bindtable[1]: [A1, (kf, kr), ...,  (...)]
+        ...
+        bindtable[n]: [An,     None, ...,  (...)]
 
     To indicate that no interaction occurs, simply enter None in the bind table.
     """
 
-    # TODO return created components
-    # TODO handle parameter objects and numbers
-    # TODO full comments
-
-    # parse the list, extract reactants, products and parameter families
-    #first line is one set of reactants
-    react_cols = bindtable[0]
-    react_rows = [row[0] for row in bindtable[1:]]
-
-    # Notice this makes intrxns indexed by intrxns[row][col]
-    intrxns = [row[1:] for row in bindtable[1:]]
+    # extract species lists and matrix of rates
+    s_rows = [row[0] for row in bindtable[1:]]
+    s_cols = bindtable[0]
+    kmatrix = [row[1:] for row in bindtable[1:]]
 
     # loop over interactions
-    pc = 1 # parameter counter
-    rc = 1 # rule counter, easy way of making sure names don't clash #FIXME
-    for i in range(0, len(react_rows)):
-        for j in range(0, len(react_cols)):
-            if intrxns[i][j] is not None:
-                kf, kr = intrxns[i][j]
-                row_mpattern = react_rows[i]()
-                col_mpattern = react_cols[j]()
-                kf_parm = Parameter('bt%d%d_kf' % (i, j), kf)
-                kr_parm = Parameter('bt%d%d_kr' % (i, j), kr)
+    components = ComponentSet()
+    for r, s_row in enumerate(s_rows):
+        for c, s_col in enumerate(s_cols):
+            if kmatrix[r][c] is not None:
+                components |= bind(s_row(), row_site, s_col(), col_site,
+                                   kmatrix[r][c])
 
-                bind(react_rows[i](), row_site, react_cols[j](), col_site,
-                     [kf_parm, kr_parm])
+    return components
 
 ## Catalysis
 def catalyze(enzyme, e_site, substrate, s_site, product, klist):
