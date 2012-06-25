@@ -16,6 +16,7 @@ Contents:
    tutorial
    modules/index
    internals
+   glossary
    about
 
 Indices and tables

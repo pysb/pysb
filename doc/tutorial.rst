@@ -1,5 +1,3 @@
-.. _BioNetGen: http://bionetgen.org/index.php/Documentation
-.. _Kappa: http://www.kappalanguage.org/documentation
 
 ==========
  Tutorial
@@ -63,6 +61,47 @@ The key components that every model in PySB needs are:
   separate instances of monomers, interact as prescribed by the
   parameters involved in a given rule.
 
+For what follows we will use an example taken from our work in
+`extrinsic apoptosis signaling`_. In this work the initiator caspases,
+activated by an upstream signal, play an essential role activating the
+effector Bcl-2 proteins downstream. Caspase-8, a representative
+initiator caspase, and Bid, a representative effector BH3 protein,
+bind to create a complex. Caspase-8 then cleaves the protein Bid to
+create truncated Bid. This is usually considered a two-step process as
+follows: ::
+
+            kf
+   C8 + Bid ↔ C8:Bid
+            kr
+
+          kc
+   C8:Bid → C8 + tBid
+
+Where tBid is the truncated Bid. The parameters *kf*, *kr*, and *kc*
+represent the forward, reverse, and catalytic rates that dictate the
+consumption of Bid via catalysis by C8 and the formation of tBid. For
+completeness we write the ODEs that represent this system below: ::
+
+   d[C8]/dt     = -kf*[C8]*[Bid] + kr*[C8:Bid] + kc*[C8:Bid]
+   d[Bid]/dt    = -kf*[C8]*[Bid] + kr*[C8:Bid]
+   d[C8:Bid]/dt =  kf*[C8]*[Bid] - kr*[C8:Bid] - kc*[C8:Bid]
+   dt[tBid]/dt  =  kc*[C8:Bid] 
+   
+The species names in square braces represent concentrations, usually
+give in molar (M) and time in seconds. These ordinary differential
+equations (ODEs) are then integrated numerically to obtain the
+evolution of the system over time. As shown, the parameters are needed
+to instantiate the equations but the manner in which the parameters
+influence the concentration changes in each chemical *species* (the
+terms on the left of the equations) is determined by the manner in
+which the chemical equations are written. We term this connectivity
+between chemical species as the system *topology*. This *topology*
+along with a number of parameters, dictates the output of a given
+model. The connectivity between the chemical reactants specify the
+manner in which the equations are written. We will explore how one
+could instantiate a model, add different actions to the model, and
+create multiple instances of a model *without* having to resort to the
+tedious and repetitive writing of equations as those listed above.
 
 The Empty Model
 ===============
@@ -147,10 +186,10 @@ Run the *ipython* (or *python*) interpreter with no arguments to enter
 interactive mode (be sure to do this from the same directory where
 you've saved :file:`mymodel.py`) and run the following code::
 
-    >>> from mymodel import model
-    >>> for m in model.monomers:
-    ...     print m
-    ... 
+   >>> from mymodel import model
+   >>> for m in model.monomers:
+   ...     print m
+   ... 
 
 You should see the following output::
 
@@ -185,38 +224,69 @@ using the keyword ``Parameter`` followed by its name and value. Here
 is how you would define a parameter named 'kf1' with the value
 :math:`4 \times 10^{-7}`::
 
-    Parameter('kf1', 4e-7)
+    Parameter('kf1', 4.0e-7)
 
 The second argument may be any numeric expression, but best practice
 is to use a floating-point literal in scientific notation as shown in
-the example above. In our example with Caspase-8 and Bid, the
-initiator caspase binds Bid and cleaves the protein to create
-truncated Bid. This is usually considered a two-step process as
-follows: ::
+the example above. For our model we will need three parameters, one
+each for the forward, reverse, and catalytic reactions in our
+system. Go to your :file:`mymodel.py` file and add the lines
+corresponding to the parameters so that your file looks like this::
 
-             kf
-   C8 + Bid <--> C8:Bid
-             kr
+   from pysb import *
 
-          kc
-   C8:Bid --> C8 + tBid
+   Model()
 
-Where tBid is the truncated Bid. The parameters *kf*, *kr*, and *kc*
-represent the forward, reverse, and catalytic rates that dictate the
-consumption of Bid via catalysis by C8 and the formation of tBid. For
-completeness we write the ODEs that represent this system below: ::
+   Monomer('C8', ['b'])
+   Monomer('Bid', ['b', 'S'])
 
-   dC8/dt     = -kf*[C8]*[Bid] + kr*[C8:Bid] + kc*[C8:Bid]
-   dBid/dt    = -kf*[C8]*[Bid] + kr*[C8:Bid]
-   dC8:Bid/dt =  kf*[C8]*[Bid] - kr*[C8:Bid] - kc*[C8:Bid]
+   Parameter('kf', 1.04e-06)
+   Parameter('kr', 1.04e-06)
+   Parameter('kc', 1.04e-06)
 
-   
+Once this is done start the *ipython* (or *python*) intepreter and
+enter the following commands:: 
+
+   >>> from mymodel import model
+   >>> model.parameters
+and you should get an output such as::
+
+   {'kf': Parameter(name='kf', value=1.04e-06),
+    'kr': Parameter(name='kr', value=1.04e-06),
+    'kc': Parameter(name='kc', value=1.04e-06)}
+
+Your model now has monomers and parameters specified. In the next
+section we will specify rules, which specify the interaction between
+monomers and parameters. 
 
 Rules
 =====
 
-Compartments
-============
+Rules, as described in this section, comprise the basic elements of
+procedural instructions that encode biochemical interactions. In its
+simplest form a rule is a chemical reaction that can be made general
+to a range of monomer states or very specific to only one kind of
+monomer in one kind of state. We follow the style for writing rules as
+described in `BioNetGen`_ but the style proposed by `Kappa`_ is quite
+similar with only some differences related to the implementation
+details (e.g. mass-action vs. stochastic simulations, compartments or
+no compartments, etc). We will write two rules to represent the
+interaction between the reactants and the products in a two-step
+manner as described in the `Basic rule-based modeling and PySB`_
+section. 
+
+The general pattern for a rule is::
+
+   Rule('{
+
+
+The first rule for our example, corresponding to the first reaction, will be
+as follows::
+
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <>
+                       C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
+
+
 
 Initial conditions
 ==================
@@ -224,12 +294,16 @@ Initial conditions
 Observables
 ===========
 
-
 Simulation and analysis
 =======================
 
 Higher-order rules
 ==================
+
+Compartments
+============
+
+
 
 .. rubric:: Footnotes
 
@@ -245,3 +319,9 @@ Higher-order rules
 .. [#mkw] The astute Python programmer will recognize this as the
    ``repr`` of the monomer object, using keyword arguments in the
    constructor call.
+
+.. _BioNetGen: http://bionetgen.org/index.php/Documentation
+
+.. _Kappa: http://www.kappalanguage.org/documentation
+
+.. _extrinsic apoptosis signaling: http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.0060299
