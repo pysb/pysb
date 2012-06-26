@@ -68,24 +68,23 @@ effector Bcl-2 proteins downstream. Caspase-8, a representative
 initiator caspase, and Bid, a representative effector BH3 protein,
 bind to create a complex. Caspase-8 then cleaves the protein Bid to
 create truncated Bid. This is usually considered a two-step process as
-follows: ::
+follows.
 
-            kf
-   C8 + Bid ↔ C8:Bid   <--- Complex formation step
-            kr
-
-          kc
-   C8:Bid → C8 + tBid  <--- Complex dissociation step
+.. math::
+   C8 + Bid \underset{kr}{\overset{kf}{\leftrightharpoons}} C8:Bid \quad {\longleftarrow \mbox{Complex formation step}} \\
+   C8:Bid \overset{kc}{\rightarrow} C8 + tBid \quad {\longleftarrow \mbox{Complex dissociation step}}
 
 Where tBid is the truncated Bid. The parameters *kf*, *kr*, and *kc*
 represent the forward, reverse, and catalytic rates that dictate the
 consumption of Bid via catalysis by C8 and the formation of tBid. For
-completeness we write the ODEs that represent this system below: ::
+completeness we write the ODEs that represent this system below:
 
-   d[C8]/dt     = -kf*[C8]*[Bid] + kr*[C8:Bid] + kc*[C8:Bid]
-   d[Bid]/dt    = -kf*[C8]*[Bid] + kr*[C8:Bid]
-   d[C8:Bid]/dt =  kf*[C8]*[Bid] - kr*[C8:Bid] - kc*[C8:Bid]
-   dt[tBid]/dt  =  kc*[C8:Bid] 
+.. math::
+   \frac{d[C8]}{dt}     &= -kf[C8]*[Bid] + kr*[C8:Bid] + kc*[C8:Bid] \\
+   \frac{d[Bid]}{dt}    &= -kf*[C8]*[Bid] + kr*[C8:Bid] \\
+   \frac{d[C8:Bid]}{dt} &=  kf*[C8]*[Bid] - kr*[C8:Bid] - kc*[C8:Bid] \\
+   \frac{dt[tBid]}{dt}  &=  kc*[C8:Bid] 
+   :label: ODEs
    
 The species names in square braces represent concentrations, usually
 give in molar (M) and time in seconds. These ordinary differential
@@ -259,6 +258,19 @@ Your model now has monomers and parameters specified. In the next
 section we will specify rules, which specify the interaction between
 monomers and parameters. 
 
+.. Warning:: 
+
+   PySB or the integrators that we suggest for use for numerical
+   manipulation do not keep track of units for the user. As such, the
+   user is responsible for keeping track of the model in units that
+   make sense to the user! For example, the forward rates are
+   typically in :math:`M^{-1}s^{-1}`, the reverse rates in :math:`s^{-1}`, and the catalytic rates
+   in :math:`s^{-1}`. For the present examples we have chosen to work in a volume
+   size of :math`1.0 pL` corresponding to the volume of a cell and to specify
+   the Parameters and `Initial conditions`_ in numbers of molecules
+   per cell. If you wish to change the units you must change *all* the
+   parameter values accordingly.
+
 Rules
 =====
 
@@ -400,19 +412,107 @@ and *Bid* so we need to specify their initial concentrations. To do
 this we enter the following lines of code into the :file:`mymodel.py`
 file::
 
-   Initial(C8(b=None), 1000)
-   Initial(Bid(b=None, S='u'), 10000)
+   Parameter('C8_0', 1000)
+   Parameter('Bid_0', 10000)
+   Initial(C8(b=None), C8_0)
+   Initial(Bid(b=None, S='u'), Bid_0)
 
-
-
+A parameter object must be declared to specify the initial condition
+rather than just giving a value as shown above. Once the parameter
+object is declared (i.e. *C8_0* and *Bid_0*) it can be fed to the
+*Initial* definition. Now that we have specified the initial
+conditions we are basically ready to run simulations. We will add an
+*observables* call in the next section prior to running the
+simulation.
 
 Observables
 ===========
 
+In our model we have two initial species (*C8* and *Bid*) and one
+output species (*tBid*). As shown in the :eq:`ODEs` derived from the
+reactions above, there are four mathematical species needed to
+describe the evolution of the system (i.e. *C8*, *Bid*, *tBid*, and
+*C8:Bid*). Although this system is rather small, there are situations
+when we will have many more species than we care to monitor or
+characterize throughout the time evolution of the :eq:`ODEs`. In
+addition, it will often happen that the desirable species are
+combinations or sums of many other species. For this reason the
+rules-based engines we currently employ implemented the *Observables*
+call which automatically collects the necessary information and
+returns the desired species. In our case, we will monitor the amount
+of free *C8*, unbound *Bid*, and active *tBid*. To specify the
+observables enter the following lines in your :file:`mymodel.py` file
+as follows::
+
+   Observable('C8', C8(b=None))
+   Observable('Bid', Bid(b=None, S='u')
+   Observable('tBid', Bid(b=None, S='t')
+
+As shown,the observable can be a species. As we will show later the
+observable can also contain wild-cards and given the "don't care don't
+write" approach to rule-writing it can be a very powerful approach to
+observe activated complexes.  
+
 Simulation and analysis
 =======================
+By now your :file:`mymodel.py` file should look something like this::
 
-Higher-order rules
+   from pysb import *
+
+   Model()
+
+   Monomer('C8', ['b'])
+   Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
+
+   Parameter('kf', 1.04e-06)
+   Parameter('kr', 1.04e-06)
+   Parameter('kc', 1.04e-06)
+
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
+   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc)
+   
+   Parameter('C8_0', 1000)
+   Parameter('Bid_0', 10000)
+   Initial(C8(b=None), C8_0)
+   Initial(Bid(b=None, S='u'), Bid_0)
+
+   Observable('obsC8', C8(b=None))
+   Observable('obsBid', Bid(b=None, S='u'))
+   Observable('obstBid', Bid(b=None, S='t'))
+
+You can use a few commands to check that your model is defined
+properly. Start your *ipython* (or *python*) interpreter and enter the
+commands as shown below. Your output should be similar to the shown
+output::
+
+   >>> from mymodel4 import model
+   >>> model.monomers
+   {'C8': Monomer(name='C8', sites=['b'], site_states={}),
+    'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
+   >>> model.parameters
+   {'kf': Parameter(name='kf', value=1.04e-06),
+    'kr': Parameter(name='kr', value=1.04e-06),
+    'kc': Parameter(name='kc', value=1.04e-06),
+    'C8_0': Parameter(name='C8_0', value=1000),
+    'Bid_0': Parameter(name='Bid_0', value=10000)}
+   >>> model.observables
+   {'obsC8': <pysb.core.Observable object at 0x104b2c4d0>,
+    'obsBid': <pysb.core.Observable object at 0x104b2c5d0>,
+    'obstBid': <pysb.core.Observable object at 0x104b2c6d0>}
+   >>> model.initial_conditions
+   [(C8(b=None), Parameter(name='C8_0', value=1000)), (Bid(b=None, S=u), Parameter(name='Bid_0', value=10000))]
+   >>> model.rules
+   {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
+   Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
+   rate_forward=Parameter(name='kf', value=1.04e-06),    rate_reverse=Parameter(name='kr', value=1.04e-06)),
+    'tBid_from_C8Bid': Rule(name='tBid_from_C8Bid', reactants=C8(b=1)
+    % Bid(b=1, S=u), products=C8(b=None) + Bid(b=None, S=t),    rate_forward=Parameter(name='kc', value=1.04e-06))}
+
+With this we are now ready to run a simulation! We will use the
+following commands to run the simulation. 
+
+
+higher-order rules
 ==================
 
 Compartments
