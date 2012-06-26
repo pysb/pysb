@@ -4,7 +4,7 @@ import pysb.core
 from pysb.core import ComponentSet
 import numbers
 
-__all__ = ['two_state_equilibrium',
+__all__ = ['equilibrate',
            'bind', 'bind_table',
            'catalyze', 'catalyze_state', 'catalyze_table',
            'catalyze_one_step', 'catalyze_one_step_reversible',
@@ -155,7 +155,7 @@ def _verify_sites(m, *site_list):
     return True
 
 ## Unimolecular patterns
-def two_state_equilibrium(s1, s2, klist):
+def equilibrate(s1, s2, klist):
     """Generate the unimolecular reversible equilibrium reaction S1 <-> S2.
 
     Parameters
@@ -511,6 +511,7 @@ def pore_species(subunit, site1, site2, size):
     return pore
 
 # TODO: Refactor
+# TODO: Klist should be size - 1
 def assemble_pore_sequential(subunit, site1, site2, size, klist):
     """
     Generate rules to chain identical MonomerPatterns <Subunit> into
@@ -566,6 +567,7 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
     csource = csource()
     cdest = cdest()
 
+    # TODO: Check the right sites, and check all
     # verify that sites are valid
     if sc_site not in csource.monomer.sites_dict:
         raise ValueError("sc_site '%s' not present in csource '%s'" %
@@ -602,4 +604,8 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         Rule(rc_name, pore + csource({c_site: None}) <> sc_complex,
              *rule_rates[0:2])
         Rule(rd_name, sc_complex >> pore + cdest({c_site: None}), rule_rates[2])
-   
+
+    # TODO: Add returned components
+
+
+
