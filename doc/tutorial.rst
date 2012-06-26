@@ -71,11 +71,11 @@ create truncated Bid. This is usually considered a two-step process as
 follows: ::
 
             kf
-   C8 + Bid ↔ C8:Bid
+   C8 + Bid ↔ C8:Bid   <--- Complex formation step
             kr
 
           kc
-   C8:Bid → C8 + tBid
+   C8:Bid → C8 + tBid  <--- Complex dissociation step
 
 Where tBid is the truncated Bid. The parameters *kf*, *kr*, and *kc*
 represent the forward, reverse, and catalytic rates that dictate the
@@ -275,21 +275,136 @@ interaction between the reactants and the products in a two-step
 manner as described in the `Basic rule-based modeling and PySB`_
 section. 
 
-The general pattern for a rule is::
+The general pattern for a rule consists of the statement *Rule* and in
+parenthesis a series of statements separated by commas, namely the
+rule name (string), the rule interactions, and the rule
+parameters. The rule interactions make use of the following
+operators::
+   *+* operator to represent complexation 
+   *<>* operator to represent backward/forward reaction
+   *>>* operator to represent forward-only reaction
+   *%* operator to represent a binding interaction between two species
 
-   Rule('{
+To illustrate the use of the operators and the rule syntax we write
+the complex formation reaction with labels illustrating the parts of
+the rule::
 
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
+	     |              |     |           |         |     |    |     |           |
+             |              |     |           |         |     |    |     |          parameter list
+	     |              |     |           |         |     |    |     |
+	     |              |     |           |         |     |    |    Whenbound species
+	     |              |     |           |         |     |    |
+	     |		    |     |           |         |     |   binding operator
+	     |              |     |           |         |     |
+	     |              |     |           |         |    bound species
+	     |              |     |           |         |
+	     |		    |     |           |        forward/backward operator
+	     |              |     |           |
+	     |		    |     |          unbound species
+	     |              |     |
+	     |		    |    complexation / addition operator
+	     |              |
+	     |		   unbound species
+	    rule name
 
-The first rule for our example, corresponding to the first reaction, will be
-as follows::
+The *rule name* can be any string and should be enclosed in single (')
+or double (") quotation marks. The species are *instances* of the
+mononmers in a specific state. In this case we are requiring that *C8*
+and *Bid* are both unbound, as we would not want any binding to occur
+with species that are previously bound. The *complexation* or
+*addition* operator tells the program that the two species are being
+added, that is, undergoing a transition, to form a new species as
+specified on the right side of the rule. The forward/backward
+operator states that the reaction is reversible. Finally the *binding*
+operator indicates that there is a bond formed between two or more
+species. This is indicated by the matching integer (in this case *1*)
+in the bonding site of both species along with the *binding*
+operator. If a non-reversible rule is desired, then the *forward-only*
+operator can be relplaced for the *forward/backward* operator. 
 
-   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <>
-                       C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
+In order to actually change the state of the Bid protein we must now
+edit the monomer so that have an acutal state site as follows::
 
+   Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
 
+Having added the state site we can now further specify the state of
+the Bid protein whe it undergoes rule-based interactions and
+explicitly indicate the changes of the protein state.  
+
+With this state site added, we can now go ahead and write the rules
+that will account for the binding step and the unbinding step as
+follows::
+
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') <>C8(b=1) % Bid(b=1, S='u'), *[kf, kr])
+   Rule('tBid_from_C8-Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) % Bid(b=None, S='t'), kc)
+
+As shown, the initial reactants, *C8* and *Bid* initially in the
+unbound state and, for Bid, in the 'u' state, undergo a complexation
+reaction and further a dissociation reaction to return the original
+*C8* protein and the *Bid* protein but now in the 't' state,
+indicating its truncation. Make these additions to your
+:file:`mymodel.py` file. After you are done, your file should look
+like this::
+
+   from pysb import *
+
+   Model()
+
+   Monomer('C8', ['b'])
+   Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
+
+   Parameter('kf', 1.04e-06)
+   Parameter('kr', 1.04e-06)
+   Parameter('kc', 1.04e-06)
+
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
+   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc)
+
+Once you are done editing your file, start your *ipython* (or
+*python*) interpreter and type the commands at the prompts below. Once
+you load your model you should be able to probe and check that you
+have the correct monomers, parameters, and rules. Your output should
+be very similar to the one presented.::
+
+   >>> from mymodel import model
+   >>> model.monomers
+   {'C8': Monomer(name='C8', sites=['b'], site_states={}),
+   'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
+   >>> model.parameters
+   {'kf': Parameter(name='kf', value=1.04e-06),
+    'kr': Parameter(name='kr', value=1.04e-06),
+    'kc': Parameter(name='kc', value=1.04e-06)}
+   >>> model.rules
+   {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
+   Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
+   rate_forward=Parameter(name='kf', value=1.04e-06),
+   rate_reverse=Parameter(name='kr', value=1.04e-06)),
+   'tBid_from_C8Bid': Rule(name='tBid_from_C8Bid', reactants=C8(b=1) %
+   Bid(b=1, S=u), products=C8(b=None) + Bid(b=None, S=t),
+   rate_forward=Parameter(name='kc', value=1.04e-06))}
+
+With this we are almost ready to run a simulation, all we need now is
+to specify the initial conditions of the system.
 
 Initial conditions
 ==================
+Having specified the *monomers*, the *parameters* and the *rules* we
+have the basics of what is needed to generate a set of ODEs and run a
+model. From a mathematical perspective a system of ODEs can only be
+solved if a bound is placed on the ODEs for integration. In our case,
+these bounds are the initial conditions of the system that indicate
+how much non-zero initial species are present at time *t=0s* in the
+system. In our system, we only have two initial species, namely *C8*
+and *Bid* so we need to specify their initial concentrations. To do
+this we enter the following lines of code into the :file:`mymodel.py`
+file::
+
+   Initial(C8(b=None), 1000)
+   Initial(Bid(b=None, S='u'), 10000)
+
+
+
 
 Observables
 ===========
