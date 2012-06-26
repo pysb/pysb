@@ -487,14 +487,35 @@ def synthesize_and_degrade_table():
     pass
 
 ## Pore assembly
-# TODO: Refactor
 def pore_species(subunit, site1, site2, size):
-    """
-    Generate a single species representing a homomeric pore, composed
-    of <size> copies of <Subunit> bound together in a ring, with bonds
-    formed between <site1> of one unit and <site2> of the next.
-    """
+    """Return a MonomerPattern representing a circular homomeric pore.
 
+    Parameters
+    ----------
+    subunit : Monomer or MonomerPattern
+        The subunit of which the pore is composed.
+    site1, site2 : string
+        The names of the sites where one copy of subunit binds to the next.
+    size : integer
+        The number of subunits in the pore.
+
+    Returns
+    -------
+    A MonomerPattern corresponding to the pore.
+
+    Notes
+    -----
+    At sizes 1 and 2 the ring is not closed, i.e. there is one site1
+    and one site2 which remain unbound. At size 3 and up the ring is
+    closed and all site1 sites are bound to a site2.
+
+    Examples
+    --------
+        Model()
+        Monomer('Unit', ['p1', 'p2'])
+        pore_tetramer = pore_species(Unit, 'p1', 'p2', 4)
+    """
+    _verify_sites(subunit, site1, site2)
     if size <= 0:
         raise ValueError("size must be an integer greater than 0")
     if size == 1:
