@@ -288,7 +288,7 @@ the rule::
 	     |              |     |           |         |     |    |     |             |
              |              |     |           |         |     |    |     |            parameter list
 	     |              |     |           |         |     |    |     |
-	     |              |     |           |         |     |    |    Whenbound species
+	     |              |     |           |         |     |    |    bound species
 	     |              |     |           |         |     |    |
 	     |		    |     |           |         |     |   binding operator
 	     |              |     |           |         |     |
