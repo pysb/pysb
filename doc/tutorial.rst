@@ -2,7 +2,7 @@
  Tutorial
 ==========
 
-This tutorial will walk you through the creation of your first **Pysb**
+This tutorial will walk you through the creation of your first **PySB**
 model. It will cover the basics, provide a guide through the different
 programming constructs and finally deal with more complex
 rule-building. Users should be able to write simple programs and
@@ -18,9 +18,9 @@ as well.
    useful.
 
 .. warning:: A basic understanding of the Python programming language
-   is essential for the use of **Pysb**. Although the user can go through
-   this tutorial and develop an understanding of the **Pysb** tools,
-   advanced programming with **Pysb** will require understanding of
+   is essential for the use of **PySB**. Although the user can go through
+   this tutorial and develop an understanding of the **PySB** tools,
+   advanced programming with **PySB** will require understanding of
    Python. Some useful tutorials/guides include the `Official Python
    Tutorial <http://docs.python.org/tutorial/>`_, `Dive into Python
    <http://www.diveintopython.net/>`_, `Numerical Python (NumPy)
@@ -28,7 +28,7 @@ as well.
    <http://scipy.org/Getting_Started>`_.
 
 
-Basic rule-based modeling and **Pysb**
+Basic rule-based modeling and **PySB**
 ======================================
 In rules-based modeling, units that undergo transformations such as
 proteins, small molecules, protein complexes, etc are termed
@@ -36,7 +36,7 @@ proteins, small molecules, protein complexes, etc are termed
 using structured objects that describe the interactions between the
 *species* and constitute what we describe as *rules*. The specific
 details of how species and rules are specified can vary across
-different rules-based modeling approaches. In **Pysb** we have chosen to
+different rules-based modeling approaches. In **PySB** we have chosen to
 ascribe to the approaches found in `BioNetGen`_ and `Kappa`_, but
 other approaches are certainly possible for advanced users interested
 in modifying the source code. Each rule, describing the interaction
@@ -45,10 +45,10 @@ between *species* or sets of *species* must be assigned a set of
 `BioNetGen`_ and `Kappa`_ both describe interactions using a
 mass-action kinetics formalism, the *parameters* will necessarily
 consist of reaction rates. In what follows we describe how a model can
-be instantiated in **Pysb**, how *species* and *rules* are specified, and
+be instantiated in **PySB**, how *species* and *rules* are specified, and
 how to run a simple simulation.
 
-The key components that every model in **Pysb** needs are:
+The key components that every model in **PySB** needs are:
 
 * Model definition: this instantiates the model object
 * Monomer definition: this instantiates the monomers that are allowed
@@ -106,7 +106,7 @@ The Empty Model
 
 We begin by creating a model, which we will call ``mymodel``. Open your
 favorite Python code editor and create a file called
-:file:`mymodel.py`. The first lines of a **Pysb** program must contain
+:file:`mymodel.py`. The first lines of a **PySB** program must contain
 these lines so you can type them or paste them in your editor as shown
 below. Comments in the *Python* language are denoted by a hash (``#``)
 in the first column.
@@ -115,26 +115,26 @@ in the first column.
 
 Now we have the simplest possible model -- the empty model!
 
-To verify that your model is valid and your **Pysb** installation is
+To verify that your model is valid and your **PySB** installation is
 working, run :file:`mymodel.py` through the Python interpreter by
 typing the following command at your command prompt::
 
    python mymodel.py
 
 If all went well, you should not see any output. This is to be
-expected, because this **Pysb** script *defines* a model but does not
+expected, because this **PySB** script *defines* a model but does not
 execute any contents. We will revisit these concepts once we have
 added some components to our model.
 
 Monomers
 ========
 
-Chemical *species* in **Pysb**, whether they are small molecules,
+Chemical *species* in **PySB**, whether they are small molecules,
 proteins, or representations of many molecules are all composed of
 *Monomers*. *Monomers* are the subunit that defines how a *species*
 can be defined and used. A *Monomer* is defined using the keyword
 ``Monomer`` followed by the desired *monomer* name and the *sites*
-relevant to that monomer. In **Pysb**, like in `BioNetGen`_ or `Kappa`_,
+relevant to that monomer. In **PySB**, like in `BioNetGen`_ or `Kappa`_,
 there are two types of *sites*, namely bond-making/breaking sites (aka
 transformation sites) and state sites. The former allow for the
 description of bonds between *species* while the latter allow for the
@@ -192,11 +192,11 @@ loop over the ``monomers`` attribute of ``model``, printing each
 element of that list.  The output for each monomer is a more verbose,
 explicit representation of the same call we used to define it. [#mkw]_
 
-Here we can start to see how **Pysb** is different from other modeling
+Here we can start to see how **PySB** is different from other modeling
 tools.  With other tools, text files are typically created with a
 certain syntax, then passed through an execution tool to perform a
 task and produce an output, whether on the screen or to an output
-file.  In **Pysb** on the other hand we write Python code defining our
+file.  In **PySB** on the other hand we write Python code defining our
 model in a regular Python module, and the elements we define in that
 module can be inspected and manipulated as Python objects
 interactively in one of the Python REPLs such as *iPython* or
@@ -242,7 +242,7 @@ species and parameters.
 
 .. Warning:: 
 
-   **Pysb** or the integrators that we suggest for use for numerical
+   **PySB** or the integrators that we suggest for use for numerical
    manipulation do not keep track of units for the user. As such, the
    user is responsible for keeping track of the model in units that
    make sense to the user! For example, the forward rates are
@@ -285,8 +285,8 @@ the complex formation reaction with labels illustrating the parts of
 the rule::
 
    Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
-	     |              |     |           |         |     |    |     |           |
-             |              |     |           |         |     |    |     |          parameter list
+	     |              |     |           |         |     |    |     |             |
+             |              |     |           |         |     |    |     |            parameter list
 	     |              |     |           |         |     |    |     |
 	     |              |     |           |         |     |    |    Whenbound species
 	     |              |     |           |         |     |    |
@@ -466,7 +466,7 @@ must use a numerical integrator. Common examples include LSODA, VODE,
 CVODE, Matlab's ode15s, etc. We will use two *python* modules that are
 very useful for numerical manipulation. We have adapted the
 integrators in the *SciPy*[#sp]_ module to function seamlessly with
-**Pysb** for integration of ODE systems. We will also be using the *PyLab*
+**PySB** for integration of ODE systems. We will also be using the *PyLab*
 [#pl]_ package for graphing and plotting from the command line. 
 
 We will begin our simulation by loading the model from the *ipython*
@@ -475,7 +475,7 @@ We will begin our simulation by loading the model from the *ipython*
    >>> from mymodel import model
    >>> model.monomers
 
-Now, we will import the *PyLab* and **Pysb** integrator module. Enter
+Now, we will import the *PyLab* and **PySB** integrator module. Enter
 the commands as shown below::
 
    >>> from pysb.integrate import odesolve
@@ -516,6 +516,11 @@ integrator. With this, we can now run our simulation. Enter the
 following commands to run the simulation::
 
    >>> yout = odesolve(model, t)
+
+To verify that the simulation run you can see the content of the
+*yout* object. For example, check for the content of the *Bid*
+observable defined previously::
+
    >>> yout['obsBid']
    array([ 10000.        ,   9601.77865674,   9224.08135988,   8868.37855506,
             8534.45591732,   8221.19944491,   7927.08884234,   7650.48970981,
@@ -578,7 +583,6 @@ functions and utilities we have found useful for the community, we
 encourage users to customize the modeling tools to their needs and
 add/contribute to the **PySB** modeling community.
 
-
 Higher-order rules
 ==================
 
@@ -599,7 +603,7 @@ interacts with the protein *Bak* (residing in the membrane).
 .. [#func] Technically speaking it's a constructor, not just any old
    function.
 
-.. [#mod] Python allows users to write python code such as **Pysb** code
+.. [#mod] Python allows users to write python code such as **PySB** code
    to a file and use this code later as an executable script or
    from an interactive instance. Such files are called *modules* and
    can be imported into a Python instance. See `Python modules
