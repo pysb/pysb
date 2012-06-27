@@ -1,9 +1,9 @@
-
+`
 ==========
  Tutorial
 ==========
 
-This tutorial will walk you through the creation of your first PySB
+This tutorial will walk you through the creation of your first **Pysb**
 model. It will cover the basics, provide a guide through the different
 programming constructs and finally deal with more complex
 rule-building. Users should be able to write simple programs and
@@ -19,9 +19,9 @@ as well.
    useful.
 
 .. warning:: A basic understanding of the Python programming language
-   is essential for the use of PySB. Although the user can go through
-   this tutorial and develop an understanding of the PySB tools,
-   advanced programming with PySB will require understanding of
+   is essential for the use of **Pysb**. Although the user can go through
+   this tutorial and develop an understanding of the **Pysb** tools,
+   advanced programming with **Pysb** will require understanding of
    Python. Some useful tutorials/guides include the `Official Python
    Tutorial <http://docs.python.org/tutorial/>`_, `Dive into Python
    <http://www.diveintopython.net/>`_, `Numerical Python (NumPy)
@@ -29,15 +29,15 @@ as well.
    <http://scipy.org/Getting_Started>`_.
 
 
-Basic rule-based modeling and PySB
-==================================
+Basic rule-based modeling and **Pysb**
+======================================
 In rules-based modeling, units that undergo transformations such as
 proteins, small molecules, protein complexes, etc are termed
 *species*. The interactions among these *species* are then represented
 using structured objects that describe the interactions between the
 *species* and constitute what we describe as *rules*. The specific
 details of how species and rules are specified can vary across
-different rules-based modeling approaches. In PySB we have chosen to
+different rules-based modeling approaches. In **Pysb** we have chosen to
 ascribe to the approaches found in `BioNetGen`_ and `Kappa`_, but
 other approaches are certainly possible for advanced users interested
 in modifying the source code. Each rule, describing the interaction
@@ -46,10 +46,10 @@ between *species* or sets of *species* must be assigned a set of
 `BioNetGen`_ and `Kappa`_ both describe interactions using a
 mass-action kinetics formalism, the *parameters* will necessarily
 consist of reaction rates. In what follows we describe how a model can
-be instantiated in PySB, how *species* and *rules* are specified, and
+be instantiated in **Pysb**, how *species* and *rules* are specified, and
 how to run a simple simulation.
 
-The key components that every model in PySB needs are:
+The key components that every model in **Pysb** needs are:
 
 * Model definition: this instantiates the model object
 * Monomer definition: this instantiates the monomers that are allowed
@@ -107,35 +107,35 @@ The Empty Model
 
 We begin by creating a model, which we will call ``mymodel``. Open your
 favorite Python code editor and create a file called
-:file:`mymodel.py`. The first lines of a PySB program must contain
-these lines so you can type them or paste them in your editor::
+:file:`mymodel.py`. The first lines of a **Pysb** program must contain
+these lines so you can type them or paste them in your editor as shown
+below. Comments in the *Python* language are denoted by a hash (``#``)
+in the first column.
 
-    from pysb import *
-
-    Model()
+.. literalinclude:: examples/mymodel0.py
 
 Now we have the simplest possible model -- the empty model!
 
-To verify that your model is valid and your PySB installation is
+To verify that your model is valid and your **Pysb** installation is
 working, run :file:`mymodel.py` through the Python interpreter by
 typing the following command at your command prompt::
 
    python mymodel.py
 
 If all went well, you should not see any output. This is to be
-expected, because this PySB script *defines* a model but does not
+expected, because this **Pysb** script *defines* a model but does not
 execute any contents. We will revisit these concepts once we have
 added some components to our model.
 
 Monomers
 ========
 
-Chemical *species* in PySB, whether they are small molecules,
+Chemical *species* in **Pysb**, whether they are small molecules,
 proteins, or representations of many molecules are all composed of
 *Monomers*. *Monomers* are the subunit that defines how a *species*
 can be defined and used. A *Monomer* is defined using the keyword
 ``Monomer`` followed by the desired *monomer* name and the *sites*
-relevant to that monomer. In PySB, like in `BioNetGen`_ or `Kappa`_,
+relevant to that monomer. In **Pysb**, like in `BioNetGen`_ or `Kappa`_,
 there are two types of *sites*, namely bond-making/breaking sites (aka
 transformation sites) and state sites. The former allow for the
 description of bonds between *species* while the latter allow for the
@@ -167,15 +167,9 @@ sites. Anticipating what comes below, the *'S'* site will become a
 state site and hence, we choose to represent it in upper case but this
 is not mandatory. 
 
-Now our model file should look like this::
+Now our model file should look like this:
 
-    from pysb import *
-
-    Model()
-
-    Monomer('C8', ['b'])
-    Monomer('Bid', ['b', 'S'])
-
+.. literalinclude:: examples/mymodel1.py
 
 We can run ``python mymodel.py`` again and verify there are no errors,
 but you should still have not output given that we have not *done*
@@ -186,9 +180,7 @@ interactive mode (be sure to do this from the same directory where
 you've saved :file:`mymodel.py`) and run the following code::
 
    >>> from mymodel import model
-   >>> for m in model.monomers:
-   ...     print m
-   ... 
+   >>> model.monomers
 
 You should see the following output::
 
@@ -201,11 +193,11 @@ loop over the ``monomers`` attribute of ``model``, printing each
 element of that list.  The output for each monomer is a more verbose,
 explicit representation of the same call we used to define it. [#mkw]_
 
-Here we can start to see how PySB is different from other modeling
+Here we can start to see how **Pysb** is different from other modeling
 tools.  With other tools, text files are typically created with a
 certain syntax, then passed through an execution tool to perform a
 task and produce an output, whether on the screen or to an output
-file.  In PySB on the other hand we write Python code defining our
+file.  In **Pysb** on the other hand we write Python code defining our
 model in a regular Python module, and the elements we define in that
 module can be inspected and manipulated as Python objects
 interactively in one of the Python REPLs such as *iPython* or
@@ -230,18 +222,9 @@ is to use a floating-point literal in scientific notation as shown in
 the example above. For our model we will need three parameters, one
 each for the forward, reverse, and catalytic reactions in our
 system. Go to your :file:`mymodel.py` file and add the lines
-corresponding to the parameters so that your file looks like this::
+corresponding to the parameters so that your file looks like this:
 
-   from pysb import *
-
-   Model()
-
-   Monomer('C8', ['b'])
-   Monomer('Bid', ['b', 'S'])
-
-   Parameter('kf', 1.04e-06)
-   Parameter('kr', 1.04e-06)
-   Parameter('kc', 1.04e-06)
+.. literalinclude:: examples/mymodel2.py
 
 Once this is done start the *ipython* (or *python*) intepreter and
 enter the following commands:: 
@@ -250,23 +233,24 @@ enter the following commands::
    >>> model.parameters
 and you should get an output such as::
 
-   {'kf': Parameter(name='kf', value=1.04e-06),
-    'kr': Parameter(name='kr', value=1.04e-06),
-    'kc': Parameter(name='kc', value=1.04e-06)}
+   {'kf': Parameter(name='kf', value=1.0e-07),
+    'kr': Parameter(name='kr', value=1.0e-03),
+    'kc': Parameter(name='kc', value=1.0    )}
 
 Your model now has monomers and parameters specified. In the next
 section we will specify rules, which specify the interaction between
-monomers and parameters. 
+species and parameters. 
 
 .. Warning:: 
 
-   PySB or the integrators that we suggest for use for numerical
+   **Pysb** or the integrators that we suggest for use for numerical
    manipulation do not keep track of units for the user. As such, the
    user is responsible for keeping track of the model in units that
    make sense to the user! For example, the forward rates are
-   typically in :math:`M^{-1}s^{-1}`, the reverse rates in :math:`s^{-1}`, and the catalytic rates
-   in :math:`s^{-1}`. For the present examples we have chosen to work in a volume
-   size of :math`1.0 pL` corresponding to the volume of a cell and to specify
+   typically in :math:`M^{-1}s^{-1}`, the reverse rates in
+   :math:`s^{-1}`, and the catalytic rates in :math:`s^{-1}`. For the
+   present examples we have chosen to work in a volume size of
+   :math:`1.0 pL` corresponding to the volume of a cell and to specify
    the Parameters and `Initial conditions`_ in numbers of molecules
    per cell. If you wish to change the units you must change *all* the
    parameter values accordingly.
@@ -357,44 +341,33 @@ reaction and further a dissociation reaction to return the original
 *C8* protein and the *Bid* protein but now in the 't' state,
 indicating its truncation. Make these additions to your
 :file:`mymodel.py` file. After you are done, your file should look
-like this::
+like this:
 
-   from pysb import *
-
-   Model()
-
-   Monomer('C8', ['b'])
-   Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
-
-   Parameter('kf', 1.04e-06)
-   Parameter('kr', 1.04e-06)
-   Parameter('kc', 1.04e-06)
-
-   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
-   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc)
+.. literalinclude:: examples/mymodel3.py
 
 Once you are done editing your file, start your *ipython* (or
 *python*) interpreter and type the commands at the prompts below. Once
 you load your model you should be able to probe and check that you
 have the correct monomers, parameters, and rules. Your output should
-be very similar to the one presented.::
+be very similar to the one presented (output shown below the ``'>>>'``
+python prompts).::
 
    >>> from mymodel import model
    >>> model.monomers
-   {'C8': Monomer(name='C8', sites=['b'], site_states={}),
-   'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
+      {'C8': Monomer(name='C8', sites=['b'], site_states={}),
+      'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
    >>> model.parameters
-   {'kf': Parameter(name='kf', value=1.04e-06),
-    'kr': Parameter(name='kr', value=1.04e-06),
-    'kc': Parameter(name='kc', value=1.04e-06)}
+      {'kf': Parameter(name='kf', value=1.0e-07),
+       'kr': Parameter(name='kr', value=1.0e-03),
+       'kc': Parameter(name='kc', value=1.0    )}
    >>> model.rules
-   {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
-   Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
-   rate_forward=Parameter(name='kf', value=1.04e-06),
-   rate_reverse=Parameter(name='kr', value=1.04e-06)),
-   'tBid_from_C8Bid': Rule(name='tBid_from_C8Bid', reactants=C8(b=1) %
-   Bid(b=1, S=u), products=C8(b=None) + Bid(b=None, S=t),
-   rate_forward=Parameter(name='kc', value=1.04e-06))}
+      {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
+      Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
+      rate_forward=Parameter(name='kf', value=1.0e-07),
+      rate_reverse=Parameter(name='kr', value=1.0e-03)),
+      'tBid_from_C8Bid': Rule(name='tBid_from_C8Bid', reactants=C8(b=1) %
+      Bid(b=1, S=u), products=C8(b=None) + Bid(b=None, S=t),
+      rate_forward=Parameter(name='kc', value=1.0))}
 
 With this we are almost ready to run a simulation, all we need now is
 to specify the initial conditions of the system.
@@ -457,66 +430,158 @@ Simulation and analysis
 =======================
 By now your :file:`mymodel.py` file should look something like this::
 
-   from pysb import *
-
-   Model()
-
-   Monomer('C8', ['b'])
-   Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
-
-   Parameter('kf', 1.04e-06)
-   Parameter('kr', 1.04e-06)
-   Parameter('kc', 1.04e-06)
-
-   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
-   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc)
-   
-   Parameter('C8_0', 1000)
-   Parameter('Bid_0', 10000)
-   Initial(C8(b=None), C8_0)
-   Initial(Bid(b=None, S='u'), Bid_0)
-
-   Observable('obsC8', C8(b=None))
-   Observable('obsBid', Bid(b=None, S='u'))
-   Observable('obstBid', Bid(b=None, S='t'))
+.. literalinclude:: examples/mymodel4.py
 
 You can use a few commands to check that your model is defined
 properly. Start your *ipython* (or *python*) interpreter and enter the
-commands as shown below. Your output should be similar to the shown
-output::
+commands as shown below. Notice the output should be similar to the
+one shown (output shown below the ``'>>>'``` prompts)::
 
-   >>> from mymodel4 import model
+   >>> from mymodel import model
    >>> model.monomers
-   {'C8': Monomer(name='C8', sites=['b'], site_states={}),
-    'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
+      {'C8': Monomer(name='C8', sites=['b'], site_states={}),
+       'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
    >>> model.parameters
-   {'kf': Parameter(name='kf', value=1.04e-06),
-    'kr': Parameter(name='kr', value=1.04e-06),
-    'kc': Parameter(name='kc', value=1.04e-06),
-    'C8_0': Parameter(name='C8_0', value=1000),
-    'Bid_0': Parameter(name='Bid_0', value=10000)}
+      {'kf': Parameter(name='kf', value=1.0e-07),
+       'kr': Parameter(name='kr', value=1.0e-03),
+       'kc': Parameter(name='kc', value=1.0    ),
+       'C8_0': Parameter(name='C8_0', value=1000),
+       'Bid_0': Parameter(name='Bid_0', value=10000)}
    >>> model.observables
-   {'obsC8': <pysb.core.Observable object at 0x104b2c4d0>,
-    'obsBid': <pysb.core.Observable object at 0x104b2c5d0>,
-    'obstBid': <pysb.core.Observable object at 0x104b2c6d0>}
+      {'obsC8': <pysb.core.Observable object at 0x104b2c4d0>,
+       'obsBid': <pysb.core.Observable object at 0x104b2c5d0>,
+       'obstBid': <pysb.core.Observable object at 0x104b2c6d0>}
    >>> model.initial_conditions
-   [(C8(b=None), Parameter(name='C8_0', value=1000)), (Bid(b=None, S=u), Parameter(name='Bid_0', value=10000))]
+      [(C8(b=None), Parameter(name='C8_0', value=1000)), (Bid(b=None, S=u), Parameter(name='Bid_0', value=10000))]
    >>> model.rules
-   {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
-   Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
-   rate_forward=Parameter(name='kf', value=1.04e-06),    rate_reverse=Parameter(name='kr', value=1.04e-06)),
-    'tBid_from_C8Bid': Rule(name='tBid_from_C8Bid', reactants=C8(b=1)
-    % Bid(b=1, S=u), products=C8(b=None) + Bid(b=None, S=t),    rate_forward=Parameter(name='kc', value=1.04e-06))}
+      {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
+      Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
+      rate_forward=Parameter(name='kf', value=1.0e-07),    rate_reverse=Parameter(name='kr', value=1.0e-03)),
+       'tBid_from_C8Bid': Rule(name='tBid_from_C8Bid', reactants=C8(b=1)
+       % Bid(b=1, S=u), products=C8(b=None) + Bid(b=None, S=t),    rate_forward=Parameter(name='kc', value=1.0))}
 
-With this we are now ready to run a simulation! We will use the
-following commands to run the simulation. 
+With this we are now ready to run a simulation! The parameter values
+for the simulation were taken directly from typical values in the
+paper about `extrinsic apoptosis signaling`_. To run the simulation we
+must use a numerical integrator. Common examples include LSODA, VODE,
+CVODE, Matlab's ode15s, etc. We will use two *python* modules that are
+very useful for numerical manipulation. We have adapted the
+integrators in the *SciPy*[#sp]_ module to function seamlessly with
+**Pysb** for integration of ODE systems. We will also be using the *PyLab*
+[#pl]_ package for graphing and plotting from the command line. 
+
+We will begin our simulation by loading the model from the *ipython*
+(or *python*) interpreter as shown below::
+
+   >>> from mymodel import model
+   >>> model.monomers
+
+Now, we will import the *PyLab* and **Pysb** integrator module. Enter
+the commands as shown below::
+
+   >>> from pysb.integrate import odesolve
+   >>> from pylab import *
+
+We have now loaded the integration engine and the graph engine into
+the interpreter environment. You may get some feedback as some things
+can be compiled at runtime, depending on your operating
+system. The next thing we need is to tell the integrator the time
+domain over which we wish to integrate the equations. For our case we
+will use :math:`20000s` of simulation time. To do this we generate an
+array using the *linspace* function. Enter the command below::
+
+   >>> t = linspace(0, 20000)
+
+This command assigns an array in the range :math:`[0..20000]` to the
+variable *t*. You can type the name of the variable at any time to see
+the content of the variable. Typing the variable *t* results in the
+following::
+
+   >>> t
+   array([     0.        ,    408.16326531,    816.32653061,   1224.48979592,
+            1632.65306122,   2040.81632653,   2448.97959184,   2857.14285714,
+            3265.30612245,   3673.46938776,   4081.63265306,   4489.79591837,
+            4897.95918367,   5306.12244898,   5714.28571429,   6122.44897959,
+            6530.6122449 ,   6938.7755102 ,   7346.93877551,   7755.10204082,
+            8163.26530612,   8571.42857143,   8979.59183673,   9387.75510204,
+            9795.91836735,  10204.08163265,  10612.24489796,  11020.40816327,
+           11428.57142857,  11836.73469388,  12244.89795918,  12653.06122449,
+           13061.2244898 ,  13469.3877551 ,  13877.55102041,  14285.71428571,
+           14693.87755102,  15102.04081633,  15510.20408163,  15918.36734694,
+           16326.53061224,  16734.69387755,  17142.85714286,  17551.02040816,
+           17959.18367347,  18367.34693878,  18775.51020408,  19183.67346939,
+           19591.83673469,  20000.        ])
+
+These are the points at which we will get data for each ODE from the
+integrator. With this, we can now run our simulation. Enter the
+following commands to run the simulation::
+
+   >>> yout = odesolve(model, t)
+   >>> yout['obsBid']
+   array([ 10000.        ,   9601.77865674,   9224.08135988,   8868.37855506,
+            8534.45591732,   8221.19944491,   7927.08884234,   7650.48970981,
+            7389.81105408,   7143.5816199 ,   6910.47836131,   6689.32927828,
+            6479.10347845,   6278.89607041,   6087.91189021,   5905.45001654,
+            5730.89003662,   5563.68044913,   5403.32856328,   5249.39176146,
+            5101.47069899,   4959.20384615,   4822.26262101,   4690.34720441,
+            4563.18294803,   4440.51745347,   4322.11815173,   4207.77021789,
+            4097.27471952,   3990.44698008,   3887.11517373,   3787.11923497,
+            3690.30945136,   3596.54594391,   3505.69733323,   3417.64025401,
+            3332.25897699,   3249.44415872,   3169.09326717,   3091.10923365,
+            3015.40034777,   2941.87977234,   2870.4652525 ,   2801.07879018,
+            2733.64632469,   2668.09744369,   2604.36497901,   2542.38554596,
+            2482.09776367,   2423.44473279])
+
+As you may recall we named some observables in the `Observables`_
+section above. The variable *yout* contains an array of all the ODE
+outputs from the integrators along with the named observables
+(i.e. *obsBid*, *obstBid*, and *obsC8*) which can be called by their
+names. We can therefore plot this data to visualize our output. Using
+the commands imported from the *PyLab* module we can create a graph
+interactively. Enter the commands as shown below::
+
+   >>>ion()
+   >>>figure()
+   >>>plot(t, yout['obsBid'], label="Bid")
+   >>>plot(t, yout['obstBid'], label="tBid")
+   >>>plot(t, yout['obsC8'], label="C8")
+   >>>legend()
+   >>>xlabel("seconds")
+   >>>ylabel("Molecules/cell")
+   >>>show()
+
+You should now have a figure in your screen showing the number of
+*Bid* molecules decreaing from the initial amount decreasing over
+time, the number of *tBid* molecules increasing over time, and the
+number of free *C8* molecules decrease to about half. For help with
+the above commands and to see more commands related to *PyLab* check
+the documentation [#pl]_.
+
+Congratulations! You have created your first model and run a
+simulation!
+
+=================
+Advanced modeling
+=================
+In this section we continue with the above tutorial and touch on some
+advanced techniques for modeling using compartments (`BioNetGen`_
+only), the definition of higher order rules using functions, and model
+calibration using the PySB utilities. Although we provide the
+functions and utilities we have found useful for the community, we
+encourage users to customize the modeling tools to their needs and
+add/contribute to the **PySB** modeling community.
 
 
-higher-order rules
+Higher-order rules
 ==================
+
 
 Compartments
 ============
+We will continue building on your :file:`mymodel.py` file and add one
+more species and a compartment. In extrinsic apoptosis, once *tBid* is
+activated it translocates to the outer mitochondrial membrane where it
+interacts with the protein *Bak* (residing in the membrane). 
 
 
 
@@ -525,7 +590,7 @@ Compartments
 .. [#func] Technically speaking it's a constructor, not just any old
    function.
 
-.. [#mod] Python allows users to write python code such as PySB code
+.. [#mod] Python allows users to write python code such as **Pysb** code
    to a file and use this code later as an executable script or
    from an interactive instance. Such files are called *modules* and
    can be imported into a Python instance. See `Python modules
@@ -534,6 +599,10 @@ Compartments
 .. [#mkw] The astute Python programmer will recognize this as the
    ``repr`` of the monomer object, using keyword arguments in the
    constructor call.
+
+.. [#sp] SciPy: http://www.scipy.org
+
+.. [#pl] PyLab: http://www.scipy.org/PyLab
 
 .. _BioNetGen: http://bionetgen.org/index.php/Documentation
 
