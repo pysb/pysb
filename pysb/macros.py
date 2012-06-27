@@ -19,7 +19,11 @@ def _complex_pattern_label(cp):
 
 def _monomer_pattern_label(mp):
     """Return a string label for a MonomerPattern."""
-    site_values = [str(x) for x in mp.site_conditions.values() if x is not None]
+    site_values = [str(x) for x in mp.site_conditions.values()
+                            if x is not None
+                            and not isinstance(x, list)
+                            and not isinstance(x, tuple)
+                            and not isinstance(x, numbers.Real)]
     return mp.monomer.name + ''.join(site_values)
 
 def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes):
@@ -539,12 +543,12 @@ def assemble_pore_sequential(subunit, site1, site2, size, klist):
     increasingly larger pores of up to <size> units, using sites <site1>
     and <site2> to bind the units to each other.
     """
-    if size != len(klist):
+    if size != len(klist) + 1:
         raise ValueError("size and len(klist) must be equal")
 
     subunit = subunit()
 
-    subunit_name = monomer_pattern_label(subunit)
+    subunit_name = _monomer_pattern_label(subunit)
     r_name_pattern = 'assemble_pore_sequential_%s_%%d' % (subunit_name)
 
     klist_clean = []
@@ -574,6 +578,8 @@ def assemble_pore_sequential(subunit, site1, site2, size, klist):
     return rules | params_created
 
 # TODO: Refactor
+# TODO This appears to have all of the subunits bind the cargo, which
+# makes the rule label get screwy
 def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
                    csource, cdest, c_site, klist):
     """
@@ -597,9 +603,9 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         raise ValueError("sc_site '%s' not present in cdest '%s'" %
                          (sc_site, cdest.monomer.name))
 
-    subunit_name = monomer_pattern_label(subunit)
-    csource_name = monomer_pattern_label(csource)
-    cdest_name = monomer_pattern_label(cdest)
+    subunit_name = _monomer_pattern_label(subunit)
+    csource_name = _monomer_pattern_label(csource)
+    cdest_name = _monomer_pattern_label(cdest)
 
     rc_name_pattern = 'transport_complex_%s_pore_%%d_%s' % \
                       (subunit_name, csource_name)
@@ -615,17 +621,21 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         rc_name = rc_name_pattern % i
         rd_name = rd_name_pattern % i
 
-        rule_rates = rates[i-min_size]
-        cpore = pore._copy()
-        source_bonds = range(i+1, i+1+i)
+        rule_rates = klist[i-min_size]
+        cpore = pore.copy()
+        source_bonds = range(i+1, i+1+i) # TODO: This appears to be the problem
         for b in range(i):
             cpore.monomer_patterns[b].site_conditions[sc_site] = \
                                                             source_bonds[b]
         sc_complex = cpore % csource({c_site: source_bonds})
-        Rule(rc_name, pore + csource({c_site: None}) <> sc_complex,
-             *rule_rates[0:2])
-        Rule(rd_name, sc_complex >> pore + cdest({c_site: None}), rule_rates[2])
+        components = _macro_rule('transport_complex',
+                                 pore + csource({c_site: None}) <> sc_complex,
+                                 rule_rates[0:2], ['kf', 'kr'])
+        components |= _macro_rule('transport_dissociate',
+                                 sc_complex >> pore + cdest({c_site: None}),
+                                 [rule_rates[2]], ['kc'])
 
+        return components
     # TODO: Add returned components
 
 
