@@ -1,4 +1,3 @@
-`
 ==========
  Tutorial
 ==========
@@ -555,7 +554,15 @@ You should now have a figure in your screen showing the number of
 time, the number of *tBid* molecules increasing over time, and the
 number of free *C8* molecules decrease to about half. For help with
 the above commands and to see more commands related to *PyLab* check
-the documentation [#pl]_.
+the documentation [#pl]_. Your figure should look something like the
+one below:
+
+.. image:: examples/fig_mymodel4.png
+           :alt: mymodel figure
+	   :height: 600 px
+	   :width: 800 px
+	   :scale: 75 %
+           :align: center
 
 Congratulations! You have created your first model and run a
 simulation!
@@ -575,6 +582,8 @@ add/contribute to the **PySB** modeling community.
 Higher-order rules
 ==================
 
+Model calibration
+=================
 
 Compartments
 ============
