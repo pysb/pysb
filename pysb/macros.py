@@ -131,7 +131,7 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
         if rule_expression.is_reversible:
             k2 = Parameter('%s_%s' % (r_name, ksuffixes[1]),
                            klist[1])
-            params_created |= ComponentSet([k2])
+            params_created.add(k2)
     else:
         raise ValueError("klist must contain Parameter objects or " +
             "a list of (name, number) tuples")
@@ -396,6 +396,20 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
 
 #TODO: Implement
 def catalyze_table():
+    """
+    table[0]: [                                             E1, ...,     En]
+    table[1]: [S1(site='ssub'), S1(site='sprod'), (kf, kr, kc), ...,  (...)]
+    (TABLE, 'sbsite', 'ebsite')
+
+    table[0]: [                                        E1, ...,     En]
+    table[1]: [S1, 'site', 'ssub', 'sprod' , (kf, kr, kc), ...,  (...)]
+    (TABLE, 'sbsite', 'ebsite')
+
+    table[0]: [                                        E1, ...,     En]
+    table[1]: [S1, (kf, kr, kc), ...,  (...)]
+    (TABLE, 'sbsite', 'ebsite' 'smodsite', 'ssub', 'sprod')
+
+    """
     pass
 
 def catalyze_one_step(enzyme, substrate, product, kf):
