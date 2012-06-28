@@ -3,6 +3,7 @@ from pysb import *
 import pysb.core
 from pysb.core import ComponentSet
 import numbers
+import functools
 
 __all__ = ['equilibrate',
            'bind', 'bind_table',
@@ -525,7 +526,7 @@ def pore_species(subunit, site1, site2, size):
     subunit : Monomer or MonomerPattern
         The subunit of which the pore is composed.
     site1, site2 : string
-        The names of the sites where one copy of subunit binds to the next.
+        The names of the sites where one copy of `subunit` binds to the next.
     size : integer
         The number of subunits in the pore.
 
@@ -535,15 +536,16 @@ def pore_species(subunit, site1, site2, size):
 
     Notes
     -----
-    At sizes 1 and 2 the ring is not closed, i.e. there is one site1
-    and one site2 which remain unbound. At size 3 and up the ring is
-    closed and all site1 sites are bound to a site2.
+    At sizes 1 and 2 the ring is not closed, i.e. there is one site1 and one
+    site2 which remain unbound. At size 3 and up the ring is closed and all
+    site1 sites are bound to a site2.
 
     Examples
     --------
         Model()
         Monomer('Unit', ['p1', 'p2'])
         pore_tetramer = pore_species(Unit, 'p1', 'p2', 4)
+
     """
     _verify_sites(subunit, site1, site2)
     if size <= 0:
@@ -561,47 +563,57 @@ def pore_species(subunit, site1, site2, size):
         pore.match_once = True
     return pore
 
-# TODO: Refactor
-# TODO: Klist should be size - 1
-def assemble_pore_sequential(subunit, site1, site2, size, klist):
+def assemble_pore_sequential(subunit, site1, site2, max_size, klist):
+    """Generate rules to assemble a circular homomeric pore sequentially.
+
+    The pore species are created by sequential addition of `subunit` monomers,
+    i.e. larger oligomeric species never fuse together.
+
+    Parameters
+    ----------
+    subunit : Monomer or MonomerPattern
+        The subunit of which the pore is composed.
+    site1, site2 : string
+        The names of the sites where one copy of `subunit` binds to the next.
+    max_size : integer
+        The maximum number of subunits in the pore.
+    klist : list of lists of (Parameters or numbers)
+        Forward and reverse rate constants for the assembly steps. The outer
+        list must be of length `max_size` - 1, and the inner lists must all be
+        of length 2. In the outer list, the first element corresponds to the
+        first assembly step in which two monomeric subunits bind to form a
+        2-subunit complex, and the last element corresponds to the final step in
+        which the `max_size`th subunit is added. Each inner list contains the
+        forward and reverse rate constants (in that order) for the corresponding
+        assembly reaction, and each of these pairs must comprise solely
+        Parameter objects or solely numbers (never one of each). If Parameters
+        are passed, they will be used directly in the generated Rules. If
+        numbers are passed, Parameters will be created with automatically
+        generated names based on `subunit`, `site1`, `site2` and the pore sizes
+        and these parameters will be included at the end of the returned
+        component list.
+
     """
-    Generate rules to chain identical MonomerPatterns <Subunit> into
-    increasingly larger pores of up to <size> units, using sites <site1>
-    and <site2> to bind the units to each other.
-    """
-    if size != len(klist) + 1:
-        raise ValueError("size and len(klist) must be equal")
+    if len(klist) != max_size - 1:
+        raise ValueError("len(klist) must be equal to max_size - 1")
 
-    subunit = subunit()
+    def pore_rule_name(rule_expression, size):
+        react_p = rule_expression.reactant_pattern
+        monomer = react_p.complex_patterns[0].monomer_patterns[0].monomer
+        return '%s_%d' % (monomer.name, size)
 
-    subunit_name = _monomer_pattern_label(subunit)
-    r_name_pattern = 'assemble_pore_sequential_%s_%%d' % (subunit_name)
+    components = ComponentSet()
+    s = pore_species(subunit, site1, site2, 1)
+    for size, ksublist in zip(range(2, max_size + 1), klist):
+        pore_prev = pore_species(subunit, site1, site2, size - 1)
+        pore_next = pore_species(subunit, site1, site2, size)
+        name_func = functools.partial(pore_rule_name, size=size)
+        components |= _macro_rule('assemble_pore_sequential',
+                                  s + pore_prev <> pore_next,
+                                  ksublist, ['kf', 'kr'],
+                                  name_func=name_func)
 
-    klist_clean = []
-    params_created = ComponentSet()
-    for i, sublist in enumerate(klist):
-        r_name = r_name_pattern % (i + 2)
-        if all(isinstance(x, Parameter) for x in sublist):
-            kf, kr = sublist
-        elif all(isinstance(x, numbers.Real) for x in sublist):
-            # if sublist is numbers, generate the Parameters
-            kf = Parameter(r_name + '_kf', sublist[0])
-            kr = Parameter(r_name + '_kr', sublist[1])
-            params_created.add(kf)
-            params_created.add(kr)
-        else:
-            raise ValueError("klist must contain Parameters objects or numbers")
-        klist_clean.append([kf, kr])
-
-    rules = ComponentSet()
-    for i in range(2, size + 1):
-        M = pore_species(subunit, site1, site2, 1)
-        S1 = pore_species(subunit, site1, site2, i-1)
-        S2 = pore_species(subunit, site1, site2, i)
-        r = Rule(r_name_pattern % i, M + S1 <> S2, *klist_clean[i-2])
-        rules.add(r)
-
-    return rules | params_created
+    return components
 
 # TODO: Refactor
 # TODO This appears to have all of the subunits bind the cargo, which
