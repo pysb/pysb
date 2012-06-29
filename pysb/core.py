@@ -494,6 +494,10 @@ class RuleExpression(object):
             raise type(e)("Product does not look like a reaction pattern")
         self.is_reversible = is_reversible
 
+    def __repr__(self):
+        operator = '<>' if self.is_reversible else '>>'
+        return '%s %s %s' % (repr(self.reactant_pattern), operator,
+                             repr(self.product_pattern))
 
 
 def as_complex_pattern(v):
