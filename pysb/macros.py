@@ -456,8 +456,8 @@ def catalyze_one_step(enzyme, substrate, product, kf):
     on the site 'b' of E being unbound, then this macro must be called as
 
         catalyze_one_step(E(b=None), S, P, 1e-4)
-        
-    and similarly if the substrate must be unbound.
+
+    and similarly if the substrate or product must be unbound.
     """
 
     return _macro_rule('one_step',
