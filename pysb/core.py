@@ -629,6 +629,11 @@ class Observable(Component):
         self.species = []
         self.coefficients = []
 
+    def __repr__(self):
+        ret = '%s(%s, %s)' % (self.__class__.__name__, repr(self.name),
+                              repr(self.reaction_pattern))
+        return ret
+
 
 
 class Model(object):
