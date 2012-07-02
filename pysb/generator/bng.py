@@ -13,6 +13,8 @@ class BngGenerator(object):
         return self.__content
 
     def generate_content(self):
+        if self.model.has_synth_deg():
+            self.model.enable_synth_deg()
         self.__content = ''
         self.generate_parameters()
         self.generate_compartments()
@@ -58,8 +60,17 @@ class BngGenerator(object):
         max_length = max(len(r.name) for r in self.model.rules) + 1  # +1 for the colon
         for r in self.model.rules:
             label = r.name + ':'
-            reactants_code = format_reactionpattern(r.reactant_pattern)
-            products_code  = format_reactionpattern(r.product_pattern)
+            react_p = r.reactant_pattern
+            prod_p = r.product_pattern
+            if r.is_synth():
+                source_mp = self.model.monomers['__source']()
+                react_p = pysb.core.as_reaction_pattern(source_mp)
+                prod_p += source_mp
+            if r.is_deg():
+                sink_mp = self.model.monomers['__sink']()
+                prod_p = pysb.core.as_reaction_pattern(sink_mp)
+            reactants_code = format_reactionpattern(react_p)
+            products_code = format_reactionpattern(prod_p)
             arrow = '->'
             if r.is_reversible:
                 arrow = '<->'
