@@ -1,7 +1,7 @@
 import inspect
 from pysb import *
 import pysb.core
-from pysb.core import ComponentSet
+from pysb.core import ComponentSet, as_reaction_pattern
 import numbers
 import functools
 
@@ -9,7 +9,7 @@ __all__ = ['equilibrate',
            'bind', 'bind_table',
            'catalyze', 'catalyze_state', 'catalyze_table',
            'catalyze_one_step', 'catalyze_one_step_reversible',
-           'synthesize_and_degrade', 'synthesize_and_degrade_table',
+           'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport']
 
 ## Internal helper functions
@@ -516,13 +516,67 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
     return components
 
 ## Synthesis and Degradation
-# TODO: Implement
-def synthesize_and_degrade():
-    pass
+## TODO: Have synth and deg check that patterns are concrete so that
+## the user gets a real error, not a BNG error. Ideally, should use
+## the default states of unspecified sites.
+def synthesize(species, ksynth):
+    """TODO: Docstring
+    """
 
-# TODO: Implement
-def synthesize_and_degrade_table():
-    pass
+    def synthesize_name_func(rule_expression):
+        prod_p = rule_expression.product_pattern
+        label = [_complex_pattern_label(cp)
+                     for cp in prod_p.complex_patterns]
+        label = '_'.join(label)
+        return label
+
+    # TODO: either the >> operator should work with a monomer, or complexpattern
+    # shouldn't blow up if it is called
+    if isinstance(species, Monomer):
+        species = species()
+
+    species_rp = as_reaction_pattern(species)
+    return _macro_rule('synthesize', None >> species_rp, [ksynth], ['k'],
+                       name_func=synthesize_name_func)
+
+def degrade(species, kdeg):
+    """TODO: Docstring """
+
+    def degrade_name_func(rule_expression):
+        react_p = rule_expression.reactant_pattern
+        label = [_complex_pattern_label(cp)
+                     for cp in react_p.complex_patterns]
+        label = '_'.join(label)
+        return label
+
+    # TODO: the >> operator should work with a monomer, or complexpattern
+    # shouldn't blow up if it is called
+    if isinstance(species, Monomer):
+        species = species()
+
+    species_rp = as_reaction_pattern(species)
+    return _macro_rule('degrade', species_rp >> None, [kdeg], ['k'],
+                       name_func=degrade_name_func)
+
+def synthesize_degrade_table(table):
+    """TODO: Docstring """
+
+    # extract species lists and matrix of rates
+    s_rows = [row[0] for row in table]
+    kmatrix = [row[1:] for row in table]
+
+    # loop over interactions
+    components = ComponentSet()
+    for r, s_row in enumerate(s_rows):
+        ksynth, kdeg = kmatrix[r]
+        #print (r, s_row)
+        if ksynth is not None:
+            components |= synthesize(s_row, ksynth)
+        if kdeg is not None:
+            components |= degrade(s_row, kdeg)
+
+    return components
+
 
 ## Pore assembly
 def pore_species(subunit, site1, site2, size):
