@@ -231,10 +231,18 @@ def bind(s1, site1, s2, site2, klist):
     _verify_sites(s1, site1)
     _verify_sites(s2, site2)
 
+    def bind_name_func(rule_expression):
+        # Get ReactionPatterns
+        react_p = rule_expression.reactant_pattern
+        # Build the label components
+        lhs_label = [_complex_pattern_label(cp) for cp in react_p.complex_patterns]
+        lhs_label = '_'.join(lhs_label)
+        return '%s' % (lhs_label)
+
     return _macro_rule('bind',
                        s1({site1: None}) + s2({site2: None}) <>
                        s1({site1: 1}) % s2({site2: 1}),
-                       klist, ['kf', 'kr'])
+                       klist, ['kf', 'kr'], name_func=bind_name_func)
 
 #TODO: Docstring
 def bind_table(bindtable, row_site, col_site):
@@ -311,9 +319,8 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
         Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
         catalyze(Kinase, 'b', Substrate(y='U'), 'b', Substrate(y='P'),
                  (1e-4, 1e-1, 1))
-
     """
-    
+
     _verify_sites(enzyme, e_site)
     _verify_sites(substrate, s_site)
 
@@ -326,12 +333,12 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
     # that it is no longer bound to enzyme
     if product().monomer is substrate().monomer:
         product = product({e_site: None})
-     
+
     # create the rules
-    components = _macro_rule('complex',
+    components = _macro_rule('bind',
                              enzyme_free + substrate_free <> es_complex,
                              klist[0:2], ['kf', 'kr'])
-    components |= _macro_rule('dissociate',
+    components |= _macro_rule('catalyze',
                               es_complex >> enzyme_free + product,
                               [klist[2]], ['kc'])
 
