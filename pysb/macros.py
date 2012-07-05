@@ -232,12 +232,10 @@ def bind(s1, site1, s2, site2, klist):
     _verify_sites(s2, site2)
 
     def bind_name_func(rule_expression):
-        # Get ReactionPatterns
-        react_p = rule_expression.reactant_pattern
+        # Get ComplexPatterns
+        react_cps = rule_expression.reactant_pattern.complex_patterns
         # Build the label components
-        lhs_label = [_complex_pattern_label(cp) for cp in react_p.complex_patterns]
-        lhs_label = '_'.join(lhs_label)
-        return '%s' % (lhs_label)
+        return '_'.join(_complex_pattern_label(cp) for cp in react_cps)
 
     return _macro_rule('bind',
                        s1({site1: None}) + s2({site2: None}) <>
