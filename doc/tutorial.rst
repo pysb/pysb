@@ -178,8 +178,8 @@ Run the *ipython* (or *python*) interpreter with no arguments to enter
 interactive mode (be sure to do this from the same directory where
 you've saved :file:`mymodel.py`) and run the following code::
 
-   >>> from mymodel import model
-   >>> model.monomers
+   >>> import mymodel as m
+   >>> m.model.monomers
 
 You should see the following output::
 
@@ -228,8 +228,8 @@ corresponding to the parameters so that your file looks like this:
 Once this is done start the *ipython* (or *python*) intepreter and
 enter the following commands:: 
 
-   >>> from mymodel import model
-   >>> model.parameters
+   >>> import mymodel as m
+   >>> m.model.parameters
 and you should get an output such as::
 
    {'kf': Parameter(name='kf', value=1.0e-07),
@@ -284,7 +284,7 @@ To illustrate the use of the operators and the rule syntax we write
 the complex formation reaction with labels illustrating the parts of
 the rule::
 
-   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') <> C8(b=1) % Bid(b=1, S='u'), *[kf, kr]) 
 	     |              |     |           |         |     |    |     |             |
              |              |     |           |         |     |    |     |            parameter list
 	     |              |     |           |         |     |    |     |
@@ -331,7 +331,7 @@ With this state site added, we can now go ahead and write the rules
 that will account for the binding step and the unbinding step as
 follows::
 
-   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') <>C8(b=1) % Bid(b=1, S='u'), *[kf, kr])
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') <>C8(b=1) % Bid(b=1, S='u'), kf, kr)
    Rule('tBid_from_C8-Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) % Bid(b=None, S='t'), kc)
 
 As shown, the initial reactants, *C8* and *Bid* initially in the
@@ -351,21 +351,21 @@ have the correct monomers, parameters, and rules. Your output should
 be very similar to the one presented (output shown below the ``'>>>'``
 python prompts).::
 
-   >>> from mymodel import model
-   >>> model.monomers
+   >>> import mymodel as m
+   >>> m.model.monomers
       {'C8': Monomer(name='C8', sites=['b'], site_states={}),
       'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
    >>> model.parameters
       {'kf': Parameter(name='kf', value=1.0e-07),
        'kr': Parameter(name='kr', value=1.0e-03),
        'kc': Parameter(name='kc', value=1.0    )}
-   >>> model.rules
+   >>> m.model.rules
       {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
-      Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
+      Bid(b=None, S='u'), products=C8(b=1) % Bid(b=1, S='u'),
       rate_forward=Parameter(name='kf', value=1.0e-07),
       rate_reverse=Parameter(name='kr', value=1.0e-03)),
       'tBid_from_C8Bid': Rule(name='tBid_from_C8Bid', reactants=C8(b=1) %
-      Bid(b=1, S=u), products=C8(b=None) + Bid(b=None, S=t),
+      Bid(b=1, S='u'u), products=C8(b=None) + Bid(b=None, S=t),
       rate_forward=Parameter(name='kc', value=1.0))}
 
 With this we are almost ready to run a simulation, all we need now is
@@ -427,7 +427,7 @@ observe activated complexes.
 
 Simulation and analysis
 =======================
-By now your :file:`mymodel.py` file should look something like this::
+By now your :file:`mymodel.py` file should look something like this:
 
 .. literalinclude:: examples/mymodel4.py
 
@@ -436,23 +436,23 @@ properly. Start your *ipython* (or *python*) interpreter and enter the
 commands as shown below. Notice the output should be similar to the
 one shown (output shown below the ``'>>>'``` prompts)::
 
-   >>> from mymodel import model
-   >>> model.monomers
+   >>> import mymodel as m
+   >>> m.model.monomers
       {'C8': Monomer(name='C8', sites=['b'], site_states={}),
        'Bid': Monomer(name='Bid', sites=['b', 'S'], site_states={'S': ['u', 't']})}
-   >>> model.parameters
+   >>> m.model.parameters
       {'kf': Parameter(name='kf', value=1.0e-07),
        'kr': Parameter(name='kr', value=1.0e-03),
        'kc': Parameter(name='kc', value=1.0    ),
        'C8_0': Parameter(name='C8_0', value=1000),
        'Bid_0': Parameter(name='Bid_0', value=10000)}
-   >>> model.observables
+   >>> m.model.observables
       {'obsC8': <pysb.core.Observable object at 0x104b2c4d0>,
        'obsBid': <pysb.core.Observable object at 0x104b2c5d0>,
        'obstBid': <pysb.core.Observable object at 0x104b2c6d0>}
-   >>> model.initial_conditions
+   >>> m.model.initial_conditions
       [(C8(b=None), Parameter(name='C8_0', value=1000)), (Bid(b=None, S=u), Parameter(name='Bid_0', value=10000))]
-   >>> model.rules
+   >>> m.model.rules
       {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
       Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),
       rate_forward=Parameter(name='kf', value=1.0e-07),    rate_reverse=Parameter(name='kr', value=1.0e-03)),
@@ -472,24 +472,25 @@ integrators in the *SciPy*[#sp]_ module to function seamlessly with
 We will begin our simulation by loading the model from the *ipython*
 (or *python*) interpreter as shown below::
 
-   >>> from mymodel import model
-   >>> model.monomers
+   >>> import mymodel as m
+   >>> m.model.monomers
 
 Now, we will import the *PyLab* and **PySB** integrator module. Enter
 the commands as shown below::
 
    >>> from pysb.integrate import odesolve
-   >>> from pylab import *
+   >>> import pylab as pl
 
 We have now loaded the integration engine and the graph engine into
-the interpreter environment. You may get some feedback as some things
-can be compiled at runtime, depending on your operating
-system. The next thing we need is to tell the integrator the time
-domain over which we wish to integrate the equations. For our case we
-will use :math:`20000s` of simulation time. To do this we generate an
-array using the *linspace* function. Enter the command below::
+the interpreter environment. You may get some feedback from the
+program as some functions can be compiled at runtime for speed,
+depending on your operating system.Next we need to tell the integrator
+the time domain over which we wish to integrate the equations. For our
+case we will use :math:`20000s` of simulation time. To do this we
+generate an array using the *linspace* function from *PyLab*. Enter
+the command below::
 
-   >>> t = linspace(0, 20000)
+   >>> t = pl.linspace(0, 20000)
 
 This command assigns an array in the range :math:`[0..20000]` to the
 variable *t*. You can type the name of the variable at any time to see
@@ -515,7 +516,7 @@ These are the points at which we will get data for each ODE from the
 integrator. With this, we can now run our simulation. Enter the
 following commands to run the simulation::
 
-   >>> yout = odesolve(model, t)
+   >>> yout = odesolve(m.model, t)
 
 To verify that the simulation run you can see the content of the
 *yout* object. For example, check for the content of the *Bid*
@@ -544,15 +545,15 @@ names. We can therefore plot this data to visualize our output. Using
 the commands imported from the *PyLab* module we can create a graph
 interactively. Enter the commands as shown below::
 
-   >>>ion()
-   >>>figure()
-   >>>plot(t, yout['obsBid'], label="Bid")
-   >>>plot(t, yout['obstBid'], label="tBid")
-   >>>plot(t, yout['obsC8'], label="C8")
-   >>>legend()
-   >>>xlabel("seconds")
-   >>>ylabel("Molecules/cell")
-   >>>show()
+   >>>pl.ion()
+   >>>pl.figure()
+   >>>pl.plot(t, yout['obsBid'], label="Bid")
+   >>>pl.plot(t, yout['obstBid'], label="tBid")
+   >>>pl.plot(t, yout['obsC8'], label="C8")
+   >>>pl.legend()
+   >>>pl.xlabel("Time (s)")
+   >>>pl.ylabel("Molecules/cell")
+   >>>pl.show()
 
 You should now have a figure in your screen showing the number of
 *Bid* molecules decreaing from the initial amount decreasing over
@@ -575,16 +576,61 @@ simulation!
 =================
 Advanced modeling
 =================
+
 In this section we continue with the above tutorial and touch on some
-advanced techniques for modeling using compartments (`BioNetGen`_
-only), the definition of higher order rules using functions, and model
-calibration using the PySB utilities. Although we provide the
-functions and utilities we have found useful for the community, we
-encourage users to customize the modeling tools to their needs and
-add/contribute to the **PySB** modeling community.
+advanced techniques for modeling using compartments, the definition of
+higher order rules using functions, and model calibration using the
+PySB utilities. Although we provide the functions and utilities we
+have found useful for the community, we encourage users to customize
+the modeling tools to their needs and add/contribute to the *PySB*
+modeling community.
+
+For this section we will show the power of functions by creating a
+function called "catalyze". Catalysis happens quite often in models
+and it is one of the basic functions we have found useful in our
+model development. Rather than typing many lines such as::
+
+   Rule("association",  Enz(b=None) + Sub(b=None, S="i") <> Enz(b=1)%Sub(b=1,S="i"), kf, kr)
+   Rule("dissociation", Enz(b=1)%Sub(b=1,S="i") >> Enz(b=None) + Sub(b=None, S="a"), kc)
+   
+multiple times, we find it more powerful, transparent and easy to
+instantiate/edit a simple, one-line function call such as::
+
+   catalyze(Enz, Sub, "S", "i", "a", kf, kr, kc)
+
+We find that the functional form captures what we mean to write: a
+chemical species (the substrate) undergoes catalytic activation (by
+the enzyme) with a given set of parameters. We will now describe how a
+function can be written in *PySB* to automate the scripting of simple
+concepts into a programmatic format. Examine the function below::
+
+   def catalyze(enz, sub, site, state1, state2, kf, kr, kc):   # (0) function call
+       """2-step catalytic process"""                          # (1) reaction name
+       r1_name = '%s_assoc_%s' % (enz.name, sub.name)          # (2) name of association reaction for rule
+       r2_name = '%s_diss_%s' % (enz.name, sub.name)           # (3) name of dissociation reaction for rule
+       E = enz(b=None)                                         # (4) define enzyme state in function
+       S = sub({'b': None, site: state1})                      # (5) define substrate state in function
+       ES = enz(b=1) % sub({'b': 1, site: state1})             # (6) define state of enzyme:substrate complex
+       P = sub({'b': None, site: state2})                      # (7) define state of product
+       Rule(r1_name, E + S <> ES, kf, kr)                      # (8) rule for enzyme + substrate association (bidirectional)
+       Rule(r2_name, ES >> E + P, kc)                          # (9) rule for enzyme:substrate dissociation  (unidirectional)
+
+As shown it takes about ten lines to write the catalyze function
+(shorter variants are certainly possible with more advanced *Python*
+statements). The skeleton of every function in *Python* 
+
+
 
 Higher-order rules
 ==================
+The key advantage to *PySB* is the fact that it provides a way for
+*Monomers*, *Parameters*, *Species*, and pretty much anything related
+to rules-based modeling as objects in the *Python* language. As such
+one could write functions to interact with these objects and they
+could be instantiated and inherit methods from a class. The limits to
+programming biology with *PySB* are mostly those enforced by the
+*Python* language itself. 
+
 
 Model calibration
 =================

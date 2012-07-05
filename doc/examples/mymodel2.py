@@ -6,11 +6,12 @@ Model()
 
 # declare monomers
 Monomer('C8', ['b'])
-Monomer('Bid', ['b', 'S'])
+Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
 
 # input the parameter values
-Parameter('kf', 1.04e-06)
-Parameter('kr', 1.04e-06)
-Parameter('kc', 1.04e-06)
+Parameter('kf', 1.0e-07)
+Parameter('kr', 1.0e-03)
+Parameter('kc', 1.0)
+
 
 

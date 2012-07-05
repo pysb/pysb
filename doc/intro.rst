@@ -1,8 +1,20 @@
-Introduction
-============
+Introduction to modeling
+========================
 
-Here is where we will describe whay PySB does and how cool it is.
-Keep it short, one paragraph or two at the most.
+The premise to all modeling is that, given experimental
+observations, we have reason to believe that a system is governed by a
+set of rules which we aim to understand and employ for furthe
+manipulation of the system. As such, models aim both to *explain* the
+behavior of a system given a set of conditions, or to predict the
+behavior of a system given a set of conditions. The best models can
+perform both tasks to explain and predict. 
+
+PySB as modeling tool
+=====================
+*PySB* is a set of software tools that enables users to develop,
+implement, and execute biological models in a programming
+environment.
+
 
 An example
 ----------

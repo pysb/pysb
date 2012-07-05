@@ -6,6 +6,6 @@ Model()
 
 # declare monomers
 Monomer('C8', ['b'])
-Monomer('Bid', ['b', 'S'])
+Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
 
 
