@@ -222,9 +222,10 @@ def bind(s1, site1, s2, site2, klist):
     Examples
     --------
         Model()
-        Monomer('A', ['b'])
-        Monomer('B', ['b'])
-        bind(A, 'b', B, 'b', [1e-4, 1e-1])
+        Monomer('A', ['x'])
+        Monomer('B', ['y'])
+        bind(A, 'x', B, 'y', [1e-4, 1e-1])
+
     """
 
     _verify_sites(s1, site1)
@@ -241,17 +242,54 @@ def bind(s1, site1, s2, site2, klist):
                        s1({site1: 1}) % s2({site2: 1}),
                        klist, ['kf', 'kr'], name_func=bind_name_func)
 
-#TODO: Docstring
 def bind_table(bindtable, row_site, col_site):
-    """This assumes that the monomers passed are in their desired state without
-    the sites which will be used for binding.
+    """Generate a table of reversible binding reactions.
 
-        bindtable[0]: [          B1, ...,     Bn]
-        bindtable[1]: [A1, (kf, kr), ...,  (...)]
-        ...
-        bindtable[n]: [An,     None, ...,  (...)]
+    Given two lists of species R and C, calls the `bind` macro on each pairwise
+    combination (R[i], C[j]). The species lists and the parameter values are
+    passed as a list of lists (i.e. a table) with elements of R passed as the
+    "row headers", elements of C as the "column headers", and forward / reverse
+    rate pairs (in that order) as tuples in the "cells". For example with two
+    elements in each of R and C, the table would appear as follows (note that
+    the first row has one fewer element than the subsequent rows)::
 
-    To indicate that no interaction occurs, simply enter None in the bind table.
+        [[              C1,           C2],
+         [R1, (1e-4, 1e-1), (2e-4, 2e-1)],
+         [R2, (3e-4, 3e-1), (4e-4, 4e-1)]]
+
+    Each parameter tuple may contain Parameters or numbers. If Parameters are
+    passed, they will be used directly in the generated Rules. If numbers are
+    passed, Parameters will be created with automatically generated names based
+    on the names and states of the relevant species and these parameters will be
+    included at the end of the returned component list. To omit any individual
+    reaction, pass None in place of the corresponding parameter tuple.
+
+    Parameters
+    ----------
+    bindtable : list of lists
+        Table of reactants and rates, as described above.
+    row_site, col_site : string 
+        The names of the sites on the elements of R and C, respectively, used
+        for binding.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains the bidirectional binding Rules and
+        optionally the Parameters for any parameters given as numbers.
+
+    Examples
+    --------
+        Model()
+        Monomer('R1', ['x'])
+        Monomer('R2', ['x'])
+        Monomer('C1', ['y'])
+        Monomer('C2', ['y'])
+        bind_table([[              C1,           C2],
+                    [R1, (1e-4, 1e-1), (2e-4, 2e-1)],
+                    [R2, (3e-4, 3e-1), None        ]],
+                   'x', 'y')
+
     """
 
     # extract species lists and matrix of rates
@@ -263,9 +301,9 @@ def bind_table(bindtable, row_site, col_site):
     components = ComponentSet()
     for r, s_row in enumerate(s_rows):
         for c, s_col in enumerate(s_cols):
-            if kmatrix[r][c] is not None:
-                components |= bind(s_row(), row_site, s_col(), col_site,
-                                   kmatrix[r][c])
+            klist = kmatrix[r][c]
+            if klist is not None:
+                components |= bind(s_row(), row_site, s_col(), col_site, klist)
 
     return components
 
