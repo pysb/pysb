@@ -134,8 +134,7 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
                            klist[1])
             params_created.add(k2)
     else:
-        raise ValueError("klist must contain Parameter objects or " +
-            "a list of (name, number) tuples")
+        raise ValueError("klist must contain Parameter objects or numbers.")
 
     if rule_expression.is_reversible:
         r = Rule(r_name, rule_expression, k1, k2)
