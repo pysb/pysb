@@ -836,8 +836,9 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         must comprise solely Parameter objects or solely numbers (never some of
         each). If Parameters are passed, they will be used directly in the
         generated Rules. If numbers are passed, Parameters will be created with
-        automatically generated names based on <TODO> and these parameters will
-        be included at the end of the returned component list.
+        automatically generated names based on the subunit, the pore size and
+        the cargo, and these parameters will be included at the end of the
+        returned component list.
 
     """
 
@@ -853,14 +854,15 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         prod_p = rule_expression.product_pattern
         # Build the label components
         # Pore is always first complex of LHS due to how we build the rules
-        subunit = react_p.complex_patterns[0].monomer_patterns[0].monomer
+        subunit = react_p.complex_patterns[0].monomer_patterns[0]
         if len(react_p.complex_patterns) == 2:
             # This is the complexation reaction
             cargo = react_p.complex_patterns[1].monomer_patterns[0]
         else:
             # This is the dissociation reaction
             cargo = prod_p.complex_patterns[1].monomer_patterns[0]
-        return '%s_%d_%s' % (subunit.name, size, _monomer_pattern_label(cargo))
+        return '%s_%d_%s' % (_monomer_pattern_label(subunit), size,
+                             _monomer_pattern_label(cargo))
 
     components = ComponentSet()
     # Set up some aliases that are invariant with pore size
