@@ -582,8 +582,11 @@ advanced techniques for modeling using compartments, the definition of
 higher order rules using functions, and model calibration using the
 PySB utilities. Although we provide the functions and utilities we
 have found useful for the community, we encourage users to customize
-the modeling tools to their needs and add/contribute to the *PySB*
+the modeling tools to their needs and add/contribute to the PySB
 modeling community.
+
+Higher-order rules
+================== 
 
 For this section we will show the power of functions by creating a
 function called "catalyze". Catalysis happens quite often in models
@@ -601,7 +604,7 @@ instantiate/edit a simple, one-line function call such as::
 We find that the functional form captures what we mean to write: a
 chemical species (the substrate) undergoes catalytic activation (by
 the enzyme) with a given set of parameters. We will now describe how a
-function can be written in *PySB* to automate the scripting of simple
+function can be written in PySB to automate the scripting of simple
 concepts into a programmatic format. Examine the function below::
 
    def catalyze(enz, sub, site, state1, state2, kf, kr, kc):   # (0) function call
@@ -619,21 +622,21 @@ As shown it takes about ten lines to write the catalyze function
 (shorter variants are certainly possible with more advanced *Python*
 statements). The skeleton of every function in *Python* 
 
-
-
-Higher-order rules
-==================
-The key advantage to *PySB* is the fact that it provides a way for
+The key advantage to PySB is the fact that it provides a way for
 *Monomers*, *Parameters*, *Species*, and pretty much anything related
 to rules-based modeling as objects in the *Python* language. As such
 one could write functions to interact with these objects and they
 could be instantiated and inherit methods from a class. The limits to
-programming biology with *PySB* are mostly those enforced by the
-*Python* language itself. 
+programming biology with PySB are those enforced by the *Python*
+language itself.
 
+**EXAMPLES WITH CODE**
 
 Model calibration
 =================
+**ANNEAL**
+
+
 
 Compartments
 ============
@@ -642,6 +645,8 @@ more species and a compartment. In extrinsic apoptosis, once *tBid* is
 activated it translocates to the outer mitochondrial membrane where it
 interacts with the protein *Bak* (residing in the membrane). 
 
+Modules
+=======
 
 
 .. rubric:: Footnotes
