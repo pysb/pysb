@@ -8,19 +8,22 @@ familiarity with the language. It will take you ten minutes to gain
 enough knowledge to "get going" and it could potentially change how
 you approach your programming needs. 
 
-Python for the impatient: 
-   * http://openopt.org/PythonIntroduction
-   * http://hetland.org/writing/instant-python.html
+Quick Python Overview (10 minutes or so): 
+   * `OpenOpt Python for the impatient <http://openopt.org/PythonIntroduction>`_
+   * `Instant Python <http://hetland.org/writing/instant-python.html>`_
    
-Python for absolute beginners:
-   * http://en.wikibooks.org/wiki/Non-Programmer%27s_Tutorial_for_Python_2.6
-   * http://wiki.python.org/moin/BeginnersGuide/NonProgrammers
+Python for beginners, experienced users, or if you want a refresher:
+   * `Official Python tutorial <http://docs.python.org/tutorial/>`_
+   * `Python for non-programmers <http://wiki.python.org/moin/BeginnersGuide/NonProgrammers>`_
+   * `Dive into Python <http://www.diveintopython.net/>`_
+   
 
-Official Python tutorial:
-   * Python website
-
-Python for MatLab users:
-   * Python for matlab tutorial
+For experienced users of other languages:
+   * `NumPy for Matlab <http://www.scipy.org/NumPy_for_Matlab_Users/>`_
+      * Also the `Mathesaurus <http://mathesaurus.sourceforge.net/matlab-numpy.html>`_
+      * Matlab commands in Numerical Python `cheatsheet <http://mathesaurus.sourceforge.net/matlab-python-xref.pdf>`_
+   * `Scientific Python <http://www.scipy.org/>`_
+   
 
 
 Requirements

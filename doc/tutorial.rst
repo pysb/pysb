@@ -5,69 +5,44 @@
 This tutorial will walk you through the creation of your first PySB
 model. It will cover the basics, provide a guide through the different
 programming constructs and finally deal with more complex
-rule-building. Users should be able to write simple programs and
-follow the programs in the example sections after finishing this
-section. In what follows we will assume you are using *iPython* as your
-interactive python REPL but the standard *python* REPL could be used
-as well. 
+rule-building. Users will be able to write simple programs after
+finishing this section. In what follows we will assume you are
+issuing commands from a *Python* prompt (whether it be actual *Python*
+or a shell such as *iPython*. See :doc:`installation` for details).
 
-.. note:: Familiarity with rules-based biomodel encoding tools such as
+.. Note:: Familiarity with rules-based biomodel encoding tools such as
    `BioNetGen`_ or `Kappa`_ would be useful to users unfamiliar with
-   *Rules-based* approaches to modeling. Although we start from the
-   basics in this tutorial, some familiarity with these tools will be
-   useful.
+   *Rules-based* approaches to modeling. A short :doc:`rulesprimer`
+   is included for new users.
 
-.. warning:: A basic understanding of the Python programming language
-   is essential for the use of PySB. Although the user can go through
-   this tutorial and develop an understanding of the PySB tools,
-   advanced programming with PySB will require understanding of
-   Python. Some useful tutorials/guides include the `Official Python
-   Tutorial <http://docs.python.org/tutorial/>`_, `Dive into Python
-   <http://www.diveintopython.net/>`_, `Numerical Python (NumPy)
-   <http://numpy.scipy.org/>`_, and `Scientific Python (SciPy)
-   <http://scipy.org/Getting_Started>`_.
+.. Note:: Although a new user can go through the tutorial to
+   understand how PySB works, a basic understanding of the Python
+   programming language is essential. See the :doc:`installation`
+   section for some *Python* suggestions.
+   
+Modeling with PySB
+==================
 
+A biological model in PySB will need the following components to
+generate a mathematical representation of a system:
 
-Basic rule-based modeling and PySB
-======================================
-In rules-based modeling, units that undergo transformations such as
-proteins, small molecules, protein complexes, etc are termed
-*species*. The interactions among these *species* are then represented
-using structured objects that describe the interactions between the
-*species* and constitute what we describe as *rules*. The specific
-details of how species and rules are specified can vary across
-different rules-based modeling approaches. In PySB we have chosen to
-ascribe to the approaches found in `BioNetGen`_ and `Kappa`_, but
-other approaches are certainly possible for advanced users interested
-in modifying the source code. Each rule, describing the interaction
-between *species* or sets of *species* must be assigned a set of
-*parameters* associated with the nature of the *rule*. Given that
-`BioNetGen`_ and `Kappa`_ both describe interactions using a
-mass-action kinetics formalism, the *parameters* will necessarily
-consist of reaction rates. In what follows we describe how a model can
-be instantiated in PySB, how *species* and *rules* are specified, and
-how to run a simple simulation.
-
-The key components that every model in PySB needs are:
-
-* Model definition: this instantiates the model object
-* Monomer definition: this instantiates the monomers that are allowed
-  in our model.
+* Model definitions: This instantiates the model object.
+* Monomer definition: This instantiates the monomers that are allowed
+  in the model.
 * Parameters: These are the numerical parameters needed to create a
-  mass-action or stochastic simulation to solve the system's evolution
-  over time.
-* Rules: the set of statements that describe how *species*, that is
-  separate instances of monomers, interact as prescribed by the
-  parameters involved in a given rule.
+  mass-action or stochastic simulation.
+* Rules: These are the set of statements that describe how *monomer
+  species*, interact as prescribed by the parameters involved in a
+  given rule. The collection of these rules is called the *model
+  topology*. 
 
-For what follows we will use an example taken from our work in
-`extrinsic apoptosis signaling`_. In this work the initiator caspases,
-activated by an upstream signal, play an essential role activating the
-effector Bcl-2 proteins downstream. Caspase-8, a representative
-initiator caspase, and Bid, a representative effector BH3 protein,
-bind to create a complex. Caspase-8 then cleaves the protein Bid to
-create truncated Bid. This is usually considered a two-step process as
-follows.
+The following examples will be taken from work in the `Sorger lab`_ in
+`extrinsic apoptosis signaling`_. The initiator caspases, activated by
+an upstream signal, play an essential role activating the effector
+Bcl-2 proteins downstream. In this model, Bid is catalitically
+truncated and activated by Caspase-8, an initiator caspase. We will
+build a model that represents this activation as a two-step process as
+follows:
 
 .. math::
    C8 + Bid \underset{kr}{\overset{kf}{\leftrightharpoons}} C8:Bid \quad {\longleftarrow \mbox{Complex formation step}} \\
@@ -75,8 +50,9 @@ follows.
 
 Where tBid is the truncated Bid. The parameters *kf*, *kr*, and *kc*
 represent the forward, reverse, and catalytic rates that dictate the
-consumption of Bid via catalysis by C8 and the formation of tBid. For
-completeness we write the ODEs that represent this system below:
+consumption of Bid via catalysis by C8 and the formation of tBid. We
+will eventually end up with a mathematical representation that will
+look something like this:
 
 .. math::
    \frac{d[C8]}{dt}     &= -kf[C8]*[Bid] + kr*[C8:Bid] + kc*[C8:Bid] \\
@@ -87,19 +63,11 @@ completeness we write the ODEs that represent this system below:
    
 The species names in square braces represent concentrations, usually
 give in molar (M) and time in seconds. These ordinary differential
-equations (ODEs) are then integrated numerically to obtain the
-evolution of the system over time. As shown, the parameters are needed
-to instantiate the equations but the manner in which the parameters
-influence the concentration changes in each chemical *species* (the
-terms on the left of the equations) is determined by the manner in
-which the chemical equations are written. We term this connectivity
-between chemical species as the system *topology*. This *topology*
-along with a number of parameters, dictates the output of a given
-model. The connectivity between the chemical reactants specify the
-manner in which the equations are written. We will explore how one
-could instantiate a model, add different actions to the model, and
-create multiple instances of a model *without* having to resort to the
-tedious and repetitive writing of equations as those listed above.
+equations (ODEs) will then be integrated numerically to obtain the
+evolution of the system over time. We will explore how a model could
+be instantiated, modified, and expanded *without* having to resort to
+the tedious and repetitive writing and rewriting of equations as those
+listed above.
 
 The Empty Model
 ===============
@@ -673,3 +641,5 @@ Modules
 .. _Kappa: http://www.kappalanguage.org/documentation
 
 .. _extrinsic apoptosis signaling: http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.0060299
+
+.. _Sorger lab http://sorger.med.harvard.edu/
