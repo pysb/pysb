@@ -51,11 +51,8 @@ class SelfExporter(object):
             if SelfExporter.default_model is not None \
                     and new_target_module is SelfExporter.target_module:
                 warnings.warn("Redefining model! (You can probably ignore this if you are running"
-                              " code interactively)", ModelExistsWarning, stacklevel);
-                # delete previously exported symbols to prevent extra SymbolExistsWarnings
-                for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
-                    if name in SelfExporter.target_globals:
-                        del SelfExporter.target_globals[name]
+                              " code interactively)", ModelExistsWarning, stacklevel)
+                SelfExporter.cleanup()
             SelfExporter.target_module = new_target_module
             SelfExporter.target_globals = caller_frame.f_globals
             SelfExporter.default_model = obj
@@ -83,6 +80,16 @@ class SelfExporter(object):
         if SelfExporter.target_globals.has_key(export_name):
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
+
+    @staticmethod
+    def cleanup():
+        # delete previously exported symbols
+        for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
+            if name in SelfExporter.target_globals:
+                del SelfExporter.target_globals[name]
+        SelfExporter.default_model = None
+        SelfExporter.target_globals = None
+        SelfExporter.target_module = None
 
     @staticmethod
     def rename(obj, new_name):
@@ -297,6 +304,14 @@ class MonomerPattern(object):
     def __rshift__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
             return RuleExpression(self, other, False)
+        elif other is None:
+            return RuleExpression(self, ReactionPattern([]), False)
+        else:
+            return NotImplemented
+
+    def __rrshift__(self, other):
+        if other is None:
+            return RuleExpression(ReactionPattern([]), self, False)
         else:
             return NotImplemented
 
@@ -403,6 +418,14 @@ class ComplexPattern(object):
     def __rshift__(self, other):
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
             return RuleExpression(self, other, False)
+        elif other is None:
+            return RuleExpression(self, ReactionPattern([]), False)
+        else:
+            return NotImplemented
+
+    def __rrshift__(self, other):
+        if other is None:
+            return RuleExpression(ReactionPattern([]), self, False)
         else:
             return NotImplemented
 
@@ -455,6 +478,14 @@ class ReactionPattern(object):
         """Irreversible reaction"""
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
             return RuleExpression(self, other, False)
+        elif other is None:
+            return RuleExpression(self, ReactionPattern([]), False)
+        else:
+            return NotImplemented
+
+    def __rrshift__(self, other):
+        if other is None:
+            return RuleExpression(ReactionPattern([]), self, False)
         else:
             return NotImplemented
 
@@ -462,11 +493,16 @@ class ReactionPattern(object):
         """Reversible reaction"""
         if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
             return RuleExpression(self, other, True)
+        elif other is None:
+            return RuleExpression(self, ReactionPattern([]), True)
         else:
             return NotImplemented
 
     def __repr__(self):
-        return ' + '.join([repr(p) for p in self.complex_patterns])
+        if len(self.complex_patterns):
+            return ' + '.join([repr(p) for p in self.complex_patterns])
+        else:
+            return 'None'
 
 
 
@@ -494,6 +530,10 @@ class RuleExpression(object):
             raise type(e)("Product does not look like a reaction pattern")
         self.is_reversible = is_reversible
 
+    def __repr__(self):
+        operator = '<>' if self.is_reversible else '>>'
+        return '%s %s %s' % (repr(self.reactant_pattern), operator,
+                             repr(self.product_pattern))
 
 
 def as_complex_pattern(v):
@@ -593,6 +633,12 @@ class Rule(Component):
         self.move_connected = move_connected
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
+    def is_synth(self):
+        return len(self.reactant_pattern.complex_patterns) == 0
+
+    def is_deg(self):
+        return len(self.product_pattern.complex_patterns) == 0
+
     def __repr__(self):
         ret = '%s(name=%s, reactants=%s, products=%s, rate_forward=%s' % \
             (self.__class__.__name__, repr(self.name), repr(self.reactant_pattern), repr(self.product_pattern), repr(self.rate_forward))
@@ -624,6 +670,11 @@ class Observable(Component):
         self.reaction_pattern = reaction_pattern
         self.species = []
         self.coefficients = []
+
+    def __repr__(self):
+        ret = '%s(%s, %s)' % (self.__class__.__name__, repr(self.name),
+                              repr(self.reaction_pattern))
+        return ret
 
 
 
@@ -747,6 +798,23 @@ class Model(object):
             return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
         except StopIteration:
             return None
+
+    def has_synth_deg(self):
+        """Return true if model uses synthesis or degradation reactions."""
+        return any(r.is_synth() or r.is_deg() for r in self.rules)
+
+    def enable_synth_deg(self):
+        """Add components needed to support synthesis and degradation rules."""
+        if self.monomers.get('__source') is None:
+            self.add_component(Monomer('__source', _export=False))
+        if self.monomers.get('__sink') is None:
+            self.add_component(Monomer('__sink', _export=False))
+        if self.parameters.get('__source_0') is None:
+            self.add_component(Parameter('__source_0', 1.0, _export=False))
+
+        source_cp = as_complex_pattern(self.monomers['__source']())
+        if not any(source_cp.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
+            self.initial(source_cp, self.parameters['__source_0'])
 
     def reset_equations(self):
         """Clear out anything generated by bng.generate_equations or the like"""
