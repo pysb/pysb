@@ -51,11 +51,8 @@ class SelfExporter(object):
             if SelfExporter.default_model is not None \
                     and new_target_module is SelfExporter.target_module:
                 warnings.warn("Redefining model! (You can probably ignore this if you are running"
-                              " code interactively)", ModelExistsWarning, stacklevel);
-                # delete previously exported symbols to prevent extra SymbolExistsWarnings
-                for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
-                    if name in SelfExporter.target_globals:
-                        del SelfExporter.target_globals[name]
+                              " code interactively)", ModelExistsWarning, stacklevel)
+                SelfExporter.cleanup()
             SelfExporter.target_module = new_target_module
             SelfExporter.target_globals = caller_frame.f_globals
             SelfExporter.default_model = obj
@@ -83,6 +80,16 @@ class SelfExporter(object):
         if SelfExporter.target_globals.has_key(export_name):
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
+
+    @staticmethod
+    def cleanup():
+        # delete previously exported symbols
+        for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
+            if name in SelfExporter.target_globals:
+                del SelfExporter.target_globals[name]
+        SelfExporter.default_model = None
+        SelfExporter.target_globals = None
+        SelfExporter.target_module = None
 
     @staticmethod
     def rename(obj, new_name):
