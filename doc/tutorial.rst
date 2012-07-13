@@ -66,8 +66,9 @@ give in molar (M) and time in seconds. These ordinary differential
 equations (ODEs) will then be integrated numerically to obtain the
 evolution of the system over time. We will explore how a model could
 be instantiated, modified, and expanded *without* having to resort to
-the tedious and repetitive writing and rewriting of equations as those
-listed above.
+the tedious, repetitive, and error-prone writing and rewriting of
+equations as those listed above. To achieve this we leverage the power
+of rules-based languages such as B
 
 The Empty Model
 ===============
@@ -642,4 +643,4 @@ Modules
 
 .. _extrinsic apoptosis signaling: http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.0060299
 
-.. _Sorger lab http://sorger.med.harvard.edu/
+.. _Sorger lab: http://sorger.med.harvard.edu/

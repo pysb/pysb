@@ -14,9 +14,8 @@ Contents:
    intro
    installation
    tutorial
-   modules/index
-   internals
    rulesprimer
+   modules/index
    glossary
    about
 
