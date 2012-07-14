@@ -778,19 +778,93 @@ class Model(object):
             if component in cset:
                 cset.rename(component, new_name)
 
-    def initial(self, complex_pattern, value):
+    def _validate_initial_condition_pattern(self, pattern):
+        """Make sure the initial condition pattern is valid.
+
+        Patterns must be:
+
+
+        Parameters
+        ----------
+        pattern : A Monomer, MonomerPattern, or ComplexPattern
+            To be valid, a pattern must be:
+
+            - Able to be cast as a ComplexPattern
+            - Concrete (all sites and states specified)
+            - Distinct from any existing initial condition pattern
+
+        Returns
+        -------
+        If the provided pattern is valid, returns it as a ComplexPattern object.
+        object.
+        """
+
         try:
-            complex_pattern = as_complex_pattern(complex_pattern)
+            complex_pattern = as_complex_pattern(pattern)
         except InvalidComplexPatternException as e:
-            raise type(e)("Initial condition species does not look like a ComplexPattern")
-        if not isinstance(value, Parameter):
-            raise Exception("Value must be a Parameter")
+            raise type(e)("Initial condition species does not look like a "
+                          "ComplexPattern")
         if not complex_pattern.is_concrete():
             raise Exception("Pattern must be concrete")
-        if any(complex_pattern.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
-            # FIXME until we get proper canonicalization this could produce false negatives
+        if any(complex_pattern.is_equivalent_to(other_cp)
+               for other_cp, value in self.initial_conditions):
+            # FIXME until we get proper canonicalization this could produce
+            # false negatives
             raise Exception("Duplicate initial condition")
+        return complex_pattern
+
+    def initial(self, pattern, value):
+        complex_pattern = self._validate_initial_condition_pattern(pattern)
+        if not isinstance(value, Parameter):
+            raise Exception("Value must be a Parameter")
         self.initial_conditions.append( (complex_pattern, value) )
+
+    def update_initial_condition_pattern(self, before_pattern, after_pattern):
+        """Update the concrete pattern associated with an initial condition.
+
+        Leaves the Parameter object associated with the initial condition
+        unchanged while modifying the pattern associated with that condition.
+        For example this is useful for changing the state of a site on a
+        monomer or complex associated with an initial condition without having
+        to create an independent initial condition, and parameter, associated
+        with that alternative state.
+
+        Parameters
+        ----------
+        before_pattern : ComplexPattern
+            The concrete pattern specifying the (already existing) initial
+            condition. If the model does not contain an initial condition
+            for the pattern, a ValueError is raised.
+        after_pattern : ComplexPattern
+            The concrete pattern specifying the new pattern to use to replace
+            before_pattern.
+        """
+        # Get the initial condition index
+        ic_index_list = [i for i, ic in enumerate(self.initial_conditions)
+                   if ic[0].is_equivalent_to(as_complex_pattern(before_pattern))]
+
+        # If the initial condition to replace is not found, raise an error
+        if not ic_index_list:
+            raise ValueError("No initial condition found for pattern %s" %
+                             before_pattern)
+
+        # If more than one matching initial condition is found, raise an
+        # error (this should never happen, because duplicate initial conditions
+        # are not allowed to be created)
+        assert len(ic_index_list) == 1
+        ic_index = ic_index_list[0]
+
+        # Make sure the new initial condition pattern is valid
+        after_pattern = self._validate_initial_condition_pattern(after_pattern)
+
+        # Since everything checks out, replace the old initial condition
+        # pattern with the new one.  Because initial_conditions are tuples (and
+        # hence immutable), we cannot simply replace the pattern; instead we
+        # must delete the old one and add the new one.
+        # We retain the old parameter object:
+        p = self.initial_conditions[ic_index][1]
+        del self.initial_conditions[ic_index]
+        self.initial_conditions.append( (after_pattern, p) )
 
     def get_species_index(self, complex_pattern):
         # FIXME I don't even want to think about the inefficiency of this, but at least it works
