@@ -22,7 +22,7 @@ def run(model):
     param_list_file.write(param_list)
     param_list_file.write('\n\nend\n')
     param_list_file.close()
-  
+
     ## ODES
     odes = 'function out = %s_odes(t, input, param)\n\n' % model_name
 
@@ -30,8 +30,8 @@ def run(model):
         enumerate(model.species)])
     odes += species_list + "\n\n"
 
-    odes += '\n'.join(['out(%d,1) = %s;' % (i+1, sympy.ccode(model.odes[i])) for i in
-        range(len(model.odes))])
+    odes += '\n'.join(['%% %s\nout(%d,1) = %s;' % (model.species[i], i+1, sympy.ccode(model.odes[i]))
+                       for i in range(len(model.odes))])
     odes = re.sub(r's(\d+)', lambda m: 'input(%s)' % (int(m.group(1))+1), odes)
     odes = re.sub(r'pow\(', 'power(', odes)
     odes += '\n\nend\n'
@@ -57,12 +57,12 @@ def run(model):
     # ic_index=cell array with a list that is mapped to the ODEs (i.e., the init_conds) file
     observables = "function [ode_observables, kd_values, kd_index, "
     observables += "ic_index, dividing_factor] = %s_observables()\n\n" % model.name
-  
+
     for i, obs in enumerate(model.observables):
-        obs_spec_list = "[" + ' '.join(str(s) for s in obs.species) + "]"
+        obs_spec_list = "[" + ' '.join(str(s+1) for s in obs.species) + "]"
         obs_coeff_list = "[" + ' '.join(str(c) for c in obs.coefficients) + "]"
 
-        observables += "ode_observables{%d, 1} = %s;\n" % (i+1, obs_spec_list)
+        observables += "ode_observables{%d, 1} = %s; %% %s\n" % (i+1, obs_spec_list, str(obs))
         observables += "ode_observables{%d, 2} = %s;\n" % (i+1, obs_coeff_list)
         observables += "ode_observables{%d, 3} = 1;\n" % (i+1)
     observables += "end\n"
@@ -82,9 +82,9 @@ def run(model):
     prior_flags = "function prior_flag=%s_prior_flags()\n\n" % model.name
     for i, p in enumerate(model.parameters):    
         if (p.name in ic_names):
-            prior_flags += "prior_flag(%d) = 0;\n" % (i+1)
+            prior_flags += "prior_flag(%d) = 0; %% %s\n" % (i+1, p.name)
         else:
-            prior_flags += "prior_flag(%d) = 1;\n" % (i+1)
+            prior_flags += "prior_flag(%d) = 1; %% %s\n" % (i+1, p.name)
     prior_flags += "\nend\n" 
 
     prior_flags_file = open('%s_prior_flags.m' % model.name, 'w')
@@ -97,7 +97,8 @@ def run(model):
     init_conds = "function conc = %s_init_conds()\n\n" % model.name
     init_conds += "conc = zeros(%d, 1);\n" % len(model.species)
     for ic in model.initial_conditions:
-        init_conds += 'conc(%d) = %g;\n' % (model.get_species_index(ic[0]), ic[1].value)
+        init_conds += 'conc(%d) = %g; %% %s; %s\n' % (model.get_species_index(ic[0])+1, ic[1].value,
+                                                  ic[1].name, ic[0])
     init_conds += "\nend\n\n"
 
     init_conds_file = open('%s_init_conds.m' % model.name, 'w')
