@@ -557,10 +557,11 @@ modeling community.
 Higher-order rules
 ================== 
 
-For this section we will show the power of functions by creating a
-function called "catalyze". Catalysis happens quite often in models
-and it is one of the basic functions we have found useful in our
-model development. Rather than typing many lines such as::
+For this section we will show the power working in a programming
+environment by creating a simple function called "catalyze". Catalysis
+happens quite often in models and it is one of the basic functions we
+have found useful in our model development. Rather than typing many
+lines such as::
 
    Rule("association",  Enz(b=None) + Sub(b=None, S="i") <> Enz(b=1)%Sub(b=1,S="i"), kf, kr)
    Rule("dissociation", Enz(b=1)%Sub(b=1,S="i") >> Enz(b=None) + Sub(b=None, S="a"), kc)
@@ -591,15 +592,20 @@ As shown it takes about ten lines to write the catalyze function
 (shorter variants are certainly possible with more advanced *Python*
 statements). The skeleton of every function in *Python* 
 
-The key advantage to PySB is the fact that it provides a way for
-*Monomers*, *Parameters*, *Species*, and pretty much anything related
-to rules-based modeling as objects in the *Python* language. As such
-one could write functions to interact with these objects and they
-could be instantiated and inherit methods from a class. The limits to
-programming biology with PySB are those enforced by the *Python*
-language itself.
+As shown, *Monomers*, *Parameters*, *Species*, and pretty much
+anything related to rules-based modeling are instantiated as objects
+in *Python*. One could write functions to interact with these objects
+and they could be instantiated and inherit methods from a class. The
+limits to programming biology with PySB are those enforced by the
+*Python* language itself.
 
-**EXAMPLES WITH CODE**
+For further reference we invite the users to explore the
+:file:`macros.py` file in the :file:`.../pysb/` directory. Ready to
+use macros for catalyze, bind, oligomerization, and some tabular data
+entry formats (lists of lists) are available for users. Users should
+be able to follow the patterns of these macros and create new macros
+as shown in this section as needed. 
+
 
 Model calibration
 =================
