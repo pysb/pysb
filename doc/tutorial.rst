@@ -67,8 +67,7 @@ equations (ODEs) will then be integrated numerically to obtain the
 evolution of the system over time. We will explore how a model could
 be instantiated, modified, and expanded *without* having to resort to
 the tedious, repetitive, and error-prone writing and rewriting of
-equations as those listed above. To achieve this we leverage the power
-of rules-based languages such as B
+equations as those listed above. 
 
 The Empty Model
 ===============
@@ -99,19 +98,20 @@ Monomers
 ========
 
 Chemical *species* in PySB, whether they are small molecules,
-proteins, or representations of many molecules are all composed of
-*Monomers*. *Monomers* are the subunit that defines how a *species*
+proteins, or representations of many molecules are all derived from
+*Monomers*. *Monomers* are the superunit that defines how a *species*
 can be defined and used. A *Monomer* is defined using the keyword
 ``Monomer`` followed by the desired *monomer* name and the *sites*
 relevant to that monomer. In PySB, like in `BioNetGen`_ or `Kappa`_,
-there are two types of *sites*, namely bond-making/breaking sites (aka
-transformation sites) and state sites. The former allow for the
-description of bonds between *species* while the latter allow for the
-assignment of *states* to species. Following the first lines of code
-entered into your model in the previous section we will add a
-*monomer* named 'Bid' with a bond site 'b::
+there are two types of *sites*, namely bond-making/breaking sites and
+state sites. The former allow for the description of bonds between
+*species* while the latter allow for the assignment of *states* to
+species. Following the first lines of code entered into your model in
+the previous section we will add a *monomer* named 'Bid' with a bond
+site 'b' and a state site 'S'. The state site will contain two states,
+the untruncated (**u**) state and the truncated (**t**) state as shown::
 
-    Monomer('Bid', ['b'])
+    Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
 
 Note that this looks like a Python function call.  This is because it
 *is* in fact a Python function call! [#func]_ The first argument to

@@ -3,10 +3,7 @@ Getting Started
 
 Python Knowledge
 ---------------
-For those unfamiliar with Python we strongly recommend some
-familiarity with the language. It will take you ten minutes to gain
-enough knowledge to "get going" and it could potentially change how
-you approach your programming needs. 
+For those unfamiliar with Python we strongly rogramming needs. 
 
 Quick Python Overview (10 minutes or so): 
    * `OpenOpt Python for the impatient <http://openopt.org/PythonIntroduction>`_
@@ -16,7 +13,8 @@ Python for beginners, experienced users, or if you want a refresher:
    * `Official Python tutorial <http://docs.python.org/tutorial/>`_
    * `Python for non-programmers <http://wiki.python.org/moin/BeginnersGuide/NonProgrammers>`_
    * `Dive into Python <http://www.diveintopython.net/>`_
-   
+   * `Thinking in Python <http://www.mindview.net/Books/TIPython>`_
+   * 
 
 For experienced users of other languages:
    * `NumPy for Matlab <http://www.scipy.org/NumPy_for_Matlab_Users/>`_
