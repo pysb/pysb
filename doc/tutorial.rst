@@ -301,7 +301,7 @@ that will account for the binding step and the unbinding step as
 follows::
 
    Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') <>C8(b=1) % Bid(b=1, S='u'), kf, kr)
-   Rule('tBid_from_C8-Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) % Bid(b=None, S='t'), kc)
+   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) % Bid(b=None, S='t'), kc)
 
 As shown, the initial reactants, *C8* and *Bid* initially in the
 unbound state and, for Bid, in the 'u' state, undergo a complexation
@@ -386,8 +386,8 @@ observables enter the following lines in your :file:`mymodel.py` file
 as follows::
 
    Observable('C8', C8(b=None))
-   Observable('Bid', Bid(b=None, S='u')
-   Observable('tBid', Bid(b=None, S='t')
+   Observable('Bid', Bid(b=None, S='u'))
+   Observable('tBid', Bid(b=None, S='t'))
 
 As shown,the observable can be a species. As we will show later the
 observable can also contain wild-cards and given the "don't care don't
@@ -599,12 +599,18 @@ and they could be instantiated and inherit methods from a class. The
 limits to programming biology with PySB are those enforced by the
 *Python* language itself.
 
+
+Using provided macros
+=====================
+
 For further reference we invite the users to explore the
 :file:`macros.py` file in the :file:`.../pysb/` directory. Ready to
 use macros for catalyze, bind, oligomerization, and some tabular data
 entry formats (lists of lists) are available for users. Users should
 be able to follow the patterns of these macros and create new macros
 as shown in this section as needed. 
+
+
 
 
 Model calibration
