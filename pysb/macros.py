@@ -194,7 +194,7 @@ def equilibrate(s1, s2, klist):
     """
     
     # turn any Monomers into MonomerPatterns
-    return _macro_rule('equilibrate', s1() <> s2(), klist, ['kf', 'kr'])
+    return _macro_rule('equilibrate', s1 <> s2, klist, ['kf', 'kr'])
 
 ## Binding
 def bind(s1, site1, s2, site2, klist):
