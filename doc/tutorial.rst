@@ -385,9 +385,9 @@ of free *C8*, unbound *Bid*, and active *tBid*. To specify the
 observables enter the following lines in your :file:`mymodel.py` file
 as follows::
 
-   Observable('C8', C8(b=None))
-   Observable('Bid', Bid(b=None, S='u'))
-   Observable('tBid', Bid(b=None, S='t'))
+   Observable('obsC8', C8(b=None))
+   Observable('obsBid', Bid(b=None, S='u'))
+   Observable('obstBid', Bid(b=None, S='t'))
 
 As shown,the observable can be a species. As we will show later the
 observable can also contain wild-cards and given the "don't care don't
@@ -442,7 +442,17 @@ We will begin our simulation by loading the model from the *ipython*
 (or *python*) interpreter as shown below::
 
    >>> import mymodel as m
-   >>> m.model.monomers
+
+You can check that your model imported correctly by typing a few
+commands related to your model as shown::
+
+   >>> m.mymodel.monomers
+   >>> m.mymodel.rules
+
+Both commands should return information about your model. (Hint: If
+you are using iPython, you can press tab twice after "m.mymodel" to
+tab complete and see all the possible options). 
+
 
 Now, we will import the *PyLab* and PySB integrator module. Enter
 the commands as shown below::
