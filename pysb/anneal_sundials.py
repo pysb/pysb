@@ -270,17 +270,20 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         objout += objarray.sum()
         #print "OBJOUT(%d,%d):%f  |\t\tOBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout)
 
-    #print "OBJOUT(total):", objout
+    print "OBJOUT(total):", objout
     return objout
 
-def logparambounds(params, omag=1, useparams=[], usemag=None):
+def logparambounds(params, omag=1, useparams=[], usemag=None, initparams=[], initmag=None):
     ub = numpy.zeros(len(params))
     lb = numpy.zeros(len(params))
     # set upper/lower bounds for generic problem
     for i in range(len(params)):
-        if i in useparams:
+        if i in useparams and i not in initparams:
             ub[i] = params[i] * pow(10,usemag)
             lb[i] = params[i] / pow(10,usemag)
+        elif i in initparams:
+            ub[i] = params[i] * pow(10,initmag)
+            lb[i] = params[i] / pow(10,initmag)
         else:
             ub[i] = params[i] * pow(10, omag)
             lb[i] = params[i] / pow(10, omag)
@@ -310,7 +313,7 @@ def mapprms(nums01, lb, ub, scaletype="log"):
     params = numpy.zeros_like(nums01)
     
     if scaletype == "log":
-        params = lb*(ub/lb)**nums01 # map the [0..1] sobol array to values sampled over their omags
+        params = lb*(ub/lb)**nums01 # map the [0..1] array to values sampled over their omags
     elif scaletype == "lin":
         params = (nums01*(ub-lb)) + lb
 
@@ -377,14 +380,27 @@ def tenninetycomp(outlistnorm, arglist, xpsamples=1.0):
     #
     
     obj = ((1./varTdxp) * (Tdsim - Tdxp)**2.) + ((1./varTsxp) * (Tssim - Tsxp)**2.)
-    obj *= xpsamples
+    #obj *= xpsamples
     
-    print "OBJOUT-10-90:(%f,%f):%f"%(Tdsim, Tssim, obj)
+    print "OBJOUT-10-90:(%g,%g):%g"%(Tdsim, Tssim, obj)
 
     return obj    
 
 def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, tn = [], scaletype="log", norm=True, vardata=False, fileobj=None):
     """Feeder function for scipy.optimize.anneal
+    zoparams: the parameters in the range [0,1) to be sampled
+    time: the time scale for the simulation
+    model: a PySB model object
+    envlist: an environment list for the sundials integrator
+    xpdata: experimental data
+    xspairlist: the pairlist of the correspondence of experimental and simulation outputs
+    lb: lower bound for parameters
+    ub: upper bound for parameters
+    tn: list of values for ten-ninety fits
+    scaletype: log, linear,etc to convert zoparams to real params b/w lb and ub. default "log"
+    norm: normalization on. default true
+    vardata: variance data available. default "false"
+    fileobj: file object to write data output. default "None"
 
     """
 
@@ -413,12 +429,12 @@ def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, tn = [
             if tn:
                 tn = tenninetycomp(outlistnorm, tn, len(xpdata[0]))
                 objout += tn 
-            print "objout TOT:", objout
+            print "NORM objout TOT:", objout
         else:
             objout = compare_data(xpdata, outlist[0], xspairlist, vardata)
             if tn:
                 tn = tenninetycomp(outlist[0], tn)
-            objout += tn 
+                objout += tn 
             print "objout TOT:", objout
     else:
         print "======> VALUE OUT OF BOUNDS NOTED"
