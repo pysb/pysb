@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
-import sys, subprocess, traceback, re
+import distutils.cmd
+import sys, os, subprocess, traceback, re
 
 def main():
 
@@ -37,6 +38,7 @@ at https://github.com/pysb/pysb.git\n""" % rv_filename)
           url='http://pysb.org/',
           packages=['pysb', 'pysb.generator', 'pysb.tools', 'pysb.examples'],
           requires=['numpy', 'scipy', 'sympy'],
+          cmdclass = {'test': test},
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
             'Development Status :: 4 - Beta',
@@ -50,6 +52,19 @@ at https://github.com/pysb/pysb.git\n""" % rv_filename)
             'Topic :: Scientific/Engineering :: Mathematics',
             ],
           )
+
+class test(distutils.cmd.Command):
+    description = "run tests (requires nose)"
+    user_options = []
+    def initialize_options(self):
+        pass
+    def finalize_options(self):
+        pass
+    def run(self):
+        import nose
+        config = nose.config.Config(exclude=[re.compile('examples')],
+                                    env=os.environ)
+        nose.run(defaultTest='pysb', config=config, argv=[''])
 
 class GitError(Exception):
     pass

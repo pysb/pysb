@@ -1,7 +1,7 @@
 import inspect
 from pysb import *
 import pysb.core
-from pysb.core import ComponentSet, as_reaction_pattern
+from pysb.core import ComponentSet, as_reaction_pattern, as_complex_pattern
 import numbers
 import functools
 
@@ -194,7 +194,7 @@ def equilibrate(s1, s2, klist):
     """
     
     # turn any Monomers into MonomerPatterns
-    return _macro_rule('equilibrate', s1() <> s2(), klist, ['kf', 'kr'])
+    return _macro_rule('equilibrate', s1 <> s2, klist, ['kf', 'kr'])
 
 ## Binding
 def bind(s1, site1, s2, site2, klist):
@@ -555,60 +555,147 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
 ## the user gets a real error, not a BNG error. Ideally, should use
 ## the default states of unspecified sites.
 def synthesize(species, ksynth):
-    """TODO: Docstring
+    """Generate a reaction which synthesizes a species.
+
+    Note that `species` must be "concrete", i.e. the state of all
+    sites in all of its monomers must be specified. No site may be
+    left unmentioned.
+
+    Parameters
+    ----------
+    species : Monomer, MonomerPattern or ComplexPattern
+        The species to synthesize. If a Monomer, sites are considered
+        as unbound and in their default state. If a pattern, must be
+        concrete.
+    ksynth : Parameters or number
+        Synthesis rate. If a Parameter is passed, it will be used directly in
+        the generated Rule. If a number is passed, a Parameter will be created
+        with an automatically generated name based on the names and site states
+        of the components of `species` and this parameter will be included at
+        the end of the returned component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains the unidirectional synthesis Rule and
+        optionally a Parameter if ksynth was given as a number.
+
+    Examples
+    --------
+        Model()
+        Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
+        synthesize(A(x=None, y='e'), 1e-4)
+
     """
 
     def synthesize_name_func(rule_expression):
-        prod_p = rule_expression.product_pattern
-        label = [_complex_pattern_label(cp)
-                     for cp in prod_p.complex_patterns]
-        label = '_'.join(label)
-        return label
+        cps = rule_expression.product_pattern.complex_patterns
+        return '_'.join(_complex_pattern_label(cp) for cp in cps)
 
     # TODO: either the >> operator should work with a monomer, or complexpattern
     # shouldn't blow up if it is called
     if isinstance(species, Monomer):
         species = species()
+    species = as_complex_pattern(species)
+    if not species.is_concrete():
+        raise ValueError("species must be concrete")
 
-    species_rp = as_reaction_pattern(species)
-    return _macro_rule('synthesize', None >> species_rp, [ksynth], ['k'],
+    return _macro_rule('synthesize', None >> species, [ksynth], ['k'],
                        name_func=synthesize_name_func)
 
 def degrade(species, kdeg):
-    """TODO: Docstring """
+    """Generate a reaction which degrades a species.
+
+    Note that `species` is not required to be "concrete".
+
+    Parameters
+    ----------
+    species : Monomer, MonomerPattern or ComplexPattern
+        The species to synthesize. If a Monomer, sites are considered
+        as unbound and in their default state. If a pattern, must be
+        concrete.
+    kdeg : Parameters or number
+        Degradation rate. If a Parameter is passed, it will be used directly in
+        the generated Rule. If a number is passed, a Parameter will be created
+        with an automatically generated name based on the names and site states
+        of the components of `species` and this parameter will be included at
+        the end of the returned component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains the unidirectional degradation Rule
+        and optionally a Parameter if ksynth was given as a number.
+
+    Examples
+    --------
+        Model()
+        Monomer('B', ['x'])
+        degrade(B(), 1e-6)  # degrade all B, even bound species
+
+    """
 
     def degrade_name_func(rule_expression):
-        react_p = rule_expression.reactant_pattern
-        label = [_complex_pattern_label(cp)
-                     for cp in react_p.complex_patterns]
-        label = '_'.join(label)
-        return label
+        cps = rule_expression.reactant_pattern.complex_patterns
+        return '_'.join(_complex_pattern_label(cp) for cp in cps)
 
     # TODO: the >> operator should work with a monomer, or complexpattern
     # shouldn't blow up if it is called
     if isinstance(species, Monomer):
         species = species()
+    species = as_complex_pattern(species)
 
-    species_rp = as_reaction_pattern(species)
-    return _macro_rule('degrade', species_rp >> None, [kdeg], ['k'],
+    return _macro_rule('degrade', species >> None, [kdeg], ['k'],
                        name_func=degrade_name_func)
 
 def synthesize_degrade_table(table):
-    """TODO: Docstring """
+    """Generate a table of synthesis and degradation reactions.
 
-    # extract species lists and matrix of rates
-    s_rows = [row[0] for row in table]
-    kmatrix = [row[1:] for row in table]
+    Given a list of species, calls the `synthesize` and `degrade` macros on each
+    one. The species and the parameter values are passed as a list of lists
+    (i.e. a table) with each inner list consisting of the species, forward and
+    reverse rates (in that order).
+
+    Each species' associated pair of rates may be either Parameters or
+    numbers. If Parameters are passed, they will be used directly in the
+    generated Rules. If numbers are passed, Parameters will be created with
+    automatically generated names based on the names and states of the relevant
+    species and these parameters will be included in the returned component
+    list. To omit any individual reaction, pass None in place of the
+    corresponding parameter.
+
+    Note that any `species` with a non-None synthesis rate must be "concrete".
+
+    Parameters
+    ----------
+    table : list of lists
+        Table of species and rates, as described above.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains the unidirectional synthesis and
+        degradation Rules and optionally the Parameters for any rates given as
+        numbers.
+
+    Examples
+    --------
+        Model()
+        Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
+        Monomer('B', ['x'])
+        synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
+                                  [B(),              None, 1e-7]])
+
+    """
 
     # loop over interactions
     components = ComponentSet()
-    for r, s_row in enumerate(s_rows):
-        ksynth, kdeg = kmatrix[r]
-        #print (r, s_row)
+    for row in table:
+        species, ksynth, kdeg = row
         if ksynth is not None:
-            components |= synthesize(s_row, ksynth)
+            components |= synthesize(species, ksynth)
         if kdeg is not None:
-            components |= degrade(s_row, kdeg)
+            components |= degrade(species, kdeg)
 
     return components
 
@@ -749,8 +836,9 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         must comprise solely Parameter objects or solely numbers (never some of
         each). If Parameters are passed, they will be used directly in the
         generated Rules. If numbers are passed, Parameters will be created with
-        automatically generated names based on <TODO> and these parameters will
-        be included at the end of the returned component list.
+        automatically generated names based on the subunit, the pore size and
+        the cargo, and these parameters will be included at the end of the
+        returned component list.
 
     """
 
@@ -766,14 +854,15 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         prod_p = rule_expression.product_pattern
         # Build the label components
         # Pore is always first complex of LHS due to how we build the rules
-        subunit = react_p.complex_patterns[0].monomer_patterns[0].monomer
+        subunit = react_p.complex_patterns[0].monomer_patterns[0]
         if len(react_p.complex_patterns) == 2:
             # This is the complexation reaction
             cargo = react_p.complex_patterns[1].monomer_patterns[0]
         else:
             # This is the dissociation reaction
             cargo = prod_p.complex_patterns[1].monomer_patterns[0]
-        return '%s_%d_%s' % (subunit.name, size, _monomer_pattern_label(cargo))
+        return '%s_%d_%s' % (_monomer_pattern_label(subunit), size,
+                             _monomer_pattern_label(cargo))
 
     components = ComponentSet()
     # Set up some aliases that are invariant with pore size

@@ -2,7 +2,6 @@ from pysb import ComponentSet
 import pysb.core
 import inspect
 import numpy
-from pysb.integrate import odesolve
 
 __all__ = ['alias_model_components', 'rules_using_parameter']
 
@@ -24,6 +23,7 @@ def rules_using_parameter(model, parameter):
 
 
 def synthetic_data(model, tspan, obs_list=None, sigma=0.1, seed=None):
+    from pysb.integrate import odesolve
     random = numpy.random.RandomState(seed)
     ysim = odesolve(model, tspan)
     ysim_array = ysim.view().reshape(len(tspan), len(ysim.dtype))

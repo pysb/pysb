@@ -33,7 +33,8 @@ default_integrator_options = {
         },
     }
 
-def odesolve(model, t, param_values=None, integrator='vode', **integrator_options):
+def odesolve(model, t, param_values=None, y0=None, integrator='vode',
+             **integrator_options):
     pysb.bng.generate_equations(model)
     
     if param_values is not None:
@@ -58,11 +59,18 @@ def odesolve(model, t, param_values=None, integrator='vode', **integrator_option
     if not use_inline:
         code_eqs_py = compile(code_eqs, '<%s odes>' % model.name, 'exec')
 
-    y0 = numpy.zeros((len(model.odes),))
-    for cp, ic_param in model.initial_conditions:
-        pi = model.parameters.index(ic_param)
-        si = model.get_species_index(cp)
-        y0[si] = param_values[pi]
+    if y0 is not None:
+        # accept vector of species amounts as an argument
+        if len(y0) != len(model.species):
+            raise Exception("y0 must be the same length as model.species")
+        if not isinstance(y0, numpy.ndarray):
+            y0 = numpy.array(y0)
+    else:
+        y0 = numpy.zeros((len(model.odes),))
+        for cp, ic_param in model.initial_conditions:
+            pi = model.parameters.index(ic_param)
+            si = model.get_species_index(cp)
+            y0[si] = param_values[pi]
 
     def rhs(t, y, p):
         ydot = numpy.empty_like(y)
