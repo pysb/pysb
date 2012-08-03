@@ -49,20 +49,27 @@ def write_params(model,paramarr, name):
         fobj.write("%s, %g\n"%(model.parameters[i].name, paramarr[i]))
     fobj.close()
 
-def update_param_vals(model, nvals):
-    """update the values of model parameters with the values
-    from an array. 
-    This assumes newvals and model.parameters are in the same order!!!
+def update_param_vals(model, newvals):
+    """update the values of model parameters with the values from a dict. 
+    the keys in the dict must match the parameter names
     """
-    if len(model.parameters) == len(nvals):
-        for i in range(len(newvals)):
-            model.parameters[i].value = nvals[i]
+    update = []
+    noupdate = []
+    for i in model.parameters:
+        if i.name in newvals:
+            i.value = newvals[i.name]
+            update.append(i.name)
+        else:
+            noupdate.append(i.name)
+    return update, noupdate
 
-
-def load_params(model, fname):
-    """load the parameter values from a csv file
-    the parameters should be stored as
-    name, value entries in a csv-type file
+def load_params(fname):
+    """load the parameter values from a csv file, return them as dict.
     """
-    parmsfromfile = numpy.loadtxt(fname, dtype=([('a','S50'),('b','f8')]), delimiter=',')
-    return parmsfromfile
+    parmsff = {}
+    # FIXME: This might fail if a parameter name is larger than 50 characters.
+    # FIXME: Maybe do this with the csv module instead?
+    temparr = numpy.loadtxt(fname, dtype=([('a','S50'),('b','f8')]), delimiter=',') 
+    for i in temparr:
+        parmsff[i[0]] = i[1]
+    return parmsff
