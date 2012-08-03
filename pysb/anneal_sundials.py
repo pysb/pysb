@@ -115,7 +115,7 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 1000, itermaxstep = N
     return [f, rhs_exprs, y, odesize, data, xout, yout, nsteps, cvode_mem, yzero, reltol, abstol], paramarray
 
 
-# reltol of 1.0e-3, relative error of ~1%. abstol of 1.0e-2, enough for values that oscillate in the hundreds to thousands
+# reltol of 1.0e-3, relative error of ~1%. abstol of 1.0e-3, enough for values that oscillate in the hundreds to thousands
 def annlodesolve(model, tfinal, envlist, params, tinit = 0.0, ic=True):
     '''
     the ODE equation solver tailored to work with the annealing algorithm
