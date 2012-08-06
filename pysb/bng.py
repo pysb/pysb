@@ -130,7 +130,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (p_out, p_err) = p.communicate()
         if p.returncode:
-            raise GenerateNetworkError(p_err.rstrip())
+            raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
 
         output_arr = _parse_bng_outfile(gdat_filename)
         #ssa_file = open(ssa_filename, 'r')
@@ -164,7 +164,7 @@ def generate_network(model, cleanup=True, append_stdout=False):
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (p_out, p_err) = p.communicate()
         if p.returncode:
-            raise GenerateNetworkError(p_err.rstrip())
+            raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
         net_file = open(net_filename, 'r')
         output.write(net_file.read())
         net_file.close()
