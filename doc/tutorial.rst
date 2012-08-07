@@ -48,11 +48,11 @@ follows:
    C8 + Bid \underset{kr}{\overset{kf}{\leftrightharpoons}} C8:Bid \quad {\longleftarrow \mbox{Complex formation step}} \\
    C8:Bid \overset{kc}{\rightarrow} C8 + tBid \quad {\longleftarrow \mbox{Complex dissociation step}}
 
-Where tBid is the truncated Bid. The parameters *kf*, *kr*, and *kc*
-represent the forward, reverse, and catalytic rates that dictate the
-consumption of Bid via catalysis by C8 and the formation of tBid. We
-will eventually end up with a mathematical representation that will
-look something like this:
+Where tBid is the truncated Bid. The parameters ``kf``, ``kr``, and
+``kc`` represent the forward, reverse, and catalytic rates that
+dictate the consumption of Bid via catalysis by C8 and the formation
+of tBid. We will eventually end up with a mathematical representation
+that will look something like this:
 
 .. math::
    \frac{d[C8]}{dt}     &= -kf[C8]*[Bid] + kr*[C8:Bid] + kc*[C8:Bid] \\
@@ -109,7 +109,7 @@ state sites. The former allow for the description of bonds between
 species. Following the first lines of code entered into your model in
 the previous section we will add a *monomer* named 'Bid' with a bond
 site 'b' and a state site 'S'. The state site will contain two states,
-the untruncated (**u**) state and the truncated (**t**) state as shown::
+the untruncated (``u``) state and the truncated (``t``) state as shown::
 
     Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
 
@@ -123,15 +123,15 @@ specifying whether any of the sites are "state sites" and the list of
 valid states for those sites.  We will introduce state sites later.
 
 Let's define two monomers in our model, corresponding to Caspase-8, an
-initiator caspase involved in apoptosis (**C8**) and BH3-interacting domain death
-agonist (**Bid**) (ref?)::
+initiator caspase involved in apoptosis (``C8``) and BH3-interacting domain death
+agonist (``Bid``) (ref?)::
 
     Monomer('C8', ['b'])
     Monomer('Bid', ['b', 'S'])
 
 Note that although the C8 monomer only has one site 'b', you must
 still use the square brackets to indicate a *list* of binding
-sites. Anticipating what comes below, the *'S'* site will become a
+sites. Anticipating what comes below, the ``'S'`` site will become a
 state site and hence, we choose to represent it in upper case but this
 is not mandatory. 
 
@@ -607,8 +607,14 @@ anything related to rules-based modeling are instantiated as objects
 in *Python*. One could write functions to interact with these objects
 and they could be instantiated and inherit methods from a class. The
 limits to programming biology with PySB are those enforced by the
-*Python* language itself.
+*Python* language itself. We can now go ahead and embed this into a
+model. Go back to your ``mymodel.py`` file and modify it to look
+something like this:
 
+.. literalinclude:: examples/mymodel5.py
+
+With this you should be able to execute your code and generate figures
+as described in the previous sections. 
 
 Using provided macros
 =====================
@@ -627,24 +633,192 @@ the higher-level macros ``bind_table`` and ``catalyze_table`` which we
 have found useful in instantiating the interactions between families
 of models. 
 
-In what follows we expand our previous model example of ``Caspase-8`` 
+In what follows we expand our previous model example of ``Caspase-8``
+by adding a few more species. The initiator caspase, as was described
+earlier, catalytically cleaves ``Bid`` to create truncated ``Bid``
+(``tBid``) in this model. This ``tBid`` then catalytically activates
+Bax and Bak which eventually go on to form pores at the mitochondria
+leading to mitochondrial outer-membrane permeabilization (MOMP) and eventual
+cell death. To introduce the concept of higher-level macros we will
+show how the ``bind_table`` macro can be used to show how a family of
+inhibitors, namely ``Bcl-2``, ``Bcl-xL``, and ``Mcl-1`` inhibits a
+family of proteins, namely ``Bid``, ``Bax``, and ``Bak``. 
 
+In your favorite editor, go ahead and create a file (I will refer to
+it as ::file::`mymodel_fxns`). Many rules that dictate the
+interactions among species depend on a single binding site. We will
+begin by creating our model and declaring a generic binding site. We
+will also declare some functions, using the ``PySB`` macros and tailor
+them to our needs by specifying the binding site to be passed to the
+function. The first thing we do is import PySB and then import PySB
+macros. Then we declare our generic site and redefine the ``pysb.macros``
+for our model as follows::
 
+   # import the pysb module and all its methods and functions
+   from pysb import *
+   from pysb.macros import *
+   
+   # some functions to make life easy
+   site_name = 'b'
+   def catalyze_b(enz, sub, product, klist):
+       """Alias for pysb.macros.catalyze with default binding site 'b'.
+       """
+       return catalyze(enz, site_name, sub, site_name, product, klist)
+   def bind_table_b(table):
+       """Alias for pysb.macros.bind_table with default binding sites 'bf'.
+       """
+       return bind_table(table, site_name, site_name)
 
+The first two lines just import the necessary modules from PySB. The
+``catalyze_b``` function, tailored for the model, takes four inputs
+but feeds six inputs to the ``pysb.macros.catalyze`` function, hence
+making the model more clean. Similarly the ``bind_table_b`` function
+takes only one entry, a list of lists, and feeds the entries needed to
+the ``pysb.macros.bind_table`` macro. Note that these entries could be
+contained in a header file to be hidden from the user at model time. 
 
+With this technical work out of the way we can now actually start our
+mdoel building. We will declare two sets of rates, the ``bid_rates``
+that we will use for all the ``Bid`` interactions and the
+``bcl2_rates`` which we will use for all the Bcl-2
+interactions. Thesevalues could be specified individually as desired
+as desired but it is common practice in models to use generic values
+for the reaction rate parameters of a model and determine these in
+detail through some sort of model calibration. We will use these
+values for now for illustrative purposes. 
 
-Model calibration
-=================
-**ANNEAL**
+The next entries for the rates, the model declaration, and the
+Monomers follow::
 
+   # Bid activation rates
+   bid_rates = [        1e-7, 1e-3, 1] #
+   
+   # Bcl2 Inhibition Rates
+   bcl2_rates = [1.428571e-05, 1e-3] # 1.0e-6/v_mito
+   
+   # instantiate a model
+   Model()
+   
+   # declare monomers
+   Monomer('C8',    ['b'])
+   Monomer('Bid',   ['b', 'S'], {'S':['u', 't', 'm']})
+   Monomer('Bax',   ['b', 'S'], {'S':['i', 'a', 'm']})
+   Monomer('Bak',   ['b', 'S'], {'S':['i', 'a']})
+   Monomer('BclxL', ['b', 'S'], {'S':['c', 'm']})
+   Monomer('Bcl2', ['b'])
+   Monomer('Mcl1', ['b'])
+
+As shown, the generic rates are declared followed by the declaration
+of the monomers. We have the ``C8`` and ``Bid`` monomers as we did in
+the initial part of the tutorial, the MOMP effectors ``Bid``, ``Bax``,
+``Bak``, and the MOMP inhibitors ``Bcl-xL``, ``Bcl-2``, and
+``Mcl-1``. The ``Bid``, ``Bax``, and ``BclxL`` monomers, in addition
+to the active and inactive terms also have a ``'m'`` term indicating
+that they can be in a membrane, which in this case we indicate as a
+state. We will have a translocation to the membrane as part of the
+reactions. 
+
+We can now begin to write some checmical procedures. The
+first procedure is the catalytic activation of ``Bid`` by ``C8``. This
+is followed by the catalytic activation of Bax and Bak. ::
+
+   # Activate Bid
+   catalyze_b(C8, Bid(S='u'), Bid(S='t'), [KF, KR, KC])
+
+   # Activate Bax/Bak
+   catalyze_b(Bid(S='m'), Bax(S='i'), Bax(S='m'), bid_rates)
+   catalyze_b(Bid(S='m'), Bak(S='i'), Bak(S='a'), bid_rates)
+
+As shown, we simply state the soecies that acts as an *enzyme* as the
+first function argument, the species that acts as the *reactant* with
+the enzyme as the second argument (along with any state
+specifications) and finally the *product* species. The ``bid_rates``
+argument is the list of rates that we declared earlier. 
+
+You may have noticed a problem with the previous statements. The
+``Bid`` species undergoes a transformation from state ``S='u'`` to
+``S='t'`` but the activation of ``Bax`` and ``Bak`` happens only when
+``Bid`` is in state ``S='m'`` to imply that these events only happen
+at the membrane. In order to transport ``Bid`` from the ``'t'`` state
+to the ``'m'`` state we need a transporf function. We achieve this by
+using the *equilibrate* macro in PySB between these states. In
+addition we use this same macro for the transport of the ``Bax``
+species and the ``BclxL`` species as shown below. ::
+
+   # Bid, Bax, BclxL "transport" to the membrane
+   equilibrate(Bid(b=None, S='t'),   Bid(b=None, S='m'), [1e-1, 1e-3])
+   equilibrate(Bax(b=None, S='m'),   Bax(b=None, S='a'), [1e-1, 1e-3])
+   equilibrate(BclxL(b=None, S='c'), BclxL(b=None, S='m'), [1e-1, 1e-3])
+
+According to published experimental data, the Bcl-2 family of
+inhibitors can inhibit the initiator ``Bid`` and the effector ``Bax``
+and ``Bak``. These family has complex interactions with all these
+proteins. Given that we have three inhibitors, and three molecules to
+be inhibited, this indicates nine interactions that need to be
+specified. This would involve writing nine reversible reactions in a
+rules language or at least eighteen reactions for each direction if we
+were writing the ODEs. Given that we are simply stating that these
+species *bind* to inhibit interactions, we can take advantage of two
+things. In the first case we have already seen that there is a *bind*
+macro specified in PySB. We can further functionalize this into a
+higher level macro, naemly the *bind_table* macro, which takes a table
+of interactions as an argument and generates the rules based on these
+simple interactions. We specify the bind table for the inhibitors (top
+row) and the inhibited molecules (left column) as follows. ::
+
+   bind_table_b([[                  Bcl2,  BclxL(S='m'),       Mcl1],
+                 [Bid(S='m'), bcl2_rates,  bcl2_rates,   bcl2_rates],
+                 [Bax(S='a'), bcl2_rates,  bcl2_rates,         None],
+                 [Bak(S='a'),       None,  bcl2_rates,   bcl2_rates]])
+
+As shown the inhibitors interact by giving the rates of interactions
+or the *"None"* Python keyword to indicate no interaction. The only
+thing left to run this simple model is to declare some initial
+conditions and some observables. We declare the following::
+
+   # initial conditions
+   Parameter('C8_0',    1e4)
+   Parameter('Bid_0',   1e4)
+   Parameter('Bax_0',  .8e5)
+   Parameter('Bak_0',  .2e5)
+   Parameter('BclxL_0', 1e3)
+   Parameter('Bcl2_0',  1e3)
+   Parameter('Mcl1_0',  1e3)
+   
+   Initial(C8(b=None), C8_0)
+   Initial(Bid(b=None, S='u'), Bid_0)
+   Initial(Bax(b=None, S='i'), Bax_0)
+   Initial(Bak(b=None, S='i'), Bak_0)
+   Initial(BclxL(b=None, S='c'), BclxL_0)
+   Initial(Bcl2(b=None), Bcl2_0)
+   Initial(Mcl1(b=None), Mcl1_0)
+   
+   # Observables
+   Observable('obstBid', Bid(b=None, S='m'))
+   Observable('obsBax', Bax(b=None, S='a'))
+   Observable('obsBak', Bax(b=None, S='a'))
+   Observable('obsBaxBclxL', Bax(b=1, S='a')%BclxL(b=1, S='m'))
+
+By now you should have a file with all the components that looks
+something like this:
+
+.. literalinclude:: examples/mymodel_fxns.py
+
+With this you should be able to run the simulations and generate
+figures as described in the basic tutorial sections. 
 
 
 Compartments
 ============
-We will continue building on your :file:`mymodel.py` file and add one
+We will continue building on your :file:`mymodel_fxns.py` file and add one
 more species and a compartment. In extrinsic apoptosis, once *tBid* is
 activated it translocates to the outer mitochondrial membrane where it
 interacts with the protein *Bak* (residing in the membrane). 
+
+
+Model calibration
+=================
+**COMING SOON: ANNEAL**
 
 Modules
 =======

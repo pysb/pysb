@@ -49,10 +49,9 @@ equilibrate(Bid(b=None, S='t'),   Bid(b=None, S='m'), [1e-1, 1e-3])
 equilibrate(Bax(b=None, S='m'),   Bax(b=None, S='a'), [1e-1, 1e-3])
 equilibrate(BclxL(b=None, S='c'), BclxL(b=None, S='m'), [1e-1, 1e-3])
 
-bind_table_b([[                  Bcl2,  BclxL(S='m'),       Mcl1],
-              [Bid(S='m'), bcl2_rates,  bcl2_rates,   bcl2_rates]])
 
 bind_table_b([[                  Bcl2,  BclxL(S='m'),       Mcl1],
+              [Bid(S='m'), bcl2_rates,  bcl2_rates,   bcl2_rates],
               [Bax(S='a'), bcl2_rates,  bcl2_rates,         None],
               [Bak(S='a'),       None,  bcl2_rates,   bcl2_rates]])
 
