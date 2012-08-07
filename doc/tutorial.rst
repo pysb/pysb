@@ -614,11 +614,21 @@ Using provided macros
 =====================
 
 For further reference we invite the users to explore the
-:file:`macros.py` file in the :file:`.../pysb/` directory. Ready to
-use macros for catalyze, bind, oligomerization, and some tabular data
-entry formats (lists of lists) are available for users. Users should
-be able to follow the patterns of these macros and create new macros
-as shown in this section as needed. 
+:file:`macros.py` file in the :file:`.../pysb/` directory. Based on
+our experience with modeling signal transduction pathways we have
+identified a set of commonly-used constructs that can serve as
+building blocks for more complex models. In addition to some
+meta-macros useful for instantiating user macros, we provide a set of
+macros such as ``equilibrate``. ``bind``, ``catalyze``,
+``catalyze_one_step``, ``catalyze_one_step_reversible``,
+``synthesize``, ``degrade``, ``assemble_pore_sequential``, and
+``pore_transport``. In addition to these basic macros we also provide
+the higher-level macros ``bind_table`` and ``catalyze_table`` which we
+have found useful in instantiating the interactions between families
+of models. 
+
+In what follows we expand our previous model example of ``Caspase-8`` 
+
 
 
 
