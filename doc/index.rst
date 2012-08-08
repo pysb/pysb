@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to pysb's documentation!
-================================
+The PySB documentation!
+=======================
 
 Contents:
 
@@ -14,8 +14,9 @@ Contents:
    intro
    installation
    tutorial
+   rulesprimer
    modules/index
-   internals
+   glossary
    about
 
 Indices and tables

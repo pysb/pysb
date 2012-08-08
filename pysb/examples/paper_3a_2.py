@@ -1,11 +1,5 @@
 from pysb import *
 
-Model()
-
-Monomer('Kinase', ['b'])
-Monomer('Substrate', ['b', 'y'], {'y': ['U','P']})
-
-
 def catalyze(enz, sub, site, state1, state2, kf, kr, kc):
     """2-step catalytic process"""
     r1_name = '%s_bind_%s' % (enz.name, sub.name)
@@ -17,6 +11,10 @@ def catalyze(enz, sub, site, state1, state2, kf, kr, kc):
     Rule(r1_name, E + S <> ES, kf, kr)
     Rule(r2_name, ES >> E + P, kc)
 
+Model()
+
+Monomer('Kinase', ['b'])
+Monomer('Substrate', ['b', 'y'], {'y': ['U','P']})
 
 Parameter('kf', 1)
 Parameter('kr', 1)
