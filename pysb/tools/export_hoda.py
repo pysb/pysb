@@ -24,7 +24,7 @@ def run(model):
     param_list_file.close()
 
     ## ODES
-    odes = 'function out = %s_odes(t, input, param)\n\n' % model_name
+    odes = 'function out = %s_odes(t, input, param)\n\n' % model.name
 
     species_list = '\n'.join(['%% input(%d) = %s;' % (i+1, s) for i, s in
         enumerate(model.species)])
