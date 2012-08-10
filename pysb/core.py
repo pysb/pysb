@@ -125,7 +125,7 @@ class Component(object):
                 raise e
 
     def rename(self, new_name):
-        self.model._rename_component(self, new_name)
+        self.model()._rename_component(self, new_name)
         if self._export:
             SelfExporter.rename(self, new_name)
         self.name = new_name
@@ -267,7 +267,7 @@ class MonomerPattern(object):
         # 1.
         sites_ok = self.is_site_concrete()
         # 2.
-        compartment_ok = not self.monomer.model.compartments or self.compartment
+        compartment_ok = not self.monomer.model().compartments or self.compartment
         return compartment_ok and sites_ok
 
     def is_site_concrete(self):
@@ -767,7 +767,7 @@ class Model(object):
         for t, cset in zip(Model._component_types, self.all_component_sets()):
             if isinstance(other, t):
                 cset.add(other)
-                other.model = weakref.proxy(self)
+                other.model = weakref.ref(self)
                 break
         else:
             raise Exception("Tried to add component of unknown type '%s' to"
