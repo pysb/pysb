@@ -838,6 +838,23 @@ something like this:
 With this you should be able to run the simulations and generate
 figures as described in the basic tutorial sections. 
 
+
+Compartments
+============
+We will continue building on your :file:`mymodel_fxns.py` file and add one
+more species and a compartment. In extrinsic apoptosis, once *tBid* is
+activated it translocates to the outer mitochondrial membrane where it
+interacts with the protein *Bak* (residing in the membrane). 
+
+
+Model calibration
+=================
+**COMING SOON: ANNEAL**
+
+Modules
+=======
+
+
 .. rubric:: Footnotes
 
 .. [#func] Technically speaking it's a constructor, not just any old

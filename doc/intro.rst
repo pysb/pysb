@@ -27,7 +27,7 @@ predict the outcome of the behavrio of a system under a given set of
 conditions. 
 
 PySB as modeling tool
-=====================
+---------------------
 
 PySB is a set of software tools that enables users to develop,
 implement, and execute biological models in the Python programming

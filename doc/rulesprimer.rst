@@ -3,8 +3,8 @@
 Rules Primer
 ============
 
-Section
--------
+Overview
+--------
 
 In rules-based modeling, units that undergo transformations such as
 proteins, small molecules, protein complexes, etc are termed
@@ -25,12 +25,18 @@ a model can be instantiated in PySB, how *species* and *rules* are
 specified, and how to run a simple simulation.
 
 
-Section
--------
-ble
-ble ble
-ble ble ble
-ble ble ble ble
+Rules as applied to PySB
+------------------------
+
+PySB uses the rules languages grammar of `BioNetGen`_ and `Kappa`_ almost
+verbatim with the differences being mostly synctactic. This has been
+done on purpose to keep compatibility with these languages and
+leverage their available simulating tools. We invited interested users
+to explore the `BioNetGen Tutorial
+<http://bionetgen.org/index.php/BioNetGen_Tutorial>`_ or the
+`Introduction to Kappa Syntax <http://kappalanguage.org/syntax>`_ pages
+for further information. Understanding of any of these languages will
+make working with PySB rules a very straightforward exercise for the user.
 
 .. _BioNetGen: http://bionetgen.org/index.php/Documentation
 
