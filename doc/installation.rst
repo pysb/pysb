@@ -105,3 +105,5 @@ Instructions for OS X installations
 
 Instructions for Windows installations
 --------------------------------------
+
+**coming soon**

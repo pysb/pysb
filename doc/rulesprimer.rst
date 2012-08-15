@@ -1,7 +1,7 @@
 .. _rules_primer:
 
-Rules Primer
-============
+About Rules
+===========
 
 Overview
 --------
@@ -25,8 +25,8 @@ a model can be instantiated in PySB, how *species* and *rules* are
 specified, and how to run a simple simulation.
 
 
-Rules as applied to PySB
-------------------------
+Reference to Rules-based languages
+----------------------------------
 
 PySB uses the rules languages grammar of `BioNetGen`_ and `Kappa`_ almost
 verbatim with the differences being mostly synctactic. This has been
