@@ -1,3 +1,5 @@
+.. _rules_primer:
+
 Rules Primer
 ============
 
@@ -11,16 +13,16 @@ using structured objects that describe the interactions between the
 *species* and constitute what we describe as *rules*. The specific
 details of how species and rules are specified can vary across
 different rules-based modeling approaches. In PySB we have chosen to
-ascribe to the approaches found in `BioNetGen`_ and `Kappa`_, but
-other approaches are certainly possible for advanced users interested
-in modifying the source code. Each rule, describing the interaction
-between *species* or sets of *species* must be assigned a set of
-*parameters* associated with the nature of the *rule*. Given that
-`BioNetGen`_ and `Kappa`_ both describe interactions using a
-mass-action kinetics formalism, the *parameters* will necessarily
-consist of reaction rates. In what follows we describe how a model can
-be instantiated in PySB, how *species* and *rules* are specified, and
-how to run a simple simulation.
+ascribe to the approaches found in `BioNetGen`_ and `Kappa`_,
+but other approaches are certainly possible for advanced users
+interested in modifying the source codbe. Each rule, describing the
+interaction between *species* or sets of *species* must be assigned a
+set of *parameters* associated with the nature of the *rule*. Given
+that `BioNetGen`_ and `Kappa`_ both describe interactions
+using a mass-action kinetics formalism, the *parameters* will
+necessarily consist of reaction rates. In what follows we describe how
+a model can be instantiated in PySB, how *species* and *rules* are
+specified, and how to run a simple simulation.
 
 
 Section
@@ -30,3 +32,6 @@ ble ble
 ble ble ble
 ble ble ble ble
 
+.. _BioNetGen: http://bionetgen.org/index.php/Documentation
+
+.. _Kappa: http://www.kappalanguage.org/documentation
