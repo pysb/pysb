@@ -39,7 +39,9 @@ def show_contact_map(model, **kwargs):
   #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
   kappa_filename = '%s.ka' % model.name
   jpg_filename = kappa_filename.replace('.ka', '.jpg')
-  args = ['--output-high-res-contact-map-jpg', jpg_filename]
+  dot_filename = kappa_filename.replace('.ka', '.dot')
+  args = ['--output-high-res-contact-map-jpg', jpg_filename,
+          '--output-high-res-contact-map-dot', dot_filename]
   run_complx(gen, kappa_filename, args, **kwargs)
   open_file(jpg_filename)
 
