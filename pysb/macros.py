@@ -437,24 +437,6 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
     return catalyze(enzyme, e_site, substrate({mod_site: state1}),
                     s_site, substrate({mod_site: state2}), klist)
 
-#TODO: Implement
-def catalyze_table():
-    """
-    table[0]: [                                             E1, ...,     En]
-    table[1]: [S1(site='ssub'), S1(site='sprod'), (kf, kr, kc), ...,  (...)]
-    (TABLE, 'sbsite', 'ebsite')
-
-    table[0]: [                                        E1, ...,     En]
-    table[1]: [S1, 'site', 'ssub', 'sprod' , (kf, kr, kc), ...,  (...)]
-    (TABLE, 'sbsite', 'ebsite')
-
-    table[0]: [                                        E1, ...,     En]
-    table[1]: [S1, (kf, kr, kc), ...,  (...)]
-    (TABLE, 'sbsite', 'ebsite' 'smodsite', 'ssub', 'sprod')
-
-    """
-    pass
-
 def catalyze_one_step(enzyme, substrate, product, kf):
     """Generate the one-step catalytic reaction E + S >> E + P.
 
@@ -547,7 +529,7 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
     components = catalyze_one_step(enzyme, substrate, product, klist[0])
 
     components |= _macro_rule('reverse', product() >> substrate(),
-                              [klist[1]], ['k'])
+                              [klist[1]], ['kr'])
     return components
 
 ## Synthesis and Degradation
