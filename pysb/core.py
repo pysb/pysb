@@ -6,6 +6,8 @@ import inspect
 import re
 import collections
 import weakref
+import copy
+
 
 def Initial(*args):
     return SelfExporter.default_model.initial(*args)
@@ -684,7 +686,7 @@ class Model(object):
 
     _component_types = (Monomer, Compartment, Parameter, Rule, Observable)
 
-    def __init__(self, name=None, _export=True):
+    def __init__(self, name=None, base=None, _export=True):
         self.name = name
         self.monomers = ComponentSet()
         self.compartments = ComponentSet()
@@ -696,9 +698,12 @@ class Model(object):
         self.reactions = []
         self.reactions_bidirectional = []
         self.initial_conditions = []
+        self.base = base
         self._export = _export
         if self._export:
             SelfExporter.export(self)
+        if self.base is not None:
+            raise ValueError("model copy constructor not yet implemented")
 
     def reload(self):
         # forcibly removes the .pyc file and reloads the model module
