@@ -119,12 +119,15 @@ class Component(object):
         self.model = None  # to be set in Model.add_component
         self._export = _export
         if self._export:
-            try:
-                SelfExporter.export(self)
-            except ComponentDuplicateNameError as e:
-                # re-raise to hide the stack trace below this point -- it's irrelevant to the user
-                # and makes the error harder to understand
-                raise e
+            self._do_export()
+
+    def _do_export(self):
+        try:
+            SelfExporter.export(self)
+        except ComponentDuplicateNameError as e:
+            # re-raise to hide the stack trace below this point -- it's irrelevant to the user
+            # and makes the error harder to understand
+            raise e
 
     def rename(self, new_name):
         self.model()._rename_component(self, new_name)
@@ -688,6 +691,8 @@ class Model(object):
 
     def __init__(self, name=None, base=None, _export=True):
         self.name = name
+        self.base = base
+        self._export = _export
         self.monomers = ComponentSet()
         self.compartments = ComponentSet()
         self.parameters = ComponentSet()
@@ -698,12 +703,16 @@ class Model(object):
         self.reactions = []
         self.reactions_bidirectional = []
         self.initial_conditions = []
-        self.base = base
-        self._export = _export
         if self._export:
             SelfExporter.export(self)
         if self.base is not None:
-            raise ValueError("model copy constructor not yet implemented")
+            if not isinstance(self.base, Model):
+                raise ValueError("base must be a Model")
+            model_copy = copy.deepcopy(self.base)
+            for component in model_copy.all_components():
+                self.add_component(component)
+                component._do_export()
+            self.initial_conditions = model_copy.initial_conditions
 
     def reload(self):
         # forcibly removes the .pyc file and reloads the model module

@@ -18,14 +18,9 @@ from pysb import *
 import pysb.bng
 import pysb.examples.earm_1_0
 
-# Load in EARM 1.0 components
+# Start from EARM 1.0 as a base
 # ==========
-
-# FIXME this exec business is awful and confuses a lot of pysb internals. maybe
-# we need a model.copy or something like that.
-with open(re.sub('c$', '', pysb.examples.earm_1_0.__file__)) as sourcefile:
-    exec(sourcefile.read())
-model.name = 'pysb.examples.earm_1_3'
+Model(base=pysb.examples.earm_1_0.model)
 
 # Rename all instances of Bcl2c to Mcl1, which was determined as a more accurate
 # description of that monomer based on its role in the model
