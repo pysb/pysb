@@ -43,8 +43,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'pysb'
-copyright = u'2011, Jeremy Muhlich'
+project = u'PySB, modeling with programs'
+copyright = u'2012, C. F. Lopez, J. L. Muhlich, J. A. Bachman'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

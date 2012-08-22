@@ -13,7 +13,7 @@ satisfactorily. A simple example is the colloquial story of Newton's
 apple. The observation was that the apple fell on Newton's head. He
 derived the simple yet incredibly powerful :math:`F=ma` whereby he
 observed that the Force, :math:`F`, applied to an object of mass,
-:mass:`m`, resulted in an acceleration, :math:`a`. We now know that
+:math:`m`, resulted in an acceleration, :math:`a`. We now know that
 this model holds for most conditions in every-day activities but we
 know that it fails for e.g. relativistic effects. Therefore a model
 has a domain of application and a limited usefulness. However, a
@@ -27,7 +27,7 @@ predict the outcome of the behavrio of a system under a given set of
 conditions. 
 
 PySB as modeling tool
-=====================
+---------------------
 
 PySB is a set of software tools that enables users to develop,
 implement, and execute biological models in the Python programming
@@ -74,13 +74,14 @@ and the figures are generated. If you want to learn how to build
 biological models in a systematic (and we think fun) way, visit our
 :doc:`tutorial`.
 
-Conversion from other modeling tools
-------------------------------------
+..
+   Conversion from other modeling tools
+   ------------------------------------
 
-**What should we say here?**
-Here we give some pointers for people coming from SBML, BNG/Kappa,
-Matlab, etc. in order to start converting their models and scripts to
-work with PySB.  Mostly just a list of resources, not full
-explanations.  This will help assure users of those tools that they
-can relatively easily carry over their current modeling investments.
+   **What should we say here?**
+   Here we give some pointers for people coming from SBML, BNG/Kappa,
+   Matlab, etc. in order to start converting their models and scripts to
+   work with PySB.  Mostly just a list of resources, not full
+   explanations.  This will help assure users of those tools that they
+   can relatively easily carry over their current modeling investments.
  

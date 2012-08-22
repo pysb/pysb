@@ -1,9 +1,12 @@
 Getting Started
 ===============
 
-Python Knowledge
----------------
-For those unfamiliar with Python we strongly rogramming needs. 
+Python Knowledge 
+---------------- 
+
+For those unfamiliar with *Python* or programming there are several
+resources available online. We have found the ones below useful to
+learn *Python* in a practical and straightfoward manner.
 
 Quick Python Overview (10 minutes or so): 
    * `OpenOpt Python for the impatient <http://openopt.org/PythonIntroduction>`_
@@ -21,8 +24,6 @@ For experienced users of other languages:
       * Also the `Mathesaurus <http://mathesaurus.sourceforge.net/matlab-numpy.html>`_
       * Matlab commands in Numerical Python `cheatsheet <http://mathesaurus.sourceforge.net/matlab-python-xref.pdf>`_
    * `Scientific Python <http://www.scipy.org/>`_
-   
-
 
 Requirements
 ------------
@@ -62,7 +63,7 @@ users may want to replace these requirements as they see fit.
 
 
 Recommended
---------------------
+-----------
 * iPython 0.13: Even though iPython is not a *requirement* it is
   **strongly** recommended. iPython provides a very nice and simple
   shell interface for the Python interpreter with such niceties as tab
@@ -73,3 +74,36 @@ Recommended
   capabilities and great visualization tools. It is a great complement
   to the modeling tools in BioNetGen.
 * cookbooks 
+
+The easiest way to use PySB
+--------------------------- 
+
+Currently the easiest way to use PySB is through a virtual machine. We
+provide an ``Ubuntu Linux ISO`` image file based on ``Ubuntu 12.04``
+to run *PySB*. With this you can get acquainted, build some simple
+models, and carry out simulations. If you decide you want to use PySB
+on your native computer platform we will be posting instructions for
+this in the near future. 
+
+To run *PySB* from the image you can download the image from `The PySB
+website <http://pysb.org>`_ and burn it onto a bootable DVD or USB
+stick. Alternatively you can download a virtual machine software such
+as `Virtual Box <https://www.virtualbox.org/>`_ (FREE) or `Parallels
+<http://www.parallels.com/>`_ ($). Follow the instructions to setup
+the virtual machine booting from the ``ISO`` file to begin modeling
+with Python programs.
+
+Instructions for Linux installations
+------------------------------------
+
+**coming soon**
+
+Instructions for OS X installations
+-----------------------------------
+
+**coming soon**
+
+Instructions for Windows installations
+--------------------------------------
+
+**coming soon**
