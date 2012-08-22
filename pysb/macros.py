@@ -4,10 +4,11 @@ import pysb.core
 from pysb.core import ComponentSet, as_reaction_pattern, as_complex_pattern
 import numbers
 import functools
+import itertools
 
 __all__ = ['equilibrate',
            'bind', 'bind_table',
-           'catalyze', 'catalyze_state', 'catalyze_table',
+           'catalyze', 'catalyze_state',
            'catalyze_one_step', 'catalyze_one_step_reversible',
            'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport']
@@ -242,7 +243,7 @@ def bind(s1, site1, s2, site2, klist):
                        s1({site1: 1}) % s2({site2: 1}),
                        klist, ['kf', 'kr'], name_func=bind_name_func)
 
-def bind_table(bindtable, row_site, col_site):
+def bind_table(bindtable, row_site, col_site, kf=None):
     """Generate a table of reversible binding reactions.
 
     Given two lists of species R and C, calls the `bind` macro on each pairwise
@@ -264,6 +265,13 @@ def bind_table(bindtable, row_site, col_site):
     included at the end of the returned component list. To omit any individual
     reaction, pass None in place of the corresponding parameter tuple.
 
+    Alternately, single kd values (dissociation constant, kr/kf) may be
+    specified instead of (kf, kr) tuples. If kds are used, a single shared kf
+    Parameter or number must be passed as an extra `kf` argument. kr values for
+    each binding reaction will be calculated as kd*kf. It is important to
+    remember that the forward rate constant is a single parameter shared across
+    the entire bind table, as this may have implications for parameter fitting.
+
     Parameters
     ----------
     bindtable : list of lists
@@ -271,6 +279,9 @@ def bind_table(bindtable, row_site, col_site):
     row_site, col_site : string 
         The names of the sites on the elements of R and C, respectively, used
         for binding.
+    kf : Parameter or number, optional
+        If the "cells" in bindtable are given as single kd values, this is the
+        shared kf used to calculate the kr values.
 
     Returns
     -------
@@ -297,12 +308,21 @@ def bind_table(bindtable, row_site, col_site):
     s_cols = bindtable[0]
     kmatrix = [row[1:] for row in bindtable[1:]]
 
+    # ensure kf is passed when necessary
+    kiter = itertools.chain.from_iterable(kmatrix)
+    if any(isinstance(x, numbers.Real) for x in kiter) and kf is None:
+        raise ValueError("must specify kf when using single kd values")
+
     # loop over interactions
     components = ComponentSet()
     for r, s_row in enumerate(s_rows):
         for c, s_col in enumerate(s_cols):
             klist = kmatrix[r][c]
             if klist is not None:
+                # if user gave a single kd, calculate kr
+                if isinstance(klist, numbers.Real):
+                    kd = klist
+                    klist = (kf, kd*kf)
                 components |= bind(s_row(), row_site, s_col(), col_site, klist)
 
     return components
