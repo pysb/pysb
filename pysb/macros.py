@@ -841,7 +841,6 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         automatically generated names based on the subunit, the pore size and
         the cargo, and these parameters will be included at the end of the
         returned component list.
-
     """
 
     _verify_sites(subunit, sc_site)
@@ -908,3 +907,91 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
                                   name_func=name_func)
 
     return components
+
+def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
+              klist):
+    """Generate rules to bind a monomer to a circular homomeric pore.
+
+    The pore structure is defined by the `pore_species` macro -- `subunit`
+    monomers bind to each other from `sp_site1` to `sp_site2` to form a closed
+    ring. The binding reaction takes the form pore + cargo <> pore:cargo.
+
+    Parameters
+    ----------
+    subunit : Monomer or MonomerPattern
+        Subunit of which the pore is composed.
+    sp_site1, sp_site2 : string
+        Names of the sites where one copy of `subunit` binds to the next.
+    sc_site : string
+        Name of the site on `subunit` where it binds to the cargo `cargo`.
+    size : integer
+        Number of subunits in the pore at which binding will occur.
+    cargo : Monomer or MonomerPattern
+        Cargo that binds to the pore complex.
+    c_site : string
+        Name of the site on `cargo` where it binds to `subunit`.
+    klist : list of Parameters or numbers
+        List containing forward and reverse rate constants for the binding
+        reaction (in that order). Rate constants should either be both Parameter
+        objects or both numbers. If Parameters are passed, they will be used
+        directly in the generated Rules. If numbers are passed, Parameters
+        will be created with automatically generated names based on <TODO>
+        and these parameters will be included at the end of the returned
+        component list.
+    """
+
+    _verify_sites(subunit, sc_site)
+    _verify_sites(cargo, c_site)
+
+    def pore_bind_rule_name(rule_expression, size):
+        # Get ReactionPatterns
+        react_p = rule_expression.reactant_pattern
+        prod_p = rule_expression.product_pattern
+        # Build the label components
+        # Pore is always first complex of LHS due to how we build the rules
+        subunit = react_p.complex_patterns[0].monomer_patterns[0].monomer
+        if len(react_p.complex_patterns) == 2:
+            # This is the complexation reaction
+            cargo = react_p.complex_patterns[1].monomer_patterns[0]
+        else:
+            # This is the dissociation reaction
+            cargo = prod_p.complex_patterns[1].monomer_patterns[0]
+        return '%s_%d_%s' % (subunit.name, size,
+                             _monomer_pattern_label(cargo))
+
+    components = ComponentSet()
+    # Set up some aliases that are invariant with pore size
+    subunit_free = subunit({sc_site: None})
+    cargo_free = cargo({c_site: None})
+
+    #for size, klist in zip(range(min_size, max_size + 1), ktable):
+
+    # More aliases which do depend on pore size
+    pore_free = pore_species(subunit_free, sp_site1, sp_site2, size)
+
+    # This one is a bit tricky. The pore:cargo complex must only introduce
+    # one additional bond even though there are multiple subunits in the
+    # pore. We create partial patterns for bound pore and cargo, using a
+    # bond number that is high enough not to conflict with the bonds within
+    # the pore ring itself.
+    # Start by copying pore_free, which has all cargo binding sites empty
+    pore_bound = pore_free.copy()
+    # Get the next bond number not yet used in the pore structure itself
+    cargo_bond_num = size + 1
+    # Assign that bond to the first subunit in the pore
+    pore_bound.monomer_patterns[0].site_conditions[sc_site] = cargo_bond_num
+    # Create a cargo source pattern with that same bond
+    cargo_bound = cargo({c_site: cargo_bond_num})
+    # Finally we can define the complex trivially; the bond numbers are
+    # already present in the patterns
+    pc_complex = pore_bound % cargo_bound
+
+    # Create the rules
+    name_func = functools.partial(pore_bind_rule_name, size=size)
+    components |= _macro_rule('pore_bind',
+                              pore_free + cargo_free <> pc_complex,
+                              klist[0:2], ['kf', 'kr'],
+                              name_func=name_func)
+
+    return components
+
