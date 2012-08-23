@@ -11,9 +11,11 @@ __all__ = ['equilibrate',
            'catalyze', 'catalyze_state',
            'catalyze_one_step', 'catalyze_one_step_reversible',
            'synthesize', 'degrade', 'synthesize_degrade_table',
-           'assemble_pore_sequential', 'pore_transport']
+           'assemble_pore_sequential', 'pore_transport', 'pore_bind']
 
-## Internal helper functions
+# Internal helper functions
+# =========================
+
 def _complex_pattern_label(cp):
     """Return a string label for a ComplexPattern."""
     mp_labels = [_monomer_pattern_label(mp) for mp in cp.monomer_patterns]
@@ -171,7 +173,9 @@ def _verify_sites(m, *site_list):
                             (m().monomer.name, site))
     return True
 
-## Unimolecular patterns
+# Unimolecular patterns
+# =====================
+
 def equilibrate(s1, s2, klist):
     """Generate the unimolecular reversible equilibrium reaction S1 <-> S2.
 
@@ -197,7 +201,9 @@ def equilibrate(s1, s2, klist):
     # turn any Monomers into MonomerPatterns
     return _macro_rule('equilibrate', s1 <> s2, klist, ['kf', 'kr'])
 
-## Binding
+# Binding
+# =======
+
 def bind(s1, site1, s2, site2, klist):
     """Generate the reversible binding reaction S1 + S2 <> S1:S2.
 
@@ -327,7 +333,9 @@ def bind_table(bindtable, row_site, col_site, kf=None):
 
     return components
 
-## Catalysis
+# Catalysis
+# =========
+
 def catalyze(enzyme, e_site, substrate, s_site, product, klist):
     """Generate the two-step catalytic reaction E + S <> E:S >> E + P.
 
@@ -552,10 +560,9 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
                               [klist[1]], ['kr'])
     return components
 
-## Synthesis and Degradation
-## TODO: Have synth and deg check that patterns are concrete so that
-## the user gets a real error, not a BNG error. Ideally, should use
-## the default states of unspecified sites.
+# Synthesis and degradation
+# =========================
+
 def synthesize(species, ksynth):
     """Generate a reaction which synthesizes a species.
 
@@ -594,8 +601,6 @@ def synthesize(species, ksynth):
         cps = rule_expression.product_pattern.complex_patterns
         return '_'.join(_complex_pattern_label(cp) for cp in cps)
 
-    # TODO: either the >> operator should work with a monomer, or complexpattern
-    # shouldn't blow up if it is called
     if isinstance(species, Monomer):
         species = species()
     species = as_complex_pattern(species)
@@ -641,8 +646,6 @@ def degrade(species, kdeg):
         cps = rule_expression.reactant_pattern.complex_patterns
         return '_'.join(_complex_pattern_label(cp) for cp in cps)
 
-    # TODO: the >> operator should work with a monomer, or complexpattern
-    # shouldn't blow up if it is called
     if isinstance(species, Monomer):
         species = species()
     species = as_complex_pattern(species)
@@ -701,8 +704,9 @@ def synthesize_degrade_table(table):
 
     return components
 
+# Pore assembly
+# =============
 
-## Pore assembly
 def pore_species(subunit, site1, site2, size):
     """Return a MonomerPattern representing a circular homomeric pore.
 
@@ -935,9 +939,9 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
         reaction (in that order). Rate constants should either be both Parameter
         objects or both numbers. If Parameters are passed, they will be used
         directly in the generated Rules. If numbers are passed, Parameters
-        will be created with automatically generated names based on <TODO>
-        and these parameters will be included at the end of the returned
-        component list.
+        will be created with automatically generated names based on the
+        subunit, the pore size and the cargo, and these parameters will be
+        included at the end of the returned component list.
     """
 
     _verify_sites(subunit, sc_site)
