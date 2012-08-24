@@ -1,0 +1,63 @@
+strict digraph {
+	graph [rankdir=LR];
+	node [label="\N"];
+	s0	 [color=transparent,
+		fillcolor="#aaffff",
+		fontsize=12,
+		label="C8(b=None)\l",
+		margin="0.06,0",
+		shape=Mrecord,
+		style=filled];
+	r0	 [color=transparent,
+		fillcolor=lightgray,
+		fontsize=12,
+		height=".3",
+		label=r0,
+		margin="0.06,0",
+		shape=circle,
+		style=filled,
+		width=".3"];
+	s0 -> r0	 [arrowhead=normal,
+		arrowtail=empty,
+		dir=both];
+	s2	 [color=transparent,
+		fillcolor="#ccffcc",
+		fontsize=12,
+		label="Bid(b=1, S=u) %\lC8(b=1)\l",
+		margin="0.06,0",
+		shape=Mrecord,
+		style=filled];
+	r0 -> s2	 [arrowhead=normal,
+		arrowtail=empty,
+		dir=both];
+	s1	 [color=transparent,
+		fillcolor="#aaffff",
+		fontsize=12,
+		label="Bid(b=None, S=u)\l",
+		margin="0.06,0",
+		shape=Mrecord,
+		style=filled];
+	s1 -> r0	 [arrowhead=normal,
+		arrowtail=empty,
+		dir=both];
+	r1	 [color=transparent,
+		fillcolor=lightgray,
+		fontsize=12,
+		height=".3",
+		label=r1,
+		margin="0.06,0",
+		shape=circle,
+		style=filled,
+		width=".3"];
+	s2 -> r1	 [arrowhead=normal];
+	r1 -> s0	 [arrowhead=normal];
+	s3	 [color=transparent,
+		fillcolor="#ccffcc",
+		fontsize=12,
+		label="Bid(b=None, S=t)\l",
+		margin="0.06,0",
+		shape=Mrecord,
+		style=filled];
+	r1 -> s3	 [arrowhead=normal];
+}
+
