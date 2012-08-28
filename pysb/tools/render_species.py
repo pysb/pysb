@@ -8,20 +8,18 @@ import pysb.bng
 
 def run(model):
     pysb.bng.generate_equations(model)
-    graph = pygraphviz.AGraph(rankdir="LR")
+    graph = pygraphviz.AGraph(name="%s species" % model.name, rankdir="LR", fontname='arial')
     for si, cp in enumerate(model.species):
         sgraph_name = 'cluster_s%d' % si
-        sgraph = graph.add_subgraph(sgraph_name, label='s%d' % si,
-                                    color="gray75", fontsize="20")
+        cp_label = re.sub(r'% ', '%<br align="left"/>', str(cp)) + '<br align="left"/>'
+        sgraph_label = '<<font point-size="10" color="blue">s%d</font><br align="left"/><font face="courier" point-size="6">%s</font>>' % (si, cp_label)
+        sgraph = graph.add_subgraph(name=sgraph_name, label=sgraph_label,
+                                    color="gray75", sortv=sgraph_name)
         bonds = {}
         for mi, mp in enumerate(cp.monomer_patterns):
             monomer_node = '%s_%d' % (sgraph_name, mi)
-            sgraph.add_node(monomer_node,
-                            label=mp.monomer.name,
-                            shape="rectangle",
-                            fillcolor="lightblue", style="filled",
-                            fontsize="12",
-                            width=".3", height=".3", margin="0.06,0")
+            monomer_label = '<<table border="0" cellborder="1" cellspacing="0">'
+            monomer_label += '<tr><td bgcolor="#a0ffa0"><b>%s</b></td></tr>' % mp.monomer.name
             for site in mp.monomer.sites:
                 site_state = None
                 cond = mp.site_conditions[site]
@@ -31,16 +29,10 @@ def run(model):
                     site_state = cond[0]
                 site_label = site
                 if site_state is not None:
-                    site_label += '=%s' % site_state
-                site_node = '%s_%s' % (monomer_node, site)
-                sgraph.add_node(site_node, label=site_label,
-                                fontname="courier", fontsize='10',
-                                fillcolor="yellow", style="filled", color="transparent",
-                                width=".2", height=".2", margin="0")
-                sgraph.add_edge(monomer_node, site_node,
-                                style="bold")
+                    site_label += '=<font color="purple">%s</font>' % site_state
+                monomer_label += '<tr><td port="%s">%s</td></tr>' % (site, site_label)
             for site, value in mp.site_conditions.items():
-                site_bonds = []
+                site_bonds = []  # list of bond numbers
                 if isinstance(value, int):
                     site_bonds.append(value)
                 elif isinstance(value, tuple):
@@ -48,10 +40,15 @@ def run(model):
                 elif isinstance(value, list):
                     site_bonds += value
                 for b in site_bonds:
-                    bonds.setdefault(b, []).append('%s_%s' % (monomer_node, site))
+                    bonds.setdefault(b, []).append((monomer_node, site))
+            monomer_label += '</table>>'
+            sgraph.add_node(monomer_node,
+                            label=monomer_label, shape="none", fontname="arial",
+                            fontsize=8)
         for bi, sites in bonds.items():
-            sgraph.add_edge(sites, label=str(bi),
-                            style="dotted")
+            node_names, port_names = zip(*sites)
+            sgraph.add_edge(node_names, tailport=port_names[0],
+                            headport=port_names[1], label=str(bi), fontsize=8)
     return graph.string()
 
 
