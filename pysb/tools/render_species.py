@@ -61,16 +61,19 @@ Usage: python -m pysb.tools.render_species mymodel.py > mymodel.dot
 Renders the species from a model into the "dot" graph format which can be
 visualized with Graphviz.
 
-To create a PDF from the .dot file, use the "neato" command from Graphviz:
+To create a PDF from the .dot file, use the Graphviz tools in the following
+command pipeline:
 
-    neato mymodel.dot -T pdf -O
+    ccomps -x mymodel.dot | dot | gvpack | neato -n2 -T pdf -o mymodel.pdf
 
-This will create mymodel.dot.pdf. You can also try "dot" instead of "neato" for
-a different type of layout. Alternately, the following "one-liner" may be
-convenient if you are making continuous changes to the model and need to run the
-tool repeatedly:
+You can also change the "dot" command to "circo" or "sfdp" for a different type
+of layout. Note that you can pipe the output of render_species straight into a
+Graphviz command pipeline without creating an intermediate .dot file, which is
+especially helpful if you are making continuous changes to the model and need to
+visualize your changes repeatedly:
 
-    python -m pysb.tools.render_species mymodel.py | neato -T pdf -o mymodel.pdf
+    python -m pysb.tools.render_species mymodel.py | ccomps -x | dot | gvpack |
+      neato -n2 -T pdf -o mymodel.pdf
 
 Note that some PDF viewers will auto-reload a changed PDF, so you may not even
 need to manually reopen it every time you rerun the tool.

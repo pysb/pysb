@@ -68,9 +68,12 @@ To create a PDF from the .dot file, use the "dot" command from Graphviz:
 
     dot mymodel.dot -T pdf -O
 
-This will create mymodel.dot.pdf. Alternately, the following "one-liner" may be
-convenient if you are making continuous changes to the model and need to run the
-tool repeatedly:
+This will create mymodel.dot.pdf. You can also change the "dot" command to one
+of the other Graphviz drawing tools for a different type of layout. Note that
+you can pipe the output of render_reactions straight into Graphviz without
+creating an intermediate .dot file, which is especially helpful if you are
+making continuous changes to the model and need to visualize your changes
+repeatedly:
 
     python -m pysb.tools.render_species mymodel.py | dot -T pdf -o mymodel.pdf
 
