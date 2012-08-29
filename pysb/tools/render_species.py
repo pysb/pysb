@@ -61,7 +61,7 @@ visualized with Graphviz.
 To create a PDF from the .dot file, use the Graphviz tools in the following
 command pipeline:
 
-    ccomps -x mymodel.dot | dot | gvpack | neato -n2 -T pdf -o mymodel.pdf
+    ccomps -x mymodel.dot | dot | gvpack -m0 | neato -n2 -T pdf -o mymodel.pdf
 
 You can also change the "dot" command to "circo" or "sfdp" for a different type
 of layout. Note that you can pipe the output of render_species straight into a
@@ -69,8 +69,8 @@ Graphviz command pipeline without creating an intermediate .dot file, which is
 especially helpful if you are making continuous changes to the model and need to
 visualize your changes repeatedly:
 
-    python -m pysb.tools.render_species mymodel.py | ccomps -x | dot | gvpack |
-      neato -n2 -T pdf -o mymodel.pdf
+    python -m pysb.tools.render_species mymodel.py | ccomps -x | dot |
+      gvpack -m0 | neato -n2 -T pdf -o mymodel.pdf
 
 Note that some PDF viewers will auto-reload a changed PDF, so you may not even
 need to manually reopen it every time you rerun the tool.
