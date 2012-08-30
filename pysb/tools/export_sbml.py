@@ -30,7 +30,7 @@ def run(model):
 <sbml xmlns="http://www.sbml.org/sbml/level2" level="2" version="1">
     <model>
         <listOfCompartments>
-            <compartment id="default" name="default" spatialDimensions="0"/>
+            <compartment id="default" name="default" spatialDimensions="3" size="1"/>
         </listOfCompartments>
 """)
 
