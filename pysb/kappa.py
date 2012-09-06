@@ -33,7 +33,7 @@ def run_simulation(model, **kwargs):
   outs = run_kasim(model, **kwargs)
   return _parse_kasim_outfile(outs['out'])
 
-def influence_map(model, **kwargs, do_open=False):
+def influence_map(model, do_open=False, **kwargs):
   """Runs Kasim with no simulation events, which generates the influence map.
 
   If do_open is set to True, then calls the open_file method to display
