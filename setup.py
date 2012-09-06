@@ -71,6 +71,16 @@ class GitError(Exception):
 
 def get_version():
     """Get a nice version number from git-describe"""
+
+    # ensure that we are working in a pysb git repo
+    setup_path = os.path.abspath(os.path.dirname(__file__))
+    print setup_path
+    if not os.path.exists(os.path.join(setup_path, '.git')):
+        raise Exception("setup.py is not in the root of a git repository; "
+                        "aborting")
+    os.chdir(setup_path)
+
+    # run git describe
     gitcmd = ['git', 'describe', '--always', '--abbrev=4']
     try:
         gitproc = subprocess.Popen(gitcmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
