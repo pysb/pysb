@@ -8,11 +8,12 @@ import pysb.bng
 
 def run(model):
     pysb.bng.generate_equations(model)
-    graph = pygraphviz.AGraph(name="%s species" % model.name, rankdir="LR", fontname='arial')
+    graph = pygraphviz.AGraph(name="%s species" % model.name, rankdir="LR", fontname='Arial')
+    graph.edge_attr.update(fontname='Arial', fontsize=8)
     for si, cp in enumerate(model.species):
         sgraph_name = 'cluster_s%d' % si
         cp_label = re.sub(r'% ', '%<br align="left"/>', str(cp)) + '<br align="left"/>'
-        sgraph_label = '<<font point-size="10" color="blue">s%d</font><br align="left"/><font face="courier" point-size="6">%s</font>>' % (si, cp_label)
+        sgraph_label = '<<font point-size="10" color="blue">s%d</font><br align="left"/><font face="Consolas" point-size="6">%s</font>>' % (si, cp_label)
         sgraph = graph.add_subgraph(name=sgraph_name, label=sgraph_label,
                                     color="gray75", sortv=sgraph_name)
         bonds = {}
@@ -43,12 +44,12 @@ def run(model):
                     bonds.setdefault(b, []).append((monomer_node, site))
             monomer_label += '</table>>'
             sgraph.add_node(monomer_node,
-                            label=monomer_label, shape="none", fontname="arial",
+                            label=monomer_label, shape="none", fontname="Arial",
                             fontsize=8)
         for bi, sites in bonds.items():
             node_names, port_names = zip(*sites)
             sgraph.add_edge(node_names, tailport=port_names[0],
-                            headport=port_names[1], label=str(bi), fontsize=8)
+                            headport=port_names[1], label=str(bi))
     return graph.string()
 
 
