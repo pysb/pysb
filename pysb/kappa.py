@@ -45,7 +45,7 @@ def influence_map(model, do_open=False, **kwargs):
   PyGraphViz graph.
   """
 
-  kasim_dict = run_kasim(model, time=0, points=0, **kwargs)
+  kasim_dict = run_kasim(model, time=1, points=1, dump_influence_map=True, **kwargs)
   im_filename = kasim_dict['im']
 
   if do_open:
@@ -94,26 +94,43 @@ def run_complx(gen, kappa_filename, args):
     raise Exception("problem running complx: " + str(e))
 
 
-def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False):
+def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False, kappa_filename=None, dump_influence_map=False,
+              perturbation=None):
   """Run kasim with the provided arguments.
   """
 
   gen = KappaGenerator(model)
   #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
 
-  kappa_filename = '%s/%s_%d_%d_temp.ka' % (output_dir,
-                        model.name, os.getpid(), random.randint(0, 10000))
+  if not kappa_filename:
+    kappa_filename = '%s/%s_%d_%d_temp.ka' % (output_dir,
+                     model.name, os.getpid(), random.randint(0, 10000))
 
-  im_filename = kappa_filename.replace('.ka', '_im.gv')
-  fm_filename = kappa_filename.replace('.ka', '_fm.gv')
+  im_filename = kappa_filename.replace('.ka', '_im.dot')
+  fm_filename = kappa_filename.replace('.ka', '_fm.dot')
   out_filename = kappa_filename.replace('.ka', '.out')
 
   args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
-          '-o', out_filename, '-im', im_filename, '-flux', fm_filename]
+          '-o', out_filename]
 
   try:
     kappa_file = open(kappa_filename, 'w')
+
+    # Generate the Kappa model code from the PySB model and write it to
+    # the Kappa file:
     kappa_file.write(gen.get_content())
+
+    # If desired, add instructions to the kappa file to generate the
+    # influence map:
+    if dump_influence_map:
+      kappa_file.write('%def: "dumpInfluenceMap" "true"\n')
+      kappa_file.write('%%def: "influenceMapFileName" "%s"\n\n' % im_filename)
+
+    # If any perturbation language code has been passed in, add it to the
+    # Kappa file:
+    if perturbation:
+      kappa_file.write('\n%s\n' % perturbation)
+
     kappa_file.close()
 
     print "Running kasim"
