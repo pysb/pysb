@@ -39,6 +39,10 @@ def influence_map(model, do_open=False, **kwargs):
   If do_open is set to True, then calls the open_file method to display
   the influence map using the default program for opening .gv files
   (e.g., GraphViz).
+
+  Returns the name of the .gv (GraphViz) file where the influence map
+  has been stored. This can subsequently be used to build a networkx or
+  PyGraphViz graph.
   """
 
   kasim_dict = run_kasim(model, time=0, points=0, **kwargs)
@@ -47,6 +51,7 @@ def influence_map(model, do_open=False, **kwargs):
   if do_open:
     open_file(im_filename)
 
+  return im_filename
 
 def contact_map(model, do_open=False, **kwargs):
   """Runs complx with the appropriate arguments for generating the contact map.
