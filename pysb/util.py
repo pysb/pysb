@@ -2,6 +2,7 @@ from pysb import ComponentSet
 import pysb.core
 import inspect
 import numpy
+import cStringIO
 
 __all__ = ['alias_model_components', 'rules_using_parameter']
 
@@ -38,16 +39,19 @@ def get_param_num(model, name):
     return i
 
 
-def write_params(model,paramarr, name):
+def write_params(model,paramarr, name=None):
     """ write the parameters and values to a csv file
     model: a model object
-    name: a string with the name for the file
-    
+    name: a string with the name for the file, or None to return the content
     """
-    fobj = open(name, 'w')
+    if name is not None:
+        fobj = open(name, 'w')
+    else:
+        fobj = cStringIO.StringIO()
     for i in range(len(model.parameters)):
         fobj.write("%s, %g\n"%(model.parameters[i].name, paramarr[i]))
-    fobj.close()
+    if name is None:
+        return fobj.getvalue()
 
 def update_param_vals(model, newvals):
     """update the values of model parameters with the values from a dict. 
