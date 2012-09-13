@@ -22,33 +22,55 @@ import sympy
 import numpy as np
 
 def run_simulation(model, **kwargs):
-    """Runs the given model using KaSim
+    """Runs the given model using KaSim and returns the parsed results.
 
-     Passes arguments
-    with the specified arguments for time and
-    number of points (note that it also generates the influence and flux
-    maps, though they are not used here).
+    Parameters
+    ----------
+    **kwargs : List of keyword arguments
+        All keyword arguments specifying conditions for the simulation are
+        passed to the function :py:func:`run_kasim` (see documentation
+        associated with that function for more information).
 
-    Returns the kasim simulation data as a numpy array, which can be
-    plotted using the plot command.
+    Returns
+    -------
+    numpy.ndarray
+        Returns the kasim simulation data as a Numpy ndarray. Data is accessed
+        using the syntax::
+        
+            results[index_name]
+            
+        The index 'time' gives the data for the time coordinates of the
+        simulation. Data for the observables can be accessed by indexing the
+        array with the names of the observables.
     """
 
     outs = run_kasim(model, **kwargs)
     return _parse_kasim_outfile(outs['out'])
 
 def influence_map(model, do_open=False, **kwargs):
-    """Runs Kasim with no simulation events, which generates the influence map.
+    """Generates the influence map by running KaSim with no events or points.
 
-    If do_open is set to True, then calls the open_file method to display
-    the influence map using the default program for opening .gv files
-    (e.g., GraphViz).
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model for generating the influence map.
+    do_open : boolean
+        If do_open is set to True, then calls the :py:func:`open_file` method
+        to display the influence map using the default program for opening .gv
+        files (e.g., GraphViz).
+    **kwargs : other keyword arguments
+        Any other keyword arguments are passed to the function
+        :py:func:`run_kasim`.
 
-    Returns the name of the .gv (GraphViz) file where the influence map
-    has been stored. This can subsequently be used to build a networkx or
-    PyGraphViz graph.
+    Returns
+    -------
+    string
+        Returns the name of the .gv (GraphViz) file where the influence map
+        has been stored. This can subsequently be used to build a networkx or
+        PyGraphViz graph.
     """
 
-    kasim_dict = run_kasim(model, time=1, points=1, dump_influence_map=True,
+    kasim_dict = run_kasim(model, time=0, points=0, dump_influence_map=True,
                            **kwargs)
     im_filename = kasim_dict['im']
 
@@ -57,10 +79,36 @@ def influence_map(model, do_open=False, **kwargs):
 
     return im_filename
 
-def contact_map(model, do_open=False, base_filename=None, **kwargs):
+def contact_map(model, output_dir='.', base_filename=None, do_open=False, 
+                **kwargs):
     """Runs complx with arguments for generating the contact map.
 
-    If do_open is True, attempts to open the JPG file for display.
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model for generating the contact map.
+    output_dir : string
+        The subdirectory in which to generate the Kappa (.ka) file for the
+        model and all output files produced by complx. Default value is '.'
+        Note that only relative paths can be specified; paths are relative
+        to the directory where the current Python instance is running.
+        If the specified directory does not exist, an Exception is thrown.
+    base_filename : The base filename to be used for generation of the Kappa
+        (.ka) file and all output files produced by complx. Defaults to a
+        string of the form::
+
+            '%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
+
+        The contact map filenames append '_cm.jpg' and '_cm.dot' to this base
+        filename; the reachable complexes filename appends '_rch.dot'.
+    do_open : boolean
+        If do_open is set to True, then calls the :py:func:`open_file` method
+        to display the contact map using the default program for opening .jpg
+        files.
+    **kwargs : other keyword arguments
+        Any other keyword arguments are passed through to the function
+        :py:func:`run_complx`.
+
     """
 
     gen = KappaGenerator(model, dialect='complx')
@@ -85,8 +133,23 @@ def contact_map(model, do_open=False, base_filename=None, **kwargs):
 
 ### "PRIVATE" Functions ###############################################
 
-# Generalized method for passing arguments to the complx executable.
 def run_complx(gen, kappa_filename, args):
+    """Generalized method for passing arguments to the complx executable.
+   
+    Parameters
+    ----------
+    gen : :py:class:`pysb.generator.KappaGenerator`
+        A KappaGenerator object that is used to produce the Kappa content
+        for writing to a file.
+    kappa_filename : string
+        The name of the file to write the generated Kappa to.
+    args : list of strings
+        List of command line arguments to pass to complx, with one entry for
+        each argument, for example::
+
+            ['--output-high-res-contact-map-jpg', jpg_filename]
+    """
+
     try:
         kappa_file = open(kappa_filename, 'w')
         kappa_file.write(gen.get_content())
@@ -134,10 +197,10 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
         Specifies whether output files produced by KaSim should be deleted
         after execution is completed. Default value is False.
     base_filename : The base filename to be used for generation of the Kappa
-        (.ka) file and all output files produced by KaSim.
-        Defaults to a string of the form::
+        (.ka) file and all output files produced by KaSim. Defaults to a
+        string of the form::
 
-        `'%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
+            '%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
 
         The influence map filename appends '_im.dot' to this base filename; the
         flux map filename appends '_fm.dot'; and the simulation output file
@@ -153,9 +216,10 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
     Returns
     -------
     A dict with three entries giving the filenames for the files produced:
-    * output_dict['out'] gives the .out filename
-    * output_dict['im'] gives the influence map filename
-    * output_dict['fm'] gives the flux map filename
+
+        * output_dict['out'] gives the .out filename
+        * output_dict['im'] gives the influence map filename
+        * output_dict['fm'] gives the flux map filename
     """
 
     gen = KappaGenerator(model)
@@ -216,7 +280,26 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
 
 
 def _parse_kasim_outfile(out_filename):
-    """Parse the outputfile produced by kasim."""
+    """
+    Parses the KaSim .out file into a Numpy ndarray.
+
+    Parameters
+    ----------
+    out_filename : string
+        String specifying the location of the .out filename produced by KaSim.
+
+    Returns
+    -------
+    numpy.ndarray
+        Returns the KaSim simulation data as a Numpy ndarray. Data is accessed
+        using the syntax::
+        
+            results[index_name]
+            
+        The index 'time' gives the data for the time coordinates of the
+        simulation. Data for the observables can be accessed by indexing the
+        array with the names of the observables.
+    """
 
     try:
         out_file = open(out_filename, 'r')
@@ -246,9 +329,11 @@ def _parse_kasim_outfile(out_filename):
 
 
 def open_file(filename):
-    """Utility function for opening files for display on Mac OS X
-    (jpg, gv, dot, etc.). Ultimately this should be rewritten to auto-detect
-    the operating system and use the appropriate system call.
+    """Utility function for opening files for display on Mac OS X.
+
+    Uses the 'open' command to open the given file using the default program
+    associated with the file's filetype. Ultimately this should be rewritten to
+    auto-detect the operating system and use the appropriate system call.
     """
 
     try:
