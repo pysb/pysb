@@ -262,15 +262,5 @@ def open_file(filename):
         raise Exception("Problem opening file: ", e)
 
 
-def generate_influence_map(model):
-    """DEPRECATED, since Kasim always generates the flux and influence maps
-    when run."""
-
-    gen = KappaGenerator(model)
-    kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
-    dot_filename = kappa_filename.replace('.ka', '.jpg')
-    args = ['--output-influence-map-jpg', jpg_filename]
-    run_complx(gen, kappa_filename, args)
-
 
 
