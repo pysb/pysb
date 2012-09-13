@@ -22,86 +22,87 @@ import sympy
 import numpy as np
 
 def run_simulation(model, **kwargs):
-  """Runs the given model using KaSim
+    """Runs the given model using KaSim
 
-   Passes arguments
-  with the specified arguments for time and
-  number of points (note that it also generates the influence and flux
-  maps, though they are not used here).
+     Passes arguments
+    with the specified arguments for time and
+    number of points (note that it also generates the influence and flux
+    maps, though they are not used here).
 
-  Returns the kasim simulation data as a numpy array, which can be
-  plotted using the plot command.
-  """
+    Returns the kasim simulation data as a numpy array, which can be
+    plotted using the plot command.
+    """
 
-  outs = run_kasim(model, **kwargs)
-  return _parse_kasim_outfile(outs['out'])
+    outs = run_kasim(model, **kwargs)
+    return _parse_kasim_outfile(outs['out'])
 
 def influence_map(model, do_open=False, **kwargs):
-  """Runs Kasim with no simulation events, which generates the influence map.
+    """Runs Kasim with no simulation events, which generates the influence map.
 
-  If do_open is set to True, then calls the open_file method to display
-  the influence map using the default program for opening .gv files
-  (e.g., GraphViz).
+    If do_open is set to True, then calls the open_file method to display
+    the influence map using the default program for opening .gv files
+    (e.g., GraphViz).
 
-  Returns the name of the .gv (GraphViz) file where the influence map
-  has been stored. This can subsequently be used to build a networkx or
-  PyGraphViz graph.
-  """
+    Returns the name of the .gv (GraphViz) file where the influence map
+    has been stored. This can subsequently be used to build a networkx or
+    PyGraphViz graph.
+    """
 
-  kasim_dict = run_kasim(model, time=1, points=1, dump_influence_map=True, **kwargs)
-  im_filename = kasim_dict['im']
+    kasim_dict = run_kasim(model, time=1, points=1, dump_influence_map=True,
+                           **kwargs)
+    im_filename = kasim_dict['im']
 
-  if do_open:
-    open_file(im_filename)
+    if do_open:
+        open_file(im_filename)
 
-  return im_filename
+    return im_filename
 
 def contact_map(model, do_open=False, base_filename=None, **kwargs):
-  """Runs complx with the appropriate arguments for generating the contact map.
+    """Runs complx with arguments for generating the contact map.
 
-  If do_open is True, attempts to open the JPG file for display.
-  """
+    If do_open is True, attempts to open the JPG file for display.
+    """
 
-  gen = KappaGenerator(model, dialect='complx')
+    gen = KappaGenerator(model, dialect='complx')
 
-  if not base_filename:
-    base_filename = '%s/%s_%d_%d_temp' % (output_dir,
-                     model.name, os.getpid(), random.randint(0, 10000))
+    if not base_filename:
+        base_filename = '%s/%s_%d_%d_temp' % (output_dir,
+                         model.name, os.getpid(), random.randint(0, 10000))
 
-  kappa_filename = base_filename + '.ka'
-  jpg_filename = base_filename + '_cm.jpg'
-  dot_filename = base_filename + '_cm.dot'
-  reachables_filename = base_filename + '_rch.dot'
+    kappa_filename = base_filename + '.ka'
+    jpg_filename = base_filename + '_cm.jpg'
+    dot_filename = base_filename + '_cm.dot'
+    reachables_filename = base_filename + '_rch.dot'
 
-  args = ['--output-high-res-contact-map-jpg', jpg_filename,
-          '--output-high-res-contact-map-dot', dot_filename,
-          '--output-reachable-complexes', reachables_filename]
-  run_complx(gen, kappa_filename, args, **kwargs)
+    args = ['--output-high-res-contact-map-jpg', jpg_filename,
+            '--output-high-res-contact-map-dot', dot_filename,
+            '--output-reachable-complexes', reachables_filename]
+    run_complx(gen, kappa_filename, args, **kwargs)
 
-  if do_open:
-    open_file(jpg_filename)
+    if do_open:
+        open_file(jpg_filename)
 
 
 ### "PRIVATE" Functions ###############################################
 
 # Generalized method for passing arguments to the complx executable.
 def run_complx(gen, kappa_filename, args):
-  try:
-    kappa_file = open(kappa_filename, 'w')
-    kappa_file.write(gen.get_content())
-    kappa_file.close()
-    cmd = 'complx ' + ' '.join(args) + ' ' + kappa_filename
-    print "Command: " + cmd
-    p = subprocess.Popen(['complx'] + args + [kappa_filename],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    #p.communicate()
-    p.wait()
+    try:
+        kappa_file = open(kappa_filename, 'w')
+        kappa_file.write(gen.get_content())
+        kappa_file.close()
+        cmd = 'complx ' + ' '.join(args) + ' ' + kappa_filename
+        print "Command: " + cmd
+        p = subprocess.Popen(['complx'] + args + [kappa_filename],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        #p.communicate()
+        p.wait()
 
-    if p.returncode:
-      raise Exception(p.stderr.read())
+        if p.returncode:
+            raise Exception(p.stderr.read())
 
-  except Exception as e:
-    raise Exception("problem running complx: " + str(e))
+    except Exception as e:
+        raise Exception("problem running complx: " + str(e))
 
 
 def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
@@ -157,118 +158,119 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
     * output_dict['fm'] gives the flux map filename
     """
 
-  gen = KappaGenerator(model)
+    gen = KappaGenerator(model)
 
-  if not base_filename:
-    base_filename = '%s/%s_%d_%d_temp' % (output_dir,
-                     model.name, os.getpid(), random.randint(0, 10000))
+    if not base_filename:
+        base_filename = '%s/%s_%d_%d_temp' % (output_dir,
+                        model.name, os.getpid(), random.randint(0, 10000))
 
-  kappa_filename = base_filename + '.ka'
-  im_filename = base_filename + '_im.dot'
-  fm_filename = base_filename + '_fm.dot'
-  out_filename = base_filename + '.out'
+    kappa_filename = base_filename + '.ka'
+    im_filename = base_filename + '_im.dot'
+    fm_filename = base_filename + '_fm.dot'
+    out_filename = base_filename + '.out'
 
-  args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
-          '-o', out_filename]
+    args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
+            '-o', out_filename]
 
-  try:
-    kappa_file = open(kappa_filename, 'w')
+    try:
+        kappa_file = open(kappa_filename, 'w')
 
-    # Generate the Kappa model code from the PySB model and write it to
-    # the Kappa file:
-    kappa_file.write(gen.get_content())
+        # Generate the Kappa model code from the PySB model and write it to
+        # the Kappa file:
+        kappa_file.write(gen.get_content())
 
-    # If desired, add instructions to the kappa file to generate the
-    # influence map:
-    if dump_influence_map:
-      kappa_file.write('%def: "dumpInfluenceMap" "true"\n')
-      kappa_file.write('%%def: "influenceMapFileName" "%s"\n\n' % im_filename)
+        # If desired, add instructions to the kappa file to generate the
+        # influence map:
+        if dump_influence_map:
+            kappa_file.write('%def: "dumpInfluenceMap" "true"\n')
+            kappa_file.write('%%def: "influenceMapFileName" "%s"\n\n' %
+                             im_filename)
 
-    # If any perturbation language code has been passed in, add it to the
-    # Kappa file:
-    if perturbation:
-      kappa_file.write('\n%s\n' % perturbation)
+        # If any perturbation language code has been passed in, add it to the
+        # Kappa file:
+        if perturbation:
+            kappa_file.write('\n%s\n' % perturbation)
 
-    kappa_file.close()
+        kappa_file.close()
 
-    print "Running kasim"
-    p = subprocess.Popen(['KaSim'] + args)
-                            #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    p.communicate()
+        print "Running kasim"
+        p = subprocess.Popen(['KaSim'] + args)
+                           #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        p.communicate()
 
-    if p.returncode:
-      raise Exception(p.stdout.read())
+        if p.returncode:
+            raise Exception(p.stdout.read())
 
-  except Exception as e:
-    raise Exception("Problem running KaSim: " + str(e))
+    except Exception as e:
+        raise Exception("Problem running KaSim: " + str(e))
 
-  finally:
-    if cleanup:
-      for filename in [kappa_filename, im_filename,
-                      fm_filename, out_filename]:
-        if os.access(filename, os.F_OK):
-          os.unlink(filename)
+    finally:
+        if cleanup:
+            for filename in [kappa_filename, im_filename,
+                            fm_filename, out_filename]:
+                if os.access(filename, os.F_OK):
+                    os.unlink(filename)
 
-  output_dict = {'out':out_filename, 'im':im_filename, 'fm':'flux.dot'}
-  return output_dict
+    output_dict = {'out':out_filename, 'im':im_filename, 'fm':'flux.dot'}
+    return output_dict
 
 
 def _parse_kasim_outfile(out_filename):
-  """Parse the outputfile produced by kasim."""
+    """Parse the outputfile produced by kasim."""
 
-  try:
-    out_file = open(out_filename, 'r')
+    try:
+        out_file = open(out_filename, 'r')
 
-    line = out_file.readline().strip() # Get the first line
-    out_file.close()
-    line = line[2:]  # strip off opening '# '
-    raw_names = re.split(' ', line)
-    column_names = []
+        line = out_file.readline().strip() # Get the first line
+        out_file.close()
+        line = line[2:]  # strip off opening '# '
+        raw_names = re.split(' ', line)
+        column_names = []
 
-    # Get rid of the quotes surrounding the observable names
-    for raw_name in raw_names:
-      mo = re.match("'(.*)'", raw_name)
-      if (mo): column_names.append(mo.group(1))
-      else: column_names.append(raw_name)
+        # Get rid of the quotes surrounding the observable names
+        for raw_name in raw_names:
+            mo = re.match("'(.*)'", raw_name)
+            if (mo): column_names.append(mo.group(1))
+            else: column_names.append(raw_name)
 
-    # Create the dtype argument for the numpy record array
-    dt = zip(column_names, ('float',)*len(column_names))
+        # Create the dtype argument for the numpy record array
+        dt = zip(column_names, ('float',)*len(column_names))
 
-    # Load the output file as a numpy record array, skip the name row
-    arr = np.loadtxt(out_filename, dtype=dt, skiprows=1)
+        # Load the output file as a numpy record array, skip the name row
+        arr = np.loadtxt(out_filename, dtype=dt, skiprows=1)
 
-  except Exception as e:
-    raise Exception("problem parsing KaSim outfile: " + str(e))
+    except Exception as e:
+        raise Exception("problem parsing KaSim outfile: " + str(e))
 
-  return arr
+    return arr
 
 
 def open_file(filename):
-  """Utility function for opening files for display on Mac OS X
-  (jpg, gv, dot, etc.). Ultimately this should be rewritten to auto-detect
-  the operating system and use the appropriate system call.
-  """
+    """Utility function for opening files for display on Mac OS X
+    (jpg, gv, dot, etc.). Ultimately this should be rewritten to auto-detect
+    the operating system and use the appropriate system call.
+    """
 
-  try:
-    p = subprocess.Popen(['open'] + [filename],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    #p.communicate()
-    p.wait()
-    if p.returncode:
-      raise Exception(p.stderr.read())
-  except Exception as e:
-    raise Exception("Problem opening file: ", e)
+    try:
+        p = subprocess.Popen(['open'] + [filename],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        #p.communicate()
+        p.wait()
+        if p.returncode:
+            raise Exception(p.stderr.read())
+    except Exception as e:
+        raise Exception("Problem opening file: ", e)
 
 
 def generate_influence_map(model):
-  """DEPRECATED, since Kasim always generates the flux and influence maps
-  when run."""
+    """DEPRECATED, since Kasim always generates the flux and influence maps
+    when run."""
 
-  gen = KappaGenerator(model)
-  kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
-  dot_filename = kappa_filename.replace('.ka', '.jpg')
-  args = ['--output-influence-map-jpg', jpg_filename]
-  run_complx(gen, kappa_filename, args)
+    gen = KappaGenerator(model)
+    kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
+    dot_filename = kappa_filename.replace('.ka', '.jpg')
+    args = ['--output-influence-map-jpg', jpg_filename]
+    run_complx(gen, kappa_filename, args)
 
 
 
