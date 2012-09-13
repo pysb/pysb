@@ -1,7 +1,7 @@
 """
 Wrapper functions for running the Kappa programs Kasim and complx.
 
-In general only the following three functions will be needed:
+In general only the following three functions will be needed for typical use:
 * :py:func:`run_simulation`
 * :py:func:`influence_map`
 * :py:func:`contact_map`
@@ -22,7 +22,10 @@ import sympy
 import numpy as np
 
 def run_simulation(model, **kwargs):
-  """Runs the model using kasim with the specified arguments for time and
+  """Runs the given model using KaSim
+
+   Passes arguments
+  with the specified arguments for time and
   number of points (note that it also generates the influence and flux
   maps, though they are not used here).
 
@@ -53,19 +56,26 @@ def influence_map(model, do_open=False, **kwargs):
 
   return im_filename
 
-def contact_map(model, do_open=False, **kwargs):
+def contact_map(model, do_open=False, base_filename=None, **kwargs):
   """Runs complx with the appropriate arguments for generating the contact map.
 
   If do_open is True, attempts to open the JPG file for display.
   """
 
   gen = KappaGenerator(model, dialect='complx')
-  #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
-  kappa_filename = '%s.ka' % model.name
-  jpg_filename = kappa_filename.replace('.ka', '.jpg')
-  dot_filename = kappa_filename.replace('.ka', '.dot')
+
+  if not base_filename:
+    base_filename = '%s/%s_%d_%d_temp' % (output_dir,
+                     model.name, os.getpid(), random.randint(0, 10000))
+
+  kappa_filename = base_filename + '.ka'
+  jpg_filename = base_filename + '_cm.jpg'
+  dot_filename = base_filename + '_cm.dot'
+  reachables_filename = base_filename + '_rch.dot'
+
   args = ['--output-high-res-contact-map-jpg', jpg_filename,
-          '--output-high-res-contact-map-dot', dot_filename]
+          '--output-high-res-contact-map-dot', dot_filename,
+          '--output-reachable-complexes', reachables_filename]
   run_complx(gen, kappa_filename, args, **kwargs)
 
   if do_open:
@@ -94,21 +104,69 @@ def run_complx(gen, kappa_filename, args):
     raise Exception("problem running complx: " + str(e))
 
 
-def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False, kappa_filename=None, dump_influence_map=False,
+def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
+              base_filename=None, dump_influence_map=False,
               perturbation=None):
-  """Run kasim with the provided arguments.
-  """
+    """Run KaSim on the given model with the provided arguments.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to simulate/analyze using KaSim.
+    time : number
+        The amount of time (in arbitrary units) to run a simulation.
+        Identical to the -t argument when using KaSim at the command line.
+        Default value is 10000. If set to 0, no simulation will be run, but
+        the influence map will be generated (if dump_influence_map is set to
+        True).
+    points : integer
+        The number of data points to collect for plotting.
+        Identical to the -p argument when using KaSim at the command line.
+        Default value is 200.
+    output_dir : string
+        The subdirectory in which to generate the Kappa (.ka) file for the
+        model and all output files produced by KaSim. Default value is '.'
+        Note that only relative paths can be specified; paths are relative
+        to the directory where the current Python instance is running.
+        If the specified directory does not exist, an Exception is thrown.
+    cleanup : boolean
+        Specifies whether output files produced by KaSim should be deleted
+        after execution is completed. Default value is False.
+    base_filename : The base filename to be used for generation of the Kappa
+        (.ka) file and all output files produced by KaSim.
+        Defaults to a string of the form::
+
+        `'%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
+
+        The influence map filename appends '_im.dot' to this base filename; the
+        flux map filename appends '_fm.dot'; and the simulation output file
+        appends '.out'
+    dump_influence_map : boolean
+        Specifies whether or not to produce the influence map. Default value
+        is False.
+    perturbation : string or None
+        Optional perturbation language syntax to be appended to the Kappa file.
+        See KaSim manual for more details. Default value is None (no
+        perturbation).
+
+    Returns
+    -------
+    A dict with three entries giving the filenames for the files produced:
+    * output_dict['out'] gives the .out filename
+    * output_dict['im'] gives the influence map filename
+    * output_dict['fm'] gives the flux map filename
+    """
 
   gen = KappaGenerator(model)
-  #kappa_filename = '%d_%d_temp.ka' % (os.getpid(), random.randint(0, 10000))
 
-  if not kappa_filename:
-    kappa_filename = '%s/%s_%d_%d_temp.ka' % (output_dir,
+  if not base_filename:
+    base_filename = '%s/%s_%d_%d_temp' % (output_dir,
                      model.name, os.getpid(), random.randint(0, 10000))
 
-  im_filename = kappa_filename.replace('.ka', '_im.dot')
-  fm_filename = kappa_filename.replace('.ka', '_fm.dot')
-  out_filename = kappa_filename.replace('.ka', '.out')
+  kappa_filename = base_filename + '.ka'
+  im_filename = base_filename + '_im.dot'
+  fm_filename = base_filename + '_fm.dot'
+  out_filename = base_filename + '.out'
 
   args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
           '-o', out_filename]
@@ -142,7 +200,7 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False, kapp
       raise Exception(p.stdout.read())
 
   except Exception as e:
-    raise Exception("problem running KaSim: " + str(e))
+    raise Exception("Problem running KaSim: " + str(e))
 
   finally:
     if cleanup:
