@@ -60,7 +60,7 @@ def fig_4b():
     t = linspace(0, 6*3600, 6*60+1)  # 6 hours
     x = odesolve(model, t)
 
-    x_norm = array([x['Bid_unbound'], x['PARP_unbound'], x['mSmac_unbound']]).T
+    x_norm = c_[x['Bid_unbound'], x['PARP_unbound'], x['mSmac_unbound']]
     x_norm = 1 - x_norm / x_norm[0, :]  # gets away without max() since first values are largest
 
     # this is what I originally thought 4B was plotting.  oddly it's very close.

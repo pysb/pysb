@@ -29,9 +29,9 @@ Observable('B_total', B())
 def main():
     t = linspace(0, 60)
     y = pint.odesolve(model, t)
-    print y.A_total[-1], y.B_total[-1]
-    plot(t, y.A_total)
-    plot(t, y.B_total)
+    print y['A_total'][-1], y['B_total'][-1]
+    plot(t, y['A_total'])
+    plot(t, y['B_total'])
     legend([o.name for o in model.observables])
     show()
 
