@@ -6,4 +6,5 @@ PySB Modules Reference
 
    core.rst
    bng.rst
+   kappa.rst
    macros.rst
