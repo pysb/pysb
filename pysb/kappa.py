@@ -1,10 +1,11 @@
 """
-Wrapper functions for running the Kappa programs Kasim and complx.
+Wrapper functions for running the Kappa programs *Kasim* and *complx*.
 
 In general only the following three functions will be needed for typical use:
-* :py:func:`run_simulation`
-* :py:func:`influence_map`
-* :py:func:`contact_map`
+
+    * :py:func:`run_simulation`
+    * :py:func:`influence_map`
+    * :py:func:`contact_map`
 
 The other functions are used internally and manage the execution of the Kappa
 software and the parsing of the data into a Numpy format.
@@ -45,10 +46,13 @@ def run_simulation(model, **kwargs):
     """
 
     outs = run_kasim(model, **kwargs)
-    return _parse_kasim_outfile(outs['out'])
+    return parse_kasim_outfile(outs['out'])
 
 def influence_map(model, do_open=False, **kwargs):
-    """Generates the influence map by running KaSim with no events or points.
+    """Generates the influence map.
+
+    Runs KaSim with no events or points and sets the dump_influence_map
+    argument to True.
 
     Parameters
     ----------
@@ -97,7 +101,7 @@ def contact_map(model, output_dir='.', base_filename=None, do_open=False,
         (.ka) file and all output files produced by complx. Defaults to a
         string of the form::
 
-            '%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
+            '%s_%d_%d_temp' % (model.name, os.getpid(), random.randint(0,10000))
 
         The contact map filenames append '_cm.jpg' and '_cm.dot' to this base
         filename; the reachable complexes filename appends '_rch.dot'.
@@ -279,7 +283,7 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
     return output_dict
 
 
-def _parse_kasim_outfile(out_filename):
+def parse_kasim_outfile(out_filename):
     """
     Parses the KaSim .out file into a Numpy ndarray.
 
