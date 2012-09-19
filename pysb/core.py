@@ -121,6 +121,12 @@ class Component(object):
         if self._export:
             self._do_export()
 
+    def __getstate__(self):
+        # clear the weakref to parent model (restored in Model.__setstate__)
+        state = self.__dict__.copy()
+        del state['model']
+        return state
+
     def _do_export(self):
         try:
             SelfExporter.export(self)
@@ -713,6 +719,12 @@ class Model(object):
                 self.add_component(component)
                 component._do_export()
             self.initial_conditions = model_copy.initial_conditions
+
+    def __setstate__(self, state):
+        # restore the 'model' weakrefs on all components
+        self.__dict__.update(state)
+        for c in self.all_components():
+            c.model = weakref.ref(self)
 
     def reload(self):
         # forcibly removes the .pyc file and reloads the model module
