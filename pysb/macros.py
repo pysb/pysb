@@ -395,7 +395,7 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
     # if product is actually a variant of substrate, we need to explicitly say
     # that it is no longer bound to enzyme
     if product().monomer is substrate().monomer:
-        product = product({e_site: None})
+        product = product({s_site: None})
 
     # create the rules
     components = _macro_rule('bind',
