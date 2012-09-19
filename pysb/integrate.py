@@ -107,8 +107,11 @@ class Solver(object):
         self.model = model
         self.tspan = tspan
         self.y = numpy.ndarray((len(tspan), len(model.species)))
-        self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
-                                                  itertools.repeat(float)))
+        if len(model.observables):
+            self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
+                                                      itertools.repeat(float)))
+        else:
+            self.yobs = numpy.ndarray((len(tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
         self.integrator = ode(rhs).set_integrator(integrator, **options)
 
@@ -281,8 +284,9 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     solver.run(param_values, y0)
 
     species_names = ['__s%d' % i for i in range(solver.y.shape[1])]
-    species_dtype = zip(species_names, itertools.repeat(float))
-    yfull_dtype = species_dtype + solver.yobs.dtype.descr
+    yfull_dtype = zip(species_names, itertools.repeat(float))
+    if len(solver.yobs.dtype):
+        yfull_dtype += solver.yobs.dtype.descr
     yfull = numpy.ndarray(len(solver.y), yfull_dtype)
 
     yfull_view = yfull.view(float).reshape(len(yfull), -1)
