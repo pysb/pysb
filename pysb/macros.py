@@ -389,12 +389,20 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     # Set up some aliases to the patterns we'll use in the rules
     enzyme_free = enzyme({e_site: None})
-    substrate_free = substrate({s_site: None})
-    es_complex = enzyme({e_site: 1}) % substrate({s_site: 1})
+    # retain any existing state for substrate's s_site, otherwise set it to None
+    if s_site in substrate.site_conditions:
+        substrate_free = substrate()
+        s_state = (substrate.site_conditions[s_site], 1)
+    else:
+        substrate_free = substrate({s_site: None})
+        s_state = 1
+    es_complex = enzyme({e_site: 1}) % substrate({s_site: s_state})
 
-    # if product is actually a variant of substrate, we need to explicitly say
-    # that it is no longer bound to enzyme
-    if product().monomer is substrate().monomer:
+    # If product is actually a variant of substrate, we need to explicitly say
+    # that it is no longer bound to enzyme, unless product already specifies a
+    # state for s_site.
+    if product().monomer is substrate().monomer \
+            and s_site not in product.site_conditions:
         product = product({s_site: None})
 
     # create the rules
