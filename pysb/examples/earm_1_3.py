@@ -57,6 +57,8 @@ Bcl2_0.value = 30000
 # Change some rate constants
 # ==========
 
+v = 0.01
+
 kr1.value = 1e-6
 kc1.value = 1e-2
 kf3.value = 1e-7
@@ -65,14 +67,14 @@ kf7.value = 1e-7
 kr9.value = 0.001
 kc9.value = 20
 kr13.value = 1
-kf14.value = 1e-6
-kf15.value = 1e-6
-kf16.value = 1e-6
-kf17.value = 1e-6
-kf18.value = 1e-6
-kf19.value = 1e-6
-kf20.value = 2e-6
-kf21.value = 2e-6
+kf14.value = 1e-6 / v
+kf15.value = 1e-6 * 2 / v
+kf16.value = 1e-6 / v
+kf17.value = 1e-6 * 2 / v
+kf18.value = 1e-6 / v
+kf19.value = 1e-6 / v
+kf20.value = 2e-6 / v
+kf21.value = 2e-6 / v
 kf22.value = 1
 kf26.value = 1
 
@@ -163,6 +165,7 @@ def show_species():
 
 def show_rates():
     """Print a table of rate parameters like Table S4"""
+    # FIXME kf14-kf21 need to be un-scaled by v to make the table look right
     print ("%-20s        " * 3) % ('forward', 'reverse', 'catalytic')
     print '-' * (9 + 17 + 8) * 3
     for i in range(1,29) + [31]:
