@@ -20,7 +20,7 @@ def pad(text, depth=0):
     return text
 
 
-def run(model):
+def run(model, docstring=None):
     output = StringIO()
     pysb.bng.generate_equations(model)
 
@@ -31,6 +31,9 @@ def run(model):
     for i, p in enumerate(model.parameters):
         code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
 
+    output.write('"""')
+    output.write(docstring)
+    output.write('"""\n\n')
     output.write("# exported from PySB model '%s'\n" % model.name)
     output.write(pad(r"""
         import numpy
@@ -177,4 +180,4 @@ if __name__ == '__main__':
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    print run(model)
+    print run(model, model_module.__doc__)
