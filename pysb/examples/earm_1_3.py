@@ -84,19 +84,13 @@ pysb.bng.generate_equations(model)
 all_species = list(model.species)
 model.reset_equations()
 
-# add some components for use in synthesis and degradation rules
-Monomer('_SynthesisDummy')
-Monomer('_Trash')
-Parameter('_SynthesisDummy_0', 1.0)
-Initial(_SynthesisDummy(), _SynthesisDummy_0)
-
 def synthesize(name, species, ks):
     """Synthesize species with rate ks"""
-    Rule(name, _SynthesisDummy() >> species, ks)
+    Rule(name, None >> species, ks)
 
 def degrade(name, species, kdeg):
     """Degrade species with rate kdeg"""
-    Rule(name, species >> _Trash(), kdeg)
+    Rule(name, species >> None, kdeg)
 
 # almost all degradation rates use this one value
 kdeg_generic = 2.9e-6
