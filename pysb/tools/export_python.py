@@ -107,7 +107,7 @@ def run(model):
 
     # note the simulate method is fixed, i.e. it doesn't require any templating
     output.write(pad(r"""
-        def simulate(self, tspan, param_values=None):
+        def simulate(self, tspan, param_values=None, view=False):
             if param_values is not None:
                 # accept vector of parameter values as an argument
                 if len(param_values) != len(self.parameters):
@@ -138,10 +138,14 @@ def run(model):
             for i, obs in enumerate(self.observables):
                 self.yobs_view[:, i] = \
                     (self.y[:, obs.species] * obs.coefficients).sum(1)
-            y_out = self.y.view()
-            yobs_out = self.yobs_view.view()
-            for a in y_out, yobs_out:
-                a.flags.writeable = False
+            if view:
+                y_out = self.y.view()
+                yobs_out = self.yobs.view()
+                for a in y_out, yobs_out:
+                    a.flags.writeable = False
+            else:
+                y_out = self.y.copy()
+                yobs_out = self.yobs.copy()
             return (y_out, yobs_out)
         """, 4))
 
