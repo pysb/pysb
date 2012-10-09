@@ -991,7 +991,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         # Must support both Sequence and Mapping behavior. This means stringified integer Mapping
         # keys (like "0") are forbidden, but since all Component names must be valid Python
         # identifiers, integers are ruled out anyway.
-        if isinstance(key, int) or isinstance(key, long):
+        if isinstance(key, (int, long, slice)):
             return self._elements[key]
         else:
             return self._map[key]
