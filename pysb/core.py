@@ -240,7 +240,8 @@ class MonomerPattern(object):
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is one of: None, integer, list of integers, string, (string,integer), (string,WILD), ANY
+        # ensure each value is one of: None, integer, list of integers, string,
+        # (string,integer), (string,WILD), ANY, WILD
         invalid_sites = []
         for (site, state) in site_conditions.items():
             # pass through to next iteration if state type is ok
@@ -254,7 +255,9 @@ class MonomerPattern(object):
                 continue
             elif type(state) == tuple and type(state[0]) == str and (type(state[1]) == int or state[1] == WILD):
                 continue
-            elif state == ANY:
+            elif state is ANY:
+                continue
+            elif state is WILD:
                 continue
             invalid_sites.append(site)
         if invalid_sites:
