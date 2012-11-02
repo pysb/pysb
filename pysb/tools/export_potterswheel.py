@@ -13,8 +13,6 @@ def run(model):
     output = StringIO()
     pysb.bng.generate_equations(model)
 
-    obs_names = [name for name, rp in model.observable_patterns]
-
     ic_values = [0] * len(model.odes)
     for cp, ic_param in model.initial_conditions:
         ic_values[model.get_species_index(cp)] = ic_param.value
@@ -33,7 +31,7 @@ def run(model):
     pw_ode = [re.sub(r'pow(?=\()', 'power', s) for s in pw_ode]
 
     # observables
-    pw_y = ["m = pwAddY(m, '%s', '%s');" % (' + '.join(['%f * s%s' % g for g in model.observable_groups[name]]), name) for name in obs_names]
+    pw_y = ["m = pwAddY(m, '%s', '%s');" % (obs.name, ' + '.join('%f * s%s' % t for t in zip(obs.coefficients, obs.species))) for obs in model.observables]
 
     output.write('% PottersWheel model definition file\n')
     output.write('%% save as %s.m\n' % model_name)
