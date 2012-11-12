@@ -199,6 +199,11 @@ def equilibrate(s1, s2, klist):
 
     Example
     -------
+        Model()
+        Monomer('A')
+        Monomer('B')
+        equilibrate(A(), B(), [1, 1])
+    
     >>> Model()
     <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
     >>> Monomer('A')
@@ -331,6 +336,16 @@ def bind_table(bindtable, row_site, col_site, kf=None):
 
     Example
     --------
+        Model()
+        Monomer('R1', ['x'])
+        Monomer('R2', ['x'])
+        Monomer('C1', ['y'])
+        Monomer('C2', ['y'])
+        bind_table([[               C1,           C2],
+                    [R1,  (1e-4, 1e-1),  (2e-4, 2e-1)],
+                    [R2,  (3e-4, 3e-1),         None]],
+                   'x', 'y')
+    
     >>> Model()
     <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
     >>> Monomer('R1', ['x'])
@@ -779,6 +794,17 @@ def synthesize(species, ksynth):
         Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         synthesize(A(x=None, y='e'), 1e-4)
 
+    >>> Model()
+    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+    >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
+    Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
+    >>> synthesize(A(x=None, y='e'), 1e-4)
+    {'synthesize_Ae':
+        Rule(name='synthesize_Ae',
+            reactants=None,
+            products=A(x=None, y=e),
+            rate_forward=Parameter(name='synthesize_Ae_k', value=0.0001)),
+     'synthesize_Ae_k': Parameter(name='synthesize_Ae_k', value=0.0001)}
     """
 
     def synthesize_name_func(rule_expression):
@@ -824,6 +850,17 @@ def degrade(species, kdeg):
         Monomer('B', ['x'])
         degrade(B(), 1e-6)  # degrade all B, even bound species
 
+    >>> Model()
+    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+    >>> Monomer('B', ['x'])
+    Monomer(name='B', sites=['x'], site_states={})
+    >>> degrade(B(), 1e-6)  # degrade all B, even bound species
+    {'degrade_B':
+        Rule(name='degrade_B',
+            reactants=B(),
+            products=None,
+            rate_forward=Parameter(name='degrade_B_k', value=1e-06)),
+     'degrade_B_k': Parameter(name='degrade_B_k', value=1e-06)}
     """
 
     def degrade_name_func(rule_expression):
@@ -875,6 +912,32 @@ def synthesize_degrade_table(table):
         synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
                                   [B(),              None, 1e-7]])
 
+    >>> Model()
+    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+    >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
+    Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
+    >>> Monomer('B', ['x'])
+    Monomer(name='B', sites=['x'], site_states={})
+    >>> synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
+    ...                           [B(),              None, 1e-7]])
+    {'synthesize_Ae':
+        Rule(name='synthesize_Ae',
+        reactants=None,
+        products=A(x=None, y=e),
+        rate_forward=Parameter(name='synthesize_Ae_k', value=0.0001)),
+     'synthesize_Ae_k': Parameter(name='synthesize_Ae_k', value=0.0001),
+     'degrade_Ae':
+        Rule(name='degrade_Ae',
+            reactants=A(x=None, y=e),
+            products=None,
+            rate_forward=Parameter(name='degrade_Ae_k', value=1e-06)),
+     'degrade_Ae_k': Parameter(name='degrade_Ae_k', value=1e-06),
+     'degrade_B':
+        Rule(name='degrade_B',
+            reactants=B(),
+            products=None,
+            rate_forward=Parameter(name='degrade_B_k', value=1e-07)),
+     'degrade_B_k': Parameter(name='degrade_B_k', value=1e-07)}
     """
 
     # loop over interactions
