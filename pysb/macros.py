@@ -982,7 +982,14 @@ def pore_species(subunit, site1, site2, size):
         Monomer('Unit', ['p1', 'p2'])
         pore_tetramer = pore_species(Unit, 'p1', 'p2', 4)
 
+    >>> Model()
+    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+    >>> Monomer('Unit', ['p1', 'p2'])
+    Monomer(name='Unit', sites=['p1', 'p2'], site_states={})
+    >>> pore_species(Unit, 'p1', 'p2', 4)
+    MatchOnce(Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=1))
     """
+
     _verify_sites(subunit, site1, site2)
     if size <= 0:
         raise ValueError("size must be an integer greater than 0")
