@@ -105,9 +105,9 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
         Monomer(name='B', sites=['s'], site_states={})
         >>> 
         >>> _macro_rule('bind', A(s=None) + B(s=None) <> A(s=1) % B(s=1), [1e6, 1e-1], ['kf', 'kr'])
-        {'bind_A_B_to_A1B1': Rule(name='bind_A_B_to_A1B1', reactants=A(s=None) + B(s=None), products=A(s=1) % B(s=1), rate_forward=Parameter(name='bind_A_B_to_A1B1_kf', value=1000000.0), rate_reverse=Parameter(name='bind_A_B_to_A1B1_kr', value=0.1)),
-         'bind_A_B_to_A1B1_kf': Parameter(name='bind_A_B_to_A1B1_kf', value=1000000.0),
-         'bind_A_B_to_A1B1_kr': Parameter(name='bind_A_B_to_A1B1_kr', value=0.1)}
+        {'bind_A_B_to_AB': Rule(name='bind_A_B_to_AB', reactants=A(s=None) + B(s=None), products=A(s=1) % B(s=1), rate_forward=Parameter(name='bind_A_B_to_AB_kf', value=1000000.0), rate_reverse=Parameter(name='bind_A_B_to_AB_kr', value=0.1)),
+         'bind_A_B_to_AB_kf': Parameter(name='bind_A_B_to_AB_kf', value=1000000.0),
+         'bind_A_B_to_AB_kr': Parameter(name='bind_A_B_to_AB_kr', value=0.1)}
         >>> 
 
     """
@@ -199,26 +199,30 @@ def equilibrate(s1, s2, klist):
 
     Example
     -------
+    Simple two-state equilibrium between A and B::
+
         Model()
         Monomer('A')
         Monomer('B')
         equilibrate(A(), B(), [1, 1])
     
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('A')
-    Monomer(name='A', sites=[], site_states={})
-    >>> Monomer('B')
-    Monomer(name='B', sites=[], site_states={})
-    >>> equilibrate(A(), B(), [1, 1])
-    {'equilibrate_A_to_B':
-        Rule(name='equilibrate_A_to_B',
-            reactants=A(),
-            products=B(),
-            rate_forward=Parameter(name='equilibrate_A_to_B_kf', value=1),
-            rate_reverse=Parameter(name='equilibrate_A_to_B_kr', value=1)),
-    'equilibrate_A_to_B_kf': Parameter(name='equilibrate_A_to_B_kf', value=1),
-    'equilibrate_A_to_B_kr': Parameter(name='equilibrate_A_to_B_kr', value=1)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('A')
+        Monomer(name='A', sites=[], site_states={})
+        >>> Monomer('B')
+        Monomer(name='B', sites=[], site_states={})
+        >>> equilibrate(A(), B(), [1, 1])
+        {'equilibrate_A_to_B':
+            Rule(name='equilibrate_A_to_B',
+                reactants=A(),
+                products=B(),
+                rate_forward=Parameter(name='equilibrate_A_to_B_kf', value=1),
+                rate_reverse=Parameter(name='equilibrate_A_to_B_kr', value=1)),
+        'equilibrate_A_to_B_kf': Parameter(name='equilibrate_A_to_B_kf', value=1),
+        'equilibrate_A_to_B_kr': Parameter(name='equilibrate_A_to_B_kr', value=1)}
     """
     
     # turn any Monomers into MonomerPatterns
@@ -251,27 +255,30 @@ def bind(s1, site1, s2, site2, klist):
 
     Examples
     --------
+    Binding between A and B::
+
         Model()
         Monomer('A', ['x'])
         Monomer('B', ['y'])
         bind(A, 'x', B, 'y', [1e-4, 1e-1])
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('A', ['x'])
-    Monomer(name='A', sites=['x'], site_states={})
-    >>> Monomer('B', ['y'])
-    Monomer(name='B', sites=['y'], site_states={})
-    >>> bind(A, 'x', B, 'y', [1e-4, 1e-1])
-    {'bind_A_B':
-        Rule(name='bind_A_B',
-            reactants=A(x=None) + B(y=None),
-            products=A(x=1) % B(y=1),
-            rate_forward=Parameter(name='bind_A_B_kf', value=0.0001),
-            rate_reverse=Parameter(name='bind_A_B_kr', value=0.1)),
-     'bind_A_B_kf': Parameter(name='bind_A_B_kf', value=0.0001),
-     'bind_A_B_kr': Parameter(name='bind_A_B_kr', value=0.1)}
-    >>> 
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('A', ['x'])
+        Monomer(name='A', sites=['x'], site_states={})
+        >>> Monomer('B', ['y'])
+        Monomer(name='B', sites=['y'], site_states={})
+        >>> bind(A, 'x', B, 'y', [1e-4, 1e-1])
+        {'bind_A_B':
+            Rule(name='bind_A_B',
+                reactants=A(x=None) + B(y=None),
+                products=A(x=1) % B(y=1),
+                rate_forward=Parameter(name='bind_A_B_kf', value=0.0001),
+                rate_reverse=Parameter(name='bind_A_B_kr', value=0.1)),
+         'bind_A_B_kf': Parameter(name='bind_A_B_kf', value=0.0001),
+         'bind_A_B_kr': Parameter(name='bind_A_B_kr', value=0.1)}
     """
 
     _verify_sites(s1, site1)
@@ -336,6 +343,8 @@ def bind_table(bindtable, row_site, col_site, kf=None):
 
     Example
     --------
+    Binding table for two species types (R and C), each with two members::
+
         Model()
         Monomer('R1', ['x'])
         Monomer('R2', ['x'])
@@ -345,45 +354,47 @@ def bind_table(bindtable, row_site, col_site, kf=None):
                     [R1,  (1e-4, 1e-1),  (2e-4, 2e-1)],
                     [R2,  (3e-4, 3e-1),         None]],
                    'x', 'y')
-    
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('R1', ['x'])
-    Monomer(name='R1', sites=['x'], site_states={})
-    >>> Monomer('R2', ['x'])
-    Monomer(name='R2', sites=['x'], site_states={})
-    >>> Monomer('C1', ['y'])
-    Monomer(name='C1', sites=['y'], site_states={})
-    >>> Monomer('C2', ['y'])
-    Monomer(name='C2', sites=['y'], site_states={})
-    >>> bind_table([[               C1,           C2],
-    ...             [R1,  (1e-4, 1e-1),  (2e-4, 2e-1)],
-    ...             [R2,  (3e-4, 3e-1),         None]],
-    ...            'x', 'y')
-    {'bind_R1_C1':
-        Rule(name='bind_R1_C1',
-            reactants=R1(x=None) + C1(y=None),
-            products=R1(x=1) % C1(y=1),
-            rate_forward=Parameter(name='bind_R1_C1_kf', value=0.0001),
-            rate_reverse=Parameter(name='bind_R1_C1_kr', value=0.1)),
-     'bind_R1_C1_kf': Parameter(name='bind_R1_C1_kf', value=0.0001),
-     'bind_R1_C1_kr': Parameter(name='bind_R1_C1_kr', value=0.1),
-     'bind_R1_C2':
-        Rule(name='bind_R1_C2',
-        reactants=R1(x=None) + C2(y=None),
-        products=R1(x=1) % C2(y=1),
-        rate_forward=Parameter(name='bind_R1_C2_kf', value=0.0002),
-        rate_reverse=Parameter(name='bind_R1_C2_kr', value=0.2)),
-     'bind_R1_C2_kf': Parameter(name='bind_R1_C2_kf', value=0.0002),
-     'bind_R1_C2_kr': Parameter(name='bind_R1_C2_kr', value=0.2),
-     'bind_R2_C1':
-        Rule(name='bind_R2_C1',
-        reactants=R2(x=None) + C1(y=None),
-        products=R2(x=1) % C1(y=1),
-        rate_forward=Parameter(name='bind_R2_C1_kf', value=0.0003),
-        rate_reverse=Parameter(name='bind_R2_C1_kr', value=0.3)),
-     'bind_R2_C1_kf': Parameter(name='bind_R2_C1_kf', value=0.0003),
-     'bind_R2_C1_kr': Parameter(name='bind_R2_C1_kr', value=0.3)}
+
+    Execution:: 
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('R1', ['x'])
+        Monomer(name='R1', sites=['x'], site_states={})
+        >>> Monomer('R2', ['x'])
+        Monomer(name='R2', sites=['x'], site_states={})
+        >>> Monomer('C1', ['y'])
+        Monomer(name='C1', sites=['y'], site_states={})
+        >>> Monomer('C2', ['y'])
+        Monomer(name='C2', sites=['y'], site_states={})
+        >>> bind_table([[               C1,           C2],
+        ...             [R1,  (1e-4, 1e-1),  (2e-4, 2e-1)],
+        ...             [R2,  (3e-4, 3e-1),         None]],
+        ...            'x', 'y')
+        {'bind_R1_C1':
+            Rule(name='bind_R1_C1',
+                reactants=R1(x=None) + C1(y=None),
+                products=R1(x=1) % C1(y=1),
+                rate_forward=Parameter(name='bind_R1_C1_kf', value=0.0001),
+                rate_reverse=Parameter(name='bind_R1_C1_kr', value=0.1)),
+         'bind_R1_C1_kf': Parameter(name='bind_R1_C1_kf', value=0.0001),
+         'bind_R1_C1_kr': Parameter(name='bind_R1_C1_kr', value=0.1),
+         'bind_R1_C2':
+            Rule(name='bind_R1_C2',
+            reactants=R1(x=None) + C2(y=None),
+            products=R1(x=1) % C2(y=1),
+            rate_forward=Parameter(name='bind_R1_C2_kf', value=0.0002),
+            rate_reverse=Parameter(name='bind_R1_C2_kr', value=0.2)),
+         'bind_R1_C2_kf': Parameter(name='bind_R1_C2_kf', value=0.0002),
+         'bind_R1_C2_kr': Parameter(name='bind_R1_C2_kr', value=0.2),
+         'bind_R2_C1':
+            Rule(name='bind_R2_C1',
+            reactants=R2(x=None) + C1(y=None),
+            products=R2(x=1) % C1(y=1),
+            rate_forward=Parameter(name='bind_R2_C1_kf', value=0.0003),
+            rate_reverse=Parameter(name='bind_R2_C1_kr', value=0.3)),
+         'bind_R2_C1_kf': Parameter(name='bind_R2_C1_kf', value=0.0003),
+         'bind_R2_C1_kr': Parameter(name='bind_R2_C1_kr', value=0.3)}
     """
 
     # extract species lists and matrix of rates
@@ -453,29 +464,31 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
         Monomer('P')
         catalyze(E(), 'b', S(), 'b', P(), (1e-4, 1e-1, 1))
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('E', ['b'])
-    Monomer(name='E', sites=['b'], site_states={})
-    >>> Monomer('S', ['b'])
-    Monomer(name='S', sites=['b'], site_states={})
-    >>> Monomer('P')
-    Monomer(name='P', sites=[], site_states={})
-    >>> catalyze(E(), 'b', S(), 'b', P(), (1e-4, 1e-1, 1))
-    {'bind_E_S_to_ES':
-        Rule(name='bind_E_S_to_ES',
-            reactants=E(b=None) + S(b=None),
-            products=E(b=1) % S(b=1),
-            rate_forward=Parameter(name='bind_E_S_to_ES_kf', value=0.0001),
-            rate_reverse=Parameter(name='bind_E_S_to_ES_kr', value=0.1)),
-     'bind_E_S_to_ES_kf': Parameter(name='bind_E_S_to_ES_kf', value=0.0001),
-     'bind_E_S_to_ES_kr': Parameter(name='bind_E_S_to_ES_kr', value=0.1),
-     'catalyze_ES_to_E_P':
-        Rule(name='catalyze_ES_to_E_P',
-        reactants=E(b=1) % S(b=1),
-        products=E(b=None) + P(),
-        rate_forward=Parameter(name='catalyze_ES_to_E_P_kc', value=1)),
-     'catalyze_ES_to_E_P_kc': Parameter(name='catalyze_ES_to_E_P_kc', value=1)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('E', ['b'])
+        Monomer(name='E', sites=['b'], site_states={})
+        >>> Monomer('S', ['b'])
+        Monomer(name='S', sites=['b'], site_states={})
+        >>> Monomer('P')
+        Monomer(name='P', sites=[], site_states={})
+        >>> catalyze(E(), 'b', S(), 'b', P(), (1e-4, 1e-1, 1))
+        {'bind_E_S_to_ES':
+            Rule(name='bind_E_S_to_ES',
+                reactants=E(b=None) + S(b=None),
+                products=E(b=1) % S(b=1),
+                rate_forward=Parameter(name='bind_E_S_to_ES_kf', value=0.0001),
+                rate_reverse=Parameter(name='bind_E_S_to_ES_kr', value=0.1)),
+         'bind_E_S_to_ES_kf': Parameter(name='bind_E_S_to_ES_kf', value=0.0001),
+         'bind_E_S_to_ES_kr': Parameter(name='bind_E_S_to_ES_kr', value=0.1),
+         'catalyze_ES_to_E_P':
+            Rule(name='catalyze_ES_to_E_P',
+            reactants=E(b=1) % S(b=1),
+            products=E(b=None) + P(),
+            rate_forward=Parameter(name='catalyze_ES_to_E_P_kc', value=1)),
+         'catalyze_ES_to_E_P_kc': Parameter(name='catalyze_ES_to_E_P_kc', value=1)}
 
     Using a single Monomer for substrate and product with a state change::
 
@@ -484,30 +497,32 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
         catalyze(Kinase(), 'b', Substrate(y='U'), 'b', Substrate(y='P'),
                  (1e-4, 1e-1, 1))
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('Kinase', ['b'])
-    Monomer(name='Kinase', sites=['b'], site_states={})
-    >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
-    Monomer(name='Substrate', sites=['b', 'y'], site_states={'y': ('U', 'P')})
-    >>> catalyze(Kinase(), 'b', Substrate(y='U'), 'b', Substrate(y='P'), (1e-4, 1e-1, 1))
-    {'bind_Kinase_SubstrateU_to_KinaseSubstrateU':
-        Rule(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU',
-            reactants=Kinase(b=None) + Substrate(b=None, y=U),
-            products=Kinase(b=1) % Substrate(b=1, y=U),
-            rate_forward=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
-            rate_reverse=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1)),
-     'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf':
-        Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
-     'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr':
-        Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1),
-     'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP':
-        Rule(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP',
-            reactants=Kinase(b=1) % Substrate(b=1, y=U),
-            products=Kinase(b=None) + Substrate(b=None, y=P),
-            rate_forward=Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)),
-     'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc':
-        Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('Kinase', ['b'])
+        Monomer(name='Kinase', sites=['b'], site_states={})
+        >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
+        Monomer(name='Substrate', sites=['b', 'y'], site_states={'y': ('U', 'P')})
+        >>> catalyze(Kinase(), 'b', Substrate(y='U'), 'b', Substrate(y='P'), (1e-4, 1e-1, 1))
+        {'bind_Kinase_SubstrateU_to_KinaseSubstrateU':
+            Rule(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU',
+                reactants=Kinase(b=None) + Substrate(b=None, y=U),
+                products=Kinase(b=1) % Substrate(b=1, y=U),
+                rate_forward=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
+                rate_reverse=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1)),
+         'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf':
+            Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
+         'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr':
+            Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1),
+         'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP':
+            Rule(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP',
+                reactants=Kinase(b=1) % Substrate(b=1, y=U),
+                products=Kinase(b=None) + Substrate(b=None, y=P),
+                rate_forward=Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)),
+         'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc':
+            Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)}
     """
 
     _verify_sites(enzyme, e_site)
@@ -595,30 +610,32 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
         catalyze_state(Kinase, 'b', Substrate, 'b', 'y', 'U', 'P',
                  (1e-4, 1e-1, 1))
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('Kinase', ['b'])
-    Monomer(name='Kinase', sites=['b'], site_states={})
-    >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
-    Monomer(name='Substrate', sites=['b', 'y'], site_states={'y': ('U', 'P')})
-    >>> catalyze_state(Kinase, 'b', Substrate, 'b', 'y', 'U', 'P', (1e-4, 1e-1, 1))
-    {'bind_Kinase_SubstrateU_to_KinaseSubstrateU':
-        Rule(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU',
-            reactants=Kinase(b=None) + Substrate(b=None, y=U),
-            products=Kinase(b=1) % Substrate(b=1, y=U),
-            rate_forward=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
-            rate_reverse=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1)),
-     'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf':
-        Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
-     'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr':
-        Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1),
-     'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP':
-        Rule(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP',
-            reactants=Kinase(b=1) % Substrate(b=1, y=U),
-            products=Kinase(b=None) + Substrate(b=None, y=P),
-            rate_forward=Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)),
-     'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc':
-        Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('Kinase', ['b'])
+        Monomer(name='Kinase', sites=['b'], site_states={})
+        >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
+        Monomer(name='Substrate', sites=['b', 'y'], site_states={'y': ('U', 'P')})
+        >>> catalyze_state(Kinase, 'b', Substrate, 'b', 'y', 'U', 'P', (1e-4, 1e-1, 1))
+        {'bind_Kinase_SubstrateU_to_KinaseSubstrateU':
+            Rule(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU',
+                reactants=Kinase(b=None) + Substrate(b=None, y=U),
+                products=Kinase(b=1) % Substrate(b=1, y=U),
+                rate_forward=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
+                rate_reverse=Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1)),
+         'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf':
+            Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', value=0.0001),
+         'bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr':
+            Parameter(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', value=0.1),
+         'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP':
+            Rule(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP',
+                reactants=Kinase(b=1) % Substrate(b=1, y=U),
+                products=Kinase(b=None) + Substrate(b=None, y=P),
+                rate_forward=Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)),
+         'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc':
+            Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)}
     """
 
     return catalyze(enzyme, e_site, substrate({mod_site: state1}),
@@ -670,22 +687,24 @@ def catalyze_one_step(enzyme, substrate, product, kf):
 
     and similarly if the substrate or product must be unbound.
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('E', ['b'])
-    Monomer(name='E', sites=['b'], site_states={})
-    >>> Monomer('S', ['b'])
-    Monomer(name='S', sites=['b'], site_states={})
-    >>> Monomer('P')
-    Monomer(name='P', sites=[], site_states={})
-    >>> catalyze_one_step(E, S, P, 1e-4)
-    {'one_step_E_S_to_E_P':
-        Rule(name='one_step_E_S_to_E_P',
-            reactants=E() + S(),
-            products=E() + P(),
-            rate_forward=Parameter(name='one_step_E_S_to_E_P_kf', value=0.0001)),
-     'one_step_E_S_to_E_P_kf':
-        Parameter(name='one_step_E_S_to_E_P_kf', value=0.0001)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('E', ['b'])
+        Monomer(name='E', sites=['b'], site_states={})
+        >>> Monomer('S', ['b'])
+        Monomer(name='S', sites=['b'], site_states={})
+        >>> Monomer('P')
+        Monomer(name='P', sites=[], site_states={})
+        >>> catalyze_one_step(E, S, P, 1e-4)
+        {'one_step_E_S_to_E_P':
+            Rule(name='one_step_E_S_to_E_P',
+                reactants=E() + S(),
+                products=E() + P(),
+                rate_forward=Parameter(name='one_step_E_S_to_E_P_kf', value=0.0001)),
+         'one_step_E_S_to_E_P_kf':
+            Parameter(name='one_step_E_S_to_E_P_kf', value=0.0001)}
     """
 
     return _macro_rule('one_step',
@@ -723,34 +742,38 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
 
     Examples
     --------
+    One-step, pseudo-first order conversion of S to P by E::
+
         Model()
         Monomer('E', ['b'])
         Monomer('S', ['b'])
         Monomer('P')
         catalyze_one_step_reversible(E, S, P, [1e-1, 1e-4])
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('E', ['b'])
-    Monomer(name='E', sites=['b'], site_states={})
-    >>> Monomer('S', ['b'])
-    Monomer(name='S', sites=['b'], site_states={})
-    >>> Monomer('P')
-    Monomer(name='P', sites=[], site_states={})
-    >>> catalyze_one_step_reversible(E, S, P, [1e-1, 1e-4])
-    {'one_step_E_S_to_E_P':
-        Rule(name='one_step_E_S_to_E_P',
-            reactants=E() + S(),
-            products=E() + P(),
-            rate_forward=Parameter(name='one_step_E_S_to_E_P_kf', value=0.1)),
-     'one_step_E_S_to_E_P_kf':
-        Parameter(name='one_step_E_S_to_E_P_kf', value=0.1),
-     'reverse_P_to_S':
-        Rule(name='reverse_P_to_S',
-            reactants=P(),
-            products=S(),
-            rate_forward=Parameter(name='reverse_P_to_S_kr', value=0.0001)),
-     'reverse_P_to_S_kr': Parameter(name='reverse_P_to_S_kr', value=0.0001)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('E', ['b'])
+        Monomer(name='E', sites=['b'], site_states={})
+        >>> Monomer('S', ['b'])
+        Monomer(name='S', sites=['b'], site_states={})
+        >>> Monomer('P')
+        Monomer(name='P', sites=[], site_states={})
+        >>> catalyze_one_step_reversible(E, S, P, [1e-1, 1e-4])
+        {'one_step_E_S_to_E_P':
+            Rule(name='one_step_E_S_to_E_P',
+                reactants=E() + S(),
+                products=E() + P(),
+                rate_forward=Parameter(name='one_step_E_S_to_E_P_kf', value=0.1)),
+         'one_step_E_S_to_E_P_kf':
+            Parameter(name='one_step_E_S_to_E_P_kf', value=0.1),
+         'reverse_P_to_S':
+            Rule(name='reverse_P_to_S',
+                reactants=P(),
+                products=S(),
+                rate_forward=Parameter(name='reverse_P_to_S_kr', value=0.0001)),
+         'reverse_P_to_S_kr': Parameter(name='reverse_P_to_S_kr', value=0.0001)}
     """
 
     components = catalyze_one_step(enzyme, substrate, product, klist[0])
@@ -790,21 +813,25 @@ def synthesize(species, ksynth):
 
     Examples
     --------
+    Synthesize A with site x unbound and site y in state 'e'::
+
         Model()
         Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         synthesize(A(x=None, y='e'), 1e-4)
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
-    Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
-    >>> synthesize(A(x=None, y='e'), 1e-4)
-    {'synthesize_Ae':
-        Rule(name='synthesize_Ae',
-            reactants=None,
-            products=A(x=None, y=e),
-            rate_forward=Parameter(name='synthesize_Ae_k', value=0.0001)),
-     'synthesize_Ae_k': Parameter(name='synthesize_Ae_k', value=0.0001)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
+        Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
+        >>> synthesize(A(x=None, y='e'), 1e-4)
+        {'synthesize_Ae':
+            Rule(name='synthesize_Ae',
+                reactants=None,
+                products=A(x=None, y=e),
+                rate_forward=Parameter(name='synthesize_Ae_k', value=0.0001)),
+         'synthesize_Ae_k': Parameter(name='synthesize_Ae_k', value=0.0001)}
     """
 
     def synthesize_name_func(rule_expression):
@@ -846,21 +873,25 @@ def degrade(species, kdeg):
 
     Examples
     --------
+    Degrade all B, even bound species::
+
         Model()
         Monomer('B', ['x'])
-        degrade(B(), 1e-6)  # degrade all B, even bound species
+        degrade(B(), 1e-6)
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('B', ['x'])
-    Monomer(name='B', sites=['x'], site_states={})
-    >>> degrade(B(), 1e-6)  # degrade all B, even bound species
-    {'degrade_B':
-        Rule(name='degrade_B',
-            reactants=B(),
-            products=None,
-            rate_forward=Parameter(name='degrade_B_k', value=1e-06)),
-     'degrade_B_k': Parameter(name='degrade_B_k', value=1e-06)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('B', ['x'])
+        Monomer(name='B', sites=['x'], site_states={})
+        >>> degrade(B(), 1e-6)  # degrade all B, even bound species
+        {'degrade_B':
+            Rule(name='degrade_B',
+                reactants=B(),
+                products=None,
+                rate_forward=Parameter(name='degrade_B_k', value=1e-06)),
+         'degrade_B_k': Parameter(name='degrade_B_k', value=1e-06)}
     """
 
     def degrade_name_func(rule_expression):
@@ -906,38 +937,42 @@ def synthesize_degrade_table(table):
 
     Examples
     --------
+    Specify synthesis and degradation reactions for A and B in a table::
+
         Model()
         Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         Monomer('B', ['x'])
         synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
                                   [B(),              None, 1e-7]])
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
-    Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
-    >>> Monomer('B', ['x'])
-    Monomer(name='B', sites=['x'], site_states={})
-    >>> synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
-    ...                           [B(),              None, 1e-7]])
-    {'synthesize_Ae':
-        Rule(name='synthesize_Ae',
-        reactants=None,
-        products=A(x=None, y=e),
-        rate_forward=Parameter(name='synthesize_Ae_k', value=0.0001)),
-     'synthesize_Ae_k': Parameter(name='synthesize_Ae_k', value=0.0001),
-     'degrade_Ae':
-        Rule(name='degrade_Ae',
-            reactants=A(x=None, y=e),
-            products=None,
-            rate_forward=Parameter(name='degrade_Ae_k', value=1e-06)),
-     'degrade_Ae_k': Parameter(name='degrade_Ae_k', value=1e-06),
-     'degrade_B':
-        Rule(name='degrade_B',
-            reactants=B(),
-            products=None,
-            rate_forward=Parameter(name='degrade_B_k', value=1e-07)),
-     'degrade_B_k': Parameter(name='degrade_B_k', value=1e-07)}
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
+        Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
+        >>> Monomer('B', ['x'])
+        Monomer(name='B', sites=['x'], site_states={})
+        >>> synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
+        ...                           [B(),              None, 1e-7]])
+        {'synthesize_Ae':
+            Rule(name='synthesize_Ae',
+            reactants=None,
+            products=A(x=None, y=e),
+            rate_forward=Parameter(name='synthesize_Ae_k', value=0.0001)),
+         'synthesize_Ae_k': Parameter(name='synthesize_Ae_k', value=0.0001),
+         'degrade_Ae':
+            Rule(name='degrade_Ae',
+                reactants=A(x=None, y=e),
+                products=None,
+                rate_forward=Parameter(name='degrade_Ae_k', value=1e-06)),
+         'degrade_Ae_k': Parameter(name='degrade_Ae_k', value=1e-06),
+         'degrade_B':
+            Rule(name='degrade_B',
+                reactants=B(),
+                products=None,
+                rate_forward=Parameter(name='degrade_B_k', value=1e-07)),
+         'degrade_B_k': Parameter(name='degrade_B_k', value=1e-07)}
     """
 
     # loop over interactions
@@ -978,16 +1013,20 @@ def pore_species(subunit, site1, site2, size):
 
     Examples
     --------
+    Get the ComplexPattern object representing a pore of size 4::
+
         Model()
         Monomer('Unit', ['p1', 'p2'])
         pore_tetramer = pore_species(Unit, 'p1', 'p2', 4)
 
-    >>> Model()
-    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
-    >>> Monomer('Unit', ['p1', 'p2'])
-    Monomer(name='Unit', sites=['p1', 'p2'], site_states={})
-    >>> pore_species(Unit, 'p1', 'p2', 4)
-    MatchOnce(Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=1))
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('Unit', ['p1', 'p2'])
+        Monomer(name='Unit', sites=['p1', 'p2'], site_states={})
+        >>> pore_species(Unit, 'p1', 'p2', 4)
+        MatchOnce(Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=1))
     """
 
     _verify_sites(subunit, site1, site2)
@@ -1037,7 +1076,45 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
         and these parameters will be included at the end of the returned
         component list.
 
+    Example
+    -------
+    Assemble a three-membered pore by sequential addition of monomers,
+    with the same forward/reverse rates for monomer-monomer and monomer-dimer
+    interactions::
+
+        Model()
+        Monomer('Unit', ['p1', 'p2'])
+        assemble_pore_sequential(Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2)
+
+    Execution::
+   
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('Unit', ['p1', 'p2'])
+        Monomer(name='Unit', sites=['p1', 'p2'], site_states={})
+        >>> assemble_pore_sequential(Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2)
+        {'assemble_pore_sequential_Unit_2':
+            Rule(name='assemble_pore_sequential_Unit_2',
+                reactants=Unit(p1=None, p2=None) + Unit(p1=None, p2=None),
+                products=Unit(p1=1, p2=None) % Unit(p1=None, p2=1),
+                rate_forward=Parameter(name='assemble_pore_sequential_Unit_2_kf', value=0.0001),
+                rate_reverse=Parameter(name='assemble_pore_sequential_Unit_2_kr', value=0.1)),
+         'assemble_pore_sequential_Unit_2_kf':
+            Parameter(name='assemble_pore_sequential_Unit_2_kf', value=0.0001),
+         'assemble_pore_sequential_Unit_2_kr':
+            Parameter(name='assemble_pore_sequential_Unit_2_kr', value=0.1),
+         'assemble_pore_sequential_Unit_3':
+            Rule(name='assemble_pore_sequential_Unit_3',
+                reactants=Unit(p1=None, p2=None) + Unit(p1=1, p2=None) % Unit(p1=None, p2=1),
+                products=MatchOnce(Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=1)),
+                rate_forward=Parameter(name='assemble_pore_sequential_Unit_3_kf', value=0.0001),
+                rate_reverse=Parameter(name='assemble_pore_sequential_Unit_3_kr', value=0.1)),
+         'assemble_pore_sequential_Unit_3_kf':
+            Parameter(name='assemble_pore_sequential_Unit_3_kf', value=0.0001),
+         'assemble_pore_sequential_Unit_3_kr':
+            Parameter(name='assemble_pore_sequential_Unit_3_kr', value=0.1)}
     """
+
     if len(ktable) != max_size - 1:
         raise ValueError("len(ktable) must be equal to max_size - 1")
 
@@ -1099,6 +1176,62 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         automatically generated names based on the subunit, the pore size and
         the cargo, and these parameters will be included at the end of the
         returned component list.
+
+    Example
+    -------
+    Specify that a three-membered pore is capable of
+    transporting cargo from the mitochondria to the cytoplasm::
+
+        Model()
+        Monomer('Unit', ['p1', 'p2', 'sc_site'])
+        Monomer('Cargo', ['c_site', 'loc'], {'loc':['mito', 'cyto']})
+        pore_transport(Unit, 'p1', 'p2', 'sc_site', 3, 3,
+                       Cargo(loc='mito'), 'c_site', Cargo(loc='cyto'),
+                       [[1e-4, 1e-1, 1]])
+
+    Generates two rules--one (reversible) binding rule and one transport
+    rule--and the three associated parameters.
+
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('Unit', ['p1', 'p2', 'sc_site'])
+        Monomer(name='Unit', sites=['p1', 'p2', 'sc_site'], site_states={})
+        >>> Monomer('Cargo', ['c_site', 'loc'], {'loc':['mito', 'cyto']})
+        Monomer(name='Cargo', sites=['c_site', 'loc'], site_states={'loc': ['mito', 'cyto']})
+        >>> pore_transport(Unit, 'p1', 'p2', 'sc_site', 3, 3,
+        ...                Cargo(loc='mito'), 'c_site', Cargo(loc='cyto'),
+        ...                [[1e-4, 1e-1, 1]])
+        {'pore_transport_complex_Unit_3_Cargomito':
+            Rule(name='pore_transport_complex_Unit_3_Cargomito',
+                reactants=MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
+                                    Unit(p1=2, p2=3, sc_site=None) %
+                                    Unit(p1=3, p2=1, sc_site=None)) +
+                                    Cargo(c_site=None, loc=mito),
+                products=MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
+                                   Unit(p1=2, p2=3, sc_site=None) %
+                                   Unit(p1=3, p2=1, sc_site=None) %
+                                   Cargo(c_site=4, loc=mito)),
+                rate_forward=Parameter(name='pore_transport_complex_Unit_3_Cargomito_kf', value=0.0001),
+                rate_reverse=Parameter(name='pore_transport_complex_Unit_3_Cargomito_kr', value=0.1)),
+         'pore_transport_complex_Unit_3_Cargomito_kf':
+            Parameter(name='pore_transport_complex_Unit_3_Cargomito_kf', value=0.0001),
+         'pore_transport_complex_Unit_3_Cargomito_kr':
+            Parameter(name='pore_transport_complex_Unit_3_Cargomito_kr', value=0.1),
+         'pore_transport_dissociate_Unit_3_Cargocyto':
+            Rule(name='pore_transport_dissociate_Unit_3_Cargocyto',
+                reactants=MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
+                                    Unit(p1=2, p2=3, sc_site=None) %
+                                    Unit(p1=3, p2=1, sc_site=None) %
+                                    Cargo(c_site=4, loc=mito)),
+                products=MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
+                                   Unit(p1=2, p2=3, sc_site=None) %
+                                   Unit(p1=3, p2=1, sc_site=None)) +
+                                   Cargo(c_site=None, loc=cyto),
+                rate_forward=Parameter(name='pore_transport_dissociate_Unit_3_Cargocyto_kc', value=1)),
+         'pore_transport_dissociate_Unit_3_Cargocyto_kc':
+            Parameter(name='pore_transport_dissociate_Unit_3_Cargocyto_kc', value=1)}
     """
 
     _verify_sites(subunit, sc_site)
@@ -1196,6 +1329,44 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
         will be created with automatically generated names based on the
         subunit, the pore size and the cargo, and these parameters will be
         included at the end of the returned component list.
+
+    Example
+    -------
+    Specify that a cargo molecule can bind reversibly to a 3-membered
+    pore::
+
+        Model()
+        Monomer('Unit', ['p1', 'p2', 'sc_site'])
+        Monomer('Cargo', ['c_site'])
+        pore_bind(Unit, 'p1', 'p2', 'sc_site', 3, 
+                  Cargo(), 'c_site', [1e-4, 1e-1, 1])
+
+    Execution::
+
+        >>> Model()
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        >>> Monomer('Unit', ['p1', 'p2', 'sc_site'])
+        Monomer(name='Unit', sites=['p1', 'p2', 'sc_site'], site_states={})
+        >>> Monomer('Cargo', ['c_site'])
+        Monomer(name='Cargo', sites=['c_site'], site_states={})
+        >>> pore_bind(Unit, 'p1', 'p2', 'sc_site', 3, 
+        ...           Cargo(), 'c_site', [1e-4, 1e-1, 1])
+        {'pore_bind_Unit_3_Cargo':
+            Rule(name='pore_bind_Unit_3_Cargo',
+                reactants=MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
+                                    Unit(p1=2, p2=3, sc_site=None) %
+                                    Unit(p1=3, p2=1, sc_site=None)) +
+                                    Cargo(c_site=None),
+                products=MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
+                                   Unit(p1=2, p2=3, sc_site=None) %
+                                   Unit(p1=3, p2=1, sc_site=None) %
+                                   Cargo(c_site=4)),
+                rate_forward=Parameter(name='pore_bind_Unit_3_Cargo_kf', value=0.0001),
+                rate_reverse=Parameter(name='pore_bind_Unit_3_Cargo_kr', value=0.1)),
+         'pore_bind_Unit_3_Cargo_kf':
+            Parameter(name='pore_bind_Unit_3_Cargo_kf', value=0.0001),
+         'pore_bind_Unit_3_Cargo_kr':
+            Parameter(name='pore_bind_Unit_3_Cargo_kr', value=0.1)}
     """
 
     _verify_sites(subunit, sc_site)
@@ -1252,7 +1423,6 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
                               name_func=name_func)
 
     return components
-
 
 if __name__ == "__main__":
     import doctest
