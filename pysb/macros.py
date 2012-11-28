@@ -208,13 +208,13 @@ def equilibrate(s1, s2, klist):
     
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('A')
         Monomer(name='A', sites=[], site_states={})
         >>> Monomer('B')
         Monomer(name='B', sites=[], site_states={})
-        >>> equilibrate(A(), B(), [1, 1])
+        >>> equilibrate(A(), B(), [1, 1]) # doctest:+NORMALIZE_WHITESPACE
         {'equilibrate_A_to_B':
             Rule(name='equilibrate_A_to_B',
                 reactants=A(),
@@ -264,13 +264,13 @@ def bind(s1, site1, s2, site2, klist):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('A', ['x'])
         Monomer(name='A', sites=['x'], site_states={})
         >>> Monomer('B', ['y'])
         Monomer(name='B', sites=['y'], site_states={})
-        >>> bind(A, 'x', B, 'y', [1e-4, 1e-1])
+        >>> bind(A, 'x', B, 'y', [1e-4, 1e-1]) # doctest:+NORMALIZE_WHITESPACE
         {'bind_A_B':
             Rule(name='bind_A_B',
                 reactants=A(x=None) + B(y=None),
@@ -357,7 +357,7 @@ def bind_table(bindtable, row_site, col_site, kf=None):
 
     Execution:: 
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('R1', ['x'])
         Monomer(name='R1', sites=['x'], site_states={})
@@ -370,7 +370,7 @@ def bind_table(bindtable, row_site, col_site, kf=None):
         >>> bind_table([[               C1,           C2],
         ...             [R1,  (1e-4, 1e-1),  (2e-4, 2e-1)],
         ...             [R2,  (3e-4, 3e-1),         None]],
-        ...            'x', 'y')
+        ...            'x', 'y') # doctest:+NORMALIZE_WHITESPACE
         {'bind_R1_C1':
             Rule(name='bind_R1_C1',
                 reactants=R1(x=None) + C1(y=None),
@@ -466,7 +466,7 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('E', ['b'])
         Monomer(name='E', sites=['b'], site_states={})
@@ -474,7 +474,7 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
         Monomer(name='S', sites=['b'], site_states={})
         >>> Monomer('P')
         Monomer(name='P', sites=[], site_states={})
-        >>> catalyze(E(), 'b', S(), 'b', P(), (1e-4, 1e-1, 1))
+        >>> catalyze(E(), 'b', S(), 'b', P(), (1e-4, 1e-1, 1)) # doctest:+NORMALIZE_WHITESPACE
         {'bind_E_S_to_ES':
             Rule(name='bind_E_S_to_ES',
                 reactants=E(b=None) + S(b=None),
@@ -499,13 +499,13 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('Kinase', ['b'])
         Monomer(name='Kinase', sites=['b'], site_states={})
         >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
         Monomer(name='Substrate', sites=['b', 'y'], site_states={'y': ('U', 'P')})
-        >>> catalyze(Kinase(), 'b', Substrate(y='U'), 'b', Substrate(y='P'), (1e-4, 1e-1, 1))
+        >>> catalyze(Kinase(), 'b', Substrate(y='U'), 'b', Substrate(y='P'), (1e-4, 1e-1, 1)) # doctest:+NORMALIZE_WHITESPACE
         {'bind_Kinase_SubstrateU_to_KinaseSubstrateU':
             Rule(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU',
                 reactants=Kinase(b=None) + Substrate(b=None, y=U),
@@ -612,13 +612,13 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('Kinase', ['b'])
         Monomer(name='Kinase', sites=['b'], site_states={})
         >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
         Monomer(name='Substrate', sites=['b', 'y'], site_states={'y': ('U', 'P')})
-        >>> catalyze_state(Kinase, 'b', Substrate, 'b', 'y', 'U', 'P', (1e-4, 1e-1, 1))
+        >>> catalyze_state(Kinase, 'b', Substrate, 'b', 'y', 'U', 'P', (1e-4, 1e-1, 1)) # doctest:+NORMALIZE_WHITESPACE
         {'bind_Kinase_SubstrateU_to_KinaseSubstrateU':
             Rule(name='bind_Kinase_SubstrateU_to_KinaseSubstrateU',
                 reactants=Kinase(b=None) + Substrate(b=None, y=U),
@@ -689,7 +689,7 @@ def catalyze_one_step(enzyme, substrate, product, kf):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('E', ['b'])
         Monomer(name='E', sites=['b'], site_states={})
@@ -697,7 +697,7 @@ def catalyze_one_step(enzyme, substrate, product, kf):
         Monomer(name='S', sites=['b'], site_states={})
         >>> Monomer('P')
         Monomer(name='P', sites=[], site_states={})
-        >>> catalyze_one_step(E, S, P, 1e-4)
+        >>> catalyze_one_step(E, S, P, 1e-4) # doctest:+NORMALIZE_WHITESPACE
         {'one_step_E_S_to_E_P':
             Rule(name='one_step_E_S_to_E_P',
                 reactants=E() + S(),
@@ -752,7 +752,7 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('E', ['b'])
         Monomer(name='E', sites=['b'], site_states={})
@@ -760,7 +760,7 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
         Monomer(name='S', sites=['b'], site_states={})
         >>> Monomer('P')
         Monomer(name='P', sites=[], site_states={})
-        >>> catalyze_one_step_reversible(E, S, P, [1e-1, 1e-4])
+        >>> catalyze_one_step_reversible(E, S, P, [1e-1, 1e-4]) # doctest:+NORMALIZE_WHITESPACE
         {'one_step_E_S_to_E_P':
             Rule(name='one_step_E_S_to_E_P',
                 reactants=E() + S(),
@@ -821,11 +821,11 @@ def synthesize(species, ksynth):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
-        >>> synthesize(A(x=None, y='e'), 1e-4)
+        >>> synthesize(A(x=None, y='e'), 1e-4) # doctest:+NORMALIZE_WHITESPACE
         {'synthesize_Ae':
             Rule(name='synthesize_Ae',
                 reactants=None,
@@ -881,11 +881,11 @@ def degrade(species, kdeg):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('B', ['x'])
         Monomer(name='B', sites=['x'], site_states={})
-        >>> degrade(B(), 1e-6)  # degrade all B, even bound species
+        >>> degrade(B(), 1e-6)  # degrade all B, even bound species # doctest:+NORMALIZE_WHITESPACE
         {'degrade_B':
             Rule(name='degrade_B',
                 reactants=B(),
@@ -947,14 +947,14 @@ def synthesize_degrade_table(table):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         Monomer(name='A', sites=['x', 'y'], site_states={'y': ['e', 'f']})
         >>> Monomer('B', ['x'])
         Monomer(name='B', sites=['x'], site_states={})
         >>> synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
-        ...                           [B(),              None, 1e-7]])
+        ...                           [B(),              None, 1e-7]]) # doctest:+NORMALIZE_WHITESPACE
         {'synthesize_Ae':
             Rule(name='synthesize_Ae',
             reactants=None,
@@ -1021,7 +1021,7 @@ def pore_species(subunit, site1, site2, size):
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer(name='Unit', sites=['p1', 'p2'], site_states={})
@@ -1088,11 +1088,11 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
 
     Execution::
    
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer(name='Unit', sites=['p1', 'p2'], site_states={})
-        >>> assemble_pore_sequential(Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2)
+        >>> assemble_pore_sequential(Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2) # doctest:+NORMALIZE_WHITESPACE
         {'assemble_pore_sequential_Unit_2':
             Rule(name='assemble_pore_sequential_Unit_2',
                 reactants=Unit(p1=None, p2=None) + Unit(p1=None, p2=None),
@@ -1194,7 +1194,7 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('Unit', ['p1', 'p2', 'sc_site'])
         Monomer(name='Unit', sites=['p1', 'p2', 'sc_site'], site_states={})
@@ -1202,7 +1202,7 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         Monomer(name='Cargo', sites=['c_site', 'loc'], site_states={'loc': ['mito', 'cyto']})
         >>> pore_transport(Unit, 'p1', 'p2', 'sc_site', 3, 3,
         ...                Cargo(loc='mito'), 'c_site', Cargo(loc='cyto'),
-        ...                [[1e-4, 1e-1, 1]])
+        ...                [[1e-4, 1e-1, 1]]) # doctest:+NORMALIZE_WHITESPACE
         {'pore_transport_complex_Unit_3_Cargomito':
             Rule(name='pore_transport_complex_Unit_3_Cargomito',
                 reactants=MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
@@ -1343,14 +1343,14 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
 
     Execution::
 
-        >>> Model()
+        >>> Model() # doctest:+ELLIPSIS
         <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
         >>> Monomer('Unit', ['p1', 'p2', 'sc_site'])
         Monomer(name='Unit', sites=['p1', 'p2', 'sc_site'], site_states={})
         >>> Monomer('Cargo', ['c_site'])
         Monomer(name='Cargo', sites=['c_site'], site_states={})
         >>> pore_bind(Unit, 'p1', 'p2', 'sc_site', 3, 
-        ...           Cargo(), 'c_site', [1e-4, 1e-1, 1])
+        ...           Cargo(), 'c_site', [1e-4, 1e-1, 1]) # doctest:+NORMALIZE_WHITESPACE
         {'pore_bind_Unit_3_Cargo':
             Rule(name='pore_bind_Unit_3_Cargo',
                 reactants=MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
@@ -1426,4 +1426,4 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
 
 if __name__ == "__main__":
     import doctest
-    doctest.testmod(optionflags=(doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS))
+    doctest.testmod()
