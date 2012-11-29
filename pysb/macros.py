@@ -108,8 +108,6 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
         {'bind_A_B_to_AB': Rule(name='bind_A_B_to_AB', reactants=A(s=None) + B(s=None), products=A(s=1) % B(s=1), rate_forward=Parameter(name='bind_A_B_to_AB_kf', value=1000000.0), rate_reverse=Parameter(name='bind_A_B_to_AB_kr', value=0.1)),
          'bind_A_B_to_AB_kf': Parameter(name='bind_A_B_to_AB_kf', value=1000000.0),
          'bind_A_B_to_AB_kr': Parameter(name='bind_A_B_to_AB_kr', value=0.1)}
-        >>> 
-
     """
 
     r_name = '%s_%s' % (rule_prefix, name_func(rule_expression))
