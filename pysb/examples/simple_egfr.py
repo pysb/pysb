@@ -1,7 +1,9 @@
+"""Translation of the BioNetGen example Simple_EGFR_model from the BNG wiki.
+
+http://bionetgen.org/index.php/Simple_EGFR_model
+"""
+
 from pysb import *
-
-# from http://bionetgen.org/index.php/Simple_EGFR_model
-
 
 Model()
 
@@ -131,6 +133,7 @@ for m in model.monomers:
 
 
 if __name__ == '__main__':
-    from pysb.bng import generate_network_code
-    from pysb.tools.export_bng import run as run_export
-    print run_export(model)
+    print __doc__, "\n", model
+    print "\nNOTE: This model code is designed to be imported and programatically " \
+        "manipulated,\nnot executed directly. The above output is merely a " \
+        "diagnostic aid."

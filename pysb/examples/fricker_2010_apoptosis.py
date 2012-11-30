@@ -1,18 +1,18 @@
+"""An implementation of the model from:
+
+Model-based dissection of CD95 signaling dynamics reveals both a pro- and
+antiapoptotic role of c-FLIPL.  Fricker N, Beaudouin J, Richter P, Eils R,
+Krammer PH, Lavrik IN. J Cell Biol. 2010 Aug 9;190(3):377-89.
+doi:10.1083/jcb.201002060
+
+http://jcb.rupress.org/content/190/3/377.long
+
+Implemented by: Jeremie Roux, Will Chen, Jeremy Muhlich
+"""
+
 from pysb import *
 
-# pySB adaptation of
-# Model-based dissection of CD95 signaling dynamics reveals both a pro- and antiapoptotic role of c-FLIPL.
-# Fricker N, Beaudouin J, Richter P, Eils R, Krammer PH, Lavrik IN. J Cell Biol. 2010 Aug 9;190(3):377-89.
-# PMID: 20696707 
-#
-# by Jeremie Roux, Will Chen, Jeremy Muhlich
-
-
 Model()
-
-transloc = .01; # rate of translocation between the cytosolic and mitochondrial compartments
-
-v = .07; # mitochondria compartment volume/cell volume
 
 # Non-zero initial conditions (in molecules per cell):
 Parameter('L_0'        , 1500e3); # baseline level of ligand for most experiments (corresponding to 50 ng/ml SuperKiller TRAIL)
@@ -168,13 +168,11 @@ for m in model.monomers:
 
 ####
 
-
-
 if __name__ == '__main__':
-    from pysb.tools.export_bng_net import run as run_export_net
-    print run_export_net(model)
-
-
+    print __doc__, "\n", model
+    print "\nNOTE: This model code is designed to be imported and programatically " \
+        "manipulated,\nnot executed directly. The above output is merely a " \
+        "diagnostic aid."
 
 
 ####

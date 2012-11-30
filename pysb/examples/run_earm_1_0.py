@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+"""Reproduce figures 4A and 4B from the EARM 1.0 publication (Albeck et
+al. 2008)."""
+
 from pysb.integrate import odesolve
 from pylab import *
 
@@ -14,6 +18,7 @@ L_0_baseline = model.parameters['L_0'].value
 
 
 def fig_4a():
+    print "Simulating model for figure 4A..."
     t = linspace(0, 20*3600, 20*60+1)  # 20 hours, in seconds, 1 min sampling
     dt = t[1] - t[0]
 
@@ -30,10 +35,11 @@ def fig_4a():
     fs = empty_like(Ls)
     Ts = empty_like(Ls)
     Td = empty_like(Ls)
+    print "Scanning over %d values of L_0" % len(Ls)
     for i in range(len(Ls)):
         model.parameters['L_0'].value = Ls[i]
 
-        print "integrating model"
+        print "  L_0 = %g" % Ls[i]
         x = odesolve(model, t)
 
         fs[i] = (x['PARP_unbound'][0] - x['PARP_unbound'][-1]) / x['PARP_unbound'][0]
@@ -57,13 +63,15 @@ def fig_4a():
 
 
 def fig_4b():
+    print "Simulating model for figure 4B..."
+
     t = linspace(0, 6*3600, 6*60+1)  # 6 hours
     x = odesolve(model, t)
 
     x_norm = c_[x['Bid_unbound'], x['PARP_unbound'], x['mSmac_unbound']]
     x_norm = 1 - x_norm / x_norm[0, :]  # gets away without max() since first values are largest
 
-    # this is what I originally thought 4B was plotting.  oddly it's very close.
+    # this is what I originally thought 4B was plotting. it's actually very close. -JLM
     #x_norm = array([x['tBid_total'], x['CPARP_total'], x['cSmac_total']]).T
     #x_norm /= x_norm.max(0)
 

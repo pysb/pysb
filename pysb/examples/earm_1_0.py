@@ -1,5 +1,4 @@
-"""
-EARM 1.0 (extrinsic apoptosis reaction model)
+"""EARM 1.0 (extrinsic apoptosis reaction model)
 
 Albeck JG, Burke JM, Spencer SL, Lauffenburger DA, Sorger PK, 2008
 Modeling a Snap-Action, Variable-Delay Switch Controlling Extrinsic
@@ -268,7 +267,7 @@ inhibit(cSmac, XIAP, kf28, kr28)
 Observable('Bid_unbound',   Bid(b=None))
 Observable('PARP_unbound',  PARP(b=None))
 Observable('mSmac_unbound', mSmac(b=None))
-# this is what I originally thought 4B was actually plotting
+# this is what I originally thought 4B was actually plotting -JLM
 Observable('tBid_total',  tBid())
 Observable('CPARP_total', CPARP())
 Observable('cSmac_total', cSmac())
@@ -292,6 +291,8 @@ for m in model.monomers:
 
 
 if __name__ == '__main__':
-    from pysb.bng import generate_network_code
-    from pysb.tools.export_bng import run as run_export
-    print run_export(model)
+    print __doc__, "\n", model
+    print "\nNOTE: This model code is designed to be imported and programatically " \
+        "manipulated,\nnot executed directly. The above output is merely a " \
+        "diagnostic aid. Please see\n" \
+        "run_earm_1_0.py for example usage."

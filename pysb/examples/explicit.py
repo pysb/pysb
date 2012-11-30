@@ -1,10 +1,13 @@
-# example of a model defined without SelfExporter
+"""Example of how to write a model without using SelfExporter.
+"""
 
 from pysb import *
 import pysb.core
 
+# disable SelfExporter from doing its thing
 pysb.core.SelfExporter.do_export = False
-pysb.core.SelfExporter.default_model = Model('dummy')
+# 
+#pysb.core.SelfExporter.default_model = Model('dummy')
 
 model = Model('explicit')
 
@@ -24,3 +27,9 @@ model.add_component(L_0)
 model.add_component(R_0)
 model.initial(L(r=None), L_0)
 model.initial(R(l=None), R_0)
+
+if __name__ == '__main__':
+    print __doc__, "\n", model
+    print "\nNOTE: This model code is designed to be imported and programatically " \
+        "manipulated,\nnot executed directly. The above output is merely a " \
+        "diagnostic aid."
