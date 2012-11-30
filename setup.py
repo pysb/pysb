@@ -62,9 +62,12 @@ class test(distutils.cmd.Command):
         pass
     def run(self):
         import nose
-        config = nose.config.Config(exclude=[re.compile('examples')],
+        from nose.plugins.manager import DefaultPluginManager
+        excludes = [r'examples', r'deprecated']
+        config = nose.config.Config(exclude=map(re.compile, excludes),
+                                    plugins=DefaultPluginManager(),
                                     env=os.environ)
-        nose.run(defaultTest='pysb', config=config, argv=[''])
+        nose.run(defaultTest='pysb', config=config, argv=['', '--with-doctest'])
 
 class GitError(Exception):
     pass
