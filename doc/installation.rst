@@ -1,32 +1,54 @@
-Getting Started
-===============
+Installation
+============
 
-Python Knowledge 
----------------- 
+There are two ways to install and use PySB:
 
-For those unfamiliar with *Python* or programming there are several
-resources available online. We have found the ones below useful to
-learn *Python* in a practical and straightfoward manner.
+1. **Download and run the virtual machine containing the complete PySB
+   installation.** Users wishing to try out PySB, who are unfamiliar with the
+   procedure for installing Python packages, or who just want a simpler
+   installation procedure should choose this option.
 
-Quick Python Overview (10 minutes or so): 
-   * `OpenOpt Python for the impatient <http://openopt.org/PythonIntroduction>`_
-   * `Instant Python <http://hetland.org/writing/instant-python.html>`_
+2. **Install the necessary software dependencies natively on your computer.**
+   Users who prefer to run PySB natively and who are comfortable with
+   installing Python packages should choose this option.
+
+Downloading the PySB Virtual Machine
+------------------------------------
+
+For easy installation, we provide a pre-configured virtual machine running the
+`Ubuntu Linux`_ operating system that comes with all necessary software
+installed.  It also includes other useful software (e.g., `Git`_,
+`iPython`_, `GraphViz`_, `Kappa`_, `OCaml`_), and has been preconfigured to
+make getting up-to-date versions of PySB and other required packages easy.
+
+In addition to the PySB virtual machine file itself, you'll need virtualization
+software to run it, such as Oracle's free and open-source `Virtual Box`_.  The
+instructions given below are for Virtual Box, but other virtualization software
+such as `VMWare Player`_ (free) or `Parallels`_ can also be used. Here's the
+installation procedure:
+
+1. `Download the PySB virtual machine OVA (Open Virtualization Archive) file
+   by clicking this link <http://www.pysb.org>`_. The file is approximately
+   800MB.
    
-Python for beginners, experienced users, or if you want a refresher:
-   * `Official Python tutorial <http://docs.python.org/tutorial/>`_
-   * `Python for non-programmers <http://wiki.python.org/moin/BeginnersGuide/NonProgrammers>`_
-   * `Dive into Python <http://www.diveintopython.net/>`_
-   * `Thinking in Python <http://www.mindview.net/Books/TIPython>`_
-   * 
+2. Download Virtual Box at https://www.virtualbox.org/wiki/Downloads.
+   etc.
+    
+.. _Ubuntu Linux: http://www.ubuntu.com
+.. _Kappa: http://www.kappalanguage.org
+.. _Git: http://git-scm.com
+.. _iPython: http://ipython.org/
+.. _OCaml: http://caml.inria.fr/ocaml/
+.. _GraphViz: http://www.graphviz.org/
+.. _Virtual Box: https://www.virtualbox.org/
+.. _VMWare Player: http://www.vmware.com/products/player/
+.. _Parallels: http://www.parallels.com/
 
-For experienced users of other languages:
-   * `NumPy for Matlab <http://www.scipy.org/NumPy_for_Matlab_Users/>`_
-      * Also the `Mathesaurus <http://mathesaurus.sourceforge.net/matlab-numpy.html>`_
-      * Matlab commands in Numerical Python `cheatsheet <http://mathesaurus.sourceforge.net/matlab-python-xref.pdf>`_
-   * `Scientific Python <http://www.scipy.org/>`_
+Installing the Dependencies Yourself
+------------------------------------
 
-Requirements
-------------
+Required Packages
+^^^^^^^^^^^^^^^^^
 
 The following are what we consider the *necessary* to use PySB as a
 biological simulation tool. The versions listed are the ones that are
@@ -61,9 +83,9 @@ users may want to replace these requirements as they see fit.
   and three dimensions. If you want to visualize any type of plots you
   will need MatPlotLib. 
 
-
 Recommended
------------
+^^^^^^^^^^^
+
 * iPython 0.13: Even though iPython is not a *requirement* it is
   **strongly** recommended. iPython provides a very nice and simple
   shell interface for the Python interpreter with such niceties as tab
@@ -73,37 +95,4 @@ Recommended
   from PySB to take advantage of its stochastic simulation
   capabilities and great visualization tools. It is a great complement
   to the modeling tools in BioNetGen.
-* cookbooks 
 
-The easiest way to use PySB
---------------------------- 
-
-Currently the easiest way to use PySB is through a virtual machine. We
-provide an ``Ubuntu Linux ISO`` image file based on ``Ubuntu 12.04``
-to run *PySB*. With this you can get acquainted, build some simple
-models, and carry out simulations. If you decide you want to use PySB
-on your native computer platform we will be posting instructions for
-this in the near future. 
-
-To run *PySB* from the image you can download the image from `The PySB
-website <http://pysb.org>`_ and burn it onto a bootable DVD or USB
-stick. Alternatively you can download a virtual machine software such
-as `Virtual Box <https://www.virtualbox.org/>`_ (FREE) or `Parallels
-<http://www.parallels.com/>`_ ($). Follow the instructions to setup
-the virtual machine booting from the ``ISO`` file to begin modeling
-with Python programs.
-
-Instructions for Linux installations
-------------------------------------
-
-**coming soon**
-
-Instructions for OS X installations
------------------------------------
-
-**coming soon**
-
-Instructions for Windows installations
---------------------------------------
-
-**coming soon**
