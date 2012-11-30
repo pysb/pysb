@@ -33,10 +33,8 @@ make PySB a better open-source tool for the programming community.
 
    installation
    tutorial
-   rulesprimer
    modules/index
    useful_references
-   about
 
 Indices and tables
 ==================
