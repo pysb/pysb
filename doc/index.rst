@@ -35,6 +35,7 @@ make PySB a better open-source tool for the programming community.
    tutorial
    rulesprimer
    modules/index
+   useful_references
    about
 
 Indices and tables
