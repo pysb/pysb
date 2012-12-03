@@ -7,7 +7,7 @@ from pysb.integrate import odesolve
 from bax_pore import model
 
 
-t = linspace(0, 5e4)
+t = linspace(0, 100)
 print "Simulating..."
 x = odesolve(model, t)
 
