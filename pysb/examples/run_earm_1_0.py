@@ -49,7 +49,7 @@ def fig_4a():
         Ts[i] = 1 / dPmax  # minutes
         Td[i] = t[ttn] / 60  # minutes
 
-    figure()
+    figure("Figure 4A")
     plot(Ls/Lfactor, Td, 'g-', Ls/Lfactor, (1-CVenv)*Td, 'g--', Ls/Lfactor, (1+CVenv)*Td, 'g--')
     errorbar(Ls_exp/Lfactor, Td_exp, Td_std, None, 'go', capsize=0),
     ylabel('Td (min)'),
@@ -77,7 +77,7 @@ def fig_4b():
 
     tp = t / 3600  # x axis as hours
 
-    figure()
+    figure("Figure 4B")
     plot(tp, x_norm[:,0], 'b', label='IC substrate (tBid)')
     plot(tp, x_norm[:,1], 'y', label='EC substrate (cPARP)')
     plot(tp, x_norm[:,2], 'r', label='MOMP (cytosolic Smac)')

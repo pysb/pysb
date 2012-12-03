@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """A simple three-species chemical kinetics system known as "Robertson's
 example", as presented in:
 
