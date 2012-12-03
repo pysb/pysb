@@ -10,6 +10,9 @@ http://www.plosbiology.org/article/info:doi/10.1371/journal.pbio.0060299
 from pysb import *
 
 Model()
+Annotation(model, 'is', 'http://identifiers.org/biomodels.db/BIOMD0000000220')
+Annotation(model, 'isDescribedBy',
+           'http://identifiers.org/doi/10.1371/journal.pbio.0060299')
 
 transloc = .01; # rate of translocation between the cytosolic and mitochondrial compartments
 

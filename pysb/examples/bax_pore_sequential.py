@@ -10,11 +10,16 @@ Model()
 
 # s1,s2 are ring-formation sites; t is the transport (cargo binding) site
 Monomer('Bax', ['s1', 's2', 't'])
+Annotation(Bax, 'http://identifiers.org/uniprot/Q07812')
 # loc is the location, (m)itochondrion or (c)ytosol; t is the transport site
 Monomer('Smac', ['loc', 't'], {'loc': ['m','c']})
+Annotation(Smac, 'http://identifiers.org/uniprot/Q9NR28')
 
 Parameter('Bax_0', 8e4)
 Parameter('Smac_0', 1e5)
+for p in Bax_0, Smac_0:
+    Annotation(p, 'http://identifiers.org/doi/10.1371/journal.pcbi.1002482',
+               'isDescribedBy')
 
 # Start with monomeric Bax and Smac in the mitochondrion
 Initial(Bax(s1=None, s2=None, t=None), Bax_0)

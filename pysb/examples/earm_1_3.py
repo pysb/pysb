@@ -20,6 +20,8 @@ import pysb.examples.earm_1_0
 # Start from EARM 1.0 as a base
 # ==========
 Model(base=pysb.examples.earm_1_0.model)
+Annotation(model, 'isDescribedBy',
+           'http://identifiers.org/doi/10.1371/journal.pcbi.1002482')
 
 # Rename all instances of Bcl2c to Mcl1, which was determined as a more accurate
 # description of that monomer based on its role in the model

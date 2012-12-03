@@ -712,6 +712,7 @@ class Model(object):
         self.reactions = []
         self.reactions_bidirectional = []
         self.initial_conditions = []
+        self.annotations = []
         if self._export:
             SelfExporter.export(self)
         if self.base is not None:
@@ -801,6 +802,18 @@ class Model(object):
         else:
             raise Exception("Tried to add component of unknown type '%s' to"
                             "model" % type(other))
+
+    def add_annotation(self, annotation):
+        """Add an Annotation object to the model"""
+        self.annotations.append(annotation)
+
+    def get_annotations(self, subject):
+        """Return all annotations for the given subject"""
+        annotations = []
+        for a in self.annotations:
+            if a.subject is subject:
+                annotations.append(a)
+        return annotations
 
     def _rename_component(self, component, new_name):
         for cset in self.all_component_sets():

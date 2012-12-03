@@ -16,11 +16,23 @@ from pysb.macros import catalyze
 Model()
 
 Monomer('Ras', ['k'])
+Annotation(Ras, 'http://identifiers.org/uniprot/P01116')
+Annotation(Ras, 'http://identifiers.org/uniprot/P01112')
+Annotation(Ras, 'http://identifiers.org/uniprot/P01111')
 Monomer('Raf', ['s', 'k'], {'s': ['u', 'p']})
+Annotation(Raf, 'http://identifiers.org/uniprot/P15056')
+Annotation(Raf, 'http://identifiers.org/uniprot/P04049')
+Annotation(Raf, 'http://identifiers.org/uniprot/P10398')
 Monomer('MEK', ['s218', 's222', 'k'], {'s218': ['u', 'p'], 's222': ['u', 'p']})
+Annotation(MEK, 'http://identifiers.org/uniprot/Q02750')
+Annotation(MEK, 'http://identifiers.org/uniprot/P36507')
 Monomer('ERK', ['t185', 'y187'], {'t185': ['u', 'p'], 'y187': ['u', 'p']})
+Annotation(ERK, 'http://identifiers.org/uniprot/P27361')
+Annotation(ERK, 'http://identifiers.org/uniprot/P28482')
 Monomer('PP2A', ['ppt'])
+Annotation(PP2A, 'http://identifiers.org/mesh/24544')
 Monomer('MKP', ['ppt'])
+Annotation(MKP, 'http://identifiers.org/mesh/24536')
 
 # Use generic rates for forward/reverse binding and kinase/phosphatase catalysis
 kf_bind = 1e-5
