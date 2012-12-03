@@ -63,7 +63,7 @@ class test(distutils.cmd.Command):
     def run(self):
         import nose
         from nose.plugins.manager import DefaultPluginManager
-        excludes = [r'examples', r'deprecated']
+        excludes = [r'^examples$', r'^deprecated$']
         config = nose.config.Config(exclude=map(re.compile, excludes),
                                     plugins=DefaultPluginManager(),
                                     env=os.environ)

@@ -86,6 +86,8 @@ class SelfExporter(object):
     @staticmethod
     def cleanup():
         # delete previously exported symbols
+        if SelfExporter.default_model is None:
+            return
         for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
             if name in SelfExporter.target_globals:
                 del SelfExporter.target_globals[name]
