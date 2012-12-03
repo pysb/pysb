@@ -6,8 +6,6 @@ import pysb.core
 
 # disable SelfExporter from doing its thing
 pysb.core.SelfExporter.do_export = False
-# 
-#pysb.core.SelfExporter.default_model = Model('dummy')
 
 model = Model('explicit')
 
