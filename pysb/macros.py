@@ -166,7 +166,7 @@ def _verify_sites(m, *site_list):
     """
 
     for site in site_list:
-        if site not in m().monomer.sites_dict:
+        if site not in m().monomer.sites:
             raise ValueError("Monomer '%s' must contain the site '%s'" %
                             (m().monomer.name, site))
     return True

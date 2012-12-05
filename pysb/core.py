@@ -10,19 +10,24 @@ import copy
 
 
 def Initial(*args):
+    """Declare an initial condition (see Model.initial)."""
     return SelfExporter.default_model.initial(*args)
 
 def MatchOnce(pattern):
+    """Make a ComplexPattern match-once."""
     cp = as_complex_pattern(pattern).copy()
     cp.match_once = True
     return cp
 
 
-# Internal helper to implement the magic of making model components
-# appear in the calling module's namespace.  Do not construct any
-# instances; we just use the class for namespace containment.
 class SelfExporter(object):
 
+    """Make model components appear in the calling module's namespace.
+
+    This class is for pysb internal use only. Do not construct any instances.
+
+    """
+    
     do_export = True
     default_model = None
     target_globals = None   # the globals dict to which we'll export our symbols
@@ -30,6 +35,8 @@ class SelfExporter(object):
 
     @staticmethod
     def export(obj):
+        """Export an object by name and add it to the default model."""
+
         if not SelfExporter.do_export:
             return
         if not isinstance(obj, (Model, Component)):
@@ -85,7 +92,7 @@ class SelfExporter(object):
 
     @staticmethod
     def cleanup():
-        # delete previously exported symbols
+        """Delete previously exported symbols."""
         if SelfExporter.default_model is None:
             return
         for name in [c.name for c in SelfExporter.default_model.all_components()] + ['model']:
@@ -112,7 +119,21 @@ class SelfExporter(object):
 
 class Component(object):
 
-    """The base class for all the things contained within a model."""
+    """The base class for all the named things contained within a model.
+
+    Parameters
+    ----------
+    name : string
+        Name of the component. Must be unique within the containing model.
+
+    Attributes
+    ----------
+    name : string
+        Name of the component.
+    model : weakref(Model)
+        Containing model.
+
+    """
 
     def __init__(self, name, _export=True):
         if not re.match(r'[_a-z][_a-z0-9]*\Z', name, re.IGNORECASE):
@@ -138,6 +159,11 @@ class Component(object):
             raise e
 
     def rename(self, new_name):
+        """Change component's name.
+
+        This is typically only needed when deriving one model from another and
+        it would be desirable to change a component's name in the derived
+        model."""
         self.model()._rename_component(self, new_name)
         if self._export:
             SelfExporter.rename(self, new_name)
@@ -146,7 +172,39 @@ class Component(object):
 
 class Monomer(Component):
 
-    """Model component representing a protein or other molecule."""
+    """Model component representing a protein or other molecule.
+
+    Parameters
+    ----------
+    sites : list of strings, optional
+        Names of the sites.
+    site_states : dict of string => string, optional
+        Allowable states for sites. Keys are sites and values are lists of
+        states. Sites which only take part in bond formation and never take on a
+        state may be omitted.
+
+    Attributes
+    ----------
+    sites : list of strings
+        Names of the sites.
+    site_states : dict of string => string
+        Allowable states for sites. Keys are sites and values are lists of
+        states.
+
+    Notes
+    -----
+
+    A Monomer instance may be \"called\" like a function to produce a
+    MonomerPattern, as syntactic sugar to approximate rule-based modeling
+    language syntax. It is typically called with keyword arguments where the arg
+    names are sites and values are site conditions such as bond numbers or
+    states (see the Notes section of the :py:class:`MonomerPattern`
+    documentation for details). To help in situations where kwargs are unwieldy
+    (for example if a site name is computed dynamically or stored in a variable)
+    a dict following the same layout as the kwargs may be passed as the first
+    and only positional argument instead.
+
+    """
 
     def __init__(self, name, sites=[], site_states={}, _export=True):
         Component.__init__(self, name, _export)
@@ -174,12 +232,22 @@ class Monomer(Component):
             raise Exception("Non-string state values in site_states for sites: " + str(invalid_sites))
 
         self.sites = list(sites)
-        self.sites_dict = dict.fromkeys(sites)
         self.site_states = site_states
 
-    def __call__(self, *args, **kwargs):
-        """Build a MonomerPattern object with convenient kwargs for the sites"""
-        return MonomerPattern(self, extract_site_conditions(*args, **kwargs), None)
+    def __call__(self, conditions=None, **kwargs):
+        """Return a MonomerPattern object for a Monomer.
+
+        See Notes for details.
+
+        Parameters
+        ----------
+        conditions : dict, optional
+            See MonomerPattern.site_conditions.
+        **kwargs : dict
+            See MonomerPattern.site_conditions.
+
+        """
+        return MonomerPattern(self, extract_site_conditions(conditions, **kwargs), None)
 
     def __repr__(self):
         return  '%s(name=%s, sites=%s, site_states=%s)' % \
@@ -192,7 +260,9 @@ class MonomerAny(Monomer):
     """
     A wildcard monomer which matches any species.
 
-    This is only needed where you would use a '+' in BNG.
+    This is only needed where you would use a '+' in BNG. Do not construct any
+    instances -- use the singleton ``ANY`` instead.
+
     """
 
     def __init__(self):
@@ -200,7 +270,6 @@ class MonomerAny(Monomer):
         # Component stuff and has no user-accessible API
         self.name = 'ANY'
         self.sites = None
-        self.sites_dict = {}
         self.site_states = {}
         self.compartment = None
 
@@ -214,7 +283,9 @@ class MonomerWild(Monomer):
     """
     A wildcard monomer which matches any species, or nothing (no bond).
 
-    This is only needed where you would use a '?' in BNG.
+    This is only needed where you would use a '?' in BNG. Do not construct any
+    instances -- use the singleton ``WILD`` instead.
+
     """
 
     def __init__(self):
@@ -222,7 +293,6 @@ class MonomerWild(Monomer):
         # Component stuff and has no user-accessible API
         self.name = 'WILD'
         self.sites = None
-        self.sites_dict = {}
         self.site_states = {}
         self.compartment = None
 
@@ -233,12 +303,40 @@ class MonomerWild(Monomer):
 
 class MonomerPattern(object):
 
-    """A pattern which matches instances of a given monomer, possibly with
-    restrictions on the state of certain sites."""
+    """A pattern which matches instances of a given monomer.
+
+    Parameters
+    ----------
+    monomer : Monomer
+        The monomer to match.
+    site_conditions : dict
+        The desired state of the monomer's sites. Keys are site names and values
+        are described below in Notes.
+    compartment : Compartment or None
+        The desired compartment where the monomer should exist. None means
+        \"don't-care\".
+
+    Notes
+    -----
+    The acceptable values in the `site_conditions` dict are as follows:
+
+    * ``None`` : no bond
+    * *str* : state
+    * *int* : a bond (to a site with the same number in a ComplexPattern)
+    * *list of int* : multi-bond (not valid in Kappa)
+    * ``ANY`` : \"any\" bond (bound to something, but don't care what)
+    * ``WILD`` : \"wildcard\" bond (bound or not bound)
+    * *tuple of (str, int)* : state with bond
+    * *tuple of (str, WILD)* : state with wildcard bond
+
+    If a site is not listed in site_conditions then the pattern will match any
+    state for that site, i.e. \"don't write, don't care\".
+
+    """
 
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
-        unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites_dict]
+        unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites]
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
@@ -277,8 +375,10 @@ class MonomerPattern(object):
         """Return a bool indicating whether the pattern is 'concrete'.
 
         'Concrete' means the pattern satisfies ALL of the following:
+
         1. All sites have specified conditions
         2. If the model uses compartments, the compartment is specified.
+
         """
         # 1.
         sites_ok = self.is_site_concrete()
@@ -293,14 +393,14 @@ class MonomerPattern(object):
         # assume __init__ did a thorough enough job of error checking that this is is all we need to do
         return len(self.site_conditions) == len(self.monomer.sites)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, conditions=None, **kwargs):
         """Build a new MonomerPattern with updated site conditions. Can be used
         to obtain a shallow copy by passing an empty argument list."""
         # The new object will have references to the original monomer and
         # compartment, and a shallow copy of site_conditions which has been
         # updated according to our args (as in Monomer.__call__).
         site_conditions = self.site_conditions.copy()
-        site_conditions.update(extract_site_conditions(*args, **kwargs))
+        site_conditions.update(extract_site_conditions(conditions, **kwargs))
         return MonomerPattern(self.monomer, site_conditions, self.compartment)
 
     def __add__(self, other):
@@ -1085,15 +1185,15 @@ class ComponentDuplicateNameError(ValueError):
     pass
 
 
-def extract_site_conditions(*args, **kwargs):
+def extract_site_conditions(conditions=None, **kwargs):
     """Handle parsing of MonomerPattern site conditions.
     """
     # enforce site conditions as kwargs or a dict but not both
-    if (args and kwargs) or len(args) > 1:
+    if conditions and kwargs:
         raise Exception("Site conditions may be specified as EITHER keyword arguments OR a single dict")
     # handle normal cases
-    elif args:
-        site_conditions = args[0].copy()
+    elif conditions:
+        site_conditions = conditions.copy()
     else:
         site_conditions = kwargs
     return site_conditions

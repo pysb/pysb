@@ -16,7 +16,6 @@ def test_monomer():
     m = Monomer('A', sites, states, _export=False)
     assert_equal(m.sites, sites)
     assert_equal(m.site_states, states)
-    assert_equal(sorted(m.sites_dict.keys()), sorted(sites))
     assert_equal(type(m()), MonomerPattern)
 
     assert_raises(ValueError, Monomer, 'A', 'x', _export=False)
