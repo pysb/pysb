@@ -1,2 +1,3 @@
 # requirements just for building the docs (mainly to help out readthedocs)
 numpydoc>=0.4
+sympy
