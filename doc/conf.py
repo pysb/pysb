@@ -43,7 +43,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'PySB, modeling with programs'
+project = u'PySB'
 copyright = u'2012, C. F. Lopez, J. L. Muhlich, J. A. Bachman'
 
 # The version info for the project you're documenting, acts as replacement for
