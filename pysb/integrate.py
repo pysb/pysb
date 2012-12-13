@@ -13,7 +13,7 @@ use_inline = False
 try:
     inline('int i;', force=1)
     use_inline = True
-except distutils.errors.CompileError:
+except (distutils.errors.CompileError, ImportError):
     pass
 
 # some sane default options for a few well-known integrators
