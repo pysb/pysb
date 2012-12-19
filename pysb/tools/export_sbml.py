@@ -9,7 +9,19 @@ from sympy.printing.mathml import MathMLPrinter
 import re
 import sys
 import os
+import itertools
+import textwrap
 from StringIO import StringIO
+
+def indent(text, n=0):
+    """Re-indent a multi-line string, strip leading newlines and trailing spaces"""
+    text = text.lstrip('\n')
+    text = textwrap.dedent(text)
+    lines = text.split('\n')
+    lines = [' '*n + l for l in lines]
+    text = '\n'.join(lines)
+    text = text.rstrip(' ')
+    return text
 
 class MathMLContentPrinter(MathMLPrinter):
     """Prints an expression to MathML without presentation markup"""
@@ -20,6 +32,49 @@ class MathMLContentPrinter(MathMLPrinter):
 
 def print_mathml(expr, **settings):
     return MathMLContentPrinter(settings).doprint(expr)
+
+def format_single_annotation(annotation):
+    return '''<rdf:li rdf:resource="%s" />''' % annotation.object
+
+def get_annotation_preamble(meta_id):
+    return indent('''
+      <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+              <rdf:Description rdf:about="#%s">
+      ''' % meta_id)
+
+def get_annotation_postamble():
+    return indent('''
+              </rdf:Description>
+          </rdf:RDF>
+      </annotation>
+      ''')
+
+def get_species_annotation(meta_id, cp):
+    output = get_annotation_preamble(meta_id)
+    model = cp.monomer_patterns[0].monomer.model()
+    if len(cp.monomer_patterns) == 1:
+        # single monomer
+        all_annotations = model.get_annotations(cp.monomer_patterns[0].monomer)
+        groups = itertools.groupby(all_annotations, lambda a: a.predicate)
+        for predicate, annotations in groups:
+            qualifier = 'bqbiol:%s' % predicate
+            output += indent('<%s>\n    <rdf:Bag>\n' % qualifier, 12)
+            for a in annotations:
+                output += indent(format_single_annotation(a) + '\n', 20)
+            output += indent('    </rdf:Bag>\n</%s>\n' % qualifier, 12)
+    else:
+        # complex
+        monomers = set(mp.monomer for mp in cp.monomer_patterns)
+        annotations = [a for m in monomers for a in model.get_annotations(m)
+                       if a.predicate in ('is', 'hasPart')]
+        qualifier = 'bqbiol:hasPart'
+        output += indent('<%s>\n    <rdf:Bag>\n' % qualifier, 12)
+        for a in annotations:
+            output += indent(format_single_annotation(a) + '\n', 20)
+        output += indent('    </rdf:Bag>\n</%s>\n' % qualifier, 12)
+    output += get_annotation_postamble()
+    return indent(output, 16)
 
 def run(model):
     output = StringIO()
@@ -39,19 +94,26 @@ def run(model):
         ics[model.get_species_index(cp)][1] = ic_param.value
     output.write("        <listOfSpecies>\n")
     for i, (cp, value) in enumerate(ics):
+        id = 's%d' % i
+        metaid = 'metaid_%s' % id
         name = str(cp).replace('% ', '._br_')  # CellDesigner does something weird with % in names
-        output.write('            <species id="s%d" name="%s" compartment="default" initialAmount="%e"/>\n' % (i, name, value));
+        output.write('            <species id="%s" metaid="%s" name="%s" compartment="default" initialAmount="%.17g">\n'
+                     % (id, metaid, name, value));
+        output.write(get_species_annotation(metaid, cp))
+        output.write('            </species>\n')
     output.write("        </listOfSpecies>\n")
 
     output.write("        <listOfParameters>\n")
     for i, param in enumerate(model.parameters_rules()):
-        output.write('            <parameter id="%s" name="%s" value="%e"/>\n' % (param.name, param.name, param.value));
+        output.write('            <parameter id="%s" metaid="metaid_%s" name="%s" value="%.17g"/>\n'
+                     % (param.name, param.name, param.name, param.value));
     output.write("        </listOfParameters>\n")
 
     output.write("        <listOfReactions>\n")
     for i, reaction in enumerate(model.reactions_bidirectional):
         reversible = str(reaction['reversible']).lower()
-        output.write('            <reaction id="r%d" name="r%d" reversible="%s">\n' % (i, i, reversible));
+        output.write('            <reaction id="r%d" metaid="metaid_r%d" name="r%d" reversible="%s">\n'
+                     % (i, i, i, reversible));
         output.write('                <listOfReactants>\n');
         for species in reaction['reactants']:
             output.write('                    <speciesReference species="s%d"/>\n' % species)
