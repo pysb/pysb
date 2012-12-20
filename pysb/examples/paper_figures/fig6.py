@@ -1,3 +1,5 @@
+"""Produce contact map for Figure 5D from the PySB publication"""
+
 import pysb.integrate
 import pysb.util
 import numpy as np
@@ -5,6 +7,7 @@ import scipy.optimize
 import scipy.interpolate
 import matplotlib.pyplot as plt
 import os
+import sys
 import inspect
 
 from earm.lopez_embedded import model
@@ -17,9 +20,7 @@ data_names = ['norm_ICRP', 'norm_ECRP']
 var_names = ['nrm_var_ICRP', 'nrm_var_ECRP']
 
 # Load experimental data file
-earm_path = os.path.dirname(__file__)
-data_path = os.path.join(earm_path, 'xpdata', 'forfits',
-                         'EC-RP_IMS-RP_IC-RP_data_for_models.csv')
+data_path = os.path.join(os.path.dirname(__file__), 'fig6_data.csv')
 exp_data = np.genfromtxt(data_path, delimiter=',', names=True)
 
 # Model observable corresponding to the IMS-RP reporter (MOMP timing)
@@ -27,8 +28,7 @@ momp_obs = 'aSmac'
 # Mean and variance of Td (delay time) and Ts (switching time) of MOMP, and
 # yfinal (the last value of the IMS-RP trajectory)
 momp_data = np.array([9810.0, 180.0, 1.0])
-#momp_var = np.array([7245000.0, 3600.0, 1e-9])
-momp_var = np.array([72450.0, 3600.0, 1e-9])
+momp_var = np.array([7245000.0, 3600.0, 1e-9])
 
 # Build time points for the integrator, using the same time scale as the
 # experimental data but with greater resolution to help the integrator converge.
@@ -49,13 +49,13 @@ rate_mask = np.array([p in rate_params for p in model.parameters])
 # Build vector of nominal parameter values from the model
 nominal_values = np.array([p.value for p in model.parameters])
 # Set the radius of a hypercube bounding the search space
-bounds_radius = 2  # TODO remove bounds checking entirely?
+bounds_radius = 2
 
 
 def objective_func(x, rate_mask, lb, ub):
 
     caller_frame, _, _, caller_func, _, _ = inspect.stack()[1]
-    if caller_func == 'anneal':
+    if caller_func in {'anneal', '_minimize_anneal'}:
         caller_locals = caller_frame.f_locals
         if caller_locals['n'] == 1:
             print caller_locals['best_state'].cost, caller_locals['current_state'].cost
@@ -174,41 +174,64 @@ def estimate(start_values=None):
 
 def display(params_estimated):
 
-    # Construct matrix of experimental data and variance columns of interest
-    exp_obs_norm = exp_data[data_names].view(float).reshape(len(exp_data), -1).T
-    var_norm = exp_data[var_names].view(float).reshape(len(exp_data), -1).T
-    std_norm = var_norm ** 0.5
-
-    # Simulate model with new parameters and construct a matrix of the
+    # Simulate model with nominal parameters and construct a matrix of the
     # trajectories of the observables of interest, normalized to 0-1.
-    solver.run(params_estimated)
-    obs_names_disp = obs_names + ['aSmac']
+    solver.run()
+    obs_names_disp = ['mBid', 'aSmac', 'cPARP']
+    obs_totals = [model.parameters[n].value for n in ('Bid_0', 'Smac_0', 'PARP_0')]
     sim_obs = solver.yobs[obs_names_disp].view(float).reshape(len(solver.yobs), -1)
-    sim_obs_norm = (sim_obs / sim_obs.max(0)).T
+    sim_obs_norm = (sim_obs / obs_totals).T
 
-    # Plot experimental data and simulation on the same axes
-    colors = ('r', 'b')
-    for exp, exp_err, sim, c in zip(exp_obs_norm, std_norm, sim_obs_norm, colors):
-        plt.plot(exp_data['Time'], exp, color=c, marker='.', linestyle=':')
-        plt.errorbar(exp_data['Time'], exp, yerr=exp_err, ecolor=c,
-                     elinewidth=0.5, capsize=0, fmt=None)
-        plt.plot(solver.tspan, sim, color=c)
-    plt.plot(solver.tspan, sim_obs_norm[2], color='g')
-    plt.vlines(momp_data[0], -0.05, 1.05, color='g', linestyle=':')
+    # Do the same with the estimated parameters
+    solver.run(params_estimated)
+    sim_est_obs = solver.yobs[obs_names_disp].view(float).reshape(len(solver.yobs), -1)
+    sim_est_obs_norm = (sim_est_obs / obs_totals).T
+
+    # Plot data with simulation trajectories both before and after fitting
+
+    color_data = '#C0C0C0'
+    color_orig = '#FAAA6A'
+    color_est = '#83C98E'
+
+    plt.subplot(311)
+    plt.errorbar(exp_data['Time'], exp_data['norm_ICRP'],
+                 yerr=exp_data['nrm_var_ICRP']**0.5, c=color_data, linewidth=2,
+                 elinewidth=0.5)
+    plt.plot(solver.tspan, sim_obs_norm[0], color_orig, linewidth=2)
+    plt.plot(solver.tspan, sim_est_obs_norm[0], color_est, linewidth=2)
+    plt.ylabel('Fraction of\ncleaved IC-RP/Bid', multialignment='center')
+    plt.axis([0, 20000, -0.2, 1.2])
+
+    plt.subplot(312)
+    plt.vlines(momp_data[0], -0.2, 1.2, color=color_data, linewidth=2)
+    plt.plot(solver.tspan, sim_obs_norm[1], color_orig, linewidth=2)
+    plt.plot(solver.tspan, sim_est_obs_norm[1], color_est, linewidth=2)
+    plt.ylabel('Td / Fraction of\nreleased Smac', multialignment='center')
+    plt.axis([0, 20000, -0.2, 1.2])
+
+    plt.subplot(313)
+    plt.errorbar(exp_data['Time'], exp_data['norm_ECRP'],
+                 yerr=exp_data['nrm_var_ECRP']**0.5, c=color_data, linewidth=2,
+                 elinewidth=0.5)
+    plt.plot(solver.tspan, sim_obs_norm[2], color_orig, linewidth=2)
+    plt.plot(solver.tspan, sim_est_obs_norm[2], color_est, linewidth=2)
+    plt.ylabel('Fraction of\ncleaved EC-RP/PARP', multialignment='center')
+    plt.xlabel('Time (s)')
+    plt.axis([0, 20000, -0.2, 1.2])
+
     plt.show()
 
 
 if __name__ == '__main__':
 
-    print 'Estimating rates for model:', model.name
-
-    np.random.seed(1)
-    params_estimated = estimate()
-
-    # Write parameter values to a file
-    fit_filename = 'fit_%s.txt' % model.name.replace('.', '_')
-    fit_filename = os.path.join(earm_path, fit_filename)
-    print 'Saving parameter values to file:', fit_filename
-    pysb.util.write_params(model, params_estimated, fit_filename)
-
+    params_estimated = None
+    try:
+        earm_path = sys.modules['earm'].__path__[0]
+        fit_file = os.path.join(earm_path, '..', 'EARM_2_0_M1a_fitted_params.txt')
+        params_estimated = np.genfromtxt(fit_file)[:,1].copy()
+    except IOError:
+        pass
+    if params_estimated is None:
+        np.random.seed(1)
+        params_estimated = estimate()
     display(params_estimated)
