@@ -10,9 +10,19 @@ import numpy
 from StringIO import StringIO
 
 
+# Cached value of BNG path
+_bng_path = None
+
+
 def _get_bng_path():
     """Return the path to BioNetGen's BNG2.pl, based on either the BNGHOME
     environment variable if it's set, or a few hard-coded standard locations."""
+
+    global _bng_path
+
+    # Just return cached value if it's available
+    if _bng_path:
+        return _bng_path
 
     path_var = 'BNGHOME'
     dist_dirs = [
@@ -50,9 +60,9 @@ def _get_bng_path():
             raise Exception('Could not find BioNetGen installed in one of the '
                             'following locations:' +
                             ''.join('\n    ' + d for d in dist_dirs))
+    # Cache path for future use
+    _bng_path = script_path
     return script_path
-
-bng_path = _get_bng_path()
 
 class GenerateNetworkError(RuntimeError):
     pass
@@ -126,7 +136,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
         bng_file.write(gen.get_content())
         bng_file.write(run_ssa_code)
         bng_file.close()
-        p = subprocess.Popen(['perl', bng_path, bng_filename],
+        p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (p_out, p_err) = p.communicate()
         if p.returncode:
@@ -160,7 +170,7 @@ def generate_network(model, cleanup=True, append_stdout=False):
         bng_file.write(gen.get_content())
         bng_file.write(generate_network_code)
         bng_file.close()
-        p = subprocess.Popen(['perl', bng_path, bng_filename],
+        p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (p_out, p_err) = p.communicate()
         if p.returncode:
