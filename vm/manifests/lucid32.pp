@@ -64,17 +64,22 @@ class python-libs {
 }
 
 class bionetgen {
-  package { "wget": ensure => present; }
-  exec { "/usr/bin/wget -c https://github.com/downloads/jmuhlich/bionetgen/BioNetGen_2.1.8_rev597.tgz":
+  package { ["wget", "unzip"]: ensure => present; }
+  exec { "/usr/bin/wget -c http://bionetgen.googlecode.com/files/BioNetGen-2.2.2-stable.zip":
     cwd => "/tmp",
-    creates => "/tmp/BioNetGen_2.1.8_rev597.tgz",
+    creates => "/tmp/BioNetGen-2.2.2-stable.zip",
     require => Package["wget"];
   }
-  file { "/tmp/BioNetGen_2.1.8_rev597.tgz": }
-  exec { "/bin/tar xzf /tmp/BioNetGen_2.1.8_rev597.tgz":
-    cwd => "/usr/local/share",
+  file { "/tmp/BioNetGen-2.2.2-stable.zip": }
+  file { "/tmp/BioNetGen-2.2.2-stable": }
+  exec { "/usr/bin/unzip /tmp/BioNetGen-2.2.2-stable.zip":
+    cwd => "/tmp",
+    creates => "/tmp/BioNetGen-2.2.2-stable",
+    require => File["/tmp/BioNetGen-2.2.2-stable.zip"],
+  }
+  exec { "/bin/mv /tmp/BioNetGen-2.2.2-stable /usr/local/share/BioNetGen":
     creates => "/usr/local/share/BioNetGen",
-    require => File["/tmp/BioNetGen_2.1.8_rev597.tgz"],
+    require => File["/tmp/BioNetGen-2.2.2-stable"],
   }
 }
 
@@ -84,7 +89,8 @@ class pysb {
       provider => "pip";
   }
   user { "demo":
-    ensure => present;
+    ensure => present,
+    shell => "/bin/bash";
   }
   file { "/home/demo":
     ensure => directory,

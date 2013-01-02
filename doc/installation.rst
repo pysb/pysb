@@ -22,7 +22,7 @@ the `Ubuntu Linux`_ operating system that comes with all necessary software
 installed.  It also includes other useful software (e.g., `Git`_, `IPython`_,
 `GraphViz`_, `Kappa`_, `OCaml`_), and has been designed to make getting
 up-to-date versions of PySB and other required packages easy. The VM will
-require 2GB of free hard drive space to install, plus an extra 800MB during the
+require 2GB of free hard drive space to install, plus an extra 500MB during the
 download and import process.
 
 In addition to the PySB virtual machine file itself, you'll need virtualization
@@ -35,7 +35,7 @@ installation procedure:
    install it.
 
 2. `Download the PySB OVA <http://www.pysb.org/#download>`_ (Open Virtualization
-   Appliance) file. The file is approximately 800MB. Double-click the downloaded
+   Appliance) file. The file is approximately 500MB. Double-click the downloaded
    .ova file to open it in VirtualBox, if your web browser doesn't offer to do
    so.
 
