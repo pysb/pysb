@@ -20,6 +20,8 @@ catalyze_one_step(C8(bf=None), Bid(state='U', bf=None),
                   Bid(state='T', bf=None), kf)
 
 bng_code = generate_network(model)
+# Merge continued lines
+bng_code = bng_code.replace('\\\n', '')
 generate_equations(model)
 
 num_rules = len(model.rules)

@@ -35,6 +35,8 @@ Initial(Bid(bf=None, state='U'), Parameter('Bid_0', 100))
 catalyze(C8(), 'bf', Bid(state='U'), 'bf', Bid(state='T'), klist)
 
 bng_code = generate_network(model)
+# Merge continued lines
+bng_code = bng_code.replace('\\\n', '')
 generate_equations(model)
 
 num_rules = len(model.rules)
