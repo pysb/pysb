@@ -77,7 +77,6 @@ def get_version():
 
     # ensure that we are working in a pysb git repo
     setup_path = os.path.abspath(os.path.dirname(__file__))
-    print setup_path
     if not os.path.exists(os.path.join(setup_path, '.git')):
         raise Exception("setup.py is not in the root of a git repository; "
                         "aborting")
