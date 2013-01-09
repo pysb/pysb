@@ -418,24 +418,13 @@ class MonomerPattern(object):
             return NotImplemented
 
     def __rshift__(self, other):
-        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return RuleExpression(self, other, False)
-        elif other is None:
-            return RuleExpression(self, ReactionPattern([]), False)
-        else:
-            return NotImplemented
+        return build_rule_expression(self, other, False)
 
     def __rrshift__(self, other):
-        if other is None:
-            return RuleExpression(ReactionPattern([]), self, False)
-        else:
-            return NotImplemented
+        return build_rule_expression(other, self, False)
 
     def __ne__(self, other):
-        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return RuleExpression(self, other, True)
-        else:
-            return NotImplemented
+        return build_rule_expression(self, other, True)
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
@@ -532,24 +521,13 @@ class ComplexPattern(object):
             return NotImplemented
 
     def __rshift__(self, other):
-        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return RuleExpression(self, other, False)
-        elif other is None:
-            return RuleExpression(self, ReactionPattern([]), False)
-        else:
-            return NotImplemented
+        return build_rule_expression(self, other, False)
 
     def __rrshift__(self, other):
-        if other is None:
-            return RuleExpression(ReactionPattern([]), self, False)
-        else:
-            return NotImplemented
+        return build_rule_expression(other, self, False)
 
     def __ne__(self, other):
-        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return RuleExpression(self, other, True)
-        else:
-            return NotImplemented
+        return build_rule_expression(self, other, True)
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
@@ -592,27 +570,14 @@ class ReactionPattern(object):
 
     def __rshift__(self, other):
         """Irreversible reaction"""
-        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return RuleExpression(self, other, False)
-        elif other is None:
-            return RuleExpression(self, ReactionPattern([]), False)
-        else:
-            return NotImplemented
+        return build_rule_expression(self, other, False)
 
     def __rrshift__(self, other):
-        if other is None:
-            return RuleExpression(ReactionPattern([]), self, False)
-        else:
-            return NotImplemented
+        return build_rule_expression(other, self, False)
 
     def __ne__(self, other):
         """Reversible reaction"""
-        if isinstance(other, (MonomerPattern, ComplexPattern, ReactionPattern)):
-            return RuleExpression(self, other, True)
-        elif other is None:
-            return RuleExpression(self, ReactionPattern([]), True)
-        else:
-            return NotImplemented
+        return build_rule_expression(self, other, True)
 
     def __repr__(self):
         if len(self.complex_patterns):
@@ -636,14 +601,8 @@ class RuleExpression(object):
     """
 
     def __init__(self, reactant_pattern, product_pattern, is_reversible):
-        try:
-            self.reactant_pattern = as_reaction_pattern(reactant_pattern)
-        except InvalidReactionPatternException as e:
-            raise type(e)("Reactant does not look like a reaction pattern")
-        try:
-            self.product_pattern = as_reaction_pattern(product_pattern)
-        except InvalidReactionPatternException as e:
-            raise type(e)("Product does not look like a reaction pattern")
+        self.reactant_pattern = reactant_pattern
+        self.product_pattern = product_pattern
         self.is_reversible = is_reversible
 
     def __repr__(self):
@@ -663,16 +622,31 @@ def as_complex_pattern(v):
 
 
 def as_reaction_pattern(v):
-    """Internal helper to 'upgrade' a Complex- or MonomerPattern to a
+    """Internal helper to 'upgrade' a Complex- or MonomerPattern or None to a
     complete ReactionPattern."""
     if isinstance(v, ReactionPattern):
         return v
+    elif v is None:
+        return ReactionPattern([])
     else:
         try:
             return ReactionPattern([as_complex_pattern(v)])
         except InvalidComplexPatternException:
             raise InvalidReactionPatternException
 
+
+def build_rule_expression(reactant, product, is_reversible):
+    """Internal helper for operators which return a RuleExpression."""
+    # Make sure the types of both reactant and product are acceptable.
+    try:
+        reactant = as_reaction_pattern(reactant)
+        product = as_reaction_pattern(product)
+    except InvalidReactionPatternException:
+        return NotImplemented
+    # Synthesis/degradation rules cannot be reversible.
+    if (reactant is None or product is None) and is_reversible:
+        raise InvalidReversibleSynthesisDegradationRule
+    return RuleExpression(reactant, product, is_reversible)
 
 
 class Parameter(Component):
@@ -1056,6 +1030,11 @@ class InvalidComplexPatternException(Exception):
 
 class InvalidReactionPatternException(Exception):
     pass
+
+class InvalidReversibleSynthesisDegradationRule(Exception):
+    def __init__(self):
+        Exception.__init__(self, "Synthesis and degradation rules may not be"
+                           "reversible.")
 
 class ModelExistsWarning(UserWarning):
     """Issued by Model constructor when a second model is defined."""
