@@ -2,8 +2,25 @@ from pysb.core import SelfExporter, Component
 
 class Annotation(object):
 
-    """A lightweight annotation mechanism for model components and other
-    elements"""
+    """
+    A lightweight annotation mechanism for model elements.
+
+    Based loosely on MIRIAM (http://co.mbine.org/standards/miriam) which is in
+    turn based on RDF. An Annotation is equivalent to an RDF triple.
+
+    This is still an experimental feature!
+
+    Parameters
+    ----------
+    subject
+        Element to annotate, typically a Component.
+    object_
+        Annotation, typically a string containing an identifiers.org URL.
+    predicate : string, optional
+        Relationship of `object_` to `subject`, typically a string containing a
+        biomodels.net qualifier. If not specified, defaults to 'is'.
+
+    """
 
     def __init__(self, subject, object_, predicate="is"):
         self.subject = subject
