@@ -22,7 +22,8 @@ def MatchOnce(pattern):
 
 class SelfExporter(object):
 
-    """Make model components appear in the calling module's namespace.
+    """
+    Make model components appear in the calling module's namespace.
 
     This class is for pysb internal use only. Do not construct any instances.
 
@@ -119,7 +120,8 @@ class SelfExporter(object):
 
 class Component(object):
 
-    """The base class for all the named things contained within a model.
+    """
+    The base class for all the named things contained within a model.
 
     Parameters
     ----------
@@ -172,7 +174,8 @@ class Component(object):
 
 class Monomer(Component):
 
-    """Model component representing a protein or other molecule.
+    """
+    Model component representing a protein or other molecule.
 
     Parameters
     ----------
@@ -185,11 +188,7 @@ class Monomer(Component):
 
     Attributes
     ----------
-    sites : list of strings
-        Names of the sites.
-    site_states : dict of string => string
-        Allowable states for sites. Keys are sites and values are lists of
-        states.
+    Identical to Parameters (see above).
 
     Notes
     -----
@@ -235,9 +234,10 @@ class Monomer(Component):
         self.site_states = site_states
 
     def __call__(self, conditions=None, **kwargs):
-        """Return a MonomerPattern object for a Monomer.
+        """
+        Return a MonomerPattern object based on this Monomer.
 
-        See Notes for details.
+        See the Notes section of this class's documentation for details.
 
         Parameters
         ----------
@@ -303,7 +303,8 @@ class MonomerWild(Monomer):
 
 class MonomerPattern(object):
 
-    """A pattern which matches instances of a given monomer.
+    """
+    A pattern which matches instances of a given monomer.
 
     Parameters
     ----------
@@ -315,6 +316,10 @@ class MonomerPattern(object):
     compartment : Compartment or None
         The desired compartment where the monomer should exist. None means
         \"don't-care\".
+
+    Attributes
+    ----------
+    Identical to Parameters (see above).
 
     Notes
     -----
@@ -372,7 +377,8 @@ class MonomerPattern(object):
         self.compartment = compartment
 
     def is_concrete(self):
-        """Return a bool indicating whether the pattern is 'concrete'.
+        """
+        Return a bool indicating whether the pattern is 'concrete'.
 
         'Concrete' means the pattern satisfies ALL of the following:
 
@@ -387,7 +393,8 @@ class MonomerPattern(object):
         return compartment_ok and sites_ok
 
     def is_site_concrete(self):
-        """Return a bool indicating whether the pattern is 'site-concrete'.
+        """
+        Return a bool indicating whether the pattern is 'site-concrete'.
 
         'Site-concrete' means all sites have specified conditions."""
         # assume __init__ did a thorough enough job of error checking that this is is all we need to do
@@ -454,6 +461,23 @@ class ComplexPattern(object):
     A bound set of MonomerPatterns, i.e. a pattern to match a complex.
 
     In BNG terms, a list of patterns combined with the '.' operator.
+
+    Parameters
+    ----------
+    monomer_patterns : list of MonomerPatterns
+        MonomerPatterns that make up the complex.
+    compartment : Compartment
+        Location restriction. None means don't care.
+    match_once : bool, optional
+        If True, the pattern will only count once against a species in which the
+        pattern can match the monomer graph in multiple distinct ways. If False
+        (default), the pattern will count as many times as it matches the
+        monomer graph, leading to a faster effective reaction rate.
+
+    Attributes
+    ----------
+    Identical to Parameters (see above).
+
     """
 
     def __init__(self, monomer_patterns, compartment, match_once=False):
@@ -466,7 +490,8 @@ class ComplexPattern(object):
         self.match_once = match_once
 
     def is_concrete(self):
-        """Return a bool indicating whether the pattern is 'concrete'.
+        """
+        Return a bool indicating whether the pattern is 'concrete'.
 
         'Concrete' means the pattern satisfies ANY of the following:
         1. All monomer patterns are concrete
@@ -555,6 +580,15 @@ class ReactionPattern(object):
     Essentially a thin wrapper around a list of ComplexPatterns. In BNG terms, a
     list of complex patterns combined with the '+' operator.
 
+    Parameters
+    ----------
+    complex_patterns : list of ComplexPatterns
+        ComplexPatterns that make up the reaction pattern.
+
+    Attributes
+    ----------
+    Identical to Parameters (see above).
+
     """
 
     def __init__(self, complex_patterns):
@@ -592,11 +626,22 @@ class RuleExpression(object):
     """
     A container for the reactant and product patterns of a rule expression.
 
-    Contains one ReactionPattern for each of reactants and products, and a
-    boolean indicating reversibility. This is a temporary object used to
-    implement syntactic sugar through operator overloading. The Rule constructor
-    takes an instance of this class as its first argument, but simply extracts
-    its fields and discards the object itself.
+    Contains one ReactionPattern for each of reactants and products, and a bool
+    indicating reversibility. This is a temporary object used to implement
+    syntactic sugar through operator overloading. The Rule constructor takes an
+    instance of this class as its first argument, but simply extracts its fields
+    and discards the object itself.
+
+    Parameters
+    ----------
+    reactant_pattern, product_pattern : ReactionPattern
+        The reactants and products of the rule.
+    is_reversible : bool
+        If True, the reaction is reversible. If False, it's irreversible.
+
+    Attributes
+    ----------
+    Identical to Parameters (see above).
 
     """
 
@@ -656,6 +701,16 @@ class Parameter(Component):
 
     Parameters are used as reaction rate constants, compartment volumes and
     initial (boundary) conditions for species.
+
+    Parameters
+    ----------
+    value : number, optional
+        The numerical value of the parameter. Defaults to 0.0 if not specified.
+
+    Attributes
+    ----------
+    Identical to Parameters (see above).
+
     """
 
     def __init__(self, name, value=0.0, _export=True):
@@ -668,30 +723,48 @@ class Parameter(Component):
 
 
 class Compartment(Component):
-    """Model component representing a bounded reaction volume."""
+
+    """
+    Model component representing a bounded reaction volume.
+
+    Parameters
+    ----------
+    parent : Compartment, optional
+        Compartment which contains this one. If not specified, this will be the
+        outermost compartment and its parent will be set to None.
+    dimension : integer, optional
+        The number of spatial dimensions in the compartment, either 2 (i.e. a
+        membrane) or 3 (a volume).
+    size : Parameter, optional
+        A parameter object whose value defines the volume or area of the
+        compartment. If not specified, the size will be fixed at 1.0.
+
+    Attributes
+    ----------
+    Identical to Parameters (see above).
+
+    Notes
+    -----
+    The compartments of a model must form a tree via their `parent` attributes
+    with a three-dimensional (volume) compartment at the root. A volume
+    compartment may have any number of two-dimensional (membrane) compartments
+    as its children, but never another volume compartment. A membrane
+    compartment may have a single volume compartment as its child, but nothing
+    else.
+
+    Examples
+    --------
+    Compartment('cytosol', dimension=3, size=cyto_vol, parent=ec_membrane)
+
+    """
 
     def __init__(self, name, parent=None, dimension=3, size=None, _export=True):
-        """
-        Requires name, accepts optional parent, dimension and size. name is a
-        string. parent should be the parent compartment, except for the root
-        compartment which should omit the parent argument. dimension may be 2
-        (for membranes) or 3 (for volumes). size is a parameter which defines
-        the compartment volume (the appropriate units will depend on the units
-        of the reaction rate constants).
-
-        Examples:
-        Compartment('cytosol', dimension=3, size=cyto_vol, parent=ec_membrane)
-        """
-
         Component.__init__(self, name, _export)
-
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
         #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
-
         if size is not None and not isinstance(size, Parameter):
             raise Exception("size must be a parameter (or omitted)")
-
         self.parent = parent
         self.dimension = dimension
         self.size = size
@@ -703,6 +776,38 @@ class Compartment(Component):
 
 
 class Rule(Component):
+
+    """
+    Model component representing a reaction rule.
+
+    Parameters
+    ----------
+    rule_expression : RuleExpression
+        RuleExpression containing the essence of the rule (reactants, products,
+        reversibility).
+    rate_forward : Parameter
+        Forward reaction rate constant.
+    rate_reverse : Parameter, optional
+        Reverse reaction rate constant (only required for reversible rules).
+    delete_molecules : bool, optional
+        If True, deleting a Monomer from a species is allowed to fragment the
+        species into multiple pieces (if the deleted Monomer was the sole link
+        between those pieces). If False (default) then fragmentation is
+        disallowed and the rule will not match a reactant species if applying
+        the rule would fragment a species.
+    move_connected : bool, optional
+        If True, a rule that transports a Monomer between compartments will
+        co-transport anything connected to that Monomer by a path in the same
+        compartment. If False (default), connected Monomers will remain where
+        they were.
+
+    Attributes
+    ----------
+    Identical to Parameters (see above), except rule_expression is replaced by
+    its component elements reactant_pattern, product_pattern and is_reversible
+    which are documented in the RuleExpression class.
+
+    """
 
     def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
                  delete_molecules=False, move_connected=False,
@@ -724,9 +829,11 @@ class Rule(Component):
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
     def is_synth(self):
+        """Return a bool indicating whether this is a synthesis rule."""
         return len(self.reactant_pattern.complex_patterns) == 0
 
     def is_deg(self):
+        """Return a bool indicating whether this is a degradation rule."""
         return len(self.product_pattern.complex_patterns) == 0
 
     def __repr__(self):
@@ -748,7 +855,37 @@ class Observable(Component):
     """
     Model component representing a linear combination of species.
 
-    May be used in rate law expressions.
+    Observables are useful in correlating model simulation results with
+    experimental measurements. For example, an observable for "A()" will report
+    on the total number of copies of Monomer A, regardless of what it's bound to
+    or the state of its sites. "A(y='P')" would report on all instances of A
+    with site 'y' in state 'P'.
+
+    Parameters
+    ----------
+    reaction_pattern : ReactionPattern
+        The list of ComplexPatterns to match.
+
+    Attributes
+    ----------
+    reaction_pattern : ReactionPattern
+        See Parameters.
+    species : list of integers
+        List of species indexes for species matching the pattern.
+    coefficients : list of integers
+        List of coefficients by which each species amount is to be multipled to
+        correct for multiple pattern matches within a species.
+
+    Notes
+    -----
+    ReactionPattern is used here as a container for a list of ComplexPatterns,
+    solely so users could utilize the ComplexPattern '+' operator overload as
+    syntactic sugar. There are no actual "reaction" semantics in this context.
+
+    Currently only BNG's 'Molecules' observables are supported, i.e. an
+    observable on "A()" will count dimers of A at two times the actual species
+    amount. 'Species' observables will be implemented in the future.
+
     """
 
     def __init__(self, name, reaction_pattern, _export=True):
@@ -770,7 +907,57 @@ class Observable(Component):
 
 class Model(object):
 
-    """Container for monomers, compartments, parameters, and rules."""
+    """
+    A rule-based model containing monomers, rules, compartments and parameters.
+
+    Parameters
+    ----------
+    name : string, optional
+        Name of the model. If not specified, will be set to the name of the file
+        from which the constructor was called (with the .py extension stripped).
+    base : Model, optional
+        If specified, the model will begin as a copy of `base`. This can be used
+        to achieve a simple sort of model extension and enhancement.
+
+    Attributes
+    ----------
+    name : string
+        Name of the model. See Parameter section above.
+    base : Model or None
+        See Parameter section above.
+    monomers, compartments, parameters, rules, observables : ComponentSet
+        The Component objects which make up the model.
+    initial_conditions : list of tuple of (ComplexPattern, Parameter)
+        Specifies which species are present in the model's starting state (t=0)
+        and how much there is of each one. The ComplexPattern defines the
+        species identity, and it must be concrete (see
+        ComplexPattern.is_concrete). The Parameter defines the amount or
+        concentration of the species.
+    species : list of ComplexPattern
+        List of all complexes which can be produced by the model, starting from
+        the initial conditions and successively applying the rules. Each
+        ComplexPattern is concrete.
+    odes : list of sympy.Expr
+        Mathematical expressions describing the time derivative of the amount of
+        each species, as generated by the rules.
+    reactions : list of dict
+        Structures describing each possible unidirectional reaction that can be
+        produced by the model. Each structure stores the name of the rule that
+        generated the reaction ('rule'), the mathematical expression for the
+        rate of the reaction ('rate'), tuples of species indexes for the
+        reactants and products ('reactants', 'products'), and a bool indicating
+        whether the reaction is the reverse component of a bidirectional
+        reaction ('reverse').
+    reactions_bidirectional : list of dict
+        Similar to `reactions` but with only one entry for each bidirectional
+        reaction. The fields are identical except 'reverse' is replaced by
+        'reversible', a bool indicating whether the reaction is reversible. The
+        'rate' is the forward rate minus the reverse rate.
+    annotations : list of Annotation
+        Structured annotations of model components. See the Annotation class for
+        details.
+
+    """
 
     _component_types = (Monomer, Compartment, Parameter, Rule, Observable)
 
@@ -807,6 +994,17 @@ class Model(object):
             c.model = weakref.ref(self)
 
     def reload(self):
+        """
+        Reload a model after its source files have been edited.
+
+        This method does not yet reload the model contents in-place, rather it
+        returns a new model object. Thus the correct usage is ``model =
+        model.reload()``.
+
+        If the model script imports any modules, these will not be reloaded. Use
+        python's reload() function to reload them.
+
+        """
         # forcibly removes the .pyc file and reloads the model module
         model_pyc = SelfExporter.target_module.__file__
         if model_pyc[-3:] == '.py':
@@ -831,19 +1029,20 @@ class Model(object):
         return SelfExporter.default_model
 
     def all_component_sets(self):
-        """Return a list of all ComponentSet objects"""
+        """Return a list of all ComponentSet objects."""
         set_names = [t.__name__.lower() + 's' for t in Model._component_types]
         sets = [getattr(self, name) for name in set_names]
         return sets
 
     def all_components(self):
+        """Return a ComponentSet containing all components in the model."""
         cset_all = ComponentSet()
         for cset in self.all_component_sets():
             cset_all |= cset
         return cset_all
 
     def parameters_rules(self):
-        """Returns a ComponentSet of the parameters used as rate constants in rules"""
+        """Return a ComponentSet of the parameters used in rules."""
         # rate_reverse is None for irreversible rules, so we'll need to filter those out
         cset = ComponentSet(p for r in self.rules for p in (r.rate_forward, r.rate_reverse)
                             if p is not None)
@@ -851,23 +1050,24 @@ class Model(object):
         return self.parameters & cset
 
     def parameters_initial_conditions(self):
-        """Returns a ComponentSet of the parameters used as initial conditions"""
+        """Return a ComponentSet of initial condition parameters."""
         cset = ComponentSet(ic[1] for ic in self.initial_conditions)
         # intersect with original parameter list to retain ordering
         return self.parameters & cset
 
     def parameters_compartments(self):
-        """Returns a ComponentSet of the parameters used as compartment sizes"""
+        """Return a ComponentSet of compartment size parameters."""
         cset = ComponentSet(c.size for c in self.compartments)
         # intersect with original parameter list to retain ordering
         return self.parameters & cset
 
     def parameters_unused(self):
-        """Returns a ComponentSet of the parameters not used in the model at all"""
+        """Return a ComponentSet of unused parameters."""
         cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
         return self.parameters - cset_used
 
     def add_component(self, other):
+        """Add a component to the model."""
         # We have a container for each type of component. This code determines
         # the right one based on the class of the object being added.
         for t, cset in zip(Model._component_types, self.all_component_sets()):
@@ -880,11 +1080,11 @@ class Model(object):
                             "model" % type(other))
 
     def add_annotation(self, annotation):
-        """Add an Annotation object to the model"""
+        """Add an annotation to the model."""
         self.annotations.append(annotation)
 
     def get_annotations(self, subject):
-        """Return all annotations for the given subject"""
+        """Return all annotations for the given subject."""
         annotations = []
         for a in self.annotations:
             if a.subject is subject:
@@ -892,31 +1092,36 @@ class Model(object):
         return annotations
 
     def _rename_component(self, component, new_name):
+        """
+        Change a component's name.
+
+        This has to be done through the Model because the ComponentSet needs to
+        be updated as well as the component's `name` field.
+
+        """
         for cset in self.all_component_sets():
             if component in cset:
                 cset.rename(component, new_name)
 
     def _validate_initial_condition_pattern(self, pattern):
-        """Make sure the initial condition pattern is valid.
+        """
+        Make sure a pattern is valid for an initial condition.
 
-        Patterns must be:
-
+        Patterns must satisfy all of the following:
+        * Able to be cast as a ComplexPattern
+        * Concrete (see ComplexPattern.is_concrete)
+        * Distinct from any existing initial condition pattern
 
         Parameters
         ----------
-        pattern : A Monomer, MonomerPattern, or ComplexPattern
-            To be valid, a pattern must be:
-
-            - Able to be cast as a ComplexPattern
-            - Concrete (all sites and states specified)
-            - Distinct from any existing initial condition pattern
+        pattern : MonomerPattern or ComplexPattern
+            Pattern to validate
 
         Returns
         -------
-        If the provided pattern is valid, returns it as a ComplexPattern object.
-        object.
-        """
+        The validated pattern, upgraded to a ComplexPattern.
 
+        """
         try:
             complex_pattern = as_complex_pattern(pattern)
         except InvalidComplexPatternException as e:
@@ -932,13 +1137,28 @@ class Model(object):
         return complex_pattern
 
     def initial(self, pattern, value):
+        """
+        Add an initial condition.
+
+        An initial condition is made up of a species and its amount or
+        concentration.
+
+        Parameters
+        ----------
+        pattern : ComplexPattern
+            A concrete pattern defining the species to initialize.
+        value : Parameter
+            Amount of the species the model will start with.
+
+        """
         complex_pattern = self._validate_initial_condition_pattern(pattern)
         if not isinstance(value, Parameter):
             raise Exception("Value must be a Parameter")
         self.initial_conditions.append( (complex_pattern, value) )
 
     def update_initial_condition_pattern(self, before_pattern, after_pattern):
-        """Update the concrete pattern associated with an initial condition.
+        """
+        Update the pattern associated with an initial condition.
 
         Leaves the Parameter object associated with the initial condition
         unchanged while modifying the pattern associated with that condition.
@@ -957,6 +1177,7 @@ class Model(object):
             The concrete pattern specifying the new pattern to use to replace
             before_pattern.
         """
+
         # Get the initial condition index
         ic_index_list = [i for i, ic in enumerate(self.initial_conditions)
                    if ic[0].is_equivalent_to(as_complex_pattern(before_pattern))]
@@ -985,6 +1206,15 @@ class Model(object):
         self.initial_conditions.append( (after_pattern, p) )
 
     def get_species_index(self, complex_pattern):
+        """
+        Return the index of a species.
+
+        Parameters
+        ----------
+        complex_pattern : ComplexPattern
+            A concrete pattern specifying the species to find.
+
+        """
         # FIXME I don't even want to think about the inefficiency of this, but at least it works
         try:
             return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
@@ -1009,7 +1239,7 @@ class Model(object):
             self.initial(source_cp, self.parameters['__source_0'])
 
     def reset_equations(self):
-        """Clear out anything generated by bng.generate_equations or the like"""
+        """Clear out fields generated by bng.generate_equations or the like."""
         self.species = []
         self.odes = []
         self.reactions = []
@@ -1026,37 +1256,52 @@ class Model(object):
 
 
 class InvalidComplexPatternException(Exception):
+    """Expression can not be cast as a ComplexPattern."""
     pass
 
 class InvalidReactionPatternException(Exception):
+    """Expression can not be cast as a ReactionPattern."""
     pass
 
 class InvalidReversibleSynthesisDegradationRule(Exception):
+    """Synthesis or degradation rule defined as reversible."""
     def __init__(self):
         Exception.__init__(self, "Synthesis and degradation rules may not be"
                            "reversible.")
 
 class ModelExistsWarning(UserWarning):
-    """Issued by Model constructor when a second model is defined."""
+    """A second model was declared in a module that already contains one."""
     pass
 
 class SymbolExistsWarning(UserWarning):
-    """Issued by model component constructors when a name is reused."""
+    """A component declaration or rename overwrote an existing symbol."""
     pass
 
 class InvalidComponentNameError(ValueError):
-    """Issued by Component.__init__ when the given name is not valid."""
+    """Inappropriate component name."""
     def __init__(self, name):
         ValueError.__init__(self, "Not a valid component name: '%s'" % name)
 
 
 
 class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
-    """An add-and-read-only container for storing model Components. It behaves mostly like an
-    ordered set, but components can also be retrieved by name *or* index by using the [] operator
-    (like a dict or list). Components may not be removed or replaced."""
-    # The implementation is based on a list instead of a linked list (as OrderedSet is), since we
-    # only allow add and retrieve, not delete.
+    """
+    An add-and-read-only container for storing model Components.
+
+    It behaves mostly like an ordered set, but components can also be retrieved
+    by name *or* index by using the [] operator (like a combination of a dict
+    and a list). Components can not be removed or replaced, but they can be
+    renamed. Iteration returns the component objects.
+
+    Parameters
+    ----------
+    iterable : iterable of Components, optional
+        Initial contents of the set.
+
+    """
+
+    # The implementation is based on a list instead of a linked list (as
+    # OrderedSet is), since we only allow add and retrieve, not delete.
 
     def __init__(self, iterable=[]):
         self._elements = []
@@ -1079,15 +1324,18 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     def add(self, c):
         if c not in self:
             if c.name in self._map:
-                raise ComponentDuplicateNameError("Tried to add a component with a duplicate name: %s" % c.name)
+                raise ComponentDuplicateNameError(
+                    "Tried to add a component with a duplicate name: %s"
+                    % c.name)
             self._elements.append(c)
             self._map[c.name] = c
             self._index_map[c.name] = len(self._elements) - 1
 
     def __getitem__(self, key):
-        # Must support both Sequence and Mapping behavior. This means stringified integer Mapping
-        # keys (like "0") are forbidden, but since all Component names must be valid Python
-        # identifiers, integers are ruled out anyway.
+        # Must support both Sequence and Mapping behavior. This means
+        # stringified integer Mapping keys (like "0") are forbidden, but since
+        # all Component names must be valid Python identifiers, integers are
+        # ruled out anyway.
         if isinstance(key, (int, long, slice)):
             return self._elements[key]
         else:
@@ -1095,7 +1343,8 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
 
     def get(self, key, default=None):
         if isinstance(key, (int, long)):
-            raise ValueError("Get is undefined for integer arguments, use [] instead")
+            raise ValueError("get is undefined for integer arguments, use []"
+                             "instead")
         try:
             return self[key]
         except KeyError:
@@ -1121,18 +1370,19 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     def items(self):
         return zip(self.keys(), self)
 
-    # We can implement this in O(1) ourselves, whereas the Sequence mixin
-    # implements it in O(n).
     def index(self, c):
+        # We can implement this in O(1) ourselves, whereas the Sequence mixin
+        # implements it in O(n).
         if not c in self:
             raise ValueError
         return self._index_map[c.name]
 
-    # We reimplement this because collections.Set's __and__ mixin iterates over other, not
-    # self. That implementation ends up retaining the ordering of other, but we'd like to keep the
-    # ordering of self instead. We require other to be a ComponentSet too so we know it will support
-    # "in" efficiently.
     def __and__(self, other):
+        # We reimplement this because collections.Set's __and__ mixin iterates
+        # over other, not self. That implementation ends up retaining the
+        # ordering of other, but we'd like to keep the ordering of self instead.
+        # We require other to be a ComponentSet too so we know it will support
+        # "in" efficiently.
         if not isinstance(other, ComponentSet):
             return collections.Set.__and__(self, other)
         return ComponentSet(value for value in self if value in other)
@@ -1152,21 +1402,19 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             '}'
 
     def rename(self, c, new_name):
-        """Change a component's name in our data structures"""
+        """Change the name of component `c` to `new_name`."""
         for m in self._map, self._index_map:
             m[new_name] = m[c.name]
             del m[c.name]
 
 
 class ComponentDuplicateNameError(ValueError):
-    """Issued by ComponentSet.add when a component is added with the
-    same name as an existing one."""
+    """A component was added with the same name as an existing one."""
     pass
 
 
 def extract_site_conditions(conditions=None, **kwargs):
-    """Handle parsing of MonomerPattern site conditions.
-    """
+    """Parse MonomerPattern site conditions."""
     # enforce site conditions as kwargs or a dict but not both
     if conditions and kwargs:
         raise Exception("Site conditions may be specified as EITHER keyword arguments OR a single dict")
