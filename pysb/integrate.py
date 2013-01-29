@@ -88,7 +88,7 @@ class Solver(object):
             code_eqs_py = compile(code_eqs, '<%s odes>' % model.name, 'exec')
 
         def rhs(t, y, p):
-            ydot = numpy.empty_like(y)
+            ydot = self.ydot
             # note that the evaluated code sets ydot as a side effect
             if use_inline:
                 inline(code_eqs, ['ydot', 't', 'y', 'p']);
@@ -107,6 +107,7 @@ class Solver(object):
         self.model = model
         self.tspan = tspan
         self.y = numpy.ndarray((len(tspan), len(model.species)))
+        self.ydot = numpy.ndarray(len(model.species))
         if len(model.observables):
             self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
                                                       itertools.repeat(float)))
