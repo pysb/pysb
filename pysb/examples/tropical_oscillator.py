@@ -8,7 +8,7 @@ model = Model('oscillator')
 Parameter('k1',  0.015)
 #Parameter('k2',  0)
 Parameter('k3',  200)
-Parameter('k4',  180)
+Parameter('k4',  10)
 Parameter('kp4', 0.018)
 #Parameter('k5',  0)
 Parameter('k6',  1.0)
@@ -50,9 +50,11 @@ Initial(cyclin(Y='U', b=None), cyc0)
 
 # This creates model.odes which contains the math
 from pysb.bng import generate_equations
+from pysb.integrate import odesolve
+from pylab import *
+
 generate_equations(model)
 
-from pylab import *
 t = linspace(0, 100, 10001)
 x = odesolve(oscillator, t)
 
