@@ -58,7 +58,7 @@ def write_params(model,paramarr, name=None):
     else:
         fobj = cStringIO.StringIO()
     for i in range(len(model.parameters)):
-        fobj.write("%s, %g\n"%(model.parameters[i].name, paramarr[i]))
+        fobj.write("%s, %.17g\n"%(model.parameters[i].name, paramarr[i]))
     if name is None:
         return fobj.getvalue()
 

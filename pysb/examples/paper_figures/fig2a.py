@@ -10,12 +10,12 @@ def catalyze(enz, e_site, sub, s_site, prod, klist):
     kf, kr, kc = klist   # Get the parameters from the list
 
     # Create the rules
-    rb = Rule('bind_%s_%s' % (enz.monomer.name, sub.monomer.name),
+    rb = Rule('bind_%s_%s' % (enz().monomer.name, sub().monomer.name),
            enz({e_site:None}) + sub({s_site:None}) <>
            enz({e_site:1}) % sub({s_site:1}),
            kf, kr)
     rc = Rule('catalyze_%s%s_to_%s' %
-           (enz.monomer.name, sub.monomer.name, prod.monomer.name),
+           (enz().monomer.name, sub().monomer.name, prod().monomer.name),
            enz({e_site:1}) % sub({s_site:1}) >>
            enz({e_site:None}) + prod({s_site:None}),
            kc)
@@ -32,9 +32,11 @@ Initial(C8(bf=None), Parameter('C8_0', 100))
 Initial(Bid(bf=None, state='U'), Parameter('Bid_0', 100))
 
 # This is the code shown for "Example Macro Call" (not printed here)
-catalyze(C8(), 'bf', Bid(state='U'), 'bf', Bid(state='T'), klist)
+catalyze(C8, 'bf', Bid(state='U'), 'bf', Bid(state='T'), klist)
 
 bng_code = generate_network(model)
+# Merge continued lines
+bng_code = bng_code.replace('\\\n', '')
 generate_equations(model)
 
 num_rules = len(model.rules)

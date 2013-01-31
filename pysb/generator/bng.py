@@ -91,7 +91,8 @@ class BngGenerator(object):
         max_length = max(len(name) for name in self.model.observables.keys())
         self.__content += "begin observables\n"
         for obs in self.model.observables:
-            observable_code = format_reactionpattern(obs.reaction_pattern)
+            observable_code = format_reactionpattern(obs.reaction_pattern,
+                                                     for_observable=True)
             self.__content += ("  Molecules %-" + str(max_length) + "s   %s\n") % (obs.name, observable_code)
         self.__content += "end observables\n\n"
 
@@ -115,8 +116,12 @@ def format_monomer_site(monomer, site):
             ret += '~' + state
     return ret
 
-def format_reactionpattern(rp):
-    return ' + '.join([format_complexpattern(cp) for cp in rp.complex_patterns])
+def format_reactionpattern(rp, for_observable=False):
+    if for_observable is False:
+        delimiter = ' + '
+    else:
+        delimiter = ' '
+    return delimiter.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
 def format_complexpattern(cp):
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])

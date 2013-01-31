@@ -1,3 +1,39 @@
+"""
+A collection of generally useful modeling macros.
+
+These macros are written to be as generic and reusable as possible, serving as a
+collection of best practices and implementation ideas. They conform to the
+following general guidelines:
+
+* All components created by the macro are implicitly added to the current model
+  and explicitly returned in a ComponentSet.
+
+* Parameters may be passed as Parameter objects, or as plain numbers for which
+  Parameter objects will be automatically created using an appropriate naming
+  convention.
+
+* Arguments which accept a MonomerPattern should also accept Monomers, which are
+  to be interpreted as MonomerPatterns on that Monomer with an empty condition
+  list. This is typically implemented by having the macro apply the "call"
+  (parentheses) operator to the argument with an empty argument list and using
+  the resulting value instead of the original argument when creating Rules, e.g.
+  ``arg = arg()``. Calling a Monomer will return a MonomerPattern, and calling a
+  MonomerPattern will return a copy of itself, so calling either is guaranteed
+  to return a MonomerPattern.
+
+The _macro_rule helper function contains much of the logic needed to follow
+these guidelines. Every macro in this module either uses _macro_rule directly or
+calls another macro which does.
+
+Another useful function is _verify_sites which will raise an exception if a
+Monomer or MonomerPattern does not possesses every one of a given list of sites.
+This can be used to trigger such errors up front rather than letting an
+exception occur at the point where the macro tries to use the invalid site in a
+pattern, which can be harder for the caller to debug.
+
+"""
+
+
 import inspect
 from pysb import *
 import pysb.core
@@ -44,7 +80,8 @@ def _rule_name_generic(rule_expression):
 
 def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
                 name_func=_rule_name_generic):
-    """A helper function for writing macros that generates a single rule.
+    """
+    A helper function for writing macros that generates a single rule.
 
     Parameters
     ----------
@@ -108,6 +145,7 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
         {'bind_A_B_to_AB': Rule(name='bind_A_B_to_AB', reactants=A(s=None) + B(s=None), products=A(s=1) % B(s=1), rate_forward=Parameter(name='bind_A_B_to_AB_kf', value=1000000.0), rate_reverse=Parameter(name='bind_A_B_to_AB_kr', value=0.1)),
          'bind_A_B_to_AB_kf': Parameter(name='bind_A_B_to_AB_kf', value=1000000.0),
          'bind_A_B_to_AB_kr': Parameter(name='bind_A_B_to_AB_kr', value=0.1)}
+
     """
 
     r_name = '%s_%s' % (rule_prefix, name_func(rule_expression))
@@ -146,7 +184,8 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
     return ComponentSet([r]) | params_created
 
 def _verify_sites(m, *site_list):
-    """Checks that the monomer m contains all of the sites in site_list.
+    """
+    Checks that the monomer m contains all of the sites in site_list.
 
     Parameters
     ----------
@@ -163,6 +202,7 @@ def _verify_sites(m, *site_list):
     ------
     ValueError
         If any of the sites are not found.
+
     """
 
     for site in site_list:
@@ -175,7 +215,8 @@ def _verify_sites(m, *site_list):
 # =====================
 
 def equilibrate(s1, s2, klist):
-    """Generate the unimolecular reversible equilibrium reaction S1 <-> S2.
+    """
+    Generate the unimolecular reversible equilibrium reaction S1 <-> S2.
 
     Parameters
     ----------
@@ -221,6 +262,7 @@ def equilibrate(s1, s2, klist):
                 rate_reverse=Parameter(name='equilibrate_A_to_B_kr', value=1)),
         'equilibrate_A_to_B_kf': Parameter(name='equilibrate_A_to_B_kf', value=1),
         'equilibrate_A_to_B_kr': Parameter(name='equilibrate_A_to_B_kr', value=1)}
+
     """
     
     # turn any Monomers into MonomerPatterns
@@ -230,7 +272,8 @@ def equilibrate(s1, s2, klist):
 # =======
 
 def bind(s1, site1, s2, site2, klist):
-    """Generate the reversible binding reaction S1 + S2 <> S1:S2.
+    """
+    Generate the reversible binding reaction S1 + S2 <> S1:S2.
 
     Parameters
     ----------
@@ -277,6 +320,7 @@ def bind(s1, site1, s2, site2, klist):
                 rate_reverse=Parameter(name='bind_A_B_kr', value=0.1)),
          'bind_A_B_kf': Parameter(name='bind_A_B_kf', value=0.0001),
          'bind_A_B_kr': Parameter(name='bind_A_B_kr', value=0.1)}
+
     """
 
     _verify_sites(s1, site1)
@@ -294,7 +338,8 @@ def bind(s1, site1, s2, site2, klist):
                        klist, ['kf', 'kr'], name_func=bind_name_func)
 
 def bind_table(bindtable, row_site, col_site, kf=None):
-    """Generate a table of reversible binding reactions.
+    """
+    Generate a table of reversible binding reactions.
 
     Given two lists of species R and C, calls the `bind` macro on each pairwise
     combination (R[i], C[j]). The species lists and the parameter values are
@@ -393,6 +438,7 @@ def bind_table(bindtable, row_site, col_site, kf=None):
             rate_reverse=Parameter(name='bind_R2_C1_kr', value=0.3)),
          'bind_R2_C1_kf': Parameter(name='bind_R2_C1_kf', value=0.0003),
          'bind_R2_C1_kr': Parameter(name='bind_R2_C1_kr', value=0.3)}
+
     """
 
     # extract species lists and matrix of rates
@@ -423,7 +469,8 @@ def bind_table(bindtable, row_site, col_site, kf=None):
 # =========
 
 def catalyze(enzyme, e_site, substrate, s_site, product, klist):
-    """Generate the two-step catalytic reaction E + S <> E:S >> E + P.
+    """
+    Generate the two-step catalytic reaction E + S <> E:S >> E + P.
 
     Parameters
     ----------
@@ -521,6 +568,7 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
                 rate_forward=Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)),
          'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc':
             Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)}
+
     """
 
     _verify_sites(enzyme, e_site)
@@ -556,9 +604,10 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
 def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
                    state1, state2, klist):
-    """Generate the two-step catalytic reaction E + S <> E:S >> E + P.
-    A wrapper around catalyze() with a signature specifying the state change
-    of the substrate resulting from catalysis.
+    """
+    Generate the two-step catalytic reaction E + S <> E:S >> E + P. A wrapper
+    around catalyze() with a signature specifying the state change of the
+    substrate resulting from catalysis.
 
     Parameters
     ----------
@@ -634,13 +683,15 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
                 rate_forward=Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)),
          'catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc':
             Parameter(name='catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', value=1)}
+
     """
 
     return catalyze(enzyme, e_site, substrate({mod_site: state1}),
                     s_site, substrate({mod_site: state2}), klist)
 
 def catalyze_one_step(enzyme, substrate, product, kf):
-    """Generate the one-step catalytic reaction E + S >> E + P.
+    """
+    Generate the one-step catalytic reaction E + S >> E + P.
 
     Parameters
     ----------
@@ -703,6 +754,7 @@ def catalyze_one_step(enzyme, substrate, product, kf):
                 rate_forward=Parameter(name='one_step_E_S_to_E_P_kf', value=0.0001)),
          'one_step_E_S_to_E_P_kf':
             Parameter(name='one_step_E_S_to_E_P_kf', value=0.0001)}
+
     """
 
     return _macro_rule('one_step',
@@ -710,7 +762,9 @@ def catalyze_one_step(enzyme, substrate, product, kf):
                        [kf], ['kf'])
 
 def catalyze_one_step_reversible(enzyme, substrate, product, klist):
-    """Create fwd and reverse rules for catalysis of the form:
+    """
+    Create fwd and reverse rules for catalysis of the form::
+
        E + S -> E + P
            P -> S 
 
@@ -772,6 +826,7 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
                 products=S(),
                 rate_forward=Parameter(name='reverse_P_to_S_kr', value=0.0001)),
          'reverse_P_to_S_kr': Parameter(name='reverse_P_to_S_kr', value=0.0001)}
+
     """
 
     components = catalyze_one_step(enzyme, substrate, product, klist[0])
@@ -784,7 +839,8 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
 # =========================
 
 def synthesize(species, ksynth):
-    """Generate a reaction which synthesizes a species.
+    """
+    Generate a reaction which synthesizes a species.
 
     Note that `species` must be "concrete", i.e. the state of all
     sites in all of its monomers must be specified. No site may be
@@ -830,6 +886,7 @@ def synthesize(species, ksynth):
                 products=A(x=None, y=e),
                 rate_forward=Parameter(name='synthesize_Ae_k', value=0.0001)),
          'synthesize_Ae_k': Parameter(name='synthesize_Ae_k', value=0.0001)}
+
     """
 
     def synthesize_name_func(rule_expression):
@@ -846,7 +903,8 @@ def synthesize(species, ksynth):
                        name_func=synthesize_name_func)
 
 def degrade(species, kdeg):
-    """Generate a reaction which degrades a species.
+    """
+    Generate a reaction which degrades a species.
 
     Note that `species` is not required to be "concrete".
 
@@ -890,6 +948,7 @@ def degrade(species, kdeg):
                 products=None,
                 rate_forward=Parameter(name='degrade_B_k', value=1e-06)),
          'degrade_B_k': Parameter(name='degrade_B_k', value=1e-06)}
+
     """
 
     def degrade_name_func(rule_expression):
@@ -904,7 +963,8 @@ def degrade(species, kdeg):
                        name_func=degrade_name_func)
 
 def synthesize_degrade_table(table):
-    """Generate a table of synthesis and degradation reactions.
+    """
+    Generate a table of synthesis and degradation reactions.
 
     Given a list of species, calls the `synthesize` and `degrade` macros on each
     one. The species and the parameter values are passed as a list of lists
@@ -971,6 +1031,7 @@ def synthesize_degrade_table(table):
                 products=None,
                 rate_forward=Parameter(name='degrade_B_k', value=1e-07)),
          'degrade_B_k': Parameter(name='degrade_B_k', value=1e-07)}
+
     """
 
     # loop over interactions
@@ -988,7 +1049,8 @@ def synthesize_degrade_table(table):
 # =============
 
 def pore_species(subunit, site1, site2, size):
-    """Return a MonomerPattern representing a circular homomeric pore.
+    """
+    Return a MonomerPattern representing a circular homomeric pore.
 
     Parameters
     ----------
@@ -1025,6 +1087,7 @@ def pore_species(subunit, site1, site2, size):
         Monomer(name='Unit', sites=['p1', 'p2'], site_states={})
         >>> pore_species(Unit, 'p1', 'p2', 4)
         MatchOnce(Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=1))
+
     """
 
     _verify_sites(subunit, site1, site2)
@@ -1044,7 +1107,8 @@ def pore_species(subunit, site1, site2, size):
     return pore
 
 def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
-    """Generate rules to assemble a circular homomeric pore sequentially.
+    """
+    Generate rules to assemble a circular homomeric pore sequentially.
 
     The pore species are created by sequential addition of `subunit` monomers,
     i.e. larger oligomeric species never fuse together. The pore structure is
@@ -1111,6 +1175,7 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
             Parameter(name='assemble_pore_sequential_Unit_3_kf', value=0.0001),
          'assemble_pore_sequential_Unit_3_kr':
             Parameter(name='assemble_pore_sequential_Unit_3_kr', value=0.1)}
+
     """
 
     if len(ktable) != max_size - 1:
@@ -1136,7 +1201,8 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
 
 def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
                    csource, c_site, cdest, ktable):
-    """Generate rules to transport cargo through a circular homomeric pore.
+    """
+    Generate rules to transport cargo through a circular homomeric pore.
 
     The pore structure is defined by the `pore_species` macro -- `subunit`
     monomers bind to each other from `sp_site1` to `sp_site2` to form a closed
@@ -1230,6 +1296,7 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
                 rate_forward=Parameter(name='pore_transport_dissociate_Unit_3_Cargocyto_kc', value=1)),
          'pore_transport_dissociate_Unit_3_Cargocyto_kc':
             Parameter(name='pore_transport_dissociate_Unit_3_Cargocyto_kc', value=1)}
+
     """
 
     _verify_sites(subunit, sc_site)
@@ -1299,7 +1366,8 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
 
 def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
               klist):
-    """Generate rules to bind a monomer to a circular homomeric pore.
+    """
+    Generate rules to bind a monomer to a circular homomeric pore.
 
     The pore structure is defined by the `pore_species` macro -- `subunit`
     monomers bind to each other from `sp_site1` to `sp_site2` to form a closed
@@ -1365,6 +1433,7 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
             Parameter(name='pore_bind_Unit_3_Cargo_kf', value=0.0001),
          'pore_bind_Unit_3_Cargo_kr':
             Parameter(name='pore_bind_Unit_3_Cargo_kr', value=0.1)}
+
     """
 
     _verify_sites(subunit, sc_site)
