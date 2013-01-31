@@ -168,6 +168,8 @@ class Solver(object):
         while self.integrator.successful() and self.integrator.t < self.tspan[-1]:
             self.y[i] = self.integrator.integrate(self.tspan[i])
             i += 1
+        if self.integrator.t < self.tspan[-1]:
+            self.y[i:, :] = 'nan'
 
         for i, obs in enumerate(self.model.observables):
             self.yobs_view[:, i] = \
