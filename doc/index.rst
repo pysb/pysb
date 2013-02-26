@@ -29,7 +29,7 @@ make PySB a better open-source tool for the programming community.
 .. _SymPy: http://sympy.org
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    installation
    tutorial

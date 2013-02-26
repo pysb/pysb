@@ -1,4 +1,30 @@
 #!/usr/bin/env python
+"""
+A module for returning the BNGL for a given PySB model. Can be used as a
+command-line script or from within the Python shell. Essentially serves
+as a wrapper around ``pysb.generator.bng.BngGenerator``.
+
+Usage as a command-line script
+==============================
+
+As a command-line script, run as follows::
+
+    export_bng.py model_name.py > model_name.bngl
+
+where ``model_name.py`` contains a PySB model definition (i.e., contains
+an instance of ``pysb.core.Model`` instantiated as a global variable). The
+generated BNGL will be printed to standard out, allowing it to be inspected
+or redirected to another file.
+
+Usage in the Python shell
+=========================
+
+To use in the Python shell, follow this pattern::
+
+    from pysb.examples.robertson import model
+    from pysb.tools import export_bng
+    bngl_output = export_bng.run(model)
+"""
 
 from pysb.generator.bng import BngGenerator
 import re
@@ -7,6 +33,20 @@ import os
 
 
 def run(model):
+    """Generate the corresponding BNGL for the given PySB model.
+    A wrapper around ``pysb.generator.bng.BngGenerator``.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to generate BNGL for.
+
+    Returns
+    -------
+    string
+        The BNGL output.
+    """
+
     gen = BngGenerator(model)
     return gen.get_content()
 
