@@ -108,7 +108,7 @@ def run(model, model_name):
     output.write('function out = %s_odes(t, input, param)\n\n' % model_name)
 
     # Initialize the parameter array with parameter values
-    params_list = '\n'.join(['param(%d) = %s %% %s;' % (i+1, p.value, p.name)
+    params_str = '\n'.join(['param(%d) = %s %% %s;' % (i+1, p.value, p.name)
                              for i, p in enumerate(model.parameters)])
 
     # Convert the species list to MATLAB comments
@@ -137,7 +137,7 @@ def run(model, model_name):
     # species_list = '\n'.join(['%% input(%d) = %s;' % (i+1, s)
     #                            for i, s in enumerate(model.species)])
 
-    output.write(params_list + "\n\n")
+    output.write(params_str + "\n\n")
     output.write(odes_str + "\n\n")
     output.write("end\n")
     return output.getvalue()
