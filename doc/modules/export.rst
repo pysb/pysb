@@ -7,3 +7,4 @@ Exporting to other formats
    export_matlab.rst
    export_mathematica.rst
    export_bng.rst
+   export_python.rst

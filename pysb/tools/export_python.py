@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-"Produce Python code for simulating a model without requiring pysb itself."
-
+"""
+Produce Python code for simulating a model without requiring pysb itself.
+"""
 
 import pysb
 import pysb.bng
