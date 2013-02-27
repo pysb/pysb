@@ -240,8 +240,8 @@ def equilibrate(s1, s2, klist):
         The generated components. Contains one reversible Rule and optionally
         two Parameters if klist was given as plain numbers.
 
-    Example
-    -------
+    Examples
+    --------
     Simple two-state equilibrium between A and B::
 
         Model()
@@ -382,7 +382,7 @@ def bind_table(bindtable, row_site, col_site, kf=None):
         The generated components. Contains the bidirectional binding Rules and
         optionally the Parameters for any parameters given as numbers.
 
-    Example
+    Examples
     --------
     Binding table for two species types (R and C), each with two members::
 
@@ -696,6 +696,8 @@ def catalyze_one_step(enzyme, substrate, product, kf):
 
     Examples
     --------
+    Convert S to P by E::
+
         Model()
         Monomer('E', ['b'])
         Monomer('S', ['b'])
@@ -1087,8 +1089,8 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
         and these parameters will be included at the end of the returned
         component list.
 
-    Example
-    -------
+    Examples
+    --------
     Assemble a three-membered pore by sequential addition of monomers,
     with the same forward/reverse rates for monomer-monomer and monomer-dimer
     interactions::
@@ -1186,8 +1188,8 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         the cargo, and these parameters will be included at the end of the
         returned component list.
 
-    Example
-    -------
+    Examples
+    --------
     Specify that a three-membered pore is capable of
     transporting cargo from the mitochondria to the cytoplasm::
 
@@ -1338,8 +1340,8 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
         subunit, the pore size and the cargo, and these parameters will be
         included at the end of the returned component list.
 
-    Example
-    -------
+    Examples
+    --------
     Specify that a cargo molecule can bind reversibly to a 3-membered
     pore::
 
