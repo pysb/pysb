@@ -1,8 +1,129 @@
 #!/usr/bin/env python
 """
+
 A module for converting a PySB model to a set of ordinary differential
-equations for integration in Mathematica. Can be used as a command-line script
-or from within the Python shell.
+equations for integration or analysis in Mathematica. Can be used as a
+command-line script or from within the Python shell.
+
+Usage as a command-line script
+==============================
+
+As a command-line script, run as follows::
+
+    export_mathematica.py model_name.py > model_name.txt
+
+where ``model_name.py`` contains a PySB model definition (i.e., contains an
+instance of ``pysb.core.Model`` instantiated as a global variable). The text of
+the Mathematica code will be printed to standard out, allowing it to be
+redirected to another file, as shown in this example.
+
+The Mathematica code produced will follow the form as given below for
+``pysb.examples.robertson``::
+
+    (* Mathematica model definition file *)
+    (* Model Name: robertson *)
+
+    (*
+    Run with, for example:
+    tmax = 10
+    soln = NDSolve[Join[odes, initconds], slist, {t, 0, tmax}]
+    Plot[s0[t] /. soln, {t, 0, tmax}, PlotRange -> All]
+    *)
+
+    (* Parameters *)
+    k1 = 4 * 10^-2;
+    k2 = 3 * 10^7;
+    k3 = 1 * 10^4;
+    A0 = 1;
+    B0 = 0;
+    C0 = 0;
+
+    (* List of Species *)
+    (* s0[t] = A() *)
+    (* s1[t] = B() *)
+    (* s2[t] = C() *)
+
+    (* ODEs *)
+    odes = {
+    s0'[t] == -k1*s0[t] + k3*s1[t]*s2[t],
+    s1'[t] == k1*s0[t] - k2*s1[t]^2 - k3*s1[t]*s2[t],
+    s2'[t] == k2*s1[t]^2
+    }
+
+    (* Initial Conditions *)
+    initconds = {
+    s0[0] == A0,
+    s1[0] == B0,
+    s2[0] == C0
+    }
+
+    (* List of Variables (e.g., as an argument to NDSolve) *)
+    solvelist = {
+    s0[t],
+    s1[t],
+    s2[t]
+    }
+
+    (* Run the simulation -- example *)
+    tmax = 100
+    soln = NDSolve[Join[odes, initconds], solvelist, {t, 0, tmax}]
+
+    (* Observables *)
+    Atotal = (s0[t] * 1) /. soln
+    Btotal = (s1[t] * 1) /. soln
+    Ctotal = (s2[t] * 1) /. soln
+
+
+The output consists of a block of commands that define the ODEs, parameters,
+species and other variables for the model, along with a set of descriptive
+comments. The sections are as follows:
+
+* The header comments identify the model and show an example of how to
+  integrate the ODEs in Mathematica.
+* The parameters block defines the numerical values of the named parameters.
+* The list of species gives the mapping between the indexed species (``s0``,
+  ``s1``, ``s2``) and their representation in PySB (``A()``, ``B()``, ``C()``).
+* The ODEs block defines the set of ordinary differential equations and assigns
+  the set of equations to the variable ``odes``.
+* The initial conditions block defines the initial values for each species and
+  assigns the set of conditions to the variable ``initconds``.
+* The "list of variables" block enumerates all of the species in the model
+  (``s0[t]``, ``s1[t]``, ``s2[t]``) and assigns them to the variable
+  ``solvelist``; this list can be passed to the Mathematica command ``NDSolve``
+  to indicate the variables to be solved for.
+* This is followed by an example of how to call ``NDSolve`` to integrate the
+  equations.
+* Finally, the observables block enumerates the observables in the model,
+  expressing each one as a linear combination of the appropriate species in
+  the model. The interpolating functions returned by ``NDSolve`` are substituted
+  in from the solution variable ``soln``, allowing the observables to be
+  plotted.
+
+Note that Mathematica does not permit underscores in variable names, so
+any underscores used in PySB variables will be removed (e.g., ``A_total`` will
+be converted to ``Atotal``).
+
+Usage in the Python shell
+=========================
+
+To use in a Python shell, import a model::
+
+    from pysb.examples.robertson import model
+
+and import this module::
+
+    from pysb.tools import export_mathematica
+
+then call the function ``run``, passing the model instance and the
+name to use for the model::
+
+    mathematica_output = export_mathematica.run(model)
+
+then write the output to a file::
+
+    f = open('robertson.txt', 'w')
+    f.write(mathematica_output)
+    f.close()
 """
 
 import pysb
@@ -15,6 +136,19 @@ from StringIO import StringIO
 from math import floor, log
 
 def run(model):
+    """Export the model as a set of ODEs for use in Mathematica.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to export as a set of ODEs.
+
+    Returns
+    -------
+    string
+        String containing the Mathematica code for the ODEs.
+    """
+
     output = StringIO()
     pysb.bng.generate_equations(model)
 
@@ -24,7 +158,7 @@ def run(model):
     output.write("(*\n")
     output.write("Run with, for example:\n")
     output.write("tmax = 10\n")
-    output.write("soln = NDSolve[Join[eqns, initconds], slist, {t, 0, tmax}]\n")
+    output.write("soln = NDSolve[Join[odes, initconds], slist, {t, 0, tmax}]\n")
     output.write("Plot[s0[t] /. soln, {t, 0, tmax}, PlotRange -> All]\n")
     output.write("*)\n\n")
 
@@ -33,6 +167,7 @@ def run(model):
     # so we simply strip them out here
     params_str = ''
     for i, p in enumerate(model.parameters):
+        # Remove underscores
         pname = p.name.replace('_', '')
 
         # Convert parameter values to scientific notation
@@ -49,7 +184,7 @@ def run(model):
                 params_str += '%s = %g;\n' %  (pname, p.value)
 
     ## ODEs ###
-    odes_str = 'eqns = {\n'
+    odes_str = 'odes = {\n'
     # Concatenate the equations
     odes_str += ',\n'.join(['s%d == %s' % (i, sympy.ccode(model.odes[i]))
                            for i in range(len(model.odes))])
@@ -86,7 +221,8 @@ def run(model):
     ## OBSERVABLES
     observables_str = ''
     for obs in model.observables:
-        observables_str += obs.name + ' = '
+        # Remove underscores
+        observables_str += obs.name.replace('_', '') + ' = '
         #groups = model.observable_groups[obs_name]
         observables_str += ' + '.join(['(s%s[t] * %d)' % (s, c)
                               for s, c in zip(obs.species, obs.coefficients)])
@@ -108,7 +244,7 @@ def run(model):
     output.write(solvelist_str + '\n\n')
     output.write('(* Run the simulation -- example *)\n')
     output.write('tmax = 100\n')
-    output.write('soln = NDSolve[Join[eqns, initconds], ' \
+    output.write('soln = NDSolve[Join[odes, initconds], ' \
                  'solvelist, {t, 0, tmax}]\n\n')
     output.write('(* Observables *)\n')
     output.write(observables_str + '\n\n')
