@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
 A module for returning the BNGL for a given PySB model. Can be used as a
-command-line script or from within the Python shell. Essentially serves
-as a wrapper around ``pysb.generator.bng.BngGenerator``.
+command-line script or from within the Python shell. Serves as a wrapper around
+``pysb.generator.bng.BngGenerator``.
 
 Usage as a command-line script
 ==============================
@@ -19,11 +19,23 @@ or redirected to another file.
 Usage in the Python shell
 =========================
 
-To use in the Python shell, follow this pattern::
+To use in a Python shell, import a model::
 
     from pysb.examples.robertson import model
+
+and import this module::
+
     from pysb.tools import export_bng
+
+then call the function ``run``, passing the model instance::
+
     bngl_output = export_bng.run(model)
+
+then, if desired, write the output to a file::
+
+    f = open('robertson.bngl', 'w')
+    f.write(bngl_output)
+    f.close()
 """
 
 from pysb.generator.bng import BngGenerator
