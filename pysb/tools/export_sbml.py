@@ -1,4 +1,41 @@
 #!/usr/bin/env python
+"""
+A module for converting a PySB model to an SBML file. Can be used as a
+command-line script or from within the Python shell.
+
+Usage as a command-line script
+==============================
+
+Run as follows::
+
+    export_sbml.py model_name.py > model_name.sbml
+
+where ``model_name.py`` contains a PySB model definition (i.e., contains an
+instance of ``pysb.core.Model`` instantiated as a global variable). The text of
+the SBML will be printed to standard out, allowing it to be redirected
+to another file, as shown in this example.
+
+Usage in the Python shell
+=========================
+
+To use in a Python shell, import a model::
+
+    from pysb.examples.robertson import model
+
+and import this module::
+
+    from pysb.tools import export_sbml
+
+then call the function ``run``, passing the model instance::
+
+    sbml_output = export_sbml.run(model)
+
+then, if desired, write the output to a file::
+
+    f = open('robertson.sbml', 'w')
+    f.write(sbml_output)
+    f.close()
+"""
 
 # FIXME this should use libsbml if available
 
@@ -14,7 +51,8 @@ import textwrap
 from StringIO import StringIO
 
 def indent(text, n=0):
-    """Re-indent a multi-line string, strip leading newlines and trailing spaces"""
+    """Re-indent a multi-line string, stripping leading newlines and trailing
+    spaces."""
     text = text.lstrip('\n')
     text = textwrap.dedent(text)
     lines = text.split('\n')
@@ -24,7 +62,7 @@ def indent(text, n=0):
     return text
 
 class MathMLContentPrinter(MathMLPrinter):
-    """Prints an expression to MathML without presentation markup"""
+    """Prints an expression to MathML without presentation markup."""
     def _print_Symbol(self, sym):
         ci = self.dom.createElement(self.mathml_tag(sym))
         ci.appendChild(self.dom.createTextNode(sym.name))
@@ -77,6 +115,19 @@ def get_species_annotation(meta_id, cp):
     return indent(output, 16)
 
 def run(model):
+    """Export the model as SBML.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to export to SBML.
+
+    Returns
+    -------
+    string
+        String containing the SBML output.
+    """
+
     output = StringIO()
     pysb.bng.generate_equations(model)
 
