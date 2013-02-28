@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """
-
 A module for converting a PySB model to a set of ordinary differential
 equations for integration or analysis in Mathematica. Can be used as a
 command-line script or from within the Python shell.

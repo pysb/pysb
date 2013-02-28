@@ -1,6 +1,99 @@
 #!/usr/bin/env python
 """
-Produce Python code for simulating a model without requiring pysb itself.
+Produce Python code for simulating a PySB model without requiring PySB itself
+(note that NumPy and SciPy are still required). This offers a way of
+distributing a model to those who do not have PySB. Can be used as a
+command-line script or from within the Python shell.
+
+Usage as a command-line script
+==============================
+
+As a command-line script, run as follows::
+
+    export_potterswheel.py model_name.py > model_standalone.py
+
+where ``model_name.py`` contains a PySB model definition (i.e., contains an
+instance of ``pysb.core.Model`` instantiated as a global variable). The text of
+the generated Python code will be printed to standard out, allowing it to be
+redirected to another file, as shown in this example.
+
+Usage in the Python shell
+=========================
+
+To use in a Python shell, import a model::
+
+    from pysb.examples.robertson import model
+
+and import this module::
+
+    from pysb.tools import export_python
+
+then call the function ``run``, passing the model instance::
+
+    python_output = export_python.run(model)
+
+then write the output to a file::
+
+    f = open('robertson_standalone.py', 'w')
+    f.write(python_output)
+    f.close()
+
+Standalone Python code for the Robertson model
+==============================================
+
+The standalone Python code defines a class, ``Model``, with a method
+``simulate`` that can be used to simulate the model.
+
+As shown in the code for the Robertson model below, the ``Model``
+class defines the fields ``parameters``, ``observables``, and ``initial_conditios`` as lists of ``collections.namedtuple`` objects that allow access to
+the features of the model.
+
+The ``simulate`` method has the following signature::
+
+    def simulate(self, tspan, param_values=None, view=False):
+
+with arguments as follows:
+
+* ``tspan`` specifies the array of timepoints
+* ``param_values`` is an optional vector of parameter values that can be used
+  to override the nominal values defined in the PySB model
+* ``view`` is an optional boolean argument that specifies if the simulation
+  output arrays are returned as copies (views) of the original. If True,
+  returns copies of the arrays, allowing changes to be made to values in the
+  arrays without affecting the originals.
+
+``simulate`` returns a tuple of two arrays. The first array is a matrix
+with timecourses for each species in the model as the columns. The
+second array is a numpy record array for the model's observables, which can
+be indexed by name.
+
+Example code generated for the Robertson model, ``pysb.examples.robertson``:
+
+.. literalinclude:: ../examples/robertson_standalone.py
+
+
+Using the standalone Python model
+=================================
+
+An example usage pattern for the standalone model, once generated::
+
+    # Import the standalone model file
+    import robertson_standalone
+    import numpy
+    from matplotlib import pyplot as plt
+
+    # Instantiate the model object (the constructor takes no arguments)
+    model = robertson_standalone.Model()
+
+    # Simulate the model
+    tspan = numpy.linspace(0, 100)
+    (species_output, observables_output) = model.simulate(tspan)
+
+    # Plot the results
+    plt.figure()
+    plt.plot(tspan, observables_output['A_total'])
+    plt.show()
+
 """
 
 import pysb
@@ -20,15 +113,33 @@ def pad(text, depth=0):
     text += '\n'
     return text
 
-
 def run(model, docstring=None):
+    """Export Python code for simulation of a model without PySB.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to export as a standalone Python program.
+    docstring : string
+        The header docstring to include at the top of the generated Python
+        code.
+
+    Returns
+    -------
+    string
+        String containing the standalone Python code.
+    """
+
     output = StringIO()
     pysb.bng.generate_equations(model)
 
-    # Note: This has a lot of duplication from pysb.integrate. Can that be helped?
+    # Note: This has a lot of duplication from pysb.integrate.
+    # Can that be helped?
 
-    code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
-    code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+    code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i]))
+                          for i in range(len(model.odes))])
+    code_eqs = re.sub(r's(\d+)',
+                      lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
     for i, p in enumerate(model.parameters):
         code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
 
@@ -70,7 +181,8 @@ def run(model, docstring=None):
             self.y = None
             self.yobs = None
             self.integrator = scipy.integrate.ode(self.ode_rhs)
-            self.integrator.set_integrator('vode', method='bdf', with_jacobian=True)
+            self.integrator.set_integrator('vode', method='bdf',
+                                           with_jacobian=True)
             self.y0 = numpy.empty(%(num_species)d)
             self.ydot = numpy.empty(%(num_species)d)
             self.sim_param_values = numpy.empty(%(num_params)d)
@@ -84,14 +196,18 @@ def run(model, docstring=None):
         output.write("self.parameters[%d] = Parameter(%s, %g)\n" % p_data)
     output.write("\n")
     for i, obs in enumerate(model.observables):
-        obs_data = (i, repr(obs.name), repr(obs.species), repr(obs.coefficients))
+        obs_data = (i, repr(obs.name), repr(obs.species),
+                    repr(obs.coefficients))
         output.write(" " * 8)
-        output.write("self.observables[%d] = Observable(%s, %s, %s)\n" % obs_data)
+        output.write("self.observables[%d] = Observable(%s, %s, %s)\n" %
+                     obs_data)
     output.write("\n")
     for i, (cp, param) in enumerate(model.initial_conditions):
-        ic_data = (i, model.parameters.index(param), model.get_species_index(cp))
+        ic_data = (i, model.parameters.index(param),
+                   model.get_species_index(cp))
         output.write(" " * 8)
-        output.write("self.initial_conditions[%d] = Initial(%d, %d)\n" % ic_data)
+        output.write("self.initial_conditions[%d] = Initial(%d, %d)\n" %
+                     ic_data)
     output.write("\n")
 
     output.write("    if _use_inline:\n")
@@ -115,7 +231,8 @@ def run(model, docstring=None):
             if param_values is not None:
                 # accept vector of parameter values as an argument
                 if len(param_values) != len(self.parameters):
-                    raise Exception("param_values must have length %d" % len(self.parameters))
+                    raise Exception("param_values must have length %d" %
+                                    len(self.parameters))
                 self.sim_param_values[:] = param_values
             else:
                 # create parameter vector from the values in the model
@@ -126,11 +243,13 @@ def run(model, docstring=None):
             if self.y is None or len(tspan) != len(self.y):
                 self.y = numpy.empty((len(tspan), len(self.y0)))
                 if len(self.observables):
-                    self.yobs = numpy.ndarray(len(tspan), zip((obs.name for obs in self.observables),
-                                                              itertools.repeat(float)))
+                    self.yobs = numpy.ndarray(len(tspan),
+                                    zip((obs.name for obs in self.observables),
+                                        itertools.repeat(float)))
                 else:
                     self.yobs = numpy.ndarray((len(tspan), 0))
-                self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
+                self.yobs_view = self.yobs.view(float).reshape(len(self.yobs),
+                                                               -1)
             # perform the actual integration
             self.integrator.set_initial_value(self.y0, tspan[0])
             self.integrator.set_f_params(self.sim_param_values)
