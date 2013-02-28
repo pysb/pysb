@@ -10,15 +10,7 @@ finishing this section. In what follows we will assume you are
 issuing commands from a *Python* prompt (whether it be actual *Python*
 or a shell such as *iPython*. See :doc:`installation` for details).
 
-.. Note:: Familiarity with rules-based biomodel encoding tools such as
-   `BioNetGen`_ or `Kappa`_ would be useful to users unfamiliar with
-   *Rules-based* approaches to modeling. A short :doc:`rulesprimer`
-   is included for new users.
-
-.. Note:: Although a new user can go through the tutorial to
-   understand how PySB works, a basic understanding of the Python
-   programming language is essential. See the :doc:`installation`
-   section for some *Python* suggestions.
+.. Note:: A basic understanding of Python and rules-based modeling is assumed.
    
 Modeling with PySB
 ==================
@@ -237,7 +229,7 @@ similar with only some differences related to the implementation
 details (e.g. mass-action vs. stochastic simulations, compartments or
 no compartments, etc). We will write two rules to represent the
 interaction between the reactants and the products in a two-step
-manner as described in the :ref:`rules_primer` section.
+manner.
 
 The general pattern for a rule consists of the statement *Rule* and in
 parenthesis a series of statements separated by commas, namely the
