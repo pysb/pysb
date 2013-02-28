@@ -12,12 +12,11 @@ or a shell such as *iPython*. See :doc:`installation` for details).
 
 .. Note:: Familiarity with rules-based biomodel encoding tools such as
    `BioNetGen`_ or `Kappa`_ would be useful to users unfamiliar with
-   *Rules-based* approaches to modeling. A short :doc:`rulesprimer`
-   is included for new users.
+   *Rules-based* approaches to modeling.
 
 .. Note:: Although a new user can go through the tutorial to
    understand how PySB works, a basic understanding of the Python
-   programming language is essential. See the :doc:`installation`
+   programming language is essential. See the :doc:`useful_references`
    section for some *Python* suggestions.
    
 Modeling with PySB
