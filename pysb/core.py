@@ -250,8 +250,13 @@ class Monomer(Component):
         return MonomerPattern(self, extract_site_conditions(conditions, **kwargs), None)
 
     def __repr__(self):
-        return  '%s(name=%s, sites=%s, site_states=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.sites), repr(self.site_states))
+        value = '%s(%s' % (self.__class__.__name__, repr(self.name))
+        if self.sites:
+            value += ', %s' % repr(self.sites)
+        if self.site_states:
+            value += ', %s' % repr(self.site_states)
+        value += ')'
+        return value
 
     
 
@@ -718,7 +723,7 @@ class Parameter(Component):
         self.value = value
 
     def __repr__(self):
-        return  '%s(name=%s, value=%s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
+        return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
 
 
@@ -803,9 +808,9 @@ class Rule(Component):
 
     Attributes
     ----------
-    Identical to Parameters (see above), except rule_expression is replaced by
-    its component elements reactant_pattern, product_pattern and is_reversible
-    which are documented in the RuleExpression class.
+
+    Identical to Parameters (see above), plus the component elements of
+    `rule_expression`: reactant_pattern, product_pattern and is_reversible.
 
     """
 
@@ -819,6 +824,7 @@ class Rule(Component):
             raise Exception("Forward rate must be a Parameter")
         if rule_expression.is_reversible and not isinstance(rate_reverse, Parameter):
             raise Exception("Reverse rate must be a Parameter")
+        self.rule_expression = rule_expression
         self.reactant_pattern = rule_expression.reactant_pattern
         self.product_pattern = rule_expression.product_pattern
         self.is_reversible = rule_expression.is_reversible
@@ -837,10 +843,11 @@ class Rule(Component):
         return len(self.product_pattern.complex_patterns) == 0
 
     def __repr__(self):
-        ret = '%s(name=%s, reactants=%s, products=%s, rate_forward=%s' % \
-            (self.__class__.__name__, repr(self.name), repr(self.reactant_pattern), repr(self.product_pattern), repr(self.rate_forward))
+        ret = '%s(%s, %s, %s' % \
+            (self.__class__.__name__, repr(self.name),
+             repr(self.rule_expression), self.rate_forward.name)
         if self.is_reversible:
-            ret += ', rate_reverse=%s' % repr(self.rate_reverse)
+            ret += ', %s' % self.rate_reverse.name
         if self.delete_molecules:
             ret += ', delete_molecules=True'
         if self.move_connected:
@@ -1397,9 +1404,9 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         return self.__xor__(other)
 
     def __repr__(self):
-        return '{' + \
-            ',\n '.join("'%s': %s" % t for t in self.iteritems()) + \
-            '}'
+        return 'ComponentSet([\n' + \
+            ''.join(' %s,\n' % x for x in self) + \
+            ' ])'
 
     def rename(self, c, new_name):
         """Change the name of component `c` to `new_name`."""
