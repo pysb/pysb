@@ -75,7 +75,7 @@ creating an intermediate .dot file, which is especially helpful if you are
 making continuous changes to the model and need to visualize your changes
 repeatedly:
 
-    python -m pysb.tools.render_species mymodel.py | dot -T pdf -o mymodel.pdf
+    python -m pysb.tools.render_reactions mymodel.py | dot -T pdf -o mymodel.pdf
 
 Note that some PDF viewers will auto-reload a changed PDF, so you may not even
 need to manually reopen it every time you rerun the tool.
