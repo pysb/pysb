@@ -9,4 +9,5 @@ Exporting to other formats
    export_mathematica.rst
    export_potterswheel.rst
    export_bng.rst
+   export_bng_net.rst
    export_python.rst

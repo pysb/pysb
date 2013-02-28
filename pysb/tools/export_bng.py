@@ -76,8 +76,9 @@ if __name__ == '__main__':
     model_name = re.sub(r'\.py$', '', os.path.basename(model_filename))
     # import it
     try:
-        # FIXME if the model has the same name as some other "real" module which we use,
-        # there will be trouble (use the imp package and import as some safe name?)
+        # FIXME if the model has the same name as some other "real" module
+        # which we use, there will be trouble (use the imp package and import
+        # as some safe name?)
         model_module = __import__(model_name)
     except StandardError as e:
         print "Error in model script:\n"
