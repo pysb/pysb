@@ -38,15 +38,16 @@ then write the output to a file::
     f.write(python_output)
     f.close()
 
-Standalone Python code for the Robertson model
-==============================================
+Structure of the standalone Python code
+=======================================
 
 The standalone Python code defines a class, ``Model``, with a method
 ``simulate`` that can be used to simulate the model.
 
-As shown in the code for the Robertson model below, the ``Model``
-class defines the fields ``parameters``, ``observables``, and ``initial_conditios`` as lists of ``collections.namedtuple`` objects that allow access to
-the features of the model.
+As shown in the code for the Robertson model below, the ``Model`` class defines
+the fields ``parameters``, ``observables``, and ``initial_conditions`` as lists
+of ``collections.namedtuple`` objects that allow access to the features of the
+model.
 
 The ``simulate`` method has the following signature::
 
@@ -67,15 +68,17 @@ with timecourses for each species in the model as the columns. The
 second array is a numpy record array for the model's observables, which can
 be indexed by name.
 
+Output for the Robertson example model
+======================================
+
 Example code generated for the Robertson model, ``pysb.examples.robertson``:
 
 .. literalinclude:: ../examples/robertson_standalone.py
 
-
 Using the standalone Python model
 =================================
 
-An example usage pattern for the standalone model, once generated::
+An example usage pattern for the standalone Robertson model, once generated::
 
     # Import the standalone model file
     import robertson_standalone
@@ -93,7 +96,6 @@ An example usage pattern for the standalone model, once generated::
     plt.figure()
     plt.plot(tspan, observables_output['A_total'])
     plt.show()
-
 """
 
 import pysb

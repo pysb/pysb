@@ -16,6 +16,31 @@ instance of ``pysb.core.Model`` instantiated as a global variable). The text of
 the Mathematica code will be printed to standard out, allowing it to be
 redirected to another file, as shown in this example.
 
+Usage in the Python shell
+=========================
+
+To use in a Python shell, import a model::
+
+    from pysb.examples.robertson import model
+
+and import this module::
+
+    from pysb.tools import export_mathematica
+
+then call the function ``run``, passing the model instance and the
+name to use for the model::
+
+    mathematica_output = export_mathematica.run(model)
+
+then write the output to a file::
+
+    f = open('robertson.txt', 'w')
+    f.write(mathematica_output)
+    f.close()
+
+Output for the Robertson example model
+======================================
+
 The Mathematica code produced will follow the form as given below for
 ``pysb.examples.robertson``::
 
@@ -72,7 +97,6 @@ The Mathematica code produced will follow the form as given below for
     Btotal = (s1[t] * 1) /. soln
     Ctotal = (s2[t] * 1) /. soln
 
-
 The output consists of a block of commands that define the ODEs, parameters,
 species and other variables for the model, along with a set of descriptive
 comments. The sections are as follows:
@@ -101,28 +125,6 @@ comments. The sections are as follows:
 Note that Mathematica does not permit underscores in variable names, so
 any underscores used in PySB variables will be removed (e.g., ``A_total`` will
 be converted to ``Atotal``).
-
-Usage in the Python shell
-=========================
-
-To use in a Python shell, import a model::
-
-    from pysb.examples.robertson import model
-
-and import this module::
-
-    from pysb.tools import export_mathematica
-
-then call the function ``run``, passing the model instance and the
-name to use for the model::
-
-    mathematica_output = export_mathematica.run(model)
-
-then write the output to a file::
-
-    f = open('robertson.txt', 'w')
-    f.write(mathematica_output)
-    f.close()
 """
 
 import pysb

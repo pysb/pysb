@@ -16,7 +16,32 @@ instance of ``pysb.core.Model`` instantiated as a global variable). The text of
 the MATLAB code will be printed to standard out, allowing it to be redirected
 to another file, as shown in this example. Note that for use in MATLAB, the
 name of the ``.m`` file must match the name of the ODE function (e.g.,
-``robertson_odes`` in the example below).
+``robertson_odes.m`` for the example below).
+
+Usage in the Python shell
+=========================
+
+To use in a Python shell, import a model::
+
+    from pysb.examples.robertson import model
+
+and import this module::
+
+    from pysb.tools import export_matlab
+
+then call the function ``run``, passing the model instance and the
+name to use for the model::
+
+    matlab_output = export_matlab.run(model, 'robertson')
+
+then write the output to a file::
+
+    f = open('robertson_odes.m', 'w')
+    f.write(matlab_output)
+    f.close()
+
+Output for the Robertson example model
+======================================
 
 The MATLAB code produced will follow the form as given below for
 ``pysb.examples.robertson``::
@@ -49,28 +74,6 @@ the file containing the model definition, stripped of the ``.py`` extension.
 The first block of code maps the named parameters of the model to entries in a
 MATLAB parameter array. The second block of code lists the ODEs, with the
 comment above each ODE indicating the corresponding species.
-
-Usage in the Python shell
-=========================
-
-To use in a Python shell, import a model::
-
-    from pysb.examples.robertson import model
-
-and import this module::
-
-    from pysb.tools import export_matlab
-
-then call the function ``run``, passing the model instance and the
-name to use for the model::
-
-    matlab_output = export_matlab.run(model, 'robertson')
-
-then write the output to a file::
-
-    f = open('robertson_odes.m', 'w')
-    f.write(matlab_output)
-    f.close()
 """
 
 import pysb

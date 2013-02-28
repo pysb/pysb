@@ -20,6 +20,30 @@ redirected to another file, as shown in this example. Note that the name of the
 ``.m`` file must match the name of the ODE function (e.g., ``robertson.m`` in
 the example below).
 
+Usage in the Python shell
+=========================
+
+To use in a Python shell, import a model::
+
+    from pysb.examples.robertson import model
+
+and import this module::
+
+    from pysb.tools import export_potterswheel
+
+then call the function ``run``, passing the model instance::
+
+    potterswheel_output = export_potterswheel.run(model)
+
+then write the output to a file::
+
+    f = open('robertson.m', 'w')
+    f.write(potterswheel_output)
+    f.close()
+
+Output for the Robertson example model
+======================================
+
 The PottersWheel code produced will follow the form as given below for
 ``pysb.examples.robertson``::
 
@@ -61,27 +85,6 @@ The PottersWheel code produced will follow the form as given below for
     m = pwAddY(m, 'C_total', '1.000000 * s2');
 
     % end of PottersWheel model robertson
-
-Usage in the Python shell
-=========================
-
-To use in a Python shell, import a model::
-
-    from pysb.examples.robertson import model
-
-and import this module::
-
-    from pysb.tools import export_potterswheel
-
-then call the function ``run``, passing the model instance::
-
-    potterswheel_output = export_potterswheel.run(model)
-
-then write the output to a file::
-
-    f = open('robertson.m', 'w')
-    f.write(potterswheel_output)
-    f.close()
 """
 
 import pysb
