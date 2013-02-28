@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 """
-A module for returning the BNGL NET file for a given PySB model.  Can be used
-as a command-line script or from within the Python shell. Serves as a wrapper
-around ``pysb.bng.generate_network()``, which generates the BNGL for the model
-and then invokes BNG to generate the NET file.
+A script for getting the BNGL NET file for a given PySB model. Serves as a
+command-line wrapper around ``pysb.bng.generate_network()``, which generates
+the BNGL for the model and then invokes BNG to generate the NET file.
 
-Usage as a command-line script
-==============================
+Usage
+=====
 
-As a command-line script, run as follows::
+At the command-line, run as follows::
 
     export_bng_net.py model_name.py > model_name.net
 
@@ -16,27 +15,6 @@ where ``model_name.py`` contains a PySB model definition (i.e., contains
 an instance of ``pysb.core.Model`` instantiated as a global variable). The
 generated NET file will be printed to standard out, allowing it to be inspected
 or redirected to another file.
-
-Usage in the Python shell
-=========================
-
-To use in a Python shell, import a model::
-
-    from pysb.examples.robertson import model
-
-and import this module::
-
-    from pysb.tools import export_bng_net
-
-then call the function ``run``, passing the model instance::
-
-    net_output = export_bng_net.run(model)
-
-then, if desired, write the output to a file::
-
-    f = open('robertson.net', 'w')
-    f.write(net_output)
-    f.close()
 """
 
 from pysb.generator.bng import BngGenerator
