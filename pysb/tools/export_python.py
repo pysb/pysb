@@ -73,7 +73,7 @@ Output for the Robertson example model
 
 Example code generated for the Robertson model, ``pysb.examples.robertson``:
 
-.. literalinclude:: ../examples/robertson_standalone.py
+.. literalinclude:: ../../examples/robertson_standalone.py
 
 Using the standalone Python model
 =================================

@@ -9,4 +9,4 @@ PySB Modules Reference
    bng.rst
    kappa.rst
    macros.rst
-   export.rst
+   export/export.rst
