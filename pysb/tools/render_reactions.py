@@ -1,4 +1,26 @@
 #!/usr/bin/env python
+"""
+Usage: ``python -m pysb.tools.render_reactions mymodel.py > mymodel.dot``
+
+Renders the reactions produced by a model into the "dot" graph format which can
+be visualized with Graphviz.
+
+To create a PDF from the .dot file, use the "dot" command from Graphviz::
+
+    dot mymodel.dot -T pdf -O
+
+This will create mymodel.dot.pdf. You can also change the "dot" command to one
+of the other Graphviz drawing tools for a different type of layout. Note that
+you can pipe the output of render_reactions straight into Graphviz without
+creating an intermediate .dot file, which is especially helpful if you are
+making continuous changes to the model and need to visualize your changes
+repeatedly::
+
+    python -m pysb.tools.render_reactions mymodel.py | dot -T pdf -o mymodel.pdf
+
+Note that some PDF viewers will auto-reload a changed PDF, so you may not even
+need to manually reopen it every time you rerun the tool.
+"""
 
 import pysb
 import pysb.bng
@@ -9,6 +31,20 @@ import os
 import pygraphviz
 
 def run(model):
+    """
+    Render the reactions produced by a model into the "dot" graph format.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to render.
+
+    Returns
+    -------
+    string
+        The dot format output.
+    """
+
     pysb.bng.generate_equations(model)
 
     graph = pygraphviz.AGraph(directed=True, rankdir="LR")
@@ -58,28 +94,7 @@ def r_link(graph, s, r, **attrs):
     graph.add_edge(*nodes, **attrs)
 
 
-usage = """
-Usage: python -m pysb.tools.render_reactions mymodel.py > mymodel.dot
-
-Renders the reactions produced by a model into the "dot" graph format which can
-be visualized with Graphviz.
-
-To create a PDF from the .dot file, use the "dot" command from Graphviz:
-
-    dot mymodel.dot -T pdf -O
-
-This will create mymodel.dot.pdf. You can also change the "dot" command to one
-of the other Graphviz drawing tools for a different type of layout. Note that
-you can pipe the output of render_reactions straight into Graphviz without
-creating an intermediate .dot file, which is especially helpful if you are
-making continuous changes to the model and need to visualize your changes
-repeatedly:
-
-    python -m pysb.tools.render_reactions mymodel.py | dot -T pdf -o mymodel.pdf
-
-Note that some PDF viewers will auto-reload a changed PDF, so you may not even
-need to manually reopen it every time you rerun the tool.
-"""
+usage = __doc__
 usage = usage[1:]  # strip leading newline
 
 if __name__ == '__main__':
