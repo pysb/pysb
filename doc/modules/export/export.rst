@@ -10,4 +10,5 @@ Exporting to other formats
    export_potterswheel.rst
    export_bng.rst
    export_bng_net.rst
+   export_kappa.rst
    export_python.rst
