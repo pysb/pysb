@@ -7,5 +7,6 @@ Exporting to other formats
    export_sbml.rst
    export_matlab.rst
    export_mathematica.rst
+   export_potterswheel.rst
    export_bng.rst
    export_python.rst
