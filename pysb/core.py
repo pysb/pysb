@@ -257,54 +257,7 @@ class Monomer(Component):
             value += ', %s' % repr(self.site_states)
         value += ')'
         return value
-
     
-
-class MonomerAny(Monomer):
-
-    """
-    A wildcard monomer which matches any species.
-
-    This is only needed where you would use a '+' in BNG. Do not construct any
-    instances -- use the singleton ``ANY`` instead.
-
-    """
-
-    def __init__(self):
-        # don't call Monomer.__init__ since this doesn't want
-        # Component stuff and has no user-accessible API
-        self.name = 'ANY'
-        self.sites = None
-        self.site_states = {}
-        self.compartment = None
-
-    def __repr__(self):
-        return self.name
-
-
-
-class MonomerWild(Monomer):
-
-    """
-    A wildcard monomer which matches any species, or nothing (no bond).
-
-    This is only needed where you would use a '?' in BNG. Do not construct any
-    instances -- use the singleton ``WILD`` instead.
-
-    """
-
-    def __init__(self):
-        # don't call Monomer.__init__ since this doesn't want
-        # Component stuff and has no user-accessible API
-        self.name = 'WILD'
-        self.sites = None
-        self.site_states = {}
-        self.compartment = None
-
-    def __repr__(self):
-        return self.name
-
-
 
 class MonomerPattern(object):
 
@@ -1433,9 +1386,20 @@ def extract_site_conditions(conditions=None, **kwargs):
     return site_conditions
 
 
+# Some light infrastructure for defining symbols that act like "keywords", i.e.
+# they are immutable singletons that stringify to their own name. Regular old
+# classes almost fit the bill, except that their __str__ method prepends the
+# complete module hierarchy to the base class name. The KeywordMeta class here
+# implements an alternate __str__ method which just returns the base name.
+class KeywordMeta(type):
+    def __str__(cls):
+        return cls.__name__
+class Keyword(object): __metaclass__ = KeywordMeta
 
-ANY = MonomerAny()
-WILD = MonomerWild()
+# The keywords.
+class ANY(Keyword): pass
+class WILD(Keyword): pass
+
 
 warnings.simplefilter('always', ModelExistsWarning)
 warnings.simplefilter('always', SymbolExistsWarning)
