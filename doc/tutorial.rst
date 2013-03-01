@@ -1,90 +1,81 @@
-==========
- Tutorial
-==========
+========
+Tutorial
+========
 
-This tutorial will walk you through the creation of your first PySB
-model. It will cover the basics, provide a guide through the different
-programming constructs and finally deal with more complex
-rule-building. Users will be able to write simple programs after
-finishing this section. In what follows we will assume you are
-issuing commands from a *Python* prompt (whether it be actual *Python*
-or a shell such as *iPython*. See :doc:`installation` for details).
+Introduction
+============
 
-.. Note:: A basic understanding of Python and rules-based modeling is assumed.
+This tutorial will walk you through the creation and simulation of a PySB model.
+A basic understanding of rules-based modeling is assumed.
    
-Modeling with PySB
-==================
+First steps
+===========
 
-A biological model in PySB will need the following components to
-generate a mathematical representation of a system:
+Once you have installed PySB, run the following commands from a Python
+interpreter to check that the basic functionality is working. This will define a
+model that synthesizes a molecule "A" at the rate of 3 copies per second,
+simulates that model from t=0 to 60 seconds and displays the amount of A
+sampled at intervals of 10 seconds::
 
-* Model definitions: This instantiates the model object.
-* Monomer definition: This instantiates the monomers that are allowed
-  in the model.
-* Parameters: These are the numerical parameters needed to create a
-  mass-action or stochastic simulation.
-* Rules: These are the set of statements that describe how *monomer
-  species*, interact as prescribed by the parameters involved in a
-  given rule. The collection of these rules is called the *model
-  topology*. 
+    >>> from pysb import *
+    >>> from pysb.integrate import Solver
+    >>> Model() # doctest:+ELLIPSIS
+    <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+    >>> Monomer('A')
+    Monomer('A')
+    >>> Parameter('k', 3.0)
+    Parameter('k', 3.0)
+    >>> Rule('synthesize_A', None >> A(), k)
+    Rule('synthesize_A', None >> A(), k)
+    >>> t = [0, 10, 20, 30, 40, 50, 60]
+    >>> solver = Solver(model, t)
+    >>> solver.run()
+    >>> print solver.y[:, 1]
+    [   0.   30.   60.   90.  120.  150.  180.]
 
-The following examples will be taken from work in the `Sorger lab`_ in
-`extrinsic apoptosis signaling`_. The initiator caspases, activated by
-an upstream signal, play an essential role activating the effector
-Bcl-2 proteins downstream. In this model, Bid is catalitically
-truncated and activated by Caspase-8, an initiator caspase. We will
-build a model that represents this activation as a two-step process as
-follows:
+Creating a model
+================
 
-.. math::
-   C8 + Bid \underset{kr}{\overset{kf}{\leftrightharpoons}} C8:Bid \quad {\longleftarrow \mbox{Complex formation step}} \\
-   C8:Bid \overset{kc}{\rightarrow} C8 + tBid \quad {\longleftarrow \mbox{Complex dissociation step}}
+The example above notwithstanding, PySB model definition is not meant to be
+performed in an interactive environment. The proper way to create a model is to
+write the code in a .py file which can then be loaded interactively or in other
+scripts for analysis and simulation. Here are the Python statements necessary to
+define the model from "First steps" above. Save this code in a file named
+``tutorial_a.py`` (you can find a copy of this file and all other named scripts
+from the tutorial in ``pysb/examples/``):
 
-Where tBid is the truncated Bid. The parameters ``kf``, ``kr``, and
-``kc`` represent the forward, reverse, and catalytic rates that
-dictate the consumption of Bid via catalysis by C8 and the formation
-of tBid. We will eventually end up with a mathematical representation
-that will look something like this:
+.. Sphinx's literalinclude interprets "/" as the doc root, i.e. the location of
+   conf.py, but we can use ".." to break out!
 
-.. math::
-   \frac{d[C8]}{dt}     &= -kf[C8]*[Bid] + kr*[C8:Bid] + kc*[C8:Bid] \\
-   \frac{d[Bid]}{dt}    &= -kf*[C8]*[Bid] + kr*[C8:Bid] \\
-   \frac{d[C8:Bid]}{dt} &=  kf*[C8]*[Bid] - kr*[C8:Bid] - kc*[C8:Bid] \\
-   \frac{dt[tBid]}{dt}  &=  kc*[C8:Bid] 
-   :label: ODEs
-   
-The species names in square braces represent concentrations, usually
-give in molar (M) and time in seconds. These ordinary differential
-equations (ODEs) will then be integrated numerically to obtain the
-evolution of the system over time. We will explore how a model could
-be instantiated, modified, and expanded *without* having to resort to
-the tedious, repetitive, and error-prone writing and rewriting of
-equations as those listed above. 
+.. literalinclude:: /../pysb/examples/tutorial_a.py
 
-The Empty Model
-===============
+Note that we did not import ``pysb.integrate`` nor define the ``t`` variable and
+create a ``Solver`` object. These are part of model usage, not definition, so
+they do not belong here.
 
-We begin by creating a model, which we will call ``mymodel``. Open your
-favorite Python code editor and create a file called
-:file:`mymodel.py`. The first lines of a PySB program must contain
-these lines so you can type them or paste them in your editor as shown
-below. Comments in the *Python* language are denoted by a hash (``#``)
-in the first column.
+You may also be wondering why there are no assignment statements to be found.
+This is because every PySB model component automatically assigns itself to a
+variable named identically to the component's name (``A``, ``k`` and
+``synthesize_A`` above), or ``model`` in the case of the ``Model`` object
+itself. This is not standard Python behavior but it makes models much more
+readable.
 
-.. literalinclude:: examples/mymodel0.py
+Using a model
+=============
 
-Now we have the simplest possible model -- the empty model!
+Now that we have created a model file, we will see how to load it and do
+something with it. Here is the code corresponding to the rest of the example
+from "First steps".
 
-To verify that your model is valid and your PySB installation is
-working, run :file:`mymodel.py` through the Python interpreter by
-typing the following command at your command prompt::
+.. literalinclude:: /../pysb/examples/run_tutorial_a.py
 
-   python mymodel.py
-
-If all went well, you should not see any output. This is to be
-expected, because this PySB script *defines* a model but does not
-execute any contents. We will revisit these concepts once we have
-added some components to our model.
+The one line that's been added relative to the original listing is ``from
+tutorial_a import model``. Since PySB models are just Python code, we use the
+standard python ``import`` mechanism to load them. The variable ``model`` which
+holds the ``Model`` object is explicitly chosen for import. All other model
+components defined in ``tutorial_a.py`` are automatically inserted into
+``model`` and accessible through it, so there is little need to export them
+separately.
 
 Monomers
 ========
@@ -517,15 +508,15 @@ names. We can therefore plot this data to visualize our output. Using
 the commands imported from the *PyLab* module we can create a graph
 interactively. Enter the commands as shown below::
 
-   >>>pl.ion()
-   >>>pl.figure()
-   >>>pl.plot(t, yout['obsBid'], label="Bid")
-   >>>pl.plot(t, yout['obstBid'], label="tBid")
-   >>>pl.plot(t, yout['obsC8'], label="C8")
-   >>>pl.legend()
-   >>>pl.xlabel("Time (s)")
-   >>>pl.ylabel("Molecules/cell")
-   >>>pl.show()
+   >>> pl.ion()
+   >>> pl.figure()
+   >>> pl.plot(t, yout['obsBid'], label="Bid")
+   >>> pl.plot(t, yout['obstBid'], label="tBid")
+   >>> pl.plot(t, yout['obsC8'], label="C8")
+   >>> pl.legend()
+   >>> pl.xlabel("Time (s)")
+   >>> pl.ylabel("Molecules/cell")
+   >>> pl.show()
 
 You should now have a figure in your screen showing the number of
 *Bid* molecules decreaing from the initial amount decreasing over
@@ -574,18 +565,6 @@ now use this file as an input for any visualization tool as described
 above. You can follow the same procedures with the
 :file:`render_species.py` script to visualize the species generated by
 your models.
-
-=================
-Advanced modeling
-=================
-
-In this section we continue with the above tutorial and touch on some
-advanced techniques for modeling using compartments, the definition of
-higher order rules using functions, and model calibration using the
-PySB utilities. Although we provide the functions and utilities we
-have found useful for the community, we encourage users to customize
-the modeling tools to their needs and add/contribute to the PySB
-modeling community.
 
 Higher-order rules
 ================== 
