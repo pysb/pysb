@@ -29,3 +29,13 @@ def test_monomer_model():
     ok_(A in model.monomers)
     ok_(A in model.all_components())
     ok_(A not in model.all_components() - model.monomers)
+
+@with_model
+def test_model_pickle():
+    import pickle
+    Monomer('A')
+    Monomer('B', ['x', 'y'], {'x': ['e', 'f']})
+    Parameter('k', 1.0)
+    Rule('bind', A() + B(x='e', y=WILD) >> A() % B(x='f', y=None), k, k)
+    model2 = pickle.loads(pickle.dumps(model))
+    check_model_against_component_list(model, model2.all_components())
