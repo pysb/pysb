@@ -6,7 +6,6 @@ Introduction
 ============
 
 This tutorial will walk you through the creation and simulation of a PySB model.
-A basic understanding of rules-based modeling is assumed.
    
 First steps
 ===========
@@ -40,7 +39,7 @@ The example above notwithstanding, PySB model definition is not meant to be
 performed in an interactive environment. The proper way to create a model is to
 write the code in a .py file which can then be loaded interactively or in other
 scripts for analysis and simulation. Here are the Python statements necessary to
-define the model from "First steps" above. Save this code in a file named
+define the model from `First steps`_ above. Save this code in a file named
 ``tutorial_a.py`` (you can find a copy of this file and all other named scripts
 from the tutorial in ``pysb/examples/``):
 
@@ -49,7 +48,7 @@ from the tutorial in ``pysb/examples/``):
 
 .. literalinclude:: /../pysb/examples/tutorial_a.py
 
-Note that we did not import ``pysb.integrate`` nor define the ``t`` variable and
+Note that we did not import ``pysb.integrate``, define the ``t`` variable or
 create a ``Solver`` object. These are part of model usage, not definition, so
 they do not belong here.
 
@@ -58,14 +57,15 @@ This is because every PySB model component automatically assigns itself to a
 variable named identically to the component's name (``A``, ``k`` and
 ``synthesize_A`` above), or ``model`` in the case of the ``Model`` object
 itself. This is not standard Python behavior but it makes models much more
-readable.
+readable. The `Component`_ section below explains a bit more about this feature,
+and technical readers can find even more in the `Self-export`_ section.
 
 Using a model
 =============
 
 Now that we have created a model file, we will see how to load it and do
-something with it. Here is the code corresponding to the rest of the example
-from "First steps".
+something with it. Here is ``run_tutorial_a.py``, the code corresponding to the
+rest of the example from `First steps`_.
 
 .. literalinclude:: /../pysb/examples/run_tutorial_a.py
 
@@ -73,91 +73,127 @@ The one line that's been added relative to the original listing is ``from
 tutorial_a import model``. Since PySB models are just Python code, we use the
 standard python ``import`` mechanism to load them. The variable ``model`` which
 holds the ``Model`` object is explicitly chosen for import. All other model
-components defined in ``tutorial_a.py`` are automatically inserted into
-``model`` and accessible through it, so there is little need to export them
-separately.
+components defined in ``tutorial_a.py`` are accessible through ``model``, so
+there is little need to import them separately.
 
-Monomers
-========
+Model creation in depth
+=======================
 
-Chemical *species* in PySB, whether they are small molecules,
-proteins, or representations of many molecules are all derived from
-*Monomers*. *Monomers* are the superunit that defines how a *species*
-can be defined and used. A *Monomer* is defined using the keyword
-``Monomer`` followed by the desired *monomer* name and the *sites*
-relevant to that monomer. In PySB, like in `BioNetGen`_ or `Kappa`_,
-there are two types of *sites*, namely bond-making/breaking sites and
-state sites. The former allow for the description of bonds between
-*species* while the latter allow for the assignment of *states* to
-species. Following the first lines of code entered into your model in
-the previous section we will add a *monomer* named 'Bid' with a bond
-site 'b' and a state site 'S'. The state site will contain two states,
-the untruncated (``u``) state and the truncated (``t``) state as shown::
+Every model file must begin with these two lines::
 
-    Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
+    from pysb import *
+    Model()
 
-Note that this looks like a Python function call.  This is because it
-*is* in fact a Python function call! [#func]_ The first argument to
-the function is a string (ecnlosed in quotation marks) specifying the
-monomer's name and the second argument is a list of strings specifying
-the names of its sites. Note that a monomer does not need to have
-state sites. There is also a third, optional argument for
-specifying whether any of the sites are "state sites" and the list of
-valid states for those sites.  We will introduce state sites later.
+The first line brings in all of the Python classes needed to define a model. The
+second line creates an instance of the ``Model`` class and implicitly assigns
+this object to the variable ``model``. We won't have to refer to ``model``
+within the model file itself, rather this is the symbol we will later import
+from *other* code in order to make use of the model.
 
-Let's define two monomers in our model, corresponding to Caspase-8, an
-initiator caspase involved in apoptosis (``C8``) and BH3-interacting domain death
-agonist (``Bid``) (ref?)::
+The rest of the model file will be component declarations. There are several
+types of components, some required and others optional. The required types are
+``Monomer``, ``Parameter`` and ``Rule`` -- we have already encountered these in
+``tutorial_a.py``. The optional ones are ``Observable`` and ``Compartment``.
+Each of these component types is represented by a Python class which inherits
+from the base class ``Component``. The following sections will explain what each
+of these component types does in a model and how to create them.
 
-    Monomer('C8', ['b'])
-    Monomer('Bid', ['b', 'S'])
+Component
+---------
 
-Note that although the C8 monomer only has one site 'b', you must
-still use the square brackets to indicate a *list* of binding
-sites. Anticipating what comes below, the ``'S'`` site will become a
-state site and hence, we choose to represent it in upper case but this
-is not mandatory. 
+The base ``Component`` class is never explicitly used in a model, but it defines
+two pieces of basic functionality that are common to all component types. The
+first is a ``name`` attribute, which is specified as the first argument to the
+constructor for all subclasses of ``Component``. The second is the "self-export"
+functionality, which automatically assigns every component to a local variable
+named for its ``name`` attribute. Self-export helps streamline model definition,
+making it feel much more like a domain-specific language like BNGL or Kappa. A
+justification for the technically-minded for this somewhat unusual behavior may
+be found in the `Self-export`_ section near the end of the tutorial.
 
-Now our model file should look like this:
+Monomer
+-------
 
-.. literalinclude:: examples/mymodel1.py
+Monomers are the indivisible elements that will make up the molecules and
+complexes whose behavior you intend to model. Typically they will represent a
+specific protein or other biomolecule such as "EGFR" or "ATP". Monomers have a
+*name* (like all components) as well as a list of *sites*. Sites are named
+locations on the monomer which can *bind* with a site on another monomer and/or
+take on a *state*. Binding merely represents aggregation, not necessarily a
+formal chemical bond. States can range from the biochemically specific (e.g.
+"phosphorylated/unphosphorylated" to the generic (e.g. "active/inactive"). The
+site list is technically optional (as seen in ``tutorial_a.py``) but only the
+simplest toy models will be able to get by without them.
 
-We can run ``python mymodel.py`` again and verify there are no errors,
-but you should still have not output given that we have not *done*
-anything with the monomers. Now we can do something with them.
+The :py:class:`Monomer constructor <pysb.core.Monomer>` takes a name, followed
+by a list of site names, and finally a dict specifying the allowable states for
+the sites. Sites used only for binding may be omitted from the dict.
 
-Run the *ipython* (or *python*) interpreter with no arguments to enter
-interactive mode (be sure to do this from the same directory where
-you've saved :file:`mymodel.py`) and run the following code::
+Here we will define a monomer representing the protein **Raf**, for use in a
+model of the MAPK signaling cascade. We choose to give our Raf monomer two
+sites: **s** represents the serine residue on which it is phosphorylated by Ras
+to activate its own kinase activity, and **k** represents the catalytic kinase
+domain with which it can subsequently phosphorylate MEK. Site **s** can take on
+two states: 'u' for unphosphorylated and 'p' for phosphorylated::
 
-   >>> import mymodel as m
-   >>> m.model.monomers
+    Monomer('Raf', ['s', 'k'], {'s': ['u', 'p']})
 
-You should see the following output::
+Now let's provide a definition for **MEK**, the substrate of Raf. MEK has two
+serine residues at positions 218 and 222 in the amino acid sequence which are
+both phosphorylated by Raf. We can't call them both **s** as site names must be
+unique within a monomer, so we've used the residue numbers in the sites' names
+to distinguish them: **s218** and **s222**. MEK has a kinase domain of its own
+for which we've again used **k**::
 
-    Monomer(name='C8', sites=['b'], site_states={})
-    Monomer(name='Bid', sites=['b', 'S'], site_states={})
+    Monomer('MEK', ['s218', 's222', 'k'], {'s218': ['u', 'p'], 's222': ['u', 'p']})
 
-In the first line, we treat :file:`mymodel.py` as a *module* [#mod]_
-and import its symbol ``model``.  In the second and third lines, we
-loop over the ``monomers`` attribute of ``model``, printing each
-element of that list.  The output for each monomer is a more verbose,
-explicit representation of the same call we used to define it. [#mkw]_
+Adding these two monomer definitions to a new model file ``tutorial_b.py``
+yields the following:
 
-Here we can start to see how PySB is different from other modeling
-tools.  With other tools, text files are typically created with a
-certain syntax, then passed through an execution tool to perform a
-task and produce an output, whether on the screen or to an output
-file.  In PySB on the other hand we write Python code defining our
-model in a regular Python module, and the elements we define in that
-module can be inspected and manipulated as Python objects
-interactively in one of the Python REPLs such as *iPython* or
-*Python*. We will explore this concept in more detail in the next
-section, but for now we will cover the other types components needed
-to create a working model.
+.. literalinclude:: /../pysb/examples/tutorial_b.py
+
+We can import this model in an interactive Python session and explore its
+monomers::
+
+    >>> from tutorial_b import model
+    >>> model.monomers
+    ComponentSet([
+     Monomer('Raf', ['s', 'k'], {'s': ['u', 'p']}),
+     Monomer('MEK', ['s218', 's222', 'k'], {'s218': ['u', 'p'], 's222': ['u', 'p']}),
+     ])
+    >>> [m.name for m in model.monomers]
+    ['Raf', 'MEK']
+    >>> model.monomers[0]
+    Monomer('Raf', ['s', 'k'], {'s': ['u', 'p']})
+    >>> model.monomers.keys()
+    ['Raf', 'MEK']
+    >>> model.monomers['MEK']
+    Monomer('MEK', ['s218', 's222', 'k'], {'s218': ['u', 'p'], 's222': ['u', 'p']})
+    >>> model.monomers['MEK'].sites
+    ['s218', 's222', 'k']
+
+The ``Model`` class has a container for each component type, for example
+``monomers`` holds the monomers. These component objects are the very same ones
+you defined in your model script -- they were implicitly added to the model's
+``monomers`` container by the self-export system. This container is a
+``ComponentSet``, a special PySB class which acts like a list, a dict and a set
+rolled into one, although it can only hold ``Component`` objects and can only be
+appended to (never deleted from). Its list personality allows you to iterate
+over the components or index an individual component by integer position, with
+the ordering of the values corresponding to the order in which the components
+were defined in the model. Its dict personality allows you to index an
+individual component with its string name and use the standard ``keys`` and
+``items`` methods. The set personality allows set operations with ordering
+retained. For binary set operators, the left-hand operand's ordering takes
+precedence.
+
+We can also access the fields of a ``Monomer`` object such as ``name`` and
+``sites``. See the :doc:`/modules/core` section of the module reference for
+documentation on the fields and methods of all the component classes.
+
 
 Parameters
-==========
+----------
 
 A ``Parameter`` is a named constant floating point number used as a
 reaction rate constant, compartment volume or initial (boundary)
@@ -208,7 +244,7 @@ species and parameters.
    parameter values accordingly.
 
 Rules
-=====
+-----
 
 Rules, as described in this section, comprise the basic elements of
 procedural instructions that encode biochemical interactions. In its
@@ -324,34 +360,8 @@ python prompts).::
 With this we are almost ready to run a simulation, all we need now is
 to specify the initial conditions of the system.
 
-Initial conditions
-==================
-Having specified the *monomers*, the *parameters* and the *rules* we
-have the basics of what is needed to generate a set of ODEs and run a
-model. From a mathematical perspective a system of ODEs can only be
-solved if a bound is placed on the ODEs for integration. In our case,
-these bounds are the initial conditions of the system that indicate
-how much non-zero initial species are present at time *t=0s* in the
-system. In our system, we only have two initial species, namely *C8*
-and *Bid* so we need to specify their initial concentrations. To do
-this we enter the following lines of code into the :file:`mymodel.py`
-file::
-
-   Parameter('C8_0', 1000)
-   Parameter('Bid_0', 10000)
-   Initial(C8(b=None), C8_0)
-   Initial(Bid(b=None, S='u'), Bid_0)
-
-A parameter object must be declared to specify the initial condition
-rather than just giving a value as shown above. Once the parameter
-object is declared (i.e. *C8_0* and *Bid_0*) it can be fed to the
-*Initial* definition. Now that we have specified the initial
-conditions we are basically ready to run simulations. We will add an
-*observables* call in the next section prior to running the
-simulation.
-
 Observables
-===========
+-----------
 
 In our model we have two initial species (*C8* and *Bid*) and one
 output species (*tBid*). As shown in the :eq:`ODEs` derived from the
@@ -377,6 +387,32 @@ As shown,the observable can be a species. As we will show later the
 observable can also contain wild-cards and given the "don't care don't
 write" approach to rule-writing it can be a very powerful approach to
 observe activated complexes.  
+
+Initial conditions
+==================
+Having specified the *monomers*, the *parameters* and the *rules* we
+have the basics of what is needed to generate a set of ODEs and run a
+model. From a mathematical perspective a system of ODEs can only be
+solved if a bound is placed on the ODEs for integration. In our case,
+these bounds are the initial conditions of the system that indicate
+how much non-zero initial species are present at time *t=0s* in the
+system. In our system, we only have two initial species, namely *C8*
+and *Bid* so we need to specify their initial concentrations. To do
+this we enter the following lines of code into the :file:`mymodel.py`
+file::
+
+   Parameter('C8_0', 1000)
+   Parameter('Bid_0', 10000)
+   Initial(C8(b=None), C8_0)
+   Initial(Bid(b=None, S='u'), Bid_0)
+
+A parameter object must be declared to specify the initial condition
+rather than just giving a value as shown above. Once the parameter
+object is declared (i.e. *C8_0* and *Bid_0*) it can be fed to the
+*Initial* definition. Now that we have specified the initial
+conditions we are basically ready to run simulations. We will add an
+*observables* call in the next section prior to running the
+simulation.
 
 Simulation and analysis
 =======================
@@ -820,27 +856,56 @@ interacts with the protein *Bak* (residing in the membrane).
 
 Model calibration
 =================
-**COMING SOON: ANNEAL**
 
 Modules
 =======
 
+Miscellaneous
+=============
+
+Self-export
+-----------
+
+For anyone who feels a little queasy about self-export, this section will try to
+explain the rationale behind it.
+
+In order to make model definition feel like a domain-specific language specially
+designed for model construction, the mechanism for component definition needs to
+provide three things:
+
+* It must provide an internal name so that components can be usefully
+  distinguished when inspected interactively, or translated into various output
+  file formats such as BNGL.
+* The component object must be assigned to a local variable so that subsequent
+  component declarations can reference it by name using normal Python syntax
+  (including operator overloading).
+* The object must also be inserted into the data structures of the model object
+  itself.
+
+Without self-export, every component definition would need to manage these
+points explicitly::
+
+    A = Monomer('A')
+    model.add_component(A)
+    B = Monomer('B')
+    model.add_component(B)
+
+This pattern introduces several opportunities for error, for example a ``name``
+argument and the corresponding variable name may end up out of sync or the
+modeler may forget an ``add_component`` call. The redundancy also introduces
+visual noise which makes the code harder to read. Furthermore, self-export makes
+model modularization much simpler, as components may be defined within functions
+without forcing the function to explicitly return them or requiring extra code
+in the caller to deal with the returned components.
+
+In addition to ``Component`` and its subclasses, the ``Model`` constructor also
+utilizes self-export, with two differences: The local variable is always named
+``model``, and the ``name`` argument is optional and defaults to the full
+hierarchical name of the module from which ``Model()`` is called, e.g.
+``pysb.examples.tutorial_a``.
+
 
 .. rubric:: Footnotes
-
-.. [#func] Technically speaking it's a constructor, not just any old
-	   function.
-
-.. [#mod] *Python* allows users to write PySB code to a file. This
-	  file can be later used as an executable script or from an
-	  interactive instance. Such files are called *modules* and
-	  can be imported into a Python instance. See `Python modules
-	  <http://docs.python.org/tutorial/modules.html>`_ for
-	  details.
-
-.. [#mkw] The astute Python programmer will recognize this as the
-	  ``repr`` of the monomer object, using keyword arguments in the
-	  constructor call.
 
 .. [#sp] SciPy: http://www.scipy.org
 
