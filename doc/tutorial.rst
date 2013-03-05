@@ -191,60 +191,68 @@ We can also access the fields of a ``Monomer`` object such as ``name`` and
 ``sites``. See the :doc:`/modules/core` section of the module reference for
 documentation on the fields and methods of all the component classes.
 
+Parameter
+---------
 
-Parameters
-----------
+Parameters are constant numerical values that represent biological constants. A
+parameter can be used as a reaction rate constant, compartment volume or initial
+(boundary) condition for a molecular species. Other than *name*, the only other
+attribute of a parameter is its numerical *value*.
 
-A ``Parameter`` is a named constant floating point number used as a
-reaction rate constant, compartment volume or initial (boundary)
-condition for a species (*parameter* in BNG). A parameter is defined
-using the keyword ``Parameter`` followed by its name and value. Here
-is how you would define a parameter named 'kf1' with the value
-:math:`4 \times 10^{-7}`::
+The :py:class:`Parameter constructor <pysb.core.Parameter>` takes the name and
+value as its two arguments. The value is optional and defaults to 0.
 
-    Parameter('kf1', 4.0e-7)
+Here we will define three parameters: a forward reaction rate for the binding of
+Raf and MEK and initial conditions for those two proteins::
 
-The second argument may be any numeric expression, but best practice
-is to use a floating-point literal in scientific notation as shown in
-the example above. For our model we will need three parameters, one
-each for the forward, reverse, and catalytic reactions in our
-system. Go to your :file:`mymodel.py` file and add the lines
-corresponding to the parameters so that your file looks like this:
+    Parameter('kf', 1e-5)
+    Parameter('Raf_0', 7e4)
+    Parameter('MEK_0', 3e6)
 
-.. literalinclude:: examples/mymodel2.py
+Add these parameter definitions to our ``tutorial_b`` model file
+to create ``tutorial_c.py``:
 
-Once this is done start the *ipython* (or *python*) intepreter and
-enter the following commands:: 
+.. literalinclude:: /../pysb/examples/tutorial_c.py
 
-   >>> import mymodel as m
-   >>> m.model.parameters
+Then explore the ``parameters`` container::
 
-and you should get an output such as::
+    >>> from tutorial_c import model
+    >>> model.parameters
+    ComponentSet([
+     Parameter('kf', 1e-05),
+     Parameter('Raf_0', 70000.0),
+     Parameter('MEK_0', 3000000.0),
+     ])
+    >>> model.parameters['Raf_0'].value
+    70000.0
 
-   {'kf': Parameter(name='kf', value=1.0e-07),
-    'kr': Parameter(name='kr', value=1.0e-03),
-    'kc': Parameter(name='kc', value=1.0    )}
+Parameters as defined are unitless, so you'll need to maintain unit consistency
+on your own. Best practice is to use number of molecules for species
+concentrations (i.e. initial conditions) and S.I. units for everything else:
+unimolecular rate constants in :math:`s^{-1}`, bimolecular rate constants in
+:math:`\#molecules^{-1} \times s^{-1}`, compartment volumes in :math:`L`, etc.
 
-Your model now has monomers and parameters specified. In the next
-section we will specify rules, which specify the interaction between
-species and parameters. 
-
-.. Warning:: 
-
-   PySB or the integrators that we suggest for use for numerical
-   manipulation do not keep track of units for the user. As such, the
-   user is responsible for keeping track of the model in units that
-   make sense to the user! For example, the forward rates are
-   typically in :math:`M^{-1}s^{-1}`, the reverse rates in
-   :math:`s^{-1}`, and the catalytic rates in :math:`s^{-1}`. For the
-   present examples we have chosen to work in a volume size of
-   :math:`1.0 pL` corresponding to the volume of a cell and to specify
-   the Parameters and `Initial conditions`_ in numbers of molecules
-   per cell. If you wish to change the units you must change *all* the
-   parameter values accordingly.
+In the following sections we will see how parameters are used to build other
+model components.
 
 Rules
 -----
+
+Rules define chemical reactions between molecules and complexes. A rule consists
+of a *name*, a pattern describing which molecular species should act as the
+*reactants*, another pattern describing how reactants should be transformed into
+*products*, and parameters denoting the *rate constants*.
+
+The :py:class:`Rule constructor <pysb.core.Rule>` takes a name, a
+``RuleExpression`` containing the reactant and product patterns (more on that
+below) and one or two ``Parameter`` objects for the rate constants. It also
+takes several optional boolean flags as kwargs which alter the behavior of the
+rule in certain ways.
+
+.. todo - describe flags somewhere and reference it here
+
+
+
 
 Rules, as described in this section, comprise the basic elements of
 procedural instructions that encode biochemical interactions. In its
