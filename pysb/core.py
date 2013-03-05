@@ -1391,14 +1391,37 @@ def extract_site_conditions(conditions=None, **kwargs):
 # classes almost fit the bill, except that their __str__ method prepends the
 # complete module hierarchy to the base class name. The KeywordMeta class here
 # implements an alternate __str__ method which just returns the base name.
+
 class KeywordMeta(type):
     def __str__(cls):
         return cls.__name__
+
 class Keyword(object): __metaclass__ = KeywordMeta
 
 # The keywords.
-class ANY(Keyword): pass
-class WILD(Keyword): pass
+
+class ANY(Keyword):
+    """Site must have a bond, but identity of binding partner is irrelevant.
+
+    Use ANY in a MonomerPattern site_conditions dict to indicate that a site
+    must have a bond without specifying what the binding partner should be.
+
+    Equivalent to the "+" bond modifier in BNG."""
+    pass
+
+class WILD(Keyword):
+    """Site may be bound or unbound.
+
+    Use WILD as part of a (state, WILD) tuple in a MonomerPattern
+    site_conditions dict to indicate that a site must have the given state,
+    irrespective of the presence or absence of a bond. (Specifying only the
+    state implies there must not be a bond). A bare WILD in a site_conditions
+    dict is also permissible, but as this has the same meaning as the much
+    simpler option of leaving the given site out of the dict entirely, this
+    usage is deprecated.
+
+    Equivalent to the "?" bond modifier in BNG."""
+    pass
 
 
 warnings.simplefilter('always', ModelExistsWarning)
