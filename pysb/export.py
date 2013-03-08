@@ -65,6 +65,7 @@ formats = {
         'bngl': 'ExportBngl',
         'bng_net': 'ExportBngNet',
         'potterswheel': 'ExportPottersWheel',
+        'sbml': 'ExportSbml',
         }
 
 def export(model, format):
