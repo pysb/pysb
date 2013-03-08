@@ -68,6 +68,7 @@ formats = {
         'potterswheel': 'ExportPottersWheel',
         'sbml': 'ExportSbml',
         'python': 'ExportPython',
+        'mathematica': 'ExportMathematica',
         }
 
 def export(model, format):
