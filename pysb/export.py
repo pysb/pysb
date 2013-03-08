@@ -1,15 +1,28 @@
 #!/usr/bin/env python
 """
-Docstring for this module
+Module containing a  class for returning the BNGL for a given PySB model. Serves as a
+command-line wrapper around ``pysb.generator.bng.BngGenerator``.
+
+Usage
+=====
+
+At the command-line, run as follows::
+
+    python -m pysb.export model_name.py bngl > model_name.bngl
+
+or
+
+    export.py model_name.py bngl > model_name.bngl
+
+where ``model_name.py`` contains a PySB model definition (i.e., contains
+an instance of ``pysb.core.Model`` instantiated as a global variable). The
+generated BNGL will be printed to standard out, allowing it to be inspected
+or redirected to another file.
 """
+
 import sys
 import os
 import re
-
-# Import all of the exporter classes
-#from pysb.export.bngl import ExportBngl
-#from pysb.export.matlab import ExportMatlab
-
 
 class Export(object):
     """The base exporter class.
@@ -20,19 +33,15 @@ class Export(object):
         self.model = model
 
     def export(self):
-        """The exporter. Maybe return notimplemented error?"""
-        pass
+        """The export method. Must be implemented by any subclass.
+        """
+        raise NotImplementedError()
 
-class ExportBngl(Export):
-    def export(self):
-        return "dummy"
-
-# Define the list of supported formats
+# Define a dict listing supported formats and the names of the classes
+# implementing their export procedures
 formats = {
-        'bngl': ExportBngl,
-        #'matlab': ExportMatlab,
+        'bngl': 'ExportBngl',
         }
-
 
 def export(model, format):
     """Top-level function for exporting a model to a given format.
@@ -44,7 +53,12 @@ def export(model, format):
     format : string
         A string indicating the desired export format.
     """
-    e = formats[format](model)
+
+    # Import the exporter module. This is done at export runtime to avoid
+    # circular imports at module loading
+    export_module = __import__('pysb.exporters.' + format, fromlist=[formats[format]])
+    export_class = getattr(export_module, formats[format])
+    e = export_class(model)
     return e.export()
 
 if __name__ == '__main__':
