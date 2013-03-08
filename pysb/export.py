@@ -18,6 +18,28 @@ where ``model_name.py`` contains a PySB model definition (i.e., contains
 an instance of ``pysb.core.Model`` instantiated as a global variable). The
 generated BNGL will be printed to standard out, allowing it to be inspected
 or redirected to another file.
+
+Usage in the Python shell
+=========================
+
+To use in a Python shell, import a model::
+
+    from pysb.examples.robertson import model
+
+and import this module::
+
+    from pysb.tools import export_potterswheel
+
+then call the function ``run``, passing the model instance::
+
+    potterswheel_output = export_potterswheel.run(model)
+
+then write the output to a file::
+
+    f = open('robertson.m', 'w')
+    f.write(potterswheel_output)
+    f.close()
+
 """
 
 import sys
@@ -41,6 +63,7 @@ class Export(object):
 # implementing their export procedures
 formats = {
         'bngl': 'ExportBngl',
+        'potterswheel': 'ExportPottersWheel',
         }
 
 def export(model, format):
