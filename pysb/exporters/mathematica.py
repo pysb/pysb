@@ -1,7 +1,9 @@
-#!/usr/bin/env python
 """
-A class for converting a PySB model to a set of ordinary differential
-equations for integration or analysis in Mathematica.
+Module containing a class for converting a PySB model to a set of ordinary
+differential equations for integration or analysis in Mathematica.
+
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
 
 Output for the Robertson example model
 ======================================
@@ -101,13 +103,21 @@ from math import floor, log
 from pysb.export import Export
 
 class ExportMathematica(Export):
+    """A class for returning the ODEs for a given PySB model for use in
+    Mathematica.
+
+    Inherits from :py:class:`pysb.export.Export`, which implements
+    basic functionality for all exporters.
+    """
+
     def export(self):
-        """Export ``self.model`` as a set of ODEs for use in Mathematica.
+        """Generate the corresponding Mathematica ODEs for the PySB model
+        associated with the exporter.
 
         Returns
         -------
         string
-            String containing the Mathematica code for the ODEs.
+            String containing the Mathematica code for the model's ODEs.
         """
 
         output = StringIO()

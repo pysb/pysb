@@ -1,23 +1,11 @@
-#!/usr/bin/env python
 """
-A class for converting a PySB model to an equivalent set of ordinary
-differential equations for integration or analysis in PottersWheel_.
+Module containing a class for converting a PySB model to an equivalent set of
+ordinary differential equations for integration or analysis in PottersWheel_.
 
 .. _PottersWheel: http://www.potterswheel.de
 
-Usage as a command-line script
-==============================
-
-As a command-line script, run as follows::
-
-    export_potterswheel.py model_name.py > model_name.m
-
-where ``model_name.py`` contains a PySB model definition (i.e., contains an
-instance of ``pysb.core.Model`` instantiated as a global variable). The text of
-the PottersWheel code will be printed to standard out, allowing it to be
-redirected to another file, as shown in this example. Note that the name of the
-``.m`` file must match the name of the ODE function (e.g., ``robertson.m`` in
-the example below).
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
 
 Output for the Robertson example model
 ======================================
@@ -75,8 +63,15 @@ from StringIO import StringIO
 from pysb.export import Export
 
 class ExportPottersWheel(Export):
+    """A class for returning the PottersWheel equivalent for a given PySB model.
+
+    Inherits from :py:class:`pysb.export.Export`, which implements
+    basic functionality for all exporters.
+    """
+
     def export(self):
-        """Export ``self.model`` as a set of ODEs for use in PottersWheel.
+        """Generate the PottersWheel code for the ODEs of the PySB model
+        associated with the exporter.
 
         Returns
         -------

@@ -1,3 +1,12 @@
+"""
+Module containing a class for exporting a PySB model to BNGL.
+
+Serves as a wrapper around :py:class:`pysb.generator.bng.BngGenerator`.
+
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
+"""
+
 from pysb.generator.bng import BngGenerator
 from pysb.export import Export
 
@@ -10,13 +19,12 @@ class ExportBngl(Export):
 
     def export(self):
         """Generate the corresponding BNGL for the PySB model associated
-        with the exporter. A wrapper around
-        ``pysb.generator.bng.BngGenerator``.
+        with the exporter. A wrapper around ``pysb.generator.bng.BngGenerator``.
 
         Returns
         -------
         string
-            The BNGL output for ``self.model``.
+            The BNGL output for the model.
         """
         gen = BngGenerator(self.model)
         return gen.get_content()

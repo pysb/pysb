@@ -1,6 +1,8 @@
-#!/usr/bin/env python
 """
-A class for converting a PySB model to an SBML file.
+Module containing a class for exporting a PySB model to SBML.
+
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
 """
 
 # FIXME this should use libsbml if available
@@ -79,8 +81,14 @@ def get_species_annotation(meta_id, cp):
     return indent(output, 16)
 
 class ExportSbml(Export):
+    """A class for returning the SBML for a given PySB model.
+
+    Inherits from :py:class:`pysb.export.Export`, which implements
+    basic functionality for all exporters.
+    """
+
     def export(self):
-        """Export ``self.model`` as SBML.
+        """Export the SBML for the PySB model associated with the exporter.
 
         Returns
         -------
@@ -100,7 +108,8 @@ class ExportSbml(Export):
             </listOfCompartments>
     """)
 
-        ics = [[s, 0] for s in self.model.species]  # complexpattern, initial value
+        # complexpattern, initial value
+        ics = [[s, 0] for s in self.model.species]
         for cp, ic_param in self.model.initial_conditions:
             ics[self.model.get_species_index(cp)][1] = ic_param.value
         output.write("        <listOfSpecies>\n")

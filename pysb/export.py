@@ -50,10 +50,26 @@ in the list in the "Command-line usage" section above::
 The output (a string) can be inspected or written to a file, e.g. as follows::
 
     with open('robertson.sbml', 'w') as f:
-        f.write(potterswheel_output)
+        f.write(sbml_output)
 
-For more information on the implementation of specific exporters, see the
-documentation for the exporter classes in the package :py:mod:`pysb.exporters`.
+
+Implementation of specific exporters
+====================================
+
+Information on the implementation of specific exporters can be found in the
+documentation for the exporter classes in the package :py:mod:`pysb.exporters`:
+
+.. toctree::
+   :maxdepth: 2
+
+   exporters/sbml.rst
+   exporters/matlab.rst
+   exporters/mathematica.rst
+   exporters/potterswheel.rst
+   exporters/bngl.rst
+   exporters/bng_net.rst
+   exporters/kappa.rst
+   exporters/python.rst
 """
 
 import sys

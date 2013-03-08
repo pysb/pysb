@@ -1,17 +1,25 @@
-#!/usr/bin/env python
 """
-A class for getting the BNGL NET file for a given PySB model. Serves as a
-command-line wrapper around ``pysb.bng.generate_network()``, which generates
-the BNGL for the model and then invokes BNG to generate the NET file.
+Module containing a class for getting the BNGL NET file for a given PySB model.
+
+Serves as a wrapper around :py:func:`pysb.bng.generate_network`, which
+generates the BNGL for the model and then invokes BNG to generate the NET file.
+
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
 """
 
 from pysb.bng import generate_network
 from pysb.export import Export
 
 class ExportBngNet(Export):
+    """A class for generating the BNG NET file for a given PySB model.
+
+    Inherits from :py:class:`pysb.export.Export`, which implements
+    basic functionality for all exporters.
+    """
     def export(self):
-        """Generate the BNGL NET file for ``self.model``.
-        A wrapper around ``pysb.bng.generate_network()``.
+        """Generate the BNGL NET file for the PySB model associated with
+        the exporter. A wrapper around :py:func:`pysb.bng.generate_network`.
 
         Returns
         -------

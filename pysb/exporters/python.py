@@ -1,41 +1,11 @@
 """
-Produce Python code for simulating a PySB model without requiring PySB itself
-(note that NumPy and SciPy are still required). This offers a way of
-distributing a model to those who do not have PySB. Can be used as a
-command-line script or from within the Python shell.
+A module containing a class that produces Python code for simulating a PySB
+model without requiring PySB itself (note that NumPy and SciPy are still
+required). This offers a way of distributing a model to those who do not have
+PySB.
 
-Usage as a command-line script
-==============================
-
-As a command-line script, run as follows::
-
-    export_potterswheel.py model_name.py > model_standalone.py
-
-where ``model_name.py`` contains a PySB model definition (i.e., contains an
-instance of ``pysb.core.Model`` instantiated as a global variable). The text of
-the generated Python code will be printed to standard out, allowing it to be
-redirected to another file, as shown in this example.
-
-Usage in the Python shell
-=========================
-
-To use in a Python shell, import a model::
-
-    from pysb.examples.robertson import model
-
-and import this module::
-
-    from pysb.tools import export_python
-
-then call the function ``run``, passing the model instance::
-
-    python_output = export_python.run(model)
-
-then write the output to a file::
-
-    f = open('robertson_standalone.py', 'w')
-    f.write(python_output)
-    f.close()
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
 
 Structure of the standalone Python code
 =======================================
@@ -113,14 +83,17 @@ def pad(text, depth=0):
     return text
 
 class ExportPython(Export):
+    """A class for returning the standalone Python code for a given PySB model.
+
+    Inherits from :py:class:`pysb.export.Export`, which implements
+    basic functionality for all exporters.
+    """
     def export(self, docstring=None):
         """Export Python code for simulation of a model without PySB.
 
         Parameters
         ----------
-        model : pysb.core.Model
-            The model to export as a standalone Python program.
-        docstring : string
+        docstring : string (optional)
             The header docstring to include at the top of the generated Python
             code.
 
