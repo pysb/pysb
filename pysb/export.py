@@ -63,6 +63,7 @@ class Export(object):
 # implementing their export procedures
 formats = {
         'bngl': 'ExportBngl',
+        'bng_net': 'ExportBngNet',
         'potterswheel': 'ExportPottersWheel',
         }
 
