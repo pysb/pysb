@@ -1,45 +1,59 @@
 #!/usr/bin/env python
 """
-Module containing a  class for returning the BNGL for a given PySB model. Serves as a
-command-line wrapper around ``pysb.generator.bng.BngGenerator``.
+A script for exporting PySB models to a variety of other formats.
 
-Usage
-=====
+Exporting can be performed at the command-line or programmatically/interactively
+from within Python.
+
+Command-line usage
+==================
 
 At the command-line, run as follows::
 
-    python -m pysb.export model_name.py bngl > model_name.bngl
+    python -m pysb.export model_name.py [format]
 
-or
+where ``model_name.py`` is a file containing a PySB model definition (i.e.,
+contains an instance of ``pysb.core.Model`` instantiated as a global variable).
+``[format]`` should be the name of one of the supported formats:
 
-    export.py model_name.py bngl > model_name.bngl
+- ``bngl``
+- ``bng_net``
+- ``kappa``
+- ``potterswheel``
+- ``sbml``
+- ``python``
+- ``mathematica``
+- ``matlab``
 
-where ``model_name.py`` contains a PySB model definition (i.e., contains
-an instance of ``pysb.core.Model`` instantiated as a global variable). The
-generated BNGL will be printed to standard out, allowing it to be inspected
-or redirected to another file.
+In all cases, the exported model code will be printed to standard
+out, allowing it to be inspected or redirected to another file.
 
-Usage in the Python shell
-=========================
+Interactive usage
+=================
 
-To use in a Python shell, import a model::
+Export functionality is implemented by this module's top-level function
+``export``. For example, to export the "Robertson" example model as SBML, first
+import the model::
 
     from pysb.examples.robertson import model
 
-and import this module::
+Then import the ``export`` function from this module::
 
-    from pysb.tools import export_potterswheel
+    from pysb.export import export
 
-then call the function ``run``, passing the model instance::
+Call the ``export`` function, passing the model instance and a string
+indicating the desired format, which should be one of the ones indicated
+in the list in the "Command-line usage" section above::
 
-    potterswheel_output = export_potterswheel.run(model)
+    sbml_output = export(model, 'sbml')
 
-then write the output to a file::
+The output (a string) can be inspected or written to a file, e.g. as follows::
 
-    f = open('robertson.m', 'w')
-    f.write(potterswheel_output)
-    f.close()
+    with open('robertson.sbml', 'w') as f:
+        f.write(potterswheel_output)
 
+For more information on the implementation of specific exporters, see the
+documentation for the exporter classes in the package :py:mod:`pysb.exporters`.
 """
 
 import sys
@@ -47,15 +61,40 @@ import os
 import re
 
 class Export(object):
-    """The base exporter class.
+    """Base class for all PySB model exporters.
+
+    Export functionality is implemented by subclasses of this class. The
+    pattern for model export is the same for all exporter subclasses: a
+    model is passed to the exporter constructor and the ``export`` method
+    on the instance is called.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to export.
+
+    Examples
+    --------
+
+    Exporting the "Robertson" example model to SBML using the ``ExportSbml``
+    subclass::
+
+    >>> from pysb.examples.robertson import model
+    >>> from pysb.exporters.sbml import ExportSbml
+    >>> e = ExportSbml(model)
+    >>> sbml_output = e.export()
     """
 
     def __init__(self, model):
-        """Constructor. Takes a model."""
         self.model = model
+        """The model to export."""
 
     def export(self):
-        """The export method. Must be implemented by any subclass.
+        """The export method, which must be implemented by any subclass.
+
+        All implementations of this method are expected to return a single
+        string containing the representation of the model in the desired
+        format.
         """
         raise NotImplementedError()
 
@@ -85,7 +124,8 @@ def export(model, format):
 
     # Import the exporter module. This is done at export runtime to avoid
     # circular imports at module loading
-    export_module = __import__('pysb.exporters.' + format, fromlist=[formats[format]])
+    export_module = __import__('pysb.exporters.' + format,
+                               fromlist=[formats[format]])
     export_class = getattr(export_module, formats[format])
     e = export_class(model)
     return e.export()
@@ -93,9 +133,9 @@ def export(model, format):
 if __name__ == '__main__':
     # Check the arguments
     if len(sys.argv) <= 2:
-        raise Exception("You must specify the filename of a model script " \
-                        "and a format for export.")
-        # FIXME FIXME Print usage message
+        print __doc__,
+        exit()
+
     model_filename = sys.argv[1]
     format = sys.argv[2]
 
