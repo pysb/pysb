@@ -64,6 +64,7 @@ class Export(object):
 formats = {
         'bngl': 'ExportBngl',
         'bng_net': 'ExportBngNet',
+        'kappa': 'ExportKappa',
         'potterswheel': 'ExportPottersWheel',
         'sbml': 'ExportSbml',
         }
