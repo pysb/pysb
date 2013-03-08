@@ -67,6 +67,7 @@ formats = {
         'kappa': 'ExportKappa',
         'potterswheel': 'ExportPottersWheel',
         'sbml': 'ExportSbml',
+        'python': 'ExportPython',
         }
 
 def export(model, format):
