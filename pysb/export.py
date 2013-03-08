@@ -69,6 +69,7 @@ formats = {
         'sbml': 'ExportSbml',
         'python': 'ExportPython',
         'mathematica': 'ExportMathematica',
+        'matlab': 'ExportMatlab',
         }
 
 def export(model, format):
