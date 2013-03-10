@@ -46,64 +46,164 @@ import pysb.bng
 import sympy
 import re
 from StringIO import StringIO
-from pysb.export import Export
+from pysb.export import Export, pad
 
 class ExportMatlab(Export):
+    """A class for returning the ODEs for a given PySB model for use in
+    MATLAB.
+
+    Inherits from :py:class:`pysb.export.Export`, which implements
+    basic functionality for all exporters.
+    """
     def export(self):
-        """Export the model as a set of ODEs for use in MATLAB.
+        """Generate a MATLAB class definition containing the ODEs for the PySB
+        model associated with the exporter.
 
         Returns
         -------
         string
-            String containing the MATLAB code for the ODE right-hand side
-            function.
+            String containing the MATLAB code for an implementation of the
+            model's ODEs.
         """
-
         output = StringIO()
         pysb.bng.generate_equations(self.model)
 
+        # Substitute underscores for any dots in the model name
         model_name = self.model.name.replace('.', '_')
 
-        # Header comment
-        output.write("% MATLAB model definition file\n")
-        output.write('%% save as %s_odes.m\n' % model_name)
-        # The name of the ODE function
-        output.write('function out = %s_odes(t, input, param)\n\n' % model_name)
+        # -- Parameters and Initial conditions -------
+        # Declare the list of parameters. Ignore any initial condition
+        # parameters, as these will get incorporated into the initial
+        # values vector
+        params_str = ('\n'+' '*8).join(
+                     ['%s' % p.name for p in self.model.parameters
+                      if p not in self.model.parameters_initial_conditions()])
 
-        # Initialize the parameter array with parameter values
-        params_str = '\n'.join(['param(%d) = %s %% %s;' % (i+1, p.value, p.name)
-                                 for i, p in enumerate(self.model.parameters)])
+        # Get a list of tuples for all species in the model, consisting
+        # of the (zero or non-zero) initial condition for the species
+        # and the species' string representation
+        ic_values = ['0'] * len(self.model.odes)
+        for i, ic in enumerate(self.model.initial_conditions):
+            ic_values[self.model.get_species_index(ic[0])] = ic[1].value
+        ic_tuples = zip(ic_values, self.model.species)
 
-        # Convert the species list to MATLAB comments
+        # Build the list of initial condition declarations, assigning the
+        # values and adding a comment to indicate the identity of the species
+        initial_values_str = ('\n'+' '*12).join(
+                ['self.default_initial_values(%d) = %s; %% %s' %
+                 (i+1, ic_tuple[0], ic_tuple[1])
+                 for i, ic_tuple in enumerate(ic_tuples)])
+
+        # Assign nominal values to parameters, ignoring any initial condition
+        # parameters
+        param_values_str = ('\n'+' '*12).join(
+                       ['self.%s = %g;' % (p.name, p.value)
+                        for p in self.model.parameters
+                        if p not in self.model.parameters_initial_conditions()])
+
+        # -- Build ODEs -------
+        # Build a stringified list of species
         species_list = ['%% %s;' % s for i, s in enumerate(self.model.species)]
         # Build the ODEs as strings from the model.odes array
-        odes_list = ['out(%d,1) = %s;' % (i+1, sympy.ccode(self.model.odes[i])) 
+        odes_list = ['y(%d,1) = %s;' % (i+1, sympy.ccode(self.model.odes[i])) 
                      for i in range(len(self.model.odes))] 
         # Zip the ODEs and species string lists and then flatten them
         # (results in the interleaving of the two lists)
         odes_species_list = [item for sublist in zip(species_list, odes_list)
                                   for item in sublist]
-        odes_str = '\n'.join(odes_species_list)
+        # Flatten to a string and add correct indentation
+        odes_str = ('\n'+' '*12).join(odes_species_list)
 
-        # Change species names from, e.g., 's(0)' to 'input(1)' (note change
+        # Change species names from, e.g., 's(0)' to 'y0(1)' (note change
         # from zero-based indexing to 1-based indexing)
         odes_str = re.sub(r's(\d+)', \
-                          lambda m: 'input(%s)' % (int(m.group(1))+1), odes_str)
+                          lambda m: 'y0(%s)' % (int(m.group(1))+1), odes_str)
         # Change C code 'pow' function to MATLAB 'power' function
         odes_str = re.sub(r'pow\(', 'power(', odes_str)
-
-        # Convert named parameters to, e.g. 'param(1)'
+        # Prepend 'self.' to named parameters
         for i, p in enumerate(self.model.parameters):
-            odes_str = re.sub(r'\b(%s)\b' % p.name, 'param(%d)' % (i+1),
+            odes_str = re.sub(r'\b(%s)\b' % p.name, 'self.%s' % p.name,
                               odes_str)
 
-        # List the mapping of complexes to indices in the species array
-        # species_list = '\n'.join(['%% input(%d) = %s;' % (i+1, s)
-        #                            for i, s in enumerate(self.model.species)])
+        # -- Build final output --
+        output.write(pad(r"""
+            classdef %(model_name)s
+                %% A class implementing the ordinary differential equations
+                %% for the %(model_name)s model.
+                %%
+                %% Save as %(model_name)s.m.
+                %%
+                %% Generated by pysb.exporters.matlab.ExportMatlab.
+                %%
+                %% Properties
+                %% ----------
+                %% default_initial_values : vector of doubles
+                %%     The vector of default initial values for all species,
+                %%     specified in the order that they occur in the original
+                %%     PySB model (i.e., in the order found in model.species).
+                %%     The default values can be used by passing this vector to
+                %%     the MATLAB solver as the y0 argument; however, if
+                %%     desired, a vector of alternative initial conditions can
+                %%     be passed to the solver instead (see Examples below).
+                %%     The order of species can be found by inspecting the
+                %%     source code for the constructor, in which the default
+                %%     values are assigned.
+                %%
+                %% All rate parameters are also exposed as properties by name,
+                %% using the names from the original PySB model. The nominal
+                %% values are set by the constructor and their values can be
+                %% overriden explicitly once an instance has been created.
+                %%
+                %% Methods
+                %% -------
+                %% %(model_name)s.odes(tspan, y0)
+                %%     The right-hand side function for the ODEs of the model,
+                %%     for use with MATLAB ODE solvers (see Examples).
+                %%
+                %% Examples
+                %% --------
+                %% Example integration using default initial and parameter
+                %% values:
+                %%
+                %% >> m = %(model_name)s();
+                %% >> tspan = [0 100];
+                %% >> [t x] = ode15s(@m.odes, tspan, m.default_initial_values);
+                %%
+                %% Example using overriden initial values:
+                %%
+                %% >> m = %(model_name)s();
+                %% >> tspan = [0 100];
+                %% >> [t x] = ode15s(@m.odes, tspan, new_initial_values);
+                %%
+                properties
+                    default_initial_values
+                    %(params_str)s
+                end
 
-        output.write(params_str + "\n\n")
-        output.write(odes_str + "\n\n")
-        output.write("end\n")
+                methods
+                    function self = %(model_name)s()
+                        %% Default initial values
+                        %(initial_values_str)s
+
+                        %% Assign default parameter values
+                        %(param_values_str)s
+                    end
+
+                    function y = odes(self, tspan, y0)
+                        %% Right hand side function for the ODEs
+
+                        %(odes_str)s
+                    end
+                end
+            end
+            """, 0) %
+            {'model_name': model_name,
+             'params_str':params_str,
+             'initial_values_str': initial_values_str,
+             'param_values_str': param_values_str,
+             'odes_str': odes_str})
+
         return output.getvalue()
+
 
 

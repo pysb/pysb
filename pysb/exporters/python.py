@@ -71,16 +71,9 @@ import pysb
 import pysb.bng
 import sympy
 import textwrap
-from pysb.export import Export
+from pysb.export import Export, pad
 from StringIO import StringIO
 import re
-
-def pad(text, depth=0):
-    "Dedent multi-line string and pad with spaces."
-    text = textwrap.dedent(text)
-    text = re.sub(r'^(?m)', ' ' * depth, text)
-    text += '\n'
-    return text
 
 class ExportPython(Export):
     """A class for returning the standalone Python code for a given PySB model.

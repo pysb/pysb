@@ -75,6 +75,7 @@ documentation for the exporter classes in the package :py:mod:`pysb.exporters`:
 import sys
 import os
 import re
+import textwrap
 
 class Export(object):
     """Base class for all PySB model exporters.
@@ -145,6 +146,13 @@ def export(model, format):
     export_class = getattr(export_module, formats[format])
     e = export_class(model)
     return e.export()
+
+def pad(text, depth=0):
+    "Dedent multi-line string and pad with spaces."
+    text = textwrap.dedent(text)
+    text = re.sub(r'^(?m)', ' ' * depth, text)
+    text += '\n'
+    return text
 
 if __name__ == '__main__':
     # Check the arguments
