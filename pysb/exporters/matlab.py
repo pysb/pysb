@@ -5,6 +5,9 @@ equations for integration in MATLAB.
 Note that for use in MATLAB, the name of the ``.m`` file must match the name of
 the exported MATLAB class (e.g., ``robertson.m`` for the example below).
 
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
+
 Output for the Robertson example model
 ======================================
 
