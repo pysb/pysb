@@ -101,6 +101,26 @@ class ExportMatlab(Export):
                         for p in self.model.parameters
                         if p not in self.model.parameters_initial_conditions()])
 
+        # -- Build observables declaration --
+        observables_str = 'self.observables = struct( ...\n'+' '*16
+        observables_str_list = []
+        for i, obs in enumerate(self.model.observables):
+            # Associate species and coefficient lists with observable names,
+            # changing from zero- to one-based indexing
+            cur_obs_str = "'%s', [%s; %s]" % \
+                          (obs.name,
+                           ' '.join([str(sp+1) for sp in obs.species]),
+                           ' '.join([str(c) for c in obs.coefficients]))
+            # Decide whether to continue or terminate the struct declaration:
+            if i == len(self.model.observables) - 1:
+                cur_obs_str += ');'    # terminate
+            else:
+                cur_obs_str += ', ...' # continue
+
+            observables_str_list.append(cur_obs_str)
+        # Format and indent the observables struct declaration
+        observables_str += ('\n'+' '*16).join(observables_str_list)
+
         # -- Build ODEs -------
         # Build a stringified list of species
         species_list = ['%% %s;' % s for i, s in enumerate(self.model.species)]
@@ -177,6 +197,9 @@ class ExportMatlab(Export):
                 %%
                 properties
                     default_initial_values
+                    observables
+
+                    %% Parameters
                     %(params_str)s
                 end
 
@@ -187,6 +210,10 @@ class ExportMatlab(Export):
 
                         %% Assign default parameter values
                         %(param_values_str)s
+
+                        %% Define species indices (first row) and coefficients
+                        %% (second row) of named observables
+                        %(observables_str)s
                     end
 
                     function y = odes(self, tspan, y0)
@@ -194,12 +221,23 @@ class ExportMatlab(Export):
 
                         %(odes_str)s
                     end
+
+                    function out = get_observable(self, y, obs_name)
+                        %% Retrieve the trajectory for the named observable
+                        %% from the trajectories of all model species.
+
+                        obs = self.observables.(obs_name);
+                        species = obs(1, :);
+                        coefficients = obs(2, :);
+                        out = y(:, species) * coefficients';
+                    end
                 end
             end
             """, 0) %
             {'model_name': model_name,
              'params_str':params_str,
              'initial_values_str': initial_values_str,
+             'observables_str': observables_str,
              'param_values_str': param_values_str,
              'odes_str': odes_str})
 
