@@ -42,8 +42,8 @@ class Model(object):
         self.observables = [None] * 3
         self.initial_conditions = [None] * 3
     
-        self.parameters[0] = Parameter('k1', 0.04)
-        self.parameters[1] = Parameter('k2', 3e+07)
+        self.parameters[0] = Parameter('k1', 0.040000000000000001)
+        self.parameters[1] = Parameter('k2', 30000000)
         self.parameters[2] = Parameter('k3', 10000)
         self.parameters[3] = Parameter('A_0', 1)
         self.parameters[4] = Parameter('B_0', 0)

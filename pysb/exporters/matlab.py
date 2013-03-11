@@ -16,6 +16,12 @@ the documentation for the MATLAB model, as shown in the following example for
 ``pysb.examples.robertson``::
 
     classdef robertson
+        % A simple three-species chemical kinetics system known as "Robertson's
+        % example", as presented in:
+        % 
+        % H. H. Robertson, The solution of a set of reaction rate equations, in Numerical
+        % Analysis: An Introduction, J. Walsh, ed., Academic Press, 1966, pp. 178-182.
+        % 
         % A class implementing the ordinary differential equations
         % for the robertson model.
         %
@@ -90,8 +96,8 @@ the documentation for the MATLAB model, as shown in the following example for
             function self = robertson()
                 % Assign default parameter values
                 self.parameters = struct( ...
-                    'k1', 0.04, ...
-                    'k2', 3e+07, ...
+                    'k1', 0.040000000000000001, ...
+                    'k2', 30000000, ...
                     'k3', 10000, ...
                     'A_0', 1, ...
                     'B_0', 0, ...
@@ -180,6 +186,10 @@ class ExportMatlab(Export):
         output = StringIO()
         pysb.bng.generate_equations(self.model)
 
+        docstring = ''
+        if self.docstring:
+            docstring += self.docstring.replace('\n', '\n    % ')
+
         # Substitute underscores for any dots in the model name
         model_name = self.model.name.replace('.', '_')
 
@@ -189,7 +199,7 @@ class ExportMatlab(Export):
         params_str_list = []
         for i, p in enumerate(self.model.parameters):
             # Add parameter to struct along with nominal value
-            cur_p_str = "'%s', %g" % (p.name, p.value)
+            cur_p_str = "'%s', %.17g" % (p.name, p.value)
             # Decide whether to continue or terminate the struct declaration:
             if i == len(self.model.parameters) - 1:
                 cur_p_str += ');'    # terminate
@@ -257,6 +267,7 @@ class ExportMatlab(Export):
         # -- Build final output --
         output.write(pad(r"""
             classdef %(model_name)s
+                %% %(docstring)s
                 %% A class implementing the ordinary differential equations
                 %% for the %(model_name)s model.
                 %%
@@ -376,7 +387,8 @@ class ExportMatlab(Export):
                 end
             end
             """, 0) %
-            {'model_name': model_name,
+            {'docstring': docstring,
+             'model_name': model_name,
              'params_str':params_str,
              'initial_values_str': initial_values_str,
              'observables_str': observables_str,

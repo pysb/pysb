@@ -89,6 +89,8 @@ class Export(object):
     ----------
     model : pysb.core.Model
         The model to export.
+    docstring : string (optional)
+        The header comment to include at the top of the exported file.
 
     Examples
     --------
@@ -102,9 +104,11 @@ class Export(object):
     >>> sbml_output = e.export()
     """
 
-    def __init__(self, model):
+    def __init__(self, model, docstring=None):
         self.model = model
         """The model to export."""
+        self.docstring = docstring
+        """Header comment to include at the top of the exported file."""
 
     def export(self):
         """The export method, which must be implemented by any subclass.
@@ -128,7 +132,7 @@ formats = {
         'matlab': 'ExportMatlab',
         }
 
-def export(model, format):
+def export(model, format, docstring=None):
     """Top-level function for exporting a model to a given format.
 
     Parameters
@@ -137,6 +141,8 @@ def export(model, format):
         The model to export.
     format : string
         A string indicating the desired export format.
+    docstring : string (optional)
+        The header comment to include at the top of the exported file.
     """
 
     # Import the exporter module. This is done at export runtime to avoid
@@ -144,7 +150,7 @@ def export(model, format):
     export_module = __import__('pysb.exporters.' + format,
                                fromlist=[formats[format]])
     export_class = getattr(export_module, formats[format])
-    e = export_class(model)
+    e = export_class(model, docstring)
     return e.export()
 
 def pad(text, depth=0):
@@ -191,4 +197,4 @@ if __name__ == '__main__':
         raise Exception("File '%s' isn't a model file" % model_filename)
 
     # Export the model
-    print export(model, format)
+    print export(model, format, model_module.__doc__)

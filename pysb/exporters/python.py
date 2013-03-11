@@ -81,14 +81,8 @@ class ExportPython(Export):
     Inherits from :py:class:`pysb.export.Export`, which implements
     basic functionality for all exporters.
     """
-    def export(self, docstring=None):
+    def export(self):
         """Export Python code for simulation of a model without PySB.
-
-        Parameters
-        ----------
-        docstring : string (optional)
-            The header docstring to include at the top of the generated Python
-            code.
 
         Returns
         -------
@@ -111,7 +105,7 @@ class ExportPython(Export):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
 
         output.write('"""')
-        output.write(docstring)
+        output.write(self.docstring)
         output.write('"""\n\n')
         output.write("# exported from PySB model '%s'\n" % self.model.name)
         output.write(pad(r"""
@@ -160,7 +154,7 @@ class ExportPython(Export):
         for i, p in enumerate(self.model.parameters):
             p_data = (i, repr(p.name), p.value)
             output.write(" " * 8)
-            output.write("self.parameters[%d] = Parameter(%s, %g)\n" % p_data)
+            output.write("self.parameters[%d] = Parameter(%s, %.17g)\n" % p_data)
         output.write("\n")
         for i, obs in enumerate(self.model.observables):
             obs_data = (i, repr(obs.name), repr(obs.species),

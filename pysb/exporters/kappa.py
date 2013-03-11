@@ -22,7 +22,6 @@ class ExportKappa(Export):
 
         Parameters
         ----------
-
         dialect : (optional) string, either 'kasim' (default) or 'complx'
             The Kappa file syntax for the Kasim simulator is slightly
             different from that of the complx analyzer. This argument
@@ -33,7 +32,10 @@ class ExportKappa(Export):
         string
             The Kappa output.
         """
-
+        kappa_str = ''
+        if self.docstring:
+            kappa_str += '# ' + self.docstring.replace('\n', '\n# ') + '\n'
         gen = KappaGenerator(self.model, dialect=dialect)
-        return gen.get_content()
+        kappa_str += gen.get_content()
+        return kappa_str
 

@@ -13,6 +13,12 @@ Output for the Robertson example model
 The PottersWheel code produced will follow the form as given below for
 ``pysb.examples.robertson``::
 
+    % A simple three-species chemical kinetics system known as "Robertson's
+    % example", as presented in:
+    % 
+    % H. H. Robertson, The solution of a set of reaction rate equations, in Numerical
+    % Analysis: An Introduction, J. Walsh, ed., Academic Press, 1966, pp. 178-182.
+    % 
     % PottersWheel model definition file
     % save as robertson.m
     function m = robertson()
@@ -112,7 +118,12 @@ class ExportPottersWheel(Export):
                                for t in zip(obs.coefficients, obs.species)))
                  for obs in self.model.observables]
 
-        output.write('% PottersWheel self.model definition file\n')
+        # Add docstring, if present
+        if self.docstring:
+            output.write('% ' + self.docstring.replace('\n', '\n% '))
+            output.write('\n')
+
+        output.write('% PottersWheel model definition file\n')
         output.write('%% save as %s.m\n' % model_name)
         output.write('function m = %s()\n' % model_name)
         output.write('\n')

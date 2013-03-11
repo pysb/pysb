@@ -26,5 +26,9 @@ class ExportBngl(Export):
         string
             The BNGL output for the model.
         """
+        bngl_str = ''
+        if self.docstring:
+            bngl_str += '# ' + self.docstring.replace('\n', '\n# ') + '\n'
         gen = BngGenerator(self.model)
-        return gen.get_content()
+        bngl_str += gen.get_content()
+        return bngl_str
