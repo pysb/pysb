@@ -166,12 +166,12 @@ class ExportMatlab(Export):
                 %%     is used for integration by passing it to the MATLAB
                 %%     solver as the y0 argument.
                 %%
-                %% %(model_name)s.get_observable(x, obs_name)
+                %% %(model_name)s.get_observables(y)
                 %%     Given a matrix of timecourses for all model species
                 %%     (i.e., resulting from an integration of the model),
-                %%     get the trajectory corresponding to the observable with
-                %%     the given name (i.e., the sum of the appropriate
-                %%     species).
+                %%     get the trajectories corresponding to the observables.
+                %%     Timecourses are returned as a struct which can be
+                %%     indexed by observable name.
                 %%
                 %% Examples
                 %% --------
@@ -180,7 +180,11 @@ class ExportMatlab(Export):
                 %%
                 %% >> m = %(model_name)s();
                 %% >> tspan = [0 100];
-                %% >> [t x] = ode15s(@m.odes, tspan, m.get_initial_values());
+                %% >> [t y] = ode15s(@m.odes, tspan, m.get_initial_values());
+                %%
+                %% Retrieving the observables:
+                %%
+                %% >> y_obs = m.get_observables(y)
                 %%
                 properties
                     observables
@@ -214,14 +218,24 @@ class ExportMatlab(Export):
                         %(odes_str)s
                     end
 
-                    function out = get_observable(self, y, obs_name)
-                        %% Retrieve the trajectory for the named observable
-                        %% from the trajectories of all model species.
+                    function y_obs = get_observables(self, y)
+                        %% Retrieve the trajectories for the model observables
+                        %% from a matrix of the trajectories of all model
+                        %% species.
 
-                        obs = self.observables.(obs_name);
-                        species = obs(1, :);
-                        coefficients = obs(2, :);
-                        out = y(:, species) * coefficients';
+                        %% Initialize the struct of observable timecourses
+                        %% that we will return
+                        y_obs = struct();
+
+                        %% Iterate over the observables;
+                        observable_names = fieldnames(self.observables);
+                        for i = 1:numel(observable_names)
+                            obs_matrix = self.observables.(observable_names{i});
+                            species = obs_matrix(1, :);
+                            coefficients = obs_matrix(2, :);
+                            y_obs.(observable_names{i}) = ...
+                                            y(:, species) * coefficients';
+                        end
                     end
                 end
             end
