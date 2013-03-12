@@ -102,7 +102,18 @@ class SbmlExporter(Exporter):
         output.write(
             """<?xml version="1.0" encoding="UTF-8"?>
     <sbml xmlns="http://www.sbml.org/sbml/level2" level="2" version="1">
-        <model>
+        <model name="%s">""" % self.model.name)
+
+        if self.docstring:
+            notes_str = """
+            <notes>
+                <body xmlns="http://www.w3.org/1999/xhtml">
+                    <p>%s</p>
+                </body>
+            </notes>""" % self.docstring.replace("\n", "<br />\n"+" "*20)
+            output.write(notes_str)
+
+        output.write("""
             <listOfCompartments>
                 <compartment id="default" name="default" spatialDimensions="3" size="1"/>
             </listOfCompartments>
