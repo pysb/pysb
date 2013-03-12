@@ -10,7 +10,7 @@ Command-line usage
 
 At the command-line, run as follows::
 
-    python -m pysb.export model_name.py [format]
+    python -m pysb.export.main() model_name.py [format]
 
 where ``model_name.py`` is a file containing a PySB model definition (i.e.,
 contains an instance of ``pysb.core.Model`` instantiated as a global variable).
