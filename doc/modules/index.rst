@@ -10,4 +10,4 @@ PySB Modules Reference
    kappa.rst
    macros.rst
    tools/render.rst
-   export.rst
+   export/index.rst
