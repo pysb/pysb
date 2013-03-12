@@ -1,0 +1,23 @@
+#!python
+
+import os
+import sys
+from pysb.export.__main__ import main, validate_argv
+import pysb.export
+
+script_name = os.path.basename(sys.argv[0])
+format_list = ', '.join(pysb.export.formats)
+usage = """Usage: %s model.py <format>
+
+Translates a PySB model into one of several formats. For more information see
+the documentation for the pysb.export module.
+
+Supported formats:
+  %s""" % (script_name, format_list)
+
+if not validate_argv(sys.argv):
+   print usage
+   sys.exit(1)
+sys.exit(main(sys.argv))
+
+# -*- mode: python -*-

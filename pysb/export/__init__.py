@@ -9,9 +9,9 @@ Command-line usage
 
 At the command-line, run as follows::
 
-    python -m pysb.export model_name.py [format]
+    python -m pysb.export model.py <format>
 
-where ``model_name.py`` is a file containing a PySB model definition (i.e.,
+where ``model.py`` is a file containing a PySB model definition (i.e.,
 contains an instance of ``pysb.core.Model`` instantiated as a global variable).
 ``[format]`` should be the name of one of the supported formats:
 

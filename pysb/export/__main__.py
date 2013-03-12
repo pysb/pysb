@@ -1,21 +1,25 @@
-from pysb.export import formats, export
 import os
 import sys
 import re
+import pysb.export
+
+
+def validate_argv(argv):
+    return len(argv) == 3
+
 
 def main(argv):
-    # Check the arguments
-    if len(argv) <= 2:
-        print __doc__,
-        exit()
+    if not validate_argv(argv):
+        print pysb.export.__doc__,
+        return 1
 
     model_filename = argv[1]
     format = argv[2]
 
     # Make sure that the user has supplied an allowable format
-    if format not in formats.keys():
+    if format not in pysb.export.formats.keys():
         raise Exception("The format must be one of the following: " +
-                ", ".join(formats.keys()) + ".")
+                ", ".join(pysb.export.formats.keys()) + ".")
 
     # Sanity checks on filename
     if not os.path.exists(model_filename):
@@ -40,7 +44,7 @@ def main(argv):
         raise Exception("File '%s' isn't a model file" % model_filename)
 
     # Export the model
-    print export(model, format, model_module.__doc__)
+    print pysb.export.export(model, format, model_module.__doc__)
 
     return 0
 
