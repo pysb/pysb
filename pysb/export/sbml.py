@@ -9,7 +9,7 @@ for :py:mod:`pysb.export`.
 
 import pysb
 import pysb.bng
-from pysb.export import Export
+from pysb.export import Exporter
 import sympy
 from sympy.printing.mathml import MathMLPrinter
 import itertools
@@ -80,10 +80,10 @@ def get_species_annotation(meta_id, cp):
     output += get_annotation_postamble()
     return indent(output, 16)
 
-class ExportSbml(Export):
+class SbmlExporter(Exporter):
     """A class for returning the SBML for a given PySB model.
 
-    Inherits from :py:class:`pysb.export.Export`, which implements
+    Inherits from :py:class:`pysb.export.Exporter`, which implements
     basic functionality for all exporters.
     """
 

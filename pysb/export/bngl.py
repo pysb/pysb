@@ -8,12 +8,12 @@ for :py:mod:`pysb.export`.
 """
 
 from pysb.generator.bng import BngGenerator
-from pysb.export import Export
+from pysb.export import Exporter
 
-class ExportBngl(Export):
+class BnglExporter(Exporter):
     """A class for returning the BNGL for a given PySB model.
 
-    Inherits from :py:class:`pysb.export.Export`, which implements
+    Inherits from :py:class:`pysb.export.Exporter`, which implements
     basic functionality for all exporters.
     """
 

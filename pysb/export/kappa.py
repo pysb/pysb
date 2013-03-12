@@ -3,15 +3,17 @@ Module containing a class for returning the Kappa equivalent for a given PySB mo
 
 Serves as a wrapper around :py:class:`pysb.generator.kappa.KappaGenerator`.
 
+For information on how to use the model exporters, see the documentation
+for :py:mod:`pysb.export`.
 """
 
 from pysb.generator.kappa import KappaGenerator
-from pysb.export import Export
+from pysb.export import Exporter
 
-class ExportKappa(Export):
+class KappaExporter(Exporter):
     """A class for returning the Kappa for a given PySB model.
 
-    Inherits from :py:class:`pysb.export.Export`, which implements
+    Inherits from :py:class:`pysb.export.Exporter`, which implements
     basic functionality for all exporters.
     """
 

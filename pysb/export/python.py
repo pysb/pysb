@@ -71,14 +71,14 @@ import pysb
 import pysb.bng
 import sympy
 import textwrap
-from pysb.export import Export, pad
+from pysb.export import Exporter, pad
 from StringIO import StringIO
 import re
 
-class ExportPython(Export):
+class PythonExporter(Exporter):
     """A class for returning the standalone Python code for a given PySB model.
 
-    Inherits from :py:class:`pysb.export.Export`, which implements
+    Inherits from :py:class:`pysb.export.Exporter`, which implements
     basic functionality for all exporters.
     """
     def export(self):

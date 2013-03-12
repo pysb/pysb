@@ -9,9 +9,9 @@ for :py:mod:`pysb.export`.
 """
 
 from pysb.bng import generate_network
-from pysb.export import Export
+from pysb.export import Exporter
 
-class ExportBngNet(Export):
+class BngNetExporter(Exporter):
     """A class for generating the BNG NET file for a given PySB model.
 
     Inherits from :py:class:`pysb.export.Export`, which implements

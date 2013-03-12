@@ -77,7 +77,7 @@ import os
 import re
 import textwrap
 
-class Export(object):
+class Exporter(object):
     """Base class for all PySB model exporters.
 
     Export functionality is implemented by subclasses of this class. The
@@ -95,12 +95,12 @@ class Export(object):
     Examples
     --------
 
-    Exporting the "Robertson" example model to SBML using the ``ExportSbml``
+    Exporting the "Robertson" example model to SBML using the ``SbmlExporter``
     subclass::
 
     >>> from pysb.examples.robertson import model
-    >>> from pysb.exporters.sbml import ExportSbml
-    >>> e = ExportSbml(model)
+    >>> from pysb.export.sbml import SbmlExporter
+    >>> e = SbmlExporter(model)
     >>> sbml_output = e.export()
     """
 
@@ -122,14 +122,14 @@ class Export(object):
 # Define a dict listing supported formats and the names of the classes
 # implementing their export procedures
 formats = {
-        'bngl': 'ExportBngl',
-        'bng_net': 'ExportBngNet',
-        'kappa': 'ExportKappa',
-        'potterswheel': 'ExportPottersWheel',
-        'sbml': 'ExportSbml',
-        'python': 'ExportPython',
-        'mathematica': 'ExportMathematica',
-        'matlab': 'ExportMatlab',
+        'bngl': 'BnglExporter',
+        'bng_net': 'BngNetExporter',
+        'kappa': 'KappaExporter',
+        'potterswheel': 'PottersWheelExporter',
+        'sbml': 'SbmlExporter',
+        'python': 'PythonExporter',
+        'mathematica': 'MathematicaExporter',
+        'matlab': 'MatlabExporter',
         }
 
 def export(model, format, docstring=None):

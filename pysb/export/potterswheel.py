@@ -66,12 +66,12 @@ import re
 import sys
 import os
 from StringIO import StringIO
-from pysb.export import Export
+from pysb.export import Exporter
 
-class ExportPottersWheel(Export):
+class PottersWheelExporter(Exporter):
     """A class for returning the PottersWheel equivalent for a given PySB model.
 
-    Inherits from :py:class:`pysb.export.Export`, which implements
+    Inherits from :py:class:`pysb.export.Exporter`, which implements
     basic functionality for all exporters.
     """
 
