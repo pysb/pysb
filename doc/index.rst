@@ -22,7 +22,7 @@ enable model simulation and analysis.
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    installation
    tutorial

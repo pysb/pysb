@@ -26,11 +26,10 @@ these guidelines. Every macro in this module either uses _macro_rule directly or
 calls another macro which does.
 
 Another useful function is _verify_sites which will raise an exception if a
-Monomer or MonomerPattern does not possesses every one of a given list of sites.
+Monomer or MonomerPattern does not possess every one of a given list of sites.
 This can be used to trigger such errors up front rather than letting an
 exception occur at the point where the macro tries to use the invalid site in a
 pattern, which can be harder for the caller to debug.
-
 """
 
 

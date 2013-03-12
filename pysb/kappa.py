@@ -37,9 +37,9 @@ def run_simulation(model, **kwargs):
     numpy.ndarray
         Returns the kasim simulation data as a Numpy ndarray. Data is accessed
         using the syntax::
-        
+
             results[index_name]
-            
+
         The index 'time' gives the data for the time coordinates of the
         simulation. Data for the observables can be accessed by indexing the
         array with the names of the observables.
@@ -97,9 +97,9 @@ def contact_map(model, output_dir='.', base_filename=None, do_open=False,
         Note that only relative paths can be specified; paths are relative
         to the directory where the current Python instance is running.
         If the specified directory does not exist, an Exception is thrown.
-    base_filename : The base filename to be used for generation of the Kappa
-        (.ka) file and all output files produced by complx. Defaults to a
-        string of the form::
+    base_filename : string
+        The base filename to be used for generation of the Kappa (.ka) file and
+        all output files produced by complx. Defaults to a string of the form::
 
             '%s_%d_%d_temp' % (model.name, os.getpid(), random.randint(0,10000))
 
@@ -139,7 +139,7 @@ def contact_map(model, output_dir='.', base_filename=None, do_open=False,
 
 def run_complx(gen, kappa_filename, args):
     """Generalized method for passing arguments to the complx executable.
-   
+
     Parameters
     ----------
     gen : :py:class:`pysb.generator.KappaGenerator`
@@ -297,9 +297,9 @@ def parse_kasim_outfile(out_filename):
     numpy.ndarray
         Returns the KaSim simulation data as a Numpy ndarray. Data is accessed
         using the syntax::
-        
+
             results[index_name]
-            
+
         The index 'time' gives the data for the time coordinates of the
         simulation. Data for the observables can be accessed by indexing the
         array with the names of the observables.
@@ -349,7 +349,3 @@ def open_file(filename):
             raise Exception(p.stderr.read())
     except Exception as e:
         raise Exception("Problem opening file: ", e)
-
-
-
-
