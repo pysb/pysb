@@ -199,7 +199,7 @@ class MatlabExporter(Exporter):
         params_str_list = []
         for i, p in enumerate(self.model.parameters):
             # Add parameter to struct along with nominal value
-            cur_p_str = "'%s', %.17g" % (p.name, p.value)
+            cur_p_str = "'%s', %.17g" % (_fix_underscores(p.name), p.value)
             # Decide whether to continue or terminate the struct declaration:
             if i == len(self.model.parameters) - 1:
                 cur_p_str += ');'    # terminate
@@ -217,7 +217,7 @@ class MatlabExporter(Exporter):
                              len(self.model.species)
         initial_values_str += ('\n'+' '*12).join(
                 ['initial_values(%d) = self.parameters.%s; %% %s' %
-                 (i+1, ic[1].name, ic[0])
+                 (i+1, _fix_underscores(ic[1].name), ic[0])
                  for i, ic in enumerate(self.model.initial_conditions)])
 
         # -- Build observables declaration --
@@ -227,7 +227,7 @@ class MatlabExporter(Exporter):
             # Associate species and coefficient lists with observable names,
             # changing from zero- to one-based indexing
             cur_obs_str = "'%s', [%s; %s]" % \
-                          (obs.name,
+                          (_fix_underscores(obs.name),
                            ' '.join([str(sp+1) for sp in obs.species]),
                            ' '.join([str(c) for c in obs.coefficients]))
             # Decide whether to continue or terminate the struct declaration:
@@ -259,10 +259,10 @@ class MatlabExporter(Exporter):
                           lambda m: 'y0(%s)' % (int(m.group(1))+1), odes_str)
         # Change C code 'pow' function to MATLAB 'power' function
         odes_str = re.sub(r'pow\(', 'power(', odes_str)
-        # Prepend 'self.' to named parameters
+        # Prepend 'p.' to named parameters and fix any underscores
         for i, p in enumerate(self.model.parameters):
-            odes_str = re.sub(r'\b(%s)\b' % p.name, 'p.%s' % p.name,
-                              odes_str)
+            odes_str = re.sub(r'\b(%s)\b' % p.name,
+                              'p.%s' % _fix_underscores(p.name), odes_str)
 
         # -- Build final output --
         output.write(pad(r"""
@@ -397,3 +397,8 @@ class MatlabExporter(Exporter):
 
         return output.getvalue()
 
+def _fix_underscores(name):
+    if name.startswith('_'):
+        return 'X' + name
+    else:
+        return name
