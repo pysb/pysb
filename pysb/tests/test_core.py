@@ -1,5 +1,6 @@
 from pysb.testing import *
 from pysb.core import *
+from functools import partial
 
 def test_component_names_valid():
     for name in 'a', 'B', 'AbC', 'dEf', '_', '_7', '__a01b__999x_x___':
@@ -29,6 +30,18 @@ def test_monomer_model():
     ok_(A in model.monomers)
     ok_(A in model.all_components())
     ok_(A not in model.all_components() - model.monomers)
+
+@with_model
+def test_initial():
+    Monomer('A', ['s'])
+    Parameter('A_0')
+    Initial(A(s=None), A_0)
+    assert_raises_iice = partial(assert_raises, InvalidInitialConditionError,
+                                 Initial)
+    assert_raises_iice('not a complexpattern', A_0)
+    assert_raises_iice(A(), A_0)
+    assert_raises_iice(A(s=None), A_0)
+    assert_raises_iice(MatchOnce(A(s=None)), A_0)
 
 @with_model
 def test_model_pickle():
