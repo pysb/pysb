@@ -209,6 +209,10 @@ def generate_network(model, cleanup=True, append_stdout=False):
 
     """
     gen = BngGenerator(model)
+    if not model.initial_conditions:
+        raise NoInitialConditionsError()
+    if not model.rules:
+        raise NoRulesError()
     bng_filename = '%s_%d_%d_temp.bngl' % (model.name, os.getpid(), random.randint(0, 10000))
     net_filename = bng_filename.replace('.bngl', '.net')
     output = StringIO()
@@ -383,3 +387,14 @@ def _parse_group(model, line):
             obs.coefficients.append(int(terms[0]))
             # -1 to change to 0-based indexing
             obs.species.append(int(terms[1]) - 1)
+
+
+class NoInitialConditionsError(RuntimeError):
+    """Model initial_conditions is empty."""
+    def __init__(self):
+        RuntimeError.__init__(self, "Model has no initial conditions")
+
+class NoRulesError(RuntimeError):
+    """Model rules is empty."""
+    def __init__(self):
+        RuntimeError.__init__(self, "Model has no rules")

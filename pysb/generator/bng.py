@@ -1,3 +1,5 @@
+import inspect
+import warnings
 import pysb
 
 
@@ -5,6 +7,8 @@ class BngGenerator(object):
 
     def __init__(self, model):
         self.model = model
+        if self.model.has_synth_deg():
+            self.model.enable_synth_deg()
         self.__content = None
 
     def get_content(self):
@@ -13,8 +17,6 @@ class BngGenerator(object):
         return self.__content
 
     def generate_content(self):
-        if self.model.has_synth_deg():
-            self.model.enable_synth_deg()
         self.__content = ''
         self.generate_parameters()
         self.generate_compartments()
@@ -24,6 +26,8 @@ class BngGenerator(object):
         self.generate_species()
 
     def generate_parameters(self):
+        if not self.model.parameters:
+            return
         self.__content += "begin parameters\n"
         max_length = max(len(p.name) for p in self.model.parameters)
         for p in self.model.parameters:
@@ -47,6 +51,8 @@ class BngGenerator(object):
         self.__content += "end compartments\n\n"        
 
     def generate_molecule_types(self):
+        if not self.model.monomers:
+            return
         self.__content += "begin molecule types\n"
         for m in self.model.monomers:
             site_code = ','.join([format_monomer_site(m, s) for s in m.sites])
@@ -55,6 +61,7 @@ class BngGenerator(object):
 
     def generate_reaction_rules(self):
         if not self.model.rules:
+            warn_caller("Model does not contain any rules")
             return
         self.__content += "begin reaction rules\n"
         max_length = max(len(r.name) for r in self.model.rules) + 1  # +1 for the colon
@@ -98,7 +105,8 @@ class BngGenerator(object):
 
     def generate_species(self):
         if not self.model.initial_conditions:
-            raise Exception("BNG generator requires initial conditions.")
+            warn_caller("Model does not contain any initial conditions")
+            return
         species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
         max_length = max(len(code) for code in species_codes)
         self.__content += "begin species\n"
@@ -171,3 +179,14 @@ def format_site_condition(site, state):
     else:
         raise Exception("BNG generator has encountered an unknown element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
+
+def warn_caller(message):
+    caller_frame = inspect.currentframe()
+    # walk up through the stack until we are outside of pysb
+    stacklevel = 1
+    module = inspect.getmodule(caller_frame)
+    while module and module.__name__.startswith('pysb.'):
+        stacklevel += 1
+        caller_frame = caller_frame.f_back
+        module = inspect.getmodule(caller_frame)
+    warnings.warn(message, stacklevel=stacklevel)
