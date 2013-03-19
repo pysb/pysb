@@ -18,7 +18,7 @@ def _get_bng_path():
     """
     Return the path to BioNetGen's BNG2.pl.
 
-    Looks for a BNG distribution at the path stored in the BNGHOME environment
+    Looks for a BNG distribution at the path stored in the BNGPATH environment
     variable if that's set, or else in a few hard-coded standard locations.
 
     """
@@ -29,7 +29,7 @@ def _get_bng_path():
     if _bng_path:
         return _bng_path
 
-    path_var = 'BNGHOME'
+    path_var = 'BNGPATH'
     dist_dirs = [
         '/usr/local/share/BioNetGen',
         'c:/Program Files/BioNetGen',
