@@ -1085,15 +1085,14 @@ class Model(object):
         try:
             complex_pattern = as_complex_pattern(pattern)
         except InvalidComplexPatternException as e:
-            raise type(e)("Initial condition species does not look like a "
-                          "ComplexPattern")
+            raise InvalidInitialConditionError("Not a ComplexPattern")
         if not complex_pattern.is_concrete():
-            raise Exception("Pattern must be concrete")
+            raise InvalidInitialConditionError("Pattern not concrete")
         if any(complex_pattern.is_equivalent_to(other_cp)
                for other_cp, value in self.initial_conditions):
             # FIXME until we get proper canonicalization this could produce
             # false negatives
-            raise Exception("Duplicate initial condition")
+            raise InvalidInitialConditionError("Duplicate species")
         return complex_pattern
 
     def initial(self, pattern, value):
@@ -1242,6 +1241,8 @@ class InvalidComponentNameError(ValueError):
     def __init__(self, name):
         ValueError.__init__(self, "Not a valid component name: '%s'" % name)
 
+class InvalidInitialConditionError(ValueError):
+    """Invalid initial condition pattern."""
 
 
 class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
