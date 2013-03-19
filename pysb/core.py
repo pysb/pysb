@@ -1071,6 +1071,7 @@ class Model(object):
         * Able to be cast as a ComplexPattern
         * Concrete (see ComplexPattern.is_concrete)
         * Distinct from any existing initial condition pattern
+        * match_once is False (nonsensical in this context)
 
         Parameters
         ----------
@@ -1093,6 +1094,8 @@ class Model(object):
             # FIXME until we get proper canonicalization this could produce
             # false negatives
             raise InvalidInitialConditionError("Duplicate species")
+        if complex_pattern.match_once:
+            raise InvalidInitialConditionError("MatchOnce not allowed here")
         return complex_pattern
 
     def initial(self, pattern, value):
