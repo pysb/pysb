@@ -402,7 +402,7 @@ class MonomerPattern(object):
     def __repr__(self):
         value = '%s(' % self.monomer.name
         value += ', '.join([
-                k + '=' + str(self.site_conditions[k])
+                k + '=' + repr(self.site_conditions[k])
                 for k in self.monomer.sites
                 if self.site_conditions.has_key(k)
                 ])
