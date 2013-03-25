@@ -243,6 +243,6 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['scipy', 'scipy.integrate', 'scipy.weave']
+MOCK_MODULES = ['pygraphviz']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
