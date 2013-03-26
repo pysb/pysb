@@ -535,13 +535,13 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
         >>> catalyze(Kinase(), 'b', Substrate(y='U'), 'b', Substrate(y='P'), (1e-4, 1e-1, 1)) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
          Rule('bind_Kinase_SubstrateU_to_KinaseSubstrateU',
-             Kinase(b=None) + Substrate(b=None, y=U) <> Kinase(b=1) % Substrate(b=1, y=U),
+             Kinase(b=None) + Substrate(b=None, y='U') <> Kinase(b=1) % Substrate(b=1, y='U'),
              bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf,
              bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr),
          Parameter('bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', 0.0001),
          Parameter('bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', 0.1),
          Rule('catalyze_KinaseSubstrateU_to_Kinase_SubstrateP',
-              Kinase(b=1) % Substrate(b=1, y=U) >> Kinase(b=None) + Substrate(b=None, y=P),
+              Kinase(b=1) % Substrate(b=1, y='U') >> Kinase(b=None) + Substrate(b=None, y='P'),
               catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc),
          Parameter('catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', 1),
          ])
@@ -645,13 +645,13 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
         >>> catalyze_state(Kinase, 'b', Substrate, 'b', 'y', 'U', 'P', (1e-4, 1e-1, 1)) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
          Rule('bind_Kinase_SubstrateU_to_KinaseSubstrateU',
-             Kinase(b=None) + Substrate(b=None, y=U) <> Kinase(b=1) % Substrate(b=1, y=U),
+             Kinase(b=None) + Substrate(b=None, y='U') <> Kinase(b=1) % Substrate(b=1, y='U'),
              bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf,
              bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr),
          Parameter('bind_Kinase_SubstrateU_to_KinaseSubstrateU_kf', 0.0001),
          Parameter('bind_Kinase_SubstrateU_to_KinaseSubstrateU_kr', 0.1),
          Rule('catalyze_KinaseSubstrateU_to_Kinase_SubstrateP',
-             Kinase(b=1) % Substrate(b=1, y=U) >> Kinase(b=None) + Substrate(b=None, y=P),
+             Kinase(b=1) % Substrate(b=1, y='U') >> Kinase(b=None) + Substrate(b=None, y='P'),
              catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc),
          Parameter('catalyze_KinaseSubstrateU_to_Kinase_SubstrateP_kc', 1),
          ])
@@ -845,7 +845,7 @@ def synthesize(species, ksynth):
         Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         >>> synthesize(A(x=None, y='e'), 1e-4) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('synthesize_Ae', None >> A(x=None, y=e), synthesize_Ae_k),
+         Rule('synthesize_Ae', None >> A(x=None, y='e'), synthesize_Ae_k),
          Parameter('synthesize_Ae_k', 0.0001),
          ])
 
@@ -974,9 +974,9 @@ def synthesize_degrade_table(table):
         >>> synthesize_degrade_table([[A(x=None, y='e'), 1e-4, 1e-6],
         ...                           [B(),              None, 1e-7]]) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-            Rule('synthesize_Ae', None >> A(x=None, y=e), synthesize_Ae_k),
+            Rule('synthesize_Ae', None >> A(x=None, y='e'), synthesize_Ae_k),
             Parameter('synthesize_Ae_k', 0.0001),
-            Rule('degrade_Ae', A(x=None, y=e) >> None, degrade_Ae_k),
+            Rule('degrade_Ae', A(x=None, y='e') >> None, degrade_Ae_k),
             Parameter('degrade_Ae_k', 1e-06),
             Rule('degrade_B', B() >> None, degrade_B_k),
             Parameter('degrade_B_k', 1e-07),
@@ -1218,11 +1218,11 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
              MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
                  Unit(p1=2, p2=3, sc_site=None) %
                  Unit(p1=3, p2=1, sc_site=None)) +
-                 Cargo(c_site=None, loc=mito) <>
+                 Cargo(c_site=None, loc='mito') <>
              MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
                  Unit(p1=2, p2=3, sc_site=None) %
                  Unit(p1=3, p2=1, sc_site=None) %
-                 Cargo(c_site=4, loc=mito)),
+                 Cargo(c_site=4, loc='mito')),
              pore_transport_complex_Unit_3_Cargomito_kf,
              pore_transport_complex_Unit_3_Cargomito_kr),
          Parameter('pore_transport_complex_Unit_3_Cargomito_kf', 0.0001),
@@ -1231,11 +1231,11 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
              MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
                  Unit(p1=2, p2=3, sc_site=None) %
                  Unit(p1=3, p2=1, sc_site=None) %
-                 Cargo(c_site=4, loc=mito)) >>
+                 Cargo(c_site=4, loc='mito')) >>
              MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
                  Unit(p1=2, p2=3, sc_site=None) %
                  Unit(p1=3, p2=1, sc_site=None)) +
-                 Cargo(c_site=None, loc=cyto),
+                 Cargo(c_site=None, loc='cyto'),
              pore_transport_dissociate_Unit_3_Cargocyto_kc),
          Parameter('pore_transport_dissociate_Unit_3_Cargocyto_kc', 1),
          ])
