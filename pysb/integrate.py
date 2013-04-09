@@ -13,6 +13,11 @@ default_integrator_options = {
     'vode': {
         'method': 'bdf',
         'with_jacobian': True,
+        # Set nsteps as high as possible to give our users flexibility in
+        # choosing their time step. (Let's be safe and assume vode was compiled
+        # with 32-bit ints. What would actually happen if it was and we passed
+        # 2**64-1 though?)
+        'nsteps': 2**31 - 1,
         },
     'cvode': {
         'method': 'bdf',
