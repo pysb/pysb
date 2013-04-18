@@ -78,7 +78,7 @@ class SelfExporter(object):
                     module_name = SelfExporter.target_module.__name__
                 else:
                     # user is defining a model interactively (not really supported, but we'll try)
-                    module_name = '<interactive>'
+                    module_name = '_interactive_'
                 obj.name = module_name   # internal name for identification
                 export_name = 'model'    # symbol name for export
         elif isinstance(obj, Component):
