@@ -619,7 +619,7 @@ def as_complex_pattern(v):
     if isinstance(v, ComplexPattern):
         return v
     elif isinstance(v, MonomerPattern):
-        return ComplexPattern([v], None)
+        return ComplexPattern([MonomerPattern(v.monomer, v.site_conditions, None)], v.compartment)
     else:
         raise InvalidComplexPatternException
 
