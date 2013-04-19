@@ -484,8 +484,8 @@ class ComplexPattern(object):
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
         return \
-            sorted((mp.monomer, mp.site_conditions) for mp in self.monomer_patterns) == \
-            sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
+            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in self.monomer_patterns) == \
+            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in other.monomer_patterns)
 
     def copy(self):
         """
