@@ -503,6 +503,12 @@ class ComplexPattern(object):
         else:
             return NotImplemented
 
+    def __rmod__(self, other):
+        if isinstance(other, MonomerPattern):
+            return ComplexPattern([other] + self.monomer_patterns, self.compartment, self.match_once)
+        else:
+            return NotImplemented
+
     def __rshift__(self, other):
         return build_rule_expression(self, other, False)
 
