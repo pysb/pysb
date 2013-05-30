@@ -7,6 +7,7 @@ import re
 import collections
 import weakref
 import copy
+import itertools
 
 
 def Initial(*args):
@@ -482,6 +483,36 @@ class ComplexPattern(object):
         copies of the monomer_patterns.
         """
         return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
+
+    def __call__(self, **kwargs):
+        """Build a new ComplexPattern with updated site conditions."""
+
+        # Ensure we don't have more than one of any Monomer in our patterns.
+        mp_monomer = lambda mp: mp.monomer
+        patterns_sorted = sorted(self.monomer_patterns, key=mp_monomer)
+        groups = itertools.groupby(patterns_sorted, mp_monomer)
+        counts = [(monomer, sum(1 for mp in mps)) for monomer, mps in groups]
+        duplicates = [monomer.name for monomer, count in counts if count > 1]
+        if duplicates:
+            raise ValueError("Duplicate monomers: " + str(duplicates))
+
+        # Ensure all specified sites are present in some Monomer.
+        site_groups = (mp.monomer.sites for mp in self.monomer_patterns)
+        sites = list(itertools.chain(*site_groups))
+        unknown_sites = set(kwargs).difference(sites)
+        if unknown_sites:
+            raise ValueError("Unknown sites for monomers: " +
+                             ", ".join(unknown_sites))
+
+        # Ensure no specified site is present in multiple Monomers.
+
+        ded_sites = dict((k, v) for k, v in kwargs.items() if k in C8_ded.sites)
+        cat_sites = dict((k, v) for k, v in kwargs.items() if k in C8_cat.sites)
+        # assumes bond 99 is unused! ideally we'd find the lowest unused bond number.
+        ded = C8_ded(peptide_c=99, **ded_sites)
+        cat = C8_cat(peptide_n=99, **cat_sites)
+        return ded % cat
+
 
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
