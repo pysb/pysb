@@ -490,28 +490,40 @@ class ComplexPattern(object):
         # Ensure we don't have more than one of any Monomer in our patterns.
         mp_monomer = lambda mp: mp.monomer
         patterns_sorted = sorted(self.monomer_patterns, key=mp_monomer)
-        groups = itertools.groupby(patterns_sorted, mp_monomer)
-        counts = [(monomer, sum(1 for mp in mps)) for monomer, mps in groups]
-        duplicates = [monomer.name for monomer, count in counts if count > 1]
-        if duplicates:
-            raise ValueError("Duplicate monomers: " + str(duplicates))
+        pgroups = itertools.groupby(patterns_sorted, mp_monomer)
+        pcounts = [(monomer, sum(1 for mp in mps)) for monomer, mps in pgroups]
+        dup_monomers = [monomer.name for monomer, count in pcounts if count > 1]
+        if dup_monomers:
+            raise ValueError("ComplexPattern has duplicate MonomerPatterns: "
+                             + str(dup_monomers))
 
         # Ensure all specified sites are present in some Monomer.
-        site_groups = (mp.monomer.sites for mp in self.monomer_patterns)
-        sites = list(itertools.chain(*site_groups))
-        unknown_sites = set(kwargs).difference(sites)
+        self_site_groups = (mp.monomer.sites for mp in self.monomer_patterns)
+        self_sites = list(itertools.chain(*self_site_groups))
+        unknown_sites = set(kwargs).difference(self_sites)
         if unknown_sites:
-            raise ValueError("Unknown sites for monomers: " +
+            raise ValueError("Unknown sites in argument list: " +
                              ", ".join(unknown_sites))
 
         # Ensure no specified site is present in multiple Monomers.
+        used_sites = [s for s in self_sites if s in kwargs]
+        sgroups = itertools.groupby(sorted(used_sites))
+        scounts = [(name, sum(1 for s in sites)) for name, sites in sgroups]
+        dup_sites = [name for name, count in scounts if count > 1]
+        if dup_sites:
+            raise ValueError("ComplexPattern has duplicate sites: " +
+                             str(dup_sites))
 
-        ded_sites = dict((k, v) for k, v in kwargs.items() if k in C8_ded.sites)
-        cat_sites = dict((k, v) for k, v in kwargs.items() if k in C8_cat.sites)
-        # assumes bond 99 is unused! ideally we'd find the lowest unused bond number.
-        ded = C8_ded(peptide_c=99, **ded_sites)
-        cat = C8_cat(peptide_n=99, **cat_sites)
-        return ded % cat
+        # Copy self so we can modify it in place before returning it.
+        cp = self.copy()
+        # Build map from site name to MonomerPattern.
+        site_map = {}
+        for mp in cp.monomer_patterns:
+            site_map.update(dict.fromkeys(mp.monomer.sites, mp))
+        # Apply kwargs to our ComplexPatterns.
+        for site, condition in kwargs.items():
+            site_map[site].site_conditions[site] = condition
+        return cp
 
 
     def __add__(self, other):
