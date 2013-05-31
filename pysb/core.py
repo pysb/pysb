@@ -494,16 +494,16 @@ class ComplexPattern(object):
         pcounts = [(monomer, sum(1 for mp in mps)) for monomer, mps in pgroups]
         dup_monomers = [monomer.name for monomer, count in pcounts if count > 1]
         if dup_monomers:
-            raise ValueError("ComplexPattern has duplicate MonomerPatterns: "
-                             + str(dup_monomers))
+            raise DuplicateMonomerError("ComplexPattern has duplicate "
+                                        "Monomers: " + str(dup_monomers))
 
         # Ensure all specified sites are present in some Monomer.
         self_site_groups = (mp.monomer.sites for mp in self.monomer_patterns)
         self_sites = list(itertools.chain(*self_site_groups))
         unknown_sites = set(kwargs).difference(self_sites)
         if unknown_sites:
-            raise ValueError("Unknown sites in argument list: " +
-                             ", ".join(unknown_sites))
+            raise UnknownSiteError("Unknown sites in argument list: " +
+                                   ", ".join(unknown_sites))
 
         # Ensure no specified site is present in multiple Monomers.
         used_sites = [s for s in self_sites if s in kwargs]
@@ -511,8 +511,8 @@ class ComplexPattern(object):
         scounts = [(name, sum(1 for s in sites)) for name, sites in sgroups]
         dup_sites = [name for name, count in scounts if count > 1]
         if dup_sites:
-            raise ValueError("ComplexPattern has duplicate sites: " +
-                             str(dup_sites))
+            raise DuplicateSiteError("ComplexPattern has duplicate sites: " +
+                                     str(dup_sites))
 
         # Copy self so we can modify it in place before returning it.
         cp = self.copy()
@@ -1295,6 +1295,15 @@ class InvalidComponentNameError(ValueError):
 
 class InvalidInitialConditionError(ValueError):
     """Invalid initial condition pattern."""
+
+class DuplicateMonomerError(ValueError):
+    pass
+
+class DuplicateSiteError(ValueError):
+    pass
+
+class UnknownSiteError(ValueError):
+    pass
 
 
 class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
