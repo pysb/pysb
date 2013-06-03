@@ -45,10 +45,14 @@ def run(model):
     """
 
     pysb.bng.generate_equations(model)
-    graph = pygraphviz.AGraph(name="%s species" % model.name, rankdir="LR",
+    return render_species_as_dot(model.species, model.name)
+
+
+def render_species_as_dot(species_list, graph_name=""):
+    graph = pygraphviz.AGraph(name="%s species" % graph_name, rankdir="LR",
                               fontname='Arial')
     graph.edge_attr.update(fontname='Arial', fontsize=8)
-    for si, cp in enumerate(model.species):
+    for si, cp in enumerate(species_list):
         sgraph_name = 'cluster_s%d' % si
         cp_label = re.sub(r'% ', '%<br align="left"/>',
                           str(cp)) + '<br align="left"/>'
