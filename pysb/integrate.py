@@ -168,6 +168,8 @@ class Solver(object):
             for cp, ic_param in self.model.initial_conditions:
                 pi = self.model.parameters.index(ic_param)
                 si = self.model.get_species_index(cp)
+                if si is None:
+                    raise Exception("Species not found in model: %s" % repr(cp))
                 y0[si] = param_values[pi]
 
         # perform the actual integration
