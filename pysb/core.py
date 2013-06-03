@@ -874,10 +874,15 @@ class Observable(Component):
     ----------
     reaction_pattern : ReactionPattern
         The list of ComplexPatterns to match.
+    match : 'species' or 'molecules'
+        Whether to match entire species ('species') or individual fragments
+        ('molecules'). Default is 'molecules'.
 
     Attributes
     ----------
     reaction_pattern : ReactionPattern
+        See Parameters.
+    match : 'species' or 'molecules'
         See Parameters.
     species : list of integers
         List of species indexes for species matching the pattern.
@@ -891,25 +896,27 @@ class Observable(Component):
     solely so users could utilize the ComplexPattern '+' operator overload as
     syntactic sugar. There are no actual "reaction" semantics in this context.
 
-    Currently only BNG's 'Molecules' observables are supported, i.e. an
-    observable on "A()" will count dimers of A at two times the actual species
-    amount. 'Species' observables will be implemented in the future.
-
     """
 
-    def __init__(self, name, reaction_pattern, _export=True):
+    def __init__(self, name, reaction_pattern, match='molecules', _export=True):
         try:
             reaction_pattern = as_reaction_pattern(reaction_pattern)
         except InvalidReactionPatternException as e:
             raise type(e)("Observable pattern does not look like a ReactionPattern")
+        if match not in ('molecules', 'species'):
+            raise ValueError("Match must be 'molecules' or 'species'")
         Component.__init__(self, name, _export)
         self.reaction_pattern = reaction_pattern
+        self.match = match
         self.species = []
         self.coefficients = []
 
     def __repr__(self):
-        ret = '%s(%s, %s)' % (self.__class__.__name__, repr(self.name),
+        ret = '%s(%s, %s' % (self.__class__.__name__, repr(self.name),
                               repr(self.reaction_pattern))
+        if self.match != 'molecules':
+            ret += ', match=%s' % repr(self.match)
+        ret += ')'
         return ret
 
 
