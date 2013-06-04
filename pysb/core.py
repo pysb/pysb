@@ -79,7 +79,7 @@ class SelfExporter(object):
                     module_name = SelfExporter.target_module.__name__
                 else:
                     # user is defining a model interactively (not really supported, but we'll try)
-                    module_name = '<interactive>'
+                    module_name = '_interactive_'
                 obj.name = module_name   # internal name for identification
                 export_name = 'model'    # symbol name for export
         elif isinstance(obj, Component):
@@ -472,8 +472,8 @@ class ComplexPattern(object):
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
         return \
-            sorted((mp.monomer, mp.site_conditions) for mp in self.monomer_patterns) == \
-            sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
+            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in self.monomer_patterns) == \
+            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in other.monomer_patterns)
 
     def copy(self):
         """
@@ -668,7 +668,7 @@ def as_complex_pattern(v):
     if isinstance(v, ComplexPattern):
         return v
     elif isinstance(v, MonomerPattern):
-        return ComplexPattern([v], None)
+        return ComplexPattern([MonomerPattern(v.monomer, v.site_conditions, None)], v.compartment)
     else:
         raise InvalidComplexPatternException
 
