@@ -1,0 +1,32 @@
+from pysb import *
+
+Model()
+Monomer('cdc2', ['s', 'k'], {'s': ['u', 'p']})
+Monomer('cyclin', ['s', 'k'], {'s': ['u', 'p']})
+Parameter('k1', 0.015)
+Parameter('k2', 0)
+Parameter('k3', 200)
+Parameter('k4', 180)
+Parameter('k5', 0)
+Parameter('k6', 1)
+Parameter('k7', 0.6)
+Parameter('k8', 1000000)
+Parameter('k9', 10000)
+
+Parameter('cdc2_0', 100)
+Parameter('cyclin_0', 10)
+Initial(cdc2(k=None, s='p'), cdc2_0)
+Initial(cyclin(k=None, s='u'), cyclin_0)
+
+Rule('step1', None >> cyclin(k=None, s='u'), k1)
+Rule('step3', cyclin(k=None, s='u') + cdc2(k=None, s='p') >> cyclin(k=1, s='p') % cdc2(k=1, s='p'), k3 ) 
+Rule('step4_5', cyclin(k=1, s='p') % cdc2(k=1, s='p') <> cyclin(k=1, s='p') % cdc2(k=1, s='u'), k4, k5)
+Rule('step6', cyclin(k=1, s='p') % cdc2(k=1, s='u') >> cyclin(k=None, s='p') + cdc2(k=None, s='u'), k6)
+Rule('step9_8', cdc2(k=None, s='u') <> cdc2(k=None, s='p'), k8, k9 )
+
+Observable('obscdc2', cdc2(k=None, s='u'))
+Observable('obscdc2p', cdc2(k=None, s='p'))
+Observable('obscyclin', cyclin(k=None, s='u'))
+Observable('obscyclinp', cyclin(k=None, s='p'))
+Observable('obscyclincdc2pp', cyclin(k=1, s='p') % cdc2(k=1, s='p'))
+Observable('obscyclincdc2p',  cyclin(k=1, s='p') % cdc2(k=1, s='u'))
