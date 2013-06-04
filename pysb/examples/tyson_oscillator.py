@@ -51,11 +51,12 @@ Observable("YT", cyclin())                                # Total Cyclin
 Observable("CT", cdc2())                                  # Total CDC2
 Observable("M",  cyclin(Y='P', b=1) % cdc2(Y='U', b=1) )  # Active Complex
 
-# Seed some values (???)
+# [C2] in Tyson
 Parameter("cdc0", 1)
-Initial(cdc2(Y='U', b=None), cdc0)
+Initial(cdc2(Y='P', b=None), cdc0)
 
-Parameter("cyc0", 0.33)
+# [Y] in Tyson
+Parameter('cyc0', 0.333333)
 Initial(cyclin(Y='U', b=None), cyc0)
 
 
