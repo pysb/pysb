@@ -1,7 +1,7 @@
 
 # This creates model.odes which contains the math
 from pysb.bng import generate_equations
-from pysb.integrate import odesolve
+from pysb.integrate import odesolve, change_of_variables
 from pysb.examples.tyson_oscillator import model
 #from pylab import *
 from numpy import *
@@ -23,6 +23,30 @@ from sympy.solvers import solve
 from sympy import Symbol
 from sympy import symarray
 from sympy.functions.elementary.complexes import Abs
+
+# This function will take a model
+# and return all the nodes that are slaves
+def find_slaves(model, t, epsilon):
+    slaves = []
+    
+    generate_equations(model)
+    x = odesolve(model, t)
+
+    names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
+
+    for i, eq in enumerate(model.odes): # i is equation number
+        eq = eq.subs('s%d' % i, 's%dstar' % i)
+        star = Symbol('s%dstar' % i)
+        sol = solve(eq, star)
+        max = 0 # Start with no distance
+        for j in range(len(sol)):  # j is solution j for equation i
+            for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
+            for tt in t:
+                values = { n.replace('__',''):x[n][tt] for n in names }
+                dist = Abs(sol[j].evalf(subs=values) - values['s%d'%i]) # compute distance
+                if dist > max: max = dist
+        if(max >= epsilon): slaves.append("s%d" % i) # Change to suit output as needed
+    return slaves
 
 
 zero = model.odes[0]
