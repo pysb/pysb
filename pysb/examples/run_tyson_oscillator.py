@@ -24,36 +24,42 @@ from sympy import Symbol
 from sympy import symarray
 from sympy.functions.elementary.complexes import Abs
 
+# Right now, s1 is the only one not matching the paper. Needs further investigation, I think this 
+
 # This function will take a model
-# and return all the nodes that are slaves
-def find_slaves(model, t, epsilon):
-    slaves = []
-    
+# and return maximum distance between concrete species trace and imposed trace 
+def find_slaves(model, t, ignore=15):
+    distance = []
+
     generate_equations(model)
     x = odesolve(model, t)
-
+    x = x[ignore:] # Ignore first couple points
+    t = t[ignore:]
     names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
+    x = x[names] # Only concrete species are considered
+    names = [n.replace('__','') for n in names]
+    x.dtype = [(n,'<f8') for n in names]
 
     for i, eq in enumerate(model.odes): # i is equation number
-        eq = eq.subs('s%d' % i, 's%dstar' % i)
-        star = Symbol('s%dstar' % i)
-        sol = solve(eq, star)
-        max = 0 # Start with no distance
+        eq   = eq.subs('s%d' % i, 's%dstar' % i)
+        sol  = solve(eq, Symbol('s%dstar' % i)) # Find equation of imposed trace
+        max  = -1 # Start with no distance between imposed trace and computed trace for this species
         for j in range(len(sol)):  # j is solution j for equation i
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
             for tt in t:
-                values = { n.replace('__',''):x[n][tt] for n in names }
-                dist = Abs(sol[j].evalf(subs=values) - values['s%d'%i]) # compute distance
+                dist = Abs(sol[j].evalf(subs={n:x[tt][n] for n in names}) - x[tt]['s%d'%i]) # compute distance
                 if dist > max: max = dist
-        if(max >= epsilon): slaves.append("s%d" % i) # Change to suit output as needed
-    return slaves
+        print("max[%d] = %lg" % (i, max))
+        distance.append(max)
+        #if(max <= epsilon): slaves.append("s%d" % i) # Change to suit output as needed
+    return distance
 
 
 zero = model.odes[0]
 zero = zero.subs('s0', 's0stars')
-zero = zero.subs('k6', model.parameters[6].value)
-zero = zero.subs('k8', model.parameters[8].value)
-zero = zero.subs('k9', model.parameters[9].value)
+zero = zero.subs('k6', model.parameters['k6'].value)
+zero = zero.subs('k8', model.parameters['k8'].value)
+zero = zero.subs('k9', model.parameters['k9'].value)
 
 first = model.odes[1]
 first = first.subs('s1', 's1stars')
@@ -113,8 +119,7 @@ D = symarray('s1', 10001)
 F = symarray('s5', 10001)
 G = symarray('s4', 10001)
 
-for i in range(0, 10001):
-  
+for i in range(1, 10001):
     B[i] = y0[0].evalf(subs={s4: x['__s4'][i], s6: x['__s6'][i]})
     C[i] = y6[0].evalf(subs={s5: x['__s5'][i], s6: x['__s6'][i]})
     D[i] = y1[0].evalf(subs={s2: x['__s2'][i], s4: x['__s4'][i]})
