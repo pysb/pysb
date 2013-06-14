@@ -43,7 +43,7 @@ def find_slaves(model, t, ignore=15):
     for i, eq in enumerate(model.odes): # i is equation number
         eq   = eq.subs('s%d' % i, 's%dstar' % i)
         sol  = solve(eq, Symbol('s%dstar' % i)) # Find equation of imposed trace
-        max  = -1 # Start with no distance between imposed trace and computed trace for this species
+        max  = None # Start with no distance between imposed traces and computed trace for this species
         for j in range(len(sol)):  # j is solution j for equation i
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
             for tt in t:
