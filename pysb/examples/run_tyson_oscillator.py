@@ -1,7 +1,7 @@
 
 # This creates model.odes which contains the math
 from pysb.bng import generate_equations
-from pysb.integrate import odesolve, change_of_variables
+from pysb.integrate import odesolve
 from pysb.examples.tyson_oscillator import model
 #from pylab import *
 from numpy import *
@@ -28,8 +28,8 @@ from sympy.functions.elementary.complexes import Abs
 
 # This function will take a model
 # and return maximum distance between concrete species trace and imposed trace 
-def find_slaves(model, t, ignore=15):
-    distance = []
+def find_slaves(model, t, ignore=15, epsilon=1e-6):
+    slaves = []
 
     generate_equations(model)
     x = odesolve(model, t)
@@ -45,14 +45,16 @@ def find_slaves(model, t, ignore=15):
         sol  = solve(eq, Symbol('s%dstar' % i)) # Find equation of imposed trace
         max  = -1 # Start with no distance between imposed trace and computed trace for this species
         for j in range(len(sol)):  # j is solution j for equation i
+            prueba = zeros(len(x))
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
-            for tt in t:
-                dist = Abs(sol[j].evalf(subs={n:x[tt][n] for n in names}) - x[tt]['s%d'%i]) # compute distance
-                if dist > max: max = dist
-        print("max[%d] = %lg" % (i, max))
-        distance.append(max)
+            for l, tt in enumerate(t):
+                prueba[l] = Abs(sol[j].evalf(subs={n:x[tt][n] for n in names}) - x[tt]['s%d'%i])            
+            if (prueba.max() <= epsilon): slaves.append("s%d" % i)
+#                if dist > max: max = dist
+#        print("max[%d] = %lg" % (i, max))
+#        distance.append(max)
         #if(max <= epsilon): slaves.append("s%d" % i) # Change to suit output as needed
-    return distance
+    return slaves
 
 
 zero = model.odes[0]
@@ -143,5 +145,6 @@ l6 = plt.semilogy(t, x['__s6'])
 plt.show()
 #plot(t, C)
    
+
 
 
