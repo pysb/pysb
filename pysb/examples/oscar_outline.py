@@ -15,7 +15,7 @@ import sys
 import os
 import pygraphviz
 import networkx
-import sympy
+import copy
 from sympy.parsing.sympy_parser import parse_expr
 from sympy.functions.elementary.complexes import Abs
 
@@ -126,8 +126,6 @@ def mass_conserved(model):
 def slave_equations(model, t, ignore=15, epsilon=1e-6):
     eq = model.odes
     slaves = find_slaves(model, t, ignore, epsilon)
-    conservation = mass_conserved(model)
-
     slave_conserved_eqs = []
     for i, j in enumerate(slaves):
         slave_conserved_eqs.append(model.odes[int(re.findall(r'\d+', slaves[i])[0])])
@@ -141,7 +139,7 @@ def slave_equations(model, t, ignore=15, epsilon=1e-6):
 #               } # Stub
     return slave_conserved_eqs
 
-def pruned_equations(model, t, ignore=15, epsilon=1e-6):
+def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
     generate_equations(model)
     x = odesolve(model, t)
     x = x[ignore:] # Ignore first couple points
@@ -150,25 +148,33 @@ def pruned_equations(model, t, ignore=15, epsilon=1e-6):
     x = x[names] # Only concrete species are considered
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
+    conservation = mass_conserved(model)
 
-    pruned_eqs = []
-    eq = slave_equations(model, t, ignore=15, epsilon=1e-6)
+    pruned_eqs = slave_equations(model, t, ignore=15, epsilon=1e-6)
+    eq = copy.deepcopy(pruned_eqs)
     for i, j in enumerate(eq):
-        ble = re.findall(r'\b\S+\b', str(j))
-        for l, m in enumerate(ble):
+        ble = re.findall(r'\b\S+\b', str(j)) #Creates a list of the monomials of each slave equation
+        for l, m in enumerate(ble): #Compares the monomials to find the pruned system
             m_ready=parse_expr(m)
+            m_elim=parse_expr(m)
             for p in model.parameters: m_ready = m_ready.subs(p.name, p.value) # Substitute parameters
             elim=zeros(len(x))
             for k in range(len(ble)):
                 if (k+l+1) <= (len(ble)-1):
                     ble_ready = parse_expr(ble[k+l+1])
+                    ble_elim = parse_expr(ble[k+l+1])
                     for p in model.parameters: ble_ready = ble_ready.subs(p.name, p.value) # Substitute parameters
                     for s, tt in enumerate(t):
-                        elim[s] = Abs(m_ready.evalf(subs={n:x[tt][n] for n in names}) - ble_ready.evalf(subs={n:x[tt][n] for n in names}))       
-                    print l, k+l+1, m_ready, ble_ready, elim.max() 
+                        elim[s] = m_ready.evalf(subs={n:x[tt][n] for n in names}) - ble_ready.evalf(subs={n:x[tt][n] for n in names})  
+                    if elim.max() > 0 and abs(elim.max()) > rho:
+                       pruned_eqs[i] = pruned_eqs[i].subs(ble_elim, 0)
+                    else: pass
+                    if elim.max() < 0 and abs(elim.max()) > rho:
+                       pruned_eqs[i] = pruned_eqs[i].subs(m_elim, 0) 
+                    else: pass
                 else: pass 
-                    
-
+    for i, l in enumerate(conservation): #Add the conservation laws to the pruned system
+        pruned_eqs.append(l)
     return pruned_eqs
 
 y1, y2, y3, y4, y5, c, k8, k9, k1, k3 = symbols('y1 y2 y3 y4 y5 c k8 k9 k1 k3')
