@@ -4,12 +4,8 @@ from pysb.integrate import odesolve
 from collections    import Mapping
 
 # NOTES TO RESTART
-# (a) Is there a better name for a species than s0, s1, ...?
-# (b) How to organize this as a class? Co-monadic structure seems overkill, when most pieces are functions
-#     ? Maybe functions inside Tropical class, or just don't export them from module
-# (c) Add test cases for given interface
-# (d) git rebase all this to a "tropical" branch
-# (e) will zeros speed it up?
+# (a) Is there a better name for a species than s0, s1, ...? Oscar says yes!
+# (b) Add test cases for given interface
 
 class Tropical:
     def __init__(self):
@@ -56,7 +52,7 @@ def imposed_distance(model, t, ignore, verbose=False):
     distances = []
 
     # Find ode solution via specified parameters
-    x = odesolve(tyson, t)
+    x = odesolve(model, t)
 
     # Ignore first couple points, till system reaches quasi-equilibrium
     x = x[ignore:]
@@ -67,7 +63,7 @@ def imposed_distance(model, t, ignore, verbose=False):
     names      = [n.replace('__','') for n in names]
     x.dtype    = [(n,'<f8') for n in names]
     symx       = FilterNdarray(x) # Create a filtered view of the ode solution, suitable for sympy
-    trabajando = [0.0]*x.size
+    #trabajando = [0.0]*x.size
 
     # Loop through all equations (i is equation number)
     for i, eq in enumerate(model.odes):
