@@ -16,13 +16,26 @@ import os
 import pygraphviz
 import networkx
 import copy
+from collections import Mapping
 from sympy.parsing.sympy_parser import parse_expr
 from sympy.functions.elementary.complexes import Abs
+from pysb.integrate import odesolve
+
+from pysb.examples.tyson_oscillator import model as tyson
+t = linspace(0, 100, 10001)
+
+def imposed_distance(model, t, ignore=15, epsilon=1e-6):
+    distances = ['s0', 's1', 's4']
+    x = odesolve(tyson, t) # Solution via specified parameters
+    x = x[ignore:] # Ignore first couple points
+    t = t[ignore:]
+    
+    return distanced
 
 def find_slaves(model, t, ignore=15, epsilon=1e-6):
     #return ['s0', 's1', 's4']
     slaves = []
-#
+
     generate_equations(model)
     x = odesolve(model, t)
     x = x[ignore:] # Ignore first couple points
@@ -31,7 +44,7 @@ def find_slaves(model, t, ignore=15, epsilon=1e-6):
     x = x[names] # Only concrete species are considered
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
-#
+
     for i, eq in enumerate(model.odes): # i is equation number
         eq   = eq.subs('s%d' % i, 's%dstar' % i)
         sol  = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
