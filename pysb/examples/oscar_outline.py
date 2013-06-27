@@ -16,6 +16,7 @@ import os
 import pygraphviz
 import networkx
 import copy
+from collections import Mapping
 from sympy.parsing.sympy_parser import parse_expr
 from sympy.functions.elementary.complexes import Abs
 from sympy.solvers import solve
@@ -23,8 +24,14 @@ from sympy import Symbol
 from sympy import symarray
 from sympy import solve_poly_system
 from sympy import symbols
+from pysb.integrate import odesolve
+
+from pysb.examples.tyson_oscillator import model as tyson
+t = linspace(0, 100, 10001)
+
 
 def find_slaves(model, t, ignore=15, epsilon=1e-6):
+    #return ['s0', 's1', 's4']
     slaves = []
 
     generate_equations(model)
@@ -38,18 +45,16 @@ def find_slaves(model, t, ignore=15, epsilon=1e-6):
 
     for i, eq in enumerate(model.odes): # i is equation number
         eq   = eq.subs('s%d' % i, 's%dstar' % i)
-        sol  = solve(eq, Symbol('s%dstar' % i)) # Find equation of imposed trace
+        sol  = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
         max  = -1 # Start with no distance between imposed trace and computed trace for this species
         for j in range(len(sol)):  # j is solution j for equation i
             prueba = zeros(len(x))
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
+            # This is the loop that kills performance
+            #prueba = Abs(sol[j].evalf(subs=x) - x)
             for l, tt in enumerate(t):
-                prueba[l] = Abs(sol[j].evalf(subs={n:x[tt][n] for n in names}) - x[tt]['s%d'%i])            
+                prueba[l] = Abs(sol[j].evalf(subs={n:x[tt][n] for n in names}) - x[tt]['s%d'%i])
             if (prueba.max() <= epsilon): slaves.append("s%d" % i)
-#                if dist > max: max = dist
-#        print("max[%d] = %lg" % (i, max))
-#        distance.append(max)
-        #if(max <= epsilon): slaves.append("s%d" % i) # Change to suit output as needed
     return slaves
 
 # The output type may change, as needed for a graph package
@@ -121,8 +126,8 @@ def mass_conserved(model):
         if b == 0:
             g.append(item)
             for l,k in enumerate(item):
-                u +=Symbol(c[i][l])    
-            h.append(u-Symbol('C%d'%i))
+                u += sympy.Symbol(c[i][l])    
+            h.append(u-sympy.Symbol('C%d'%i))
             print 'cycle%d'%i, 'is conserved'
             
     return h, g
@@ -149,8 +154,6 @@ def slave_equations(model, t, ignore=15, epsilon=1e-6):
 def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
     generate_equations(model)
     x = odesolve(model, t)
-    x = x[ignore:] # Ignore first couple points
-    t = t[ignore:]
     names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
     x = x[names] # Only concrete species are considered
     names = [n.replace('__','') for n in names]
