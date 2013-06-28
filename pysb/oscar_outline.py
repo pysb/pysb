@@ -21,18 +21,16 @@ from sympy import symbols, solve
 from collections import Mapping
 from sympy.parsing.sympy_parser import parse_expr
 from sympy.functions.elementary.complexes import Abs
+from sympy.solvers import solve
+from sympy import Symbol
+from sympy import symarray
+from sympy import solve_poly_system
+from sympy import symbols
 from pysb.integrate import odesolve
 
 from pysb.examples.tyson_oscillator import model as tyson
 t = linspace(0, 100, 10001)
 
-def imposed_distance(model, t, ignore=15, epsilon=1e-6):
-    distances = ['s0', 's1', 's4']
-    x = odesolve(tyson, t) # Solution via specified parameters
-    x = x[ignore:] # Ignore first couple points
-    t = t[ignore:]
-    
-    return distanced
 
 def find_slaves(model, t, ignore=15, epsilon=1e-6):
     #return ['s0', 's1', 's4']
@@ -120,6 +118,7 @@ def find_cycles(model):
 def mass_conserved(model):
     c = find_cycles(model)
     h = []
+    g = []
     for i, item in enumerate(c):
         b = 0
         u = 0
@@ -127,12 +126,13 @@ def mass_conserved(model):
         for j, specie in enumerate(item):
             b += model.odes[int(re.findall(r'\d+', c[i][j])[0])]
         if b == 0:
+            g.append(item)
             for l,k in enumerate(item):
                 u += sympy.Symbol(c[i][l])    
             h.append(u-sympy.Symbol('C%d'%i))
             print 'cycle%d'%i, 'is conserved'
             
-    return h
+    return h, g
 
 # Might need a "Prune" equation function
 
@@ -160,7 +160,7 @@ def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
     x = x[names] # Only concrete species are considered
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
-    conservation = mass_conserved(model)
+    conservation = mass_conserved(model)[0]
 
     pruned_eqs = slave_equations(model, t, ignore=15, epsilon=1e-6)
     eq = copy.deepcopy(pruned_eqs)
@@ -189,8 +189,27 @@ def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
         pruned_eqs.append(l)
     return pruned_eqs
 
+
+def diff_alg_system(model):
+    var_ready = []
+    var = find_slaves(model, t, ignore=15, epsilon=1e-6)
+    eqs = pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1)
+    w = mass_conserved(model)[1]
+    for i in w: #Adds the variable of s2 cycle 
+        if len(i) == 1:
+            var.append(i[0])
+        else: pass  
+    for j in var:
+        var_ready.append(Symbol(j))
+    sol = solve_poly_system(eqs, var_ready)
+    return sol
+
+
+
+
 y1, y2, y3, y4, y5, c, k8, k9, k1, k3 = symbols('y1 y2 y3 y4 y5 c k8 k9 k1 k3')
-eqs=(k8*y1-k9*y2, k8*y1-k9*y2, y1+y2+y3+y4-c, k1-k3*y2*y5 )
+eqs=[k8*y1-k9*y2, k8*y1-k9*y2, y1+y2+y3+y4-c, k1-k3*y2*y5]
 solve(eqs, y1, y2, y5)
  
  
+#eqs=[-k8*s0 + k9*s4, k1*s2 - k2*s1 - k3*s1*s4, k8*s0 - k9*s4, -C0 + s2, -C2 + s0 + s4 + s5 + s6]
