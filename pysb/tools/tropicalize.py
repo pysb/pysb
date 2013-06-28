@@ -21,8 +21,9 @@ def tropicalize(model, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
     tropical = Tropical()
     tropical.model = model
     if verbose: print "Computing Imposed Distances"
-    imposed_distance = imposed_distance(model, t, ignore, verbose, epsilon)
-    tropical.slaves = slaves(imposed_distance, epsilon)
+    # Not saving imposed distance, since it's shortcutting
+    dist = imposed_distance(model, t, ignore, verbose, epsilon)
+    tropical.slaves = slaves(dist, epsilon)
     return tropical
 
 # Helper class to use evalf with a ndarray
@@ -64,7 +65,8 @@ def imposed_distance(model, t, ignore=1, verbose=False, epsilon=None):
     for i, eq in enumerate(model.odes):
         eq        = eq.subs('s%d' % i, 's%dstar' % i)
         sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
-        max       = None # Start with no distance between imposed trace and computed trace for this species
+        max       = None # maximum for a single solution
+        min       = None # Minimum between all possible solution
 
         # The minimum of the maximum of all possible solutions
         # Note: It should prefer real solutions over complex, but this isn't coded to do that 
@@ -78,7 +80,11 @@ def imposed_distance(model, t, ignore=1, verbose=False, epsilon=None):
                     max = current
                 if epsilon != None and current > epsilon:
                     break
-        distances.append(max)
+            if j==0:
+                min = max
+            else:
+                if max < min: min = max
+        distances.append(min)
         if verbose: print "  * Equation",i," distance =",max
     return distances
 
