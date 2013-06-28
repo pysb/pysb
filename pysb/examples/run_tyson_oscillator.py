@@ -1,13 +1,9 @@
-
 # This creates model.odes which contains the math
 from pysb.bng import generate_equations
 from pysb.integrate import odesolve
 from pysb.examples.tyson_oscillator import model
-#from pylab import *
 from numpy import *
 import matplotlib.pyplot as plt
-
-#ion()
 
 generate_equations(model)
 
