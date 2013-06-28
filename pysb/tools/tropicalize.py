@@ -21,7 +21,7 @@ def tropicalize(model, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
     tropical = Tropical()
     tropical.model = model
     if verbose: print "Computing Imposed Distances"
-    imposed_distance = imposed_distance(model, t, ignore, verbose, True)
+    imposed_distance = imposed_distance(model, t, ignore, verbose, epsilon)
     tropical.slaves = slaves(imposed_distance, epsilon)
     return tropical
 
@@ -44,7 +44,7 @@ class FilterNdarray(Mapping):
         return self
 
 # Compute imposed distances of a model
-def imposed_distance(model, t, ignore=1, verbose=False, abortOnThreshold=False):
+def imposed_distance(model, t, ignore=1, verbose=False, epsilon=None):
     distances = []
 
     # Find ode solution via specified parameters
@@ -59,7 +59,6 @@ def imposed_distance(model, t, ignore=1, verbose=False, abortOnThreshold=False):
     names      = [n.replace('__','') for n in names]
     x.dtype    = [(n,'<f8') for n in names]
     symx       = FilterNdarray(x) # Create a filtered view of the ode solution, suitable for sympy
-    #trabajando = [0.0]*x.size
 
     # Loop through all equations (i is equation number)
     for i, eq in enumerate(model.odes):
@@ -72,13 +71,13 @@ def imposed_distance(model, t, ignore=1, verbose=False, abortOnThreshold=False):
         #       and the current test case is all complex
         for j in range(len(sol)):  # j is solution j for equation i (mostly likely never greater than 2)
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
-            #for t in range(x.size): trabajando[t] = sol[j].evalf(subs=symx.set_time(t))
-            #prueba = abs(trabajando - x['s%d' % i]).max()
-            prueba = abs([sol[j].evalf(subs=symx.set_time(t)) for t in range(x.size)] - x['s%d' % i]).max()
-            if j == 0:
-                max = prueba
-            else:       
-                if prueba < max: max = prueba
+            trace = x['s%d' % i]
+            for t in range(x.size):
+                current = abs(sol[j].evalf(subs=symx.set_time(t)) - trace[t])
+                if max == None or current > max:
+                    max = current
+                if epsilon != None and current > epsilon:
+                    break
         distances.append(max)
         if verbose: print "  * Equation",i," distance =",max
     return distances
