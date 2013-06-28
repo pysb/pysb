@@ -31,7 +31,7 @@ t = linspace(0, 100, 10001)
 
 
 def find_slaves(model, t, ignore=15, epsilon=1e-6):
-    #return ['s0', 's1', 's4']
+    return ['s0', 's1', 's4']
     slaves = []
 
     generate_equations(model)
@@ -45,8 +45,7 @@ def find_slaves(model, t, ignore=15, epsilon=1e-6):
 
     for i, eq in enumerate(model.odes): # i is equation number
         eq   = eq.subs('s%d' % i, 's%dstar' % i)
-        sol  = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
-        max  = -1 # Start with no distance between imposed trace and computed trace for this species
+        sol  = solve(eq, Symbol('s%dstar' % i)) # Find equation of imposed trace
         for j in range(len(sol)):  # j is solution j for equation i
             prueba = zeros(len(x))
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
@@ -55,6 +54,7 @@ def find_slaves(model, t, ignore=15, epsilon=1e-6):
             for l, tt in enumerate(t):
                 prueba[l] = Abs(sol[j].evalf(subs={n:x[tt][n] for n in names}) - x[tt]['s%d'%i])
             if (prueba.max() <= epsilon): slaves.append("s%d" % i)
+            print prueba.max()
     return slaves
 
 # The output type may change, as needed for a graph package
@@ -201,6 +201,15 @@ def diff_alg_system(model):
         var_ready.append(Symbol(j))
     sol = solve_poly_system(eqs, var_ready)
     return sol
+
+def tropicalization(model):
+    eqs = model.odes
+    tropical = copy.deepcopy(eqs)
+    slaves = find_slaves(model, t, ignore, epsilon)
+    cycle = mass_conserved(model)[1]
+    for i, j in enumerate(slaves):
+        del tropical[int(re.findall(r'\d+', slaves[i])[0])]
+        
 
 
 
