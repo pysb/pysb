@@ -3,10 +3,6 @@ import sympy
 from pysb.integrate import odesolve
 from collections    import Mapping
 
-# NOTES TO RESTART
-# (a) Is there a better name for a species than s0, s1, ...? Oscar says yes!
-# (b) Add test cases for given interface
-
 class Tropical:
     def __init__(self):
         self.model            = None
@@ -21,12 +17,12 @@ class Tropical:
              id(self))
 
 # Constructor function
-def tropicalize(model, t, ignore, epsilon=1e-6, rho=1, verbose=False):
+def tropicalize(model, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
     tropical = Tropical()
     tropical.model = model
     if verbose: print "Computing Imposed Distances"
-    tropical.imposed_distance = imposed_distance(model, t, ignore, verbose)
-    tropical.slaves = slaves(tropical.imposed_distance, epsilon)
+    imposed_distance = imposed_distance(model, t, ignore, verbose, True)
+    tropical.slaves = slaves(imposed_distance, epsilon)
     return tropical
 
 # Helper class to use evalf with a ndarray
@@ -48,7 +44,7 @@ class FilterNdarray(Mapping):
         return self
 
 # Compute imposed distances of a model
-def imposed_distance(model, t, ignore, verbose=False):
+def imposed_distance(model, t, ignore=1, verbose=False, abortOnThreshold=False):
     distances = []
 
     # Find ode solution via specified parameters
@@ -69,16 +65,21 @@ def imposed_distance(model, t, ignore, verbose=False):
     for i, eq in enumerate(model.odes):
         eq        = eq.subs('s%d' % i, 's%dstar' % i)
         sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
-        max       = -1 # Start with no distance between imposed trace and computed trace for this species
+        max       = None # Start with no distance between imposed trace and computed trace for this species
 
+        # The minimum of the maximum of all possible solutions
+        # Note: It should prefer real solutions over complex, but this isn't coded to do that 
+        #       and the current test case is all complex
         for j in range(len(sol)):  # j is solution j for equation i (mostly likely never greater than 2)
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
             #for t in range(x.size): trabajando[t] = sol[j].evalf(subs=symx.set_time(t))
             #prueba = abs(trabajando - x['s%d' % i]).max()
             prueba = abs([sol[j].evalf(subs=symx.set_time(t)) for t in range(x.size)] - x['s%d' % i]).max()
-            if(prueba > max): max = prueba
-        if (max < 0): distances.append(None)
-        else:         distances.append(max)
+            if j == 0:
+                max = prueba
+            else:       
+                if prueba < max: max = prueba
+        distances.append(max)
         if verbose: print "  * Equation",i," distance =",max
     return distances
 
