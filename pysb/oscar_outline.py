@@ -16,6 +16,8 @@ import os
 import pygraphviz
 import networkx
 import copy
+from numpy import linspace
+from sympy import symbols, solve
 from collections import Mapping
 from sympy.parsing.sympy_parser import parse_expr
 from sympy.functions.elementary.complexes import Abs

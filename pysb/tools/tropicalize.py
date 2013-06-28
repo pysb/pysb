@@ -3,14 +3,6 @@ import sympy
 from pysb.integrate import odesolve
 from collections    import Mapping
 
-# NOTES TO RESTART
-# (a) Is there a better name for a species than s0, s1, ...?
-# (b) How to organize this as a class? Co-monadic structure seems overkill, when most pieces are functions
-#     ? Maybe functions inside Tropical class, or just don't export them from module
-# (c) Add test cases for given interface
-# (d) git rebase all this to a "tropical" branch
-# (e) will zeros speed it up?
-
 class Tropical:
     def __init__(self):
         self.model            = None
@@ -25,12 +17,13 @@ class Tropical:
              id(self))
 
 # Constructor function
-def tropicalize(model, t, ignore, epsilon=1e-6, rho=1, verbose=False):
+def tropicalize(model, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
     tropical = Tropical()
     tropical.model = model
     if verbose: print "Computing Imposed Distances"
-    tropical.imposed_distance = imposed_distance(model, t, ignore, verbose)
-    tropical.slaves = slaves(tropical.imposed_distance, epsilon)
+    # Not saving imposed distance, since it's shortcutting
+    dist = imposed_distance(model, t, ignore, verbose, epsilon)
+    tropical.slaves = slaves(dist, epsilon)
     return tropical
 
 # Helper class to use evalf with a ndarray
@@ -52,11 +45,11 @@ class FilterNdarray(Mapping):
         return self
 
 # Compute imposed distances of a model
-def imposed_distance(model, t, ignore, verbose=False):
+def imposed_distance(model, t, ignore=1, verbose=False, epsilon=None):
     distances = []
 
     # Find ode solution via specified parameters
-    x = odesolve(tyson, t)
+    x = odesolve(model, t)
 
     # Ignore first couple points, till system reaches quasi-equilibrium
     x = x[ignore:]
@@ -67,22 +60,31 @@ def imposed_distance(model, t, ignore, verbose=False):
     names      = [n.replace('__','') for n in names]
     x.dtype    = [(n,'<f8') for n in names]
     symx       = FilterNdarray(x) # Create a filtered view of the ode solution, suitable for sympy
-    trabajando = [0.0]*x.size
 
     # Loop through all equations (i is equation number)
     for i, eq in enumerate(model.odes):
         eq        = eq.subs('s%d' % i, 's%dstar' % i)
         sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
-        max       = -1 # Start with no distance between imposed trace and computed trace for this species
+        max       = None # maximum for a single solution
+        min       = None # Minimum between all possible solution
 
+        # The minimum of the maximum of all possible solutions
+        # Note: It should prefer real solutions over complex, but this isn't coded to do that 
+        #       and the current test case is all complex
         for j in range(len(sol)):  # j is solution j for equation i (mostly likely never greater than 2)
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
-            #for t in range(x.size): trabajando[t] = sol[j].evalf(subs=symx.set_time(t))
-            #prueba = abs(trabajando - x['s%d' % i]).max()
-            prueba = abs([sol[j].evalf(subs=symx.set_time(t)) for t in range(x.size)] - x['s%d' % i]).max()
-            if(prueba > max): max = prueba
-        if (max < 0): distances.append(None)
-        else:         distances.append(max)
+            trace = x['s%d' % i]
+            for t in range(x.size):
+                current = abs(sol[j].evalf(subs=symx.set_time(t)) - trace[t])
+                if max == None or current > max:
+                    max = current
+                if epsilon != None and current > epsilon:
+                    break
+            if j==0:
+                min = max
+            else:
+                if max < min: min = max
+        distances.append(min)
         if verbose: print "  * Equation",i," distance =",max
     return distances
 
