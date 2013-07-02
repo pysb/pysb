@@ -6,7 +6,11 @@
 # Using any of these functions, you can skip around in tasks orders, as they 
 # return the expected results for the tyson model.
 # Use the output of each to compare with the functions you create
-
+from sympy import Symbol
+from sympy import symarray
+from sympy import solve_poly_system
+from sympy import symbols
+from sympy import log
 import pysb
 import pysb.bng
 import sympy
@@ -22,11 +26,9 @@ from collections import Mapping
 from sympy.parsing.sympy_parser import parse_expr
 from sympy.functions.elementary.complexes import Abs
 from sympy.solvers import solve
-from sympy import Symbol
-from sympy import symarray
-from sympy import solve_poly_system
-from sympy import symbols
+from sympy.functions.special.delta_functions import Heaviside
 from pysb.integrate import odesolve
+
 
 from pysb.examples.tyson_oscillator import model as tyson
 t = linspace(0, 100, 10001)
@@ -138,7 +140,6 @@ def mass_conserved(model):
 
 # Large time sink, tropicalization step is needed in here, i.e. maximum
 def slave_equations(model, t, ignore=15, epsilon=1e-6):
-    eq = model.odes
     slaves = find_slaves(model, t, ignore, epsilon)
     slave_conserved_eqs = []
     for i, j in enumerate(slaves):
@@ -207,12 +208,38 @@ def diff_alg_system(model):
 def tropicalization(model):
     eqs = model.odes
     tropical = copy.deepcopy(eqs)
-    slaves = find_slaves(model, t, ignore, epsilon)
+    tropicalized = []
+    index_slaves = []
+    slaves = find_slaves(model, t, ignore=15, epsilon=1e-6)
     cycle = mass_conserved(model)[1]
-    for i, j in enumerate(slaves):
-        del tropical[int(re.findall(r'\d+', slaves[i])[0])]
-        
+    for i in slaves:   #Gets the indexes of the slaved species in order to delete them from model.odes
+        index_slaves.append(int(re.findall(r'\d+', i)[0]))
+    for index in sorted(index_slaves, reverse=True): #Deletes the slaved species
+        del tropical[index] 
+ 
+    for t, j in enumerate(tropical):
+        ar = j.args #List of the terms of each equation  
+        asd=0
+        for l, k in enumerate(ar):
+            p = k
+            for f, h in enumerate(ar):
+                if k != h:
+                   p *= Heaviside(k - h)
+                   asd +=p
+        print asd
+            
 
+
+      
+#        for l, k in enumerate(ar):
+#            asd = 0
+#            p=k
+#            for f, h in enumerate(ar):
+#                   p *= Heaviside(log(abs(k)) - log(abs(h)))
+#            asd += p       
+#            print t, 2*p 
+   
+                             
 
 
 
