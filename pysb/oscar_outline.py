@@ -6,11 +6,15 @@
 # Using any of these functions, you can skip around in tasks orders, as they 
 # return the expected results for the tyson model.
 # Use the output of each to compare with the functions you create
+
+from sympy.solvers import solve
 from sympy import Symbol
-from sympy import symarray
-from sympy import solve_poly_system
 from sympy import symbols
+from sympy import symarray
+from sympy.functions.elementary.complexes import Abs
+from sympy import solve_poly_system
 from sympy import log
+from sympy.functions.special.delta_functions import Heaviside
 import pysb
 import pysb.bng
 import sympy
@@ -20,22 +24,16 @@ import os
 import pygraphviz
 import networkx
 import copy
-from numpy import linspace
-from sympy import symbols, solve
-from collections import Mapping
 from sympy.parsing.sympy_parser import parse_expr
-from sympy.functions.elementary.complexes import Abs
-from sympy.solvers import solve
-from sympy.functions.special.delta_functions import Heaviside
-from pysb.integrate import odesolve
+from collections import Mapping
 
 
-from pysb.examples.tyson_oscillator import model as tyson
-t = linspace(0, 100, 10001)
+
+
 
 
 def find_slaves(model, t, ignore=15, epsilon=1e-6):
-    return ['s0', 's1', 's4']
+    return ['s0', 's1', 's5']
     slaves = []
 
     generate_equations(model)
@@ -140,10 +138,10 @@ def mass_conserved(model):
 
 # Large time sink, tropicalization step is needed in here, i.e. maximum
 def slave_equations(model, t, ignore=15, epsilon=1e-6):
-    slaves = find_slaves(model, t, ignore, epsilon)
-    slave_conserved_eqs = []
+    slaves = find_slaves(model, t, ignore=15, epsilon=1e-6)
+    slave_conserved_eqs = {}
     for i, j in enumerate(slaves):
-        slave_conserved_eqs.append(model.odes[int(re.findall(r'\d+', slaves[i])[0])])
+        slave_conserved_eqs.setdefault(j,[]).append(model.odes[int(re.findall(r'\d+', slaves[i])[0])])
         
     # Solve the slave equations here
     # Stubbed computation
@@ -196,6 +194,12 @@ def diff_alg_system(model):
     var = find_slaves(model, t, ignore=15, epsilon=1e-6)
     eqs = pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1)
     w = mass_conserved(model)[1]
+    generate_equations(model)
+    x = odesolve(model, t)
+    names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
+    names = [n.replace('__','') for n in names]
+    
+
     for i in w: #Adds the variable of s2 cycle 
         if len(i) == 1:
             var.append(i[0])
@@ -205,7 +209,7 @@ def diff_alg_system(model):
     sol = solve_poly_system(eqs, var_ready)
     return sol
 
-def tropicalization(model):
+def tropicalization(model, t):
     eqs = model.odes
     tropical = copy.deepcopy(eqs)
     tropicalized = []
@@ -216,19 +220,25 @@ def tropicalization(model):
         index_slaves.append(int(re.findall(r'\d+', i)[0]))
     for index in sorted(index_slaves, reverse=True): #Deletes the slaved species
         del tropical[index] 
- 
+
+    for tr in range(len(tropical)): #Subs parameter's names for their values    
+        for par in model.parameters: tropical[tr] = tropical[tr].subs(par.name, par.value) # Substitute parameters 
+
     for t, j in enumerate(tropical):
-        ar = j.args #List of the terms of each equation  
-        asd=0
+        if type(j) == Mul: print solve(log(j), dict = True) #If Mul=True there is only one monomial
+        else:            
+            ar = j.args #List of the terms of each equation  
+            asd=0   
         for l, k in enumerate(ar):
             p = k
             for f, h in enumerate(ar):
                 if k != h:
-                   p *= Heaviside(k - h)
-                   asd +=p
-        print asd
-            
+                   p *= Heaviside(log(abs(k)) - log(abs(h)))
+            asd +=p
+        tropicalized.append(asd)
+    return tropicalized    
 
+    
 
       
 #        for l, k in enumerate(ar):
