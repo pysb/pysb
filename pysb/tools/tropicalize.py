@@ -172,7 +172,7 @@ def find_nearest_zero(array):
 def pruned_equations(model, y, conservation_laws, slaves, rho=1):
     pruned_eqs = slave_equations(model, slaves)
     eqs        = copy.deepcopy(pruned_eqs)
-     # Create a filtered view of the ode solution, suitable for sympy
+    symy       = FilterNdarray (y)
 
     for i, eq in enumerate(eqs):
         ble = eq.as_coefficients_dict().keys() # Get monomials
@@ -187,6 +187,7 @@ def pruned_equations(model, y, conservation_laws, slaves, rho=1):
                     for p in model.parameters: ble_ready = ble_ready.subs(p.name, p.value) # Substitute parameters
                     diff = [m_ready.evalf(subs=symy.set_time(t)) - ble_ready.evalf(subs=symy.set_time(t)) for t in range(y.size)]
                     diff = find_nearest_zero(diff)
+                    print i, eq, l, m, k, diff
                     if diff > 0 and abs(diff) > rho:
                        pruned_eqs[i] = pruned_eqs[i].subs(ble_elim, 0)
                     if diff < 0 and abs(diff) > rho:
