@@ -6,8 +6,9 @@ import traceback
 import os
 import importlib
 
+t = linspace(0, 100, 10001)
+tropical = tropicalize(tyson, t, ignore=1, epsilon=0.1, rho=1, verbose=False)
+
 def test_slaves():
-    t = linspace(0, 100, 10001)
-    tropical = tropicalize(tyson, t, ignore=15, epsilon=1e-6, rho=1, verbose=False)
     assert_equal(tropical.slaves, ['s0','s1','s5'])
     

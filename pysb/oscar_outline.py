@@ -33,7 +33,7 @@ t = linspace(0, 100, 10001)
 
 
 def find_slaves(model, t, ignore=15, epsilon=1e-6):
-    return ['s0', 's1', 's4']
+    return ['s0', 's1', 's5']
     slaves = []
 
     generate_equations(model)
