@@ -1403,7 +1403,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         # We can implement this in O(1) ourselves, whereas the Sequence mixin
         # implements it in O(n).
         if not c in self:
-            raise ValueError
+            raise ValueError("%s is not in ComponentSet" % c)
         return self._index_map[c.name]
 
     def __and__(self, other):
