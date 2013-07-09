@@ -8,6 +8,7 @@ import collections
 import weakref
 import copy
 import itertools
+import sympy
 
 
 def Initial(*args):
@@ -701,7 +702,7 @@ def build_rule_expression(reactant, product, is_reversible):
     return RuleExpression(reactant, product, is_reversible)
 
 
-class Parameter(Component):
+class Parameter(Component, sympy.Symbol):
 
     """
     Model component representing a named constant floating point number.
@@ -713,6 +714,8 @@ class Parameter(Component):
     ----------
     value : number, optional
         The numerical value of the parameter. Defaults to 0.0 if not specified.
+        The provided value is converted to a float before being stored, so any
+        value that cannot be coerced to a float will trigger an exception.
 
     Attributes
     ----------
@@ -720,9 +723,18 @@ class Parameter(Component):
 
     """
 
+    def __new__(cls, name, value=0.0, _export=True):
+        return super(sympy.Symbol, cls).__new__(cls, name)
+
     def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
-        self.value = value
+        self.value = float(value)
+
+    # This is needed to make sympy's evalf machinery treat this class like a
+    # Symbol.
+    @property
+    def func(self):
+        return sympy.Symbol
 
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
@@ -822,10 +834,9 @@ class Rule(Component):
         Component.__init__(self, name, _export)
         if not isinstance(rule_expression, RuleExpression):
             raise Exception("rule_expression is not a RuleExpression object")
-        if not isinstance(rate_forward, Parameter):
-            raise Exception("Forward rate must be a Parameter")
-        if rule_expression.is_reversible and not isinstance(rate_reverse, Parameter):
-            raise Exception("Reverse rate must be a Parameter")
+        validate_const_expr(rate_forward, "forward rate")
+        if rule_expression.is_reversible:
+            validate_const_expr(rate_reverse, "reverse rate")
         self.rule_expression = rule_expression
         self.reactant_pattern = rule_expression.reactant_pattern
         self.product_pattern = rule_expression.product_pattern
@@ -856,6 +867,17 @@ class Rule(Component):
             ret += ', move_connected=True'
         ret += ')'
         return ret
+
+
+
+def validate_const_expr(obj, description):
+    """Raises an exception if the argument is not a constant expression."""
+    if not (isinstance(obj, Parameter) or
+            isinstance(obj, Expression) and obj.is_constant_expression()):
+        description_upperfirst = description[0].upper() + description[1:]
+        msg = ("%s must be a Parameter or constant Expression" %
+               description_upperfirst)
+        raise ConstantExpressionError(msg)
 
 
 
@@ -921,6 +943,50 @@ class Observable(Component):
 
 
 
+class Expression(Component, sympy.Symbol):
+
+    """
+    Model component representing a symbolic expression of other variables.
+
+    Parameters
+    ----------
+    expr : sympy.Expr
+        Symbolic expression.
+
+    Attributes
+    ----------
+    expr : sympy.Expr
+        See Parameters.
+
+    """
+
+    def __new__(cls, name, expr, _export=True):
+        return super(sympy.Symbol, cls).__new__(cls, name)
+
+    def __init__(self, name, expr, _export=True):
+        Component.__init__(self, name, _export)
+        self.expr = expr
+
+    @property
+    def value(self):
+        #try:
+        ret = self.expr.evalf()
+        return ret
+
+    def is_constant_expression(self):
+        """Return True if all terminal symbols are Parameters or numbers."""
+        return all(isinstance(a, Parameter) or
+                   (isinstance(a, Expression) and a.is_constant_expression()) or
+                   isinstance(a, sympy.Number)
+                   for a in self.expr.atoms())
+
+    def __repr__(self):
+        ret = '%s(%s, %s)' % (self.__class__.__name__, repr(self.name),
+                              repr(self.expr))
+        return ret
+
+
+
 class Model(object):
 
     """
@@ -975,7 +1041,8 @@ class Model(object):
 
     """
 
-    _component_types = (Monomer, Compartment, Parameter, Rule, Observable)
+    _component_types = (Monomer, Compartment, Parameter, Rule, Observable,
+                        Expression)
 
     def __init__(self, name=None, base=None, _export=True):
         self.name = name
@@ -986,6 +1053,7 @@ class Model(object):
         self.parameters = ComponentSet()
         self.rules = ComponentSet()
         self.observables = ComponentSet()
+        self.expressions = ComponentSet()
         self.species = []
         self.odes = []
         self.reactions = []
@@ -1092,7 +1160,7 @@ class Model(object):
                 other.model = weakref.ref(self)
                 break
         else:
-            raise Exception("Tried to add component of unknown type '%s' to"
+            raise Exception("Tried to add component of unknown type '%s' to "
                             "model" % type(other))
 
     def add_annotation(self, annotation):
@@ -1170,8 +1238,8 @@ class Model(object):
 
         """
         complex_pattern = self._validate_initial_condition_pattern(pattern)
-        if not isinstance(value, Parameter):
-            raise Exception("Value must be a Parameter")
+        if not isinstance(value, (Parameter, Expression)):
+            raise Exception("Value must be a Parameter or Expression")
         self.initial_conditions.append( (complex_pattern, value) )
 
     def update_initial_condition_pattern(self, before_pattern, after_pattern):
@@ -1286,6 +1354,10 @@ class InvalidReversibleSynthesisDegradationRule(Exception):
     def __init__(self):
         Exception.__init__(self, "Synthesis and degradation rules may not be"
                            "reversible.")
+
+class ConstantExpressionError(ValueError):
+    """Expression is not constant."""
+    pass
 
 class ModelExistsWarning(UserWarning):
     """A second model was declared in a module that already contains one."""

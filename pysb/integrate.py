@@ -1,3 +1,4 @@
+import pysb.core
 import pysb.bng
 import numpy
 from scipy.integrate import ode
@@ -165,12 +166,19 @@ class Solver(object):
                 y0 = numpy.array(y0)
         else:
             y0 = numpy.zeros((self.y.shape[1],))
-            for cp, ic_param in self.model.initial_conditions:
-                pi = self.model.parameters.index(ic_param)
+            subs = dict((p, param_values[i]) for i, p
+                        in enumerate(self.model.parameters))
+            subs.update((e, e.expr) for e in self.model.expressions)
+            for cp, value_obj in self.model.initial_conditions:
+                if isinstance(value_obj, pysb.core.Parameter):
+                    pi = self.model.parameters.index(ic_param)
+                    value = param_values[pi]
+                elif isinstance(value_obj, pysb.core.Expression):
+                    value = value_obj.expr.evalf(subs=subs)
                 si = self.model.get_species_index(cp)
                 if si is None:
                     raise Exception("Species not found in model: %s" % repr(cp))
-                y0[si] = param_values[pi]
+                y0[si] = value
 
         # perform the actual integration
         self.integrator.set_initial_value(y0, self.tspan[0])
