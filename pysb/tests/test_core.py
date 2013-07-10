@@ -46,9 +46,10 @@ def test_initial():
 @with_model
 def test_model_pickle():
     import pickle
-    Monomer('A')
-    Monomer('B', ['x', 'y'], {'x': ['e', 'f']})
-    Parameter('k', 1.0)
-    Rule('bind', A() + B(x='e', y=WILD) >> A() % B(x='f', y=None), k, k)
+    A = Monomer('A', _export=False)
+    B = Monomer('B', ['x', 'y'], {'x': ['e', 'f']}, _export=False)
+    k = Parameter('k', 1.0, _export=False)
+    bind = Rule('bind', A() + B(x='e', y=WILD) >> A() % B(x='f', y=None), k,
+                _export=False)
     model2 = pickle.loads(pickle.dumps(model))
     check_model_against_component_list(model, model2.all_components())
