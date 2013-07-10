@@ -967,11 +967,11 @@ class Expression(Component, sympy.Symbol):
         Component.__init__(self, name, _export)
         self.expr = expr
 
-    @property
-    def value(self):
-        #try:
-        ret = self.expr.evalf()
-        return ret
+    def expand_expr(self):
+        """Return expr rewritten in terms of terminal symbols only."""
+        subs = ((a, a.expand_expr()) for a in self.expr.atoms()
+                if isinstance(a, Expression))
+        return self.expr.subs(subs)
 
     def is_constant_expression(self):
         """Return True if all terminal symbols are Parameters or numbers."""
@@ -1335,9 +1335,11 @@ class Model(object):
             obs.coefficients = []
 
     def __repr__(self):
-        return "<%s '%s' (monomers: %d, rules: %d, parameters: %d, compartments: %d) at 0x%x>" % \
-            (self.__class__.__name__, self.name, len(self.monomers), len(self.rules),
-             len(self.parameters), len(self.compartments), id(self))
+        return ("<%s '%s' (monomers: %d, rules: %d, parameters: %d, "
+                "expressions: %d, compartments: %d) at 0x%x>" %
+                (self.__class__.__name__, self.name,
+                 len(self.monomers), len(self.rules), len(self.parameters),
+                 len(self.expressions), len(self.compartments), id(self)))
 
 
 

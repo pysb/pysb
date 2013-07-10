@@ -88,6 +88,9 @@ class Solver(object):
 
         code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
         code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+        for e in model.expressions:
+            code_eqs = re.sub(r'\b(%s)\b' % e.name,
+                              sympy.ccode(e.expand_expr()), code_eqs)
         for i, p in enumerate(model.parameters):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
 
@@ -166,15 +169,16 @@ class Solver(object):
                 y0 = numpy.array(y0)
         else:
             y0 = numpy.zeros((self.y.shape[1],))
-            subs = dict((p, param_values[i]) for i, p
-                        in enumerate(self.model.parameters))
-            subs.update((e, e.expr) for e in self.model.expressions)
+            subs = dict((p, param_values[i])
+                        for i, p in enumerate(self.model.parameters))
             for cp, value_obj in self.model.initial_conditions:
-                if isinstance(value_obj, pysb.core.Parameter):
-                    pi = self.model.parameters.index(ic_param)
+                if value_obj in self.model.parameters:
+                    pi = self.model.parameters.index(value_obj)
                     value = param_values[pi]
-                elif isinstance(value_obj, pysb.core.Expression):
-                    value = value_obj.expr.evalf(subs=subs)
+                elif value_obj in self.model.expressions:
+                    value = value_obj.expand_expr().evalf(subs=subs)
+                else:
+                    raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)
                 if si is None:
                     raise Exception("Species not found in model: %s" % repr(cp))
