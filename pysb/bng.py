@@ -270,7 +270,7 @@ def generate_equations(model):
 
         while 'begin reactions' not in lines.next():
             pass
-        model.odes = [sympy.S(0)] * len(model.species)
+        model.odes = [sympy.numbers.Zero()] * len(model.species)
         reaction_cache = {}
         while True:
             line = lines.next()
@@ -283,7 +283,8 @@ def generate_equations(model):
             (rule_name, is_reverse) = re.match(r'#(\w+)(?:\((reverse)\))?', rule).groups()
             is_reverse = bool(is_reverse)
             r_names = ['s%d' % r for r in reactants]
-            combined_rate = sympy.Mul(*[sympy.S(t) for t in r_names + rate]) 
+            combined_rate = sympy.Mul(
+                *[sympy.Symbol(t) for t in r_names + rate])
             rule = model.rules[rule_name]
             reaction = {
                 'reactants': reactants,
