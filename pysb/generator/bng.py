@@ -27,7 +27,7 @@ class BngGenerator(object):
         self.generate_species()
 
     def generate_parameters(self):
-        if not self.model.parameters:
+        if not self.model.parameters and not self.model.expressions:
             return
         self.__content += "begin parameters\n"
         max_length = max(len(p.name) for p in
