@@ -1501,7 +1501,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
 
     def __repr__(self):
         return 'ComponentSet([\n' + \
-            ''.join(' %s,\n' % x for x in self) + \
+            ''.join(' %s,\n' % repr(x) for x in self) + \
             ' ])'
 
     def rename(self, c, new_name):
