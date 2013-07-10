@@ -100,6 +100,11 @@ class Solver(object):
         # be valid Python.  If the equations ever have more complex things in them, this might fail.
         if not Solver._use_inline:
             code_eqs_py = compile(code_eqs, '<%s odes>' % model.name, 'exec')
+        else:
+            for arr_name in ('ydot', 'y', 'p'):
+                macro = arr_name.upper() + '1'
+                code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
+                                  '%s(\\1)' % macro, code_eqs)
 
         def rhs(t, y, p):
             ydot = self.ydot
