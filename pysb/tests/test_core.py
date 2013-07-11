@@ -99,3 +99,13 @@ def test_model_pickle():
     Rule('bind', A() + B(x='e', y=WILD) >> A() % B(x='f', y=None), k, k)
     model2 = pickle.loads(pickle.dumps(model))
     check_model_against_component_list(model, model2.all_components())
+
+@with_model
+def test_compartment_initial_error():
+    Monomer('A', ['s'])
+    Parameter('A_0', 2.0)
+    c1 = Compartment("C1")
+    c2 = Compartment("C2")
+    Initial(A(s=None)**c1, A_0)
+    Initial(A(s=None)**c2, A_0)
+    
