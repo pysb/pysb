@@ -500,6 +500,7 @@ class ComplexPattern(object):
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
         return \
+            self.compartment == other.compartment and \
             sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in self.monomer_patterns) == \
             sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in other.monomer_patterns)
 
