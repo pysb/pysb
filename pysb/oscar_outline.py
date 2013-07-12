@@ -15,6 +15,9 @@ from sympy.functions.elementary.complexes import Abs
 from sympy import solve_poly_system
 from sympy import log
 from sympy.functions.special.delta_functions import Heaviside
+from sympy import simplify
+from sympy import Mul
+from sympy import log
 import pysb
 import pysb.bng
 import sympy
@@ -141,7 +144,9 @@ def slave_equations(model, t, ignore=15, epsilon=1e-6):
     slaves = find_slaves(model, t, ignore=15, epsilon=1e-6)
     slave_conserved_eqs = {}
     for i, j in enumerate(slaves):
-        slave_conserved_eqs.setdefault(j,[]).append(model.odes[int(re.findall(r'\d+', slaves[i])[0])])
+        slave_conserved_eqs[j] = model.odes[int(re.findall(r'\d+', slaves[i])[0])] 
+
+#        slave_conserved_eqs.setdefault(j,[]).append(model.odes[int(re.findall(r'\d+', slaves[i])[0])])
         
     # Solve the slave equations here
     # Stubbed computation
@@ -153,6 +158,11 @@ def slave_equations(model, t, ignore=15, epsilon=1e-6):
     return slave_conserved_eqs
 
 def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
+
+    k8, s5, k9, s0, k3, s1, k1, s2, k2, k3, k6, s6 = symbols('k8 s5 k9 s0 k3 s1 k1 s2 k2 k3 k6 s6')
+    a = [k8*s5-k9*s0, -k8*s5+k9*s0, k1*s2-k2*s1-k3*s0*s1]
+    return a
+
     generate_equations(model)
     x = odesolve(model, t)
     names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
@@ -187,75 +197,66 @@ def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
     for i, l in enumerate(conservation): #Add the conservation laws to the pruned system
         pruned_eqs.append(l)
     return pruned_eqs
-
+ 
 
 def diff_alg_system(model):
+    sol_dict = {}
+    index_slaves = []
+    slaves = find_slaves(model, t, ignore=15, epsilon=1e-6)
     var_ready = []
+    eqs_to_add = copy.deepcopy(model.odes)
+    eqs_to_add_dict = {}
     var = find_slaves(model, t, ignore=15, epsilon=1e-6)
     eqs = pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1)
     w = mass_conserved(model)[1]
-    generate_equations(model)
-    x = odesolve(model, t)
-    names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
-    names = [n.replace('__','') for n in names]
-    
-
-    for i in w: #Adds the variable of s2 cycle 
+    cycle_eqs = mass_conserved(model)[0]
+    for i in cycle_eqs:
+        eqs.append(i)
+    for i in w: #Adds the variable of s2 cycle, it is required because the solver doesnt know if s2 or C2 is theconstant 
         if len(i) == 1:
-            var.append(i[0])
-        else: pass  
+            var.append(i[0])   
     for j in var:
         var_ready.append(Symbol(j))
     sol = solve_poly_system(eqs, var_ready)
-    return sol
+    for i, j in enumerate(var_ready):
+        sol_dict[j] = sol[0][i] 
 
-def tropicalization(model, t):
-    eqs = model.odes
-    tropical = copy.deepcopy(eqs)
-    tropicalized = []
-    index_slaves = []
-    slaves = find_slaves(model, t, ignore=15, epsilon=1e-6)
-    cycle = mass_conserved(model)[1]
-    for i in slaves:   #Gets the indexes of the slaved species in order to delete them from model.odes
-        index_slaves.append(int(re.findall(r'\d+', i)[0]))
-    for index in sorted(index_slaves, reverse=True): #Deletes the slaved species
-        del tropical[index] 
+    for i, j in enumerate(eqs_to_add):
+        eqs_to_add_dict[Symbol('s%d'%i)] = j
+    for i in slaves:
+        del eqs_to_add_dict[Symbol('%s'%i)]
+        
+    eqs_to_add_ready = copy.deepcopy(eqs_to_add_dict)    
 
-    for tr in range(len(tropical)): #Subs parameter's names for their values    
-        for par in model.parameters: tropical[tr] = tropical[tr].subs(par.name, par.value) # Substitute parameters 
+    for i in eqs_to_add_dict: #Changes s2 to (d/dt)s2
+        eqs_to_add_ready[Symbol('(d/dt)%s'%i)] = eqs_to_add_ready.pop(i)
+    for l in eqs_to_add_ready.keys(): #Substitutes the values of the algebraic system
+        for i, j in enumerate(sol_dict): eqs_to_add_ready[l]=eqs_to_add_ready[l].subs(sol_dict.keys()[i], sol_dict.values()[i])
+    
+    return eqs_to_add_ready
 
-    for t, j in enumerate(tropical):
-        if type(j) == Mul: print solve(log(j), dict = True) #If Mul=True there is only one monomial
+
+def tropicalization(model):
+
+    eqs_for_tropicalization = diff_alg_system(model) 
+    tropicalized = {}
+
+    for i in eqs_for_tropicalization.keys():
+        for par in model.parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters 
+
+    for j in sorted(eqs_for_tropicalization.keys()):
+        if type(eqs_for_tropicalization[j]) == Mul: print solve(log(j), dict = True) #If Mul=True there is only one monomial
+        elif eqs_for_tropicalization[j] == 0: print 'there are not monomials'
         else:            
-            ar = j.args #List of the terms of each equation  
-            asd=0   
-        for l, k in enumerate(ar):
-            p = k
-            for f, h in enumerate(ar):
-                if k != h:
-                   p *= Heaviside(log(abs(k)) - log(abs(h)))
-            asd +=p
-        tropicalized.append(asd)
+            ar = eqs_for_tropicalization[j].args #List of the terms of each equation  
+            asd=0 
+            for l, k in enumerate(ar):
+                p = k
+                for f, h in enumerate(ar):
+                   if k != h:
+                      p *= Heaviside(log(abs(k)) - log(abs(h)))
+                asd +=p
+            tropicalized[j] = asd
     return tropicalized    
 
-    
 
-      
-#        for l, k in enumerate(ar):
-#            asd = 0
-#            p=k
-#            for f, h in enumerate(ar):
-#                   p *= Heaviside(log(abs(k)) - log(abs(h)))
-#            asd += p       
-#            print t, 2*p 
-   
-                             
-
-
-
-y1, y2, y3, y4, y5, c, k8, k9, k1, k3 = symbols('y1 y2 y3 y4 y5 c k8 k9 k1 k3')
-eqs=[k8*y1-k9*y2, k8*y1-k9*y2, y1+y2+y3+y4-c, k1-k3*y2*y5]
-solve(eqs, y1, y2, y5)
- 
- 
-#eqs=[-k8*s0 + k9*s4, k1*s2 - k2*s1 - k3*s1*s4, k8*s0 - k9*s4, -C0 + s2, -C2 + s0 + s4 + s5 + s6]
