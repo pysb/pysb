@@ -29,7 +29,7 @@ import networkx
 import copy
 from sympy.parsing.sympy_parser import parse_expr
 from collections import Mapping
-
+import matplotlib.pyplot as plt
 
 
 
@@ -240,6 +240,7 @@ def tropicalization(model):
 
     eqs_for_tropicalization = diff_alg_system(model) 
     tropicalized = {}
+    borders = {}
 
     for i in eqs_for_tropicalization.keys():
         for par in model.parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters 
@@ -250,13 +251,24 @@ def tropicalization(model):
         else:            
             ar = eqs_for_tropicalization[j].args #List of the terms of each equation  
             asd=0 
+            bor = []
             for l, k in enumerate(ar):
                 p = k
                 for f, h in enumerate(ar):
                    if k != h:
                       p *= Heaviside(log(abs(k)) - log(abs(h)))
+                      bor.append(log(abs(k)) - log(abs(h)))
+                borders[j] = bor  # this adds the arguments of the heaviside functions to the borderss dict.    
                 asd +=p
             tropicalized[j] = asd
-    return tropicalized    
+    return borders    
 
+def visualization(model):
+    prueba = linspace(0, 100, 10001)
+    eqs_to_graph = tropicalization(model)
+    for i, j in enumerate(sorted(eqs_to_graph.values()[1])):
+        solve(j, Symbol('s6')).
+        plt.loglog(s4, )
+        plt.show()
 
+ 
