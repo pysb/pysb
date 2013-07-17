@@ -423,28 +423,22 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         Monomer('D', ['g', 'h'])
         >>> bind(A, 'a', B, 'c', [1e4, 1e-1])
         ComponentSet([
-        Rule('bind_A_B',
-        A(a=None) + B(c=None) <> A(a=1) % B(c=1),
-        bind_A_B_kf, bind_A_B_kr),
-        Parameter('bind_A_B_kf', 10000.0),
-        Parameter('bind_A_B_kr', 0.1),
-        ])
+         Rule('bind_A_B', A(a=None) + B(c=None) <> A(a=1) % B(c=1), bind_A_B_kf, bind_A_B_kr),
+         Parameter('bind_A_B_kf', 10000.0),
+         Parameter('bind_A_B_kr', 0.1),
+         ])
         >>> bind(C, 'e', D, 'g', [1e4, 1e-1])
         ComponentSet([
-        Rule('bind_C_D',
-        C(e=None) + D(g=None) <> C(e=1) % D(g=1),
-        bind_C_D_kf, bind_C_D_kr),
-        Parameter('bind_C_D_kf', 10000.0),
-        Parameter('bind_C_D_kr', 0.1),
-        ])
+         Rule('bind_C_D', C(e=None) + D(g=None) <> C(e=1) % D(g=1), bind_C_D_kf, bind_C_D_kr),
+         Parameter('bind_C_D_kf', 10000.0),
+         Parameter('bind_C_D_kr', 0.1),
+         ])
         >>> bind_complex(A(a=1) % B(c=1), 'b', C(e=2) % D(g=2), 'h', [1e-4, 1e-1])
         ComponentSet([
-        Rule('bind_AB_DC',
-        A(a=1, b=None) % B(c=1) + D(g=3, h=None) % C(e=3) <> A(a=1, b=50) % B(c=1) % D(g=3, h=50) % C(e=3),
-        bind_AB_DC_kf, bind_AB_DC_kr),
-        Parameter('bind_AB_DC_kf', 0.0001),
-        Parameter('bind_AB_DC_kr', 0.1),
-        ])
+         Rule('bind_AB_DC', A(a=1, b=None) % B(c=1) + D(g=3, h=None) % C(e=3) <> A(a=1, b=50) % B(c=1) % D(g=3, h=50) % C(e=3), bind_AB_DC_kf, bind_AB_DC_kr),
+         Parameter('bind_AB_DC_kf', 0.0001),
+         Parameter('bind_AB_DC_kr', 0.1),
+         ])
     """
     if isinstance(m1, Monomer):
         m1 = m1()
@@ -778,31 +772,30 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
         Monomer('C2', ['y', 'c2'])
         >>> bind(C1, 'y', C2, 'y', [1e4, 1e-1])
         ComponentSet([
-        Rule('bind_C1_C2', C1(y=None) + C2(y=None) <> C1(y=1) % C2(y=1), bind_C1_C2_kf, bind_C1_C2_kr),
-        Parameter('bind_C1_C2_kf', 10000.0),
-        Parameter('bind_C1_C2_kr', 0.1),
-        ])
+         Rule('bind_C1_C2', C1(y=None) + C2(y=None) <> C1(y=1) % C2(y=1), bind_C1_C2_kf, bind_C1_C2_kr),
+         Parameter('bind_C1_C2_kf', 10000.0),
+         Parameter('bind_C1_C2_kr', 0.1),
+         ])
         >>> bind(R1, 'c1', R2, 'x', [1e3, 1e-1])
         ComponentSet([
-        Rule('bind_R1_R2', R1(x=None) + R2(c1=None) <> R1(x=1) % R2(c1=1), bind_R1_R2_kf, bind_R1_R2_kr),
-        Parameter('bind_R1_R2_kf', 100.0),
-        Parameter('bind_R1_R2_kr', 0.1),
-        ])
-        >>> bind_table_complex([[C1(y=1) % C2(y=1),           C2],
-                           [R1,  (1e-4, 1e-1),  (2e-4, 2e-1)],
-                           [R1(c1=1) % R2(x=1),  (3e-4, 3e-1), None]], 'x', 'c2', m1=R1, m2=C2)
+         Rule('bind_R1_R2', R1(c1=None) + R2(x=None) <> R1(c1=1) % R2(x=1), bind_R1_R2_kf, bind_R1_R2_kr),
+         Parameter('bind_R1_R2_kf', 1000.0),
+         Parameter('bind_R1_R2_kr', 0.1),
+         ])
+        >>> bind_table_complex([[                     C1(y=1) % C2(y=1), C2],\
+                                [R1,                  (1e-4, 1e-1),      (2e-4, 2e-1)],\
+                                [R1(c1=1) % R2(x=1),  (3e-4, 3e-1),      None]], 'x', 'c2', m1=R1, m2=C2)
         ComponentSet([
-        Rule('bind_C2C1_R1', C2(y=1, c2=None) % C1(y=2) + R1(x=None) <> C2(y=1, c2=50) % C1(y=2) % R1(x=50), bind_C2C1_R1_kf, bind_C2C1_R1_kr),
-        Parameter('bind_C2C1_R1_kf', 0.0001),
-        Parameter('bind_C2C1_R1_kr', 0.1),
-        Rule('bind_R1_C2', R1(x=None) + C2(c2=None) <> R1(x=1) % C2(c2=1), bind_R1_C2_kf, bind_R1_C2_kr),
-        Parameter('bind_R1_C2_kf', 0.0002),
-        Parameter('bind_R1_C2_kr', 0.2),
-        Rule('bind_R1R2_C2C1', R1(x=None, c1=1) % R2(x=1) + C2(y=2, c2=None) % C1(y=2) <> R1(x=50, c1=1) % R2(x=1) % C2(y=2, c2=50) % C1(y=2), bind_R1R2_C2C1_kf, bind_R1R2_C2C1_kr),
-        Parameter('bind_R1R2_C2C1_kf', 0.0003),
-        Parameter('bind_R1R2_C2C1_kr', 0.3),
-        ])
-        
+         Rule('bind_C2C1_R1', C2(y=1, c2=None) % C1(y=2) + R1(x=None) <> C2(y=1, c2=50) % C1(y=2) % R1(x=50), bind_C2C1_R1_kf, bind_C2C1_R1_kr),
+         Parameter('bind_C2C1_R1_kf', 0.0001),
+         Parameter('bind_C2C1_R1_kr', 0.1),
+         Rule('bind_R1_C2', R1(x=None) + C2(c2=None) <> R1(x=1) % C2(c2=1), bind_R1_C2_kf, bind_R1_C2_kr),
+         Parameter('bind_R1_C2_kf', 0.0002),
+         Parameter('bind_R1_C2_kr', 0.2),
+         Rule('bind_R1R2_C2C1', R1(x=None, c1=1) % R2(x=1) + C2(y=2, c2=None) % C1(y=2) <> R1(x=50, c1=1) % R2(x=1) % C2(y=2, c2=50) % C1(y=2), bind_R1R2_C2C1_kf, bind_R1R2_C2C1_kr),
+         Parameter('bind_R1R2_C2C1_kf', 0.0003),
+         Parameter('bind_R1R2_C2C1_kr', 0.3),
+         ])
 
     """
     # extract species lists and matrix of rates
