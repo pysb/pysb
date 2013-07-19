@@ -61,8 +61,9 @@ class SelfExporter(object):
             new_target_module = inspect.getmodule(caller_frame)
             if SelfExporter.default_model is not None \
                     and new_target_module is SelfExporter.target_module:
-                warnings.warn("Redefining model! (You can probably ignore this if you are running"
-                              " code interactively)", ModelExistsWarning, stacklevel)
+                # This is rarely useful
+                #warnings.warn("Redefining model! (You can probably ignore this if you are running"
+                #              " code interactively)", ModelExistsWarning, stacklevel)
                 SelfExporter.cleanup()
             SelfExporter.target_module = new_target_module
             SelfExporter.target_globals = caller_frame.f_globals
