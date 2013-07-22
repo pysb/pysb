@@ -236,6 +236,15 @@ def diff_alg_system(model):
     return eqs_to_add_ready
 
 
+def remove_minus_sign(expr):
+    
+    if expr.could_extract_minus_sign() == True:
+       expr=expr*-1
+   
+    return expr   
+
+
+
 def tropicalization(model):
 
     eqs_for_tropicalization = diff_alg_system(model) 
@@ -243,22 +252,22 @@ def tropicalization(model):
     borders = {}
 
     for i in eqs_for_tropicalization.keys():
-        for par in model.parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters 
+        for par in model.parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters and simplify 
 
     for j in sorted(eqs_for_tropicalization.keys()):
         if type(eqs_for_tropicalization[j]) == Mul: print solve(log(j), dict = True) #If Mul=True there is only one monomial
         elif eqs_for_tropicalization[j] == 0: print 'there are not monomials'
         else:            
-            ar = eqs_for_tropicalization[j].args #List of the terms of each equation  
+            ar = eqs_for_tropicalization[j].args #List of the terms of each equation
             asd=0 
             bor = []
             for l, k in enumerate(ar):
                 p = k
                 for f, h in enumerate(ar):
                    if k != h:
-                      p *= Heaviside(log(abs(k)) - log(abs(h)))
-                      bor.append(log(abs(k)) - log(abs(h)))
-                borders[j] = bor  # this adds the arguments of the heaviside functions to the borderss dict.    
+                      p *= Heaviside(log(remove_minus_sign(k)) - log(remove_minus_sign(h)))
+                      bor.append(log(remove_minus_sign(k)) - log(remove_minus_sign(h)))
+                borders[j] = bor  # this adds the arguments of the heaviside functions to the borders dict.    
                 asd +=p
             tropicalized[j] = asd
     return borders    
@@ -266,9 +275,10 @@ def tropicalization(model):
 def visualization(model):
     prueba = linspace(0, 100, 10001)
     eqs_to_graph = tropicalization(model)
-    for i, j in enumerate(sorted(eqs_to_graph.values()[1])):
-        solve(j, Symbol('s6')).
-        plt.loglog(s4, )
-        plt.show()
+    for l in sorted(eqs_to_graph.keys()):
+        for i, j in enumerate(sorted(eqs_to_graph[l])):
+            print solve(j, Symbol('s6'), dict=True)
+            plt.loglog(s4, )
+            plt.show()
 
  
