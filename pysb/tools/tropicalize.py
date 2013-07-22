@@ -18,6 +18,7 @@ class Tropical:
         self.graph            = None
         self.cycles           = None
         self.conservation     = None
+        self.conserve_var    = None
         self.full_names       = {}
 
     def __repr__(self):
@@ -49,7 +50,12 @@ def tropicalize(model, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
     if verbose: print "Computing Cycles"
     tropical.cycles = [c[0:(len(c)-1)]  for c in networkx.simple_cycles(tropical.graph) ]
     if verbose: print "Computing Conservation laws"
-    (tropical.conservation, conserved_variabled) = mass_conserved(model, tropical.cycles)
+    (tropical.conservation, tropical.conserve_var) = mass_conserved(model, tropical.cycles)
+    if verbose: print "Pruning Equations"
+    tropical.pruned = pruned_equations(model, tropical.y[ignore:], tropical.conservation, tropical.slaves)
+    if verbose: print "Solving pruned equations"
+    tropical.solve_pruned = solve_pruned(model, tropical.conservation, tropical.conserve_var, tropical.slaves, tropical.pruned)
+    
     return tropical
 
 # Helper class to use evalf with a ndarray
@@ -187,7 +193,7 @@ def pruned_equations(model, y, conservation_laws, slaves, rho=1):
                     for p in model.parameters: ble_ready = ble_ready.subs(p.name, p.value) # Substitute parameters
                     diff = [m_ready.evalf(subs=symy.set_time(t)) - ble_ready.evalf(subs=symy.set_time(t)) for t in range(y.size)]
                     diff = find_nearest_zero(diff)
-                    print i, eq, l, m, k, diff
+                    #print i, eq, l, m, k, diff
                     if diff > 0 and abs(diff) > rho:
                        pruned_eqs[i] = pruned_eqs[i].subs(ble_elim, 0)
                     if diff < 0 and abs(diff) > rho:
@@ -196,3 +202,48 @@ def pruned_equations(model, y, conservation_laws, slaves, rho=1):
         pruned_eqs.append(law)
     return pruned_eqs
 
+def solve_pruned(model, conservation, conserve_var, slaves, pruned):
+    solve_for = copy.deepcopy(slaves)
+    eqs       = copy.deepcopy(pruned)
+
+    # Locate single protein conserved (s2 in tyson, the solver now knows what is constant)
+    for i in conserve_var:
+        if len(i) == 1:
+            solve_for.append(i[0])
+    variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
+    sol = sympy.solve_poly_system(eqs, variables)
+
+    return { j:sol[0][i] for i, j in enumerate(solve_for) }
+
+def equations_to_tropicalize(model, solve_pruned):
+    idx = list( set(range(len(model.odes))) - set(solve_pruned.keys()) )
+    eqs = { i:model.odes[i] for i in idx }
+
+    for l in eqs.keys(): #Substitutes the values of the algebraic system
+        for k in solve_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), solve_pruned[k])
+
+    for i in eqs.keys():
+        for par in model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
+
+    return eqs
+
+def tropicalization(eqs_for_tropicalization, parameters):
+    tropicalized = {}
+
+    for i in eqs_for_tropicalization.keys():
+        for par in parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters 
+
+    for j in sorted(eqs_for_tropicalization.keys()):
+        if type(eqs_for_tropicalization[j]) == Mul: print solve(log(j), dict = True) #If Mul=True there is only one monomial
+        elif eqs_for_tropicalization[j] == 0: print 'there are not monomials'
+        else:            
+            ar = eqs_for_tropicalization[j].args #List of the terms of each equation  
+            asd=0 
+            for l, k in enumerate(ar):
+                p = k
+                for f, h in enumerate(ar):
+                   if k != h:
+                      p *= Heaviside(log(abs(k)) - log(abs(h)))
+                asd +=p
+            tropicalized[j] = asd
+    return tropicalized

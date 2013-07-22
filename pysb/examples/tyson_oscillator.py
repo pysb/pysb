@@ -8,7 +8,7 @@ model = Model('oscillator')
 Parameter('k1',  0.015)
 Parameter('k2',  0)
 Parameter('k3',  200)
-Parameter('k4',  180 * 2.0) # due to molarity in calculation, have to double paper value
+Parameter('k4',  180)
 Parameter('kp4', 0.018)
 Parameter('k5',  0)
 Parameter('k6',  1.0)
