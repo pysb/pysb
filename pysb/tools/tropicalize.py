@@ -7,57 +7,6 @@ import sympy.parsing.sympy_parser
 from pysb.integrate import odesolve
 from collections    import Mapping
 
-
-class Tropical:
-    def __init__(self):
-        self.model            = None
-        self.t                = None # timerange used
-        self.y                = None # odes solution, numpy array
-        self.imposed_distance = None
-        self.slaves           = None
-        self.graph            = None
-        self.cycles           = None
-        self.conservation     = None
-        self.conserve_var    = None
-        self.full_names       = {}
-
-    def __repr__(self):
-        return "<%s '%s' (slaves: %s, cycles: %d) at 0x%x>" % \
-            (self.__class__.__name__, self.model.name,
-             self.slaves.__repr__(),
-             len(self.cycles),
-             id(self))
-
-# Constructor function
-def tropicalize(model, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
-    tropical = Tropical()
-    tropical.model = model
-    if verbose: print "Solving Simulation"
-    tropical.y = odesolve(model, t)
-    
-    # Only concrete species are considered, and the names must be made to match
-    names               = [n for n in filter(lambda n: n.startswith('__'), tropical.y.dtype.names)]
-    tropical.y          = tropical.y[names]
-    names               = [n.replace('__','') for n in names]
-    tropical.y.dtype    = [(n,'<f8') for n in names]
-    
-    if verbose: print "Computing Imposed Distances"
-    # Not saving imposed distance, since it's shortcutting
-    dist = imposed_distance(model, tropical.y[ignore:], verbose, epsilon)
-    tropical.slaves = slaves(dist, epsilon)
-    if verbose: print "Constructing Graph"
-    tropical.graph = construct_graph(model)
-    if verbose: print "Computing Cycles"
-    tropical.cycles = [c[0:(len(c)-1)]  for c in networkx.simple_cycles(tropical.graph) ]
-    if verbose: print "Computing Conservation laws"
-    (tropical.conservation, tropical.conserve_var) = mass_conserved(model, tropical.cycles)
-    if verbose: print "Pruning Equations"
-    tropical.pruned = pruned_equations(model, tropical.y[ignore:], tropical.conservation, tropical.slaves)
-    if verbose: print "Solving pruned equations"
-    tropical.solve_pruned = solve_pruned(model, tropical.conservation, tropical.conserve_var, tropical.slaves, tropical.pruned)
-    
-    return tropical
-
 # Helper class to use evalf with a ndarray
 class FilterNdarray(Mapping):
     def __init__(self, source):
@@ -76,165 +25,209 @@ class FilterNdarray(Mapping):
         self.t = t
         return self
 
-# Compute imposed distances of a model
-def imposed_distance(model, y, verbose=False, epsilon=None):
-    distances = []
+class Tropical:
+    def __init__(self, model):
+        self.model            = model
+        self.t                = None # timerange used
+        self.y                = None # odes solution, numpy array
+        self.slaves           = None
+        self.graph            = None
+        self.cycles           = []
+        self.conservation     = None
+        self.conserve_var     = None
+        self.full_names       = {}
 
-    symy = FilterNdarray(y) # Create a filtered view of the ode solution, suitable for sympy
+    def __repr__(self):
+        return "<%s '%s' (slaves: %s, cycles: %d) at 0x%x>" % \
+            (self.__class__.__name__, self.model.name,
+             self.slaves.__repr__(),
+             len(self.cycles),
+             id(self))
 
-    # Loop through all equations (i is equation number)
-    for i, eq in enumerate(model.odes):
-        eq        = eq.subs('s%d' % i, 's%dstar' % i)
-        sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
-        max       = None # maximum for a single solution
-        min       = None # Minimum between all possible solution
+    def tropicalize(self, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
+        if verbose: print "Solving Simulation"
+        self.y = odesolve(self.model, t)
+    
+        # Only concrete species are considered, and the names must be made to match
+        names           = [n for n in filter(lambda n: n.startswith('__'), self.y.dtype.names)]
+        self.y          = self.y[names]
+        names           = [n.replace('__','') for n in names]
+        self.y.dtype    = [(n,'<f8') for n in names]
+    
+        if verbose: print "Computing Imposed Distances"
+        # Not saving imposed distance, since it's shortcutting
+        dist = self.imposed_distance(self.y[ignore:], verbose, epsilon)
+        self.find_slaves(dist, epsilon)
+        if verbose: print "Constructing Graph"
+        self.construct_graph()
+        if verbose: print "Computing Cycles"
+        self.cycles = [c[0:(len(c)-1)]  for c in networkx.simple_cycles(self.graph) ]
+        if verbose: print "Computing Conservation laws"
+        (self.conservation, self.conserve_var) = self.mass_conserved()
+        if verbose: print "Pruning Equations"
+        self.pruned = self.pruned_equations(self.y[ignore:], rho)
+        if verbose: print "Solving pruned equations"
+        self.solved_pruned = self.solve_pruned()
+    
+        return self
 
-        # The minimum of the maximum of all possible solutions
-        # Note: It should prefer real solutions over complex, but this isn't coded to do that 
-        #       and the current test case is all complex
-        for j in range(len(sol)):  # j is solution j for equation i (mostly likely never greater than 2)
-            for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
-            trace = y['s%d' % i]
-            for t in range(y.size):
-                current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
-                if max == None or current > max:
-                    max = current
-                if epsilon != None and current > epsilon:
-                    break
-            if j==0:
-                min = max
-            else:
-                if max < min: min = max
-        distances.append(min)
-        if verbose: print "  * Equation",i," distance =",max
-    return distances
+    # Compute imposed distances of a model
+    def imposed_distance(self, y, verbose=False, epsilon=None):
+        distances = []
 
-def slaves(distances, epsilon):
-    slaves = []
-    for i,d in enumerate(distances):
-        if (d != None and d < epsilon): slaves.append(i)
-    return slaves
+        symy = FilterNdarray(y) # Create a filtered view of the ode solution, suitable for sympy
 
-# This is a function which builds the edges according to the nodes
-def r_link(graph, s, r, **attrs):
-    nodes = (s, r)
-    if attrs.get('_flip'):
-        del attrs['_flip']
-        nodes = reversed(nodes)
-    attrs.setdefault('arrowhead', 'normal')
-    graph.add_edge(*nodes, **attrs)
+        # Loop through all equations (i is equation number)
+        for i, eq in enumerate(self.model.odes):
+            eq        = eq.subs('s%d' % i, 's%dstar' % i)
+            sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
+            max       = None # maximum for a single solution
+            min       = None # Minimum between all possible solution
 
-def construct_graph(model):
-    if(model.odes == None or model.odes == []):
-        pysb.bng.generate_equations(model)
+            # The minimum of the maximum of all possible solutions
+            # Note: It should prefer real solutions over complex, but this isn't coded to do that 
+            #       and the current test case is all complex
+            for j in range(len(sol)):  # j is solution j for equation i (mostly likely never greater than 2)
+                for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
+                trace = y['s%d' % i]
+                for t in range(y.size):
+                    current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
+                    if max == None or current > max:
+                        max = current
+                    if epsilon != None and current > epsilon:
+                        break
+                if j==0:
+                    min = max
+                else:
+                    if max < min: min = max
+            distances.append(min)
+            if verbose: print "  * Equation",i," distance =",max
+        return distances
 
-    graph = networkx.DiGraph(rankdir="LR")
-    ic_species = [cp for cp, parameter in model.initial_conditions]
-    for i, cp in enumerate(model.species):
-        species_node = i
-        graph.add_node(species_node,
-                       label=species_node)
-    for i, reaction in enumerate(model.reactions):       
-        reactants = set(reaction['reactants'])
-        products = set(reaction['products']) 
-        attr_reversible = {}
-        for s in reactants:
-            for p in products:
-                r_link(graph, s, p, **attr_reversible)
-    return graph
+    def find_slaves(self, distances, epsilon):
+        self.slaves = []
+        for i,d in enumerate(distances):
+            if (d != None and d < epsilon): self.slaves.append(i)
+        return self.slaves
 
-#This function finds conservation laws from the conserved cycles
-def mass_conserved(model, cycles, verbose=False):
-    if(model.odes == None or model.odes == []):
-        pysb.bng.generate_equations(model)
-    h = [] # Array to hold conservation equation
-    g = [] # Array to hold corresponding lists of free variables in conservation equations
-    for i, item in enumerate(cycles):
-        b = 0
-        u = 0
-        for j, specie in enumerate(item):
-            b += model.odes[cycles[i][j]]
-        if b == 0:
-            g.append(item)
-            for l,k in enumerate(item):
-                u += sympy.Symbol('s%d' % cycles[i][l])    
-            h.append(u-sympy.Symbol('C%d'%i))
-            if verbose: print '  cycle%d'%i, 'is conserved'
-    return h, g
+    # This is a function which builds the edges according to the nodes
+    def r_link(self, graph, s, r, **attrs):
+        nodes = (s, r)
+        if attrs.get('_flip'):
+            del attrs['_flip']
+            nodes = reversed(nodes)
+        attrs.setdefault('arrowhead', 'normal')
+        graph.add_edge(*nodes, **attrs)
 
-def slave_equations(model, slaves):
-    if(model.odes == None or model.odes == []):
-        eq = model.odes
-    slave_conserved_eqs = []
-    for i, j in enumerate(slaves):
-        slave_conserved_eqs.append(model.odes[slaves[i]])
-    return slave_conserved_eqs
+    def construct_graph(self):
+        if(self.model.odes == None or self.model.odes == []):
+            pysb.bng.generate_equations(model)
 
-def find_nearest_zero(array):
-    idx = (numpy.abs(array)).argmin()
-    return array[idx]
+        self.graph = networkx.DiGraph(rankdir="LR")
+        ic_species = [cp for cp, parameter in self.model.initial_conditions]
+        for i, cp in enumerate(self.model.species):
+            species_node = i
+            self.graph.add_node(species_node, label=species_node)
+        for i, reaction in enumerate(self.model.reactions):       
+            reactants = set(reaction['reactants'])
+            products = set(reaction['products']) 
+            attr_reversible = {}
+            for s in reactants:
+                for p in products:
+                    self.r_link(self.graph, s, p, **attr_reversible)
+        return self.graph
 
-# Make sure this is the "ignore:" y
-def pruned_equations(model, y, conservation_laws, slaves, rho=1):
-    pruned_eqs = slave_equations(model, slaves)
-    eqs        = copy.deepcopy(pruned_eqs)
-    symy       = FilterNdarray (y)
+    #This function finds conservation laws from the conserved cycles
+    def mass_conserved(self, verbose=False):
+        if(self.model.odes == None or self.model.odes == []):
+            pysb.bng.generate_equations(self.model)
+        h = [] # Array to hold conservation equation
+        g = [] # Array to hold corresponding lists of free variables in conservation equations
+        for i, item in enumerate(self.cycles):
+            b = 0
+            u = 0
+            for j, specie in enumerate(item):
+                b += self.model.odes[self.cycles[i][j]]
+            if b == 0:
+                g.append(item)
+                for l,k in enumerate(item):
+                    u += sympy.Symbol('s%d' % self.cycles[i][l])    
+                h.append(u-sympy.Symbol('C%d'%i))
+                if verbose: print '  cycle%d'%i, 'is conserved'
+        (self.conservation, self.conserve_var) = h,g
+        return h, g
 
-    for i, eq in enumerate(eqs):
-        ble = eq.as_coefficients_dict().keys() # Get monomials
-        for l, m in enumerate(ble): #Compares the monomials to find the pruned system
-            m_ready = m # Monomial to compute with
-            m_elim  = m # Monomial to save
-            for p in model.parameters: m_ready = m_ready.subs(p.name, p.value) # Substitute parameters
-            for k in range(len(ble)):
-                if (k+l+1) <= (len(ble)-1):
-                    ble_ready = ble[k+l+1] # Monomial to compute with
-                    ble_elim  = ble[k+l+1] # Monomial to save
-                    for p in model.parameters: ble_ready = ble_ready.subs(p.name, p.value) # Substitute parameters
-                    diff = [m_ready.evalf(subs=symy.set_time(t)) - ble_ready.evalf(subs=symy.set_time(t)) for t in range(y.size)]
-                    diff = find_nearest_zero(diff)
-                    #print i, eq, l, m, k, diff
-                    if diff > 0 and abs(diff) > rho:
-                       pruned_eqs[i] = pruned_eqs[i].subs(ble_elim, 0)
-                    if diff < 0 and abs(diff) > rho:
-                       pruned_eqs[i] = pruned_eqs[i].subs(m_elim, 0)
-    for law in conservation_laws: #Add the conservation laws to the pruned system
-        pruned_eqs.append(law)
-    return pruned_eqs
+    def slave_equations(self):
+        if(self.model.odes == None or self.model.odes == []):
+            eq = self.model.odes
+        slave_conserved_eqs = []
+        for i, j in enumerate(self.slaves):
+            slave_conserved_eqs.append(self.model.odes[self.slaves[i]])
+        return slave_conserved_eqs
 
-def solve_pruned(model, conservation, conserve_var, slaves, pruned):
-    solve_for = copy.deepcopy(slaves)
-    eqs       = copy.deepcopy(pruned)
+    def find_nearest_zero(self, array):
+        idx = (numpy.abs(array)).argmin()
+        return array[idx]
 
-    # Locate single protein conserved (s2 in tyson, the solver now knows what is constant)
-    for i in conserve_var:
-        if len(i) == 1:
-            solve_for.append(i[0])
-    variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
-    sol = sympy.solve_poly_system(eqs, variables)
+    # Make sure this is the "ignore:" y
+    def pruned_equations(self, y, rho=1):
+        pruned_eqs = self.slave_equations()
+        eqs        = copy.deepcopy(pruned_eqs)
+        symy       = FilterNdarray (y)
 
-    return { j:sol[0][i] for i, j in enumerate(solve_for) }
+        for i, eq in enumerate(eqs):
+            ble = eq.as_coefficients_dict().keys() # Get monomials
+            for l, m in enumerate(ble): #Compares the monomials to find the pruned system
+                m_ready = m # Monomial to compute with
+                m_elim  = m # Monomial to save
+                for p in self.model.parameters: m_ready = m_ready.subs(p.name, p.value) # Substitute parameters
+                for k in range(len(ble)):
+                    if (k+l+1) <= (len(ble)-1):
+                        ble_ready = ble[k+l+1] # Monomial to compute with
+                        ble_elim  = ble[k+l+1] # Monomial to save
+                        for p in self.model.parameters: ble_ready = ble_ready.subs(p.name, p.value) # Substitute parameters
+                        diff = [m_ready.evalf(subs=symy.set_time(t)) - ble_ready.evalf(subs=symy.set_time(t)) for t in range(y.size)]
+                        diff = self.find_nearest_zero(diff)
+                        #print i, eq, l, m, k, diff
+                        if diff > 0 and abs(diff) > rho:
+                           pruned_eqs[i] = pruned_eqs[i].subs(ble_elim, 0)
+                        if diff < 0 and abs(diff) > rho:
+                           pruned_eqs[i] = pruned_eqs[i].subs(m_elim, 0)
+        for law in self.conservation: #Add the conservation laws to the pruned system
+            pruned_eqs.append(law)
+        self.pruned = pruned_eqs
+        return pruned_eqs
 
-def equations_to_tropicalize(model, solve_pruned):
-    idx = list( set(range(len(model.odes))) - set(solve_pruned.keys()) )
-    eqs = { i:model.odes[i] for i in idx }
+    def solve_pruned(self):
+        solve_for = copy.deepcopy(self.slaves)
+        eqs       = copy.deepcopy(self.pruned)
 
-    for l in eqs.keys(): #Substitutes the values of the algebraic system
-        for k in solve_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), solve_pruned[k])
+        # Locate single protein conserved (s2 in tyson, the solver now knows what is constant)
+        for i in self.conserve_var:
+            if len(i) == 1:
+                solve_for.append(i[0])
+        variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
+        sol = sympy.solve_poly_system(eqs, variables)
+        self.solve_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
+        return self.solve_pruned
 
-    for i in eqs.keys():
-        for par in model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
+    def equations_to_tropicalize(self):
+        idx = list( set(range(len(self.model.odes))) - set(self.solve_pruned.keys()) )
+        eqs = { i:self.model.odes[i] for i in idx }
 
-    return eqs
+        for l in eqs.keys(): #Substitutes the values of the algebraic system
+            for k in self.solved_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.solved_pruned[k])
 
-def tropicalization(eqs_for_tropicalization, parameters):
+        for i in eqs.keys():
+            for par in self.model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
+
+        return eqs
+
+def tropicalization(eqs_for_tropicalization):
     tropicalized = {}
 
-    for i in eqs_for_tropicalization.keys():
-        for par in parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters 
-
     for j in sorted(eqs_for_tropicalization.keys()):
-        if type(eqs_for_tropicalization[j]) == Mul: print solve(log(j), dict = True) #If Mul=True there is only one monomial
+        if type(eqs_for_tropicalization[j]) == sympy.Mul: print sympy.solve(sympy.log(j), dict = True) #If Mul=True there is only one monomial
         elif eqs_for_tropicalization[j] == 0: print 'there are not monomials'
         else:            
             ar = eqs_for_tropicalization[j].args #List of the terms of each equation  
@@ -243,7 +236,7 @@ def tropicalization(eqs_for_tropicalization, parameters):
                 p = k
                 for f, h in enumerate(ar):
                    if k != h:
-                      p *= Heaviside(log(abs(k)) - log(abs(h)))
+                      p *= sympy.Heaviside(sympy.log(abs(k)) - sympy.log(abs(h)))
                 asd +=p
             tropicalized[j] = asd
     return tropicalized
