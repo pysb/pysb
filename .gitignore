@@ -12,3 +12,5 @@ RELEASE-VERSION
 .idea
 *#
 *.#*
+*.dylib
+*.so.*
