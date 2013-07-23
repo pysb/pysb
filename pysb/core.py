@@ -834,9 +834,9 @@ class Rule(Component):
         Component.__init__(self, name, _export)
         if not isinstance(rule_expression, RuleExpression):
             raise Exception("rule_expression is not a RuleExpression object")
-        validate_const_expr(rate_forward, "forward rate")
+        validate_expr(rate_forward, "forward rate")
         if rule_expression.is_reversible:
-            validate_const_expr(rate_reverse, "reverse rate")
+            validate_expr(rate_reverse, "reverse rate")
         self.rule_expression = rule_expression
         self.reactant_pattern = rule_expression.reactant_pattern
         self.product_pattern = rule_expression.product_pattern
@@ -870,10 +870,17 @@ class Rule(Component):
 
 
 
+def validate_expr(obj, description):
+    """Raises an exception if the argument is not an expression."""
+    if not isinstance(obj, (Parameter, Expression)):
+        description_upperfirst = description[0].upper() + description[1:]
+        msg = "%s must be a Parameter or Expression" % description_upperfirst
+        raise ExpressionError(msg)
+
 def validate_const_expr(obj, description):
     """Raises an exception if the argument is not a constant expression."""
-    if not (isinstance(obj, Parameter) or
-            isinstance(obj, Expression) and obj.is_constant_expression()):
+    validate_expr(obj, description)
+    if isinstance(obj, Expression) and not obj.is_constant_expression():
         description_upperfirst = description[0].upper() + description[1:]
         msg = ("%s must be a Parameter or constant Expression" %
                description_upperfirst)
@@ -881,7 +888,7 @@ def validate_const_expr(obj, description):
 
 
 
-class Observable(Component):
+class Observable(Component, sympy.Symbol):
 
     """
     Model component representing a linear combination of species.
@@ -920,6 +927,9 @@ class Observable(Component):
 
     """
 
+    def __new__(cls, name, reaction_pattern, match='molecules', _export=True):
+        return super(sympy.Symbol, cls).__new__(cls, name)
+
     def __init__(self, name, reaction_pattern, match='molecules', _export=True):
         try:
             reaction_pattern = as_reaction_pattern(reaction_pattern)
@@ -932,6 +942,12 @@ class Observable(Component):
         self.match = match
         self.species = []
         self.coefficients = []
+
+    # This is needed to make sympy's evalf machinery treat this class like a
+    # Symbol.
+    @property
+    def func(self):
+        return sympy.Symbol
 
     def __repr__(self):
         ret = '%s(%s, %s' % (self.__class__.__name__, repr(self.name),
@@ -979,6 +995,12 @@ class Expression(Component, sympy.Symbol):
                    (isinstance(a, Expression) and a.is_constant_expression()) or
                    isinstance(a, sympy.Number)
                    for a in self.expr.atoms())
+
+    # This is needed to make sympy's evalf machinery treat this class like a
+    # Symbol.
+    @property
+    def func(self):
+        return sympy.Symbol
 
     def __repr__(self):
         ret = '%s(%s, %s)' % (self.__class__.__name__, repr(self.name),
@@ -1150,6 +1172,17 @@ class Model(object):
         cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
         return self.parameters - cset_used
 
+    def expressions_constant(self):
+        """Return a ComponentSet of constant expressions."""
+        cset = ComponentSet(e for e in self.expressions
+                            if all(isinstance(a, (Parameter, sympy.Number))
+                                   for a in e.expand_expr().atoms()))
+        return cset
+
+    def expressions_dynamic(self):
+        """Return a ComponentSet of non-constant expressions."""
+        return self.expressions - self.expressions_constant()
+
     def add_component(self, other):
         """Add a component to the model."""
         # We have a container for each type of component. This code determines
@@ -1238,8 +1271,7 @@ class Model(object):
 
         """
         complex_pattern = self._validate_initial_condition_pattern(pattern)
-        if not isinstance(value, (Parameter, Expression)):
-            raise Exception("Value must be a Parameter or Expression")
+        validate_const_expr(value, "initial condition value")
         self.initial_conditions.append( (complex_pattern, value) )
 
     def update_initial_condition_pattern(self, before_pattern, after_pattern):
@@ -1357,8 +1389,12 @@ class InvalidReversibleSynthesisDegradationRule(Exception):
         Exception.__init__(self, "Synthesis and degradation rules may not be"
                            "reversible.")
 
+class ExpressionError(ValueError):
+    """Expected an Expression but got something else."""
+    pass
+
 class ConstantExpressionError(ValueError):
-    """Expression is not constant."""
+    """Expected a constant Expression but got something else."""
     pass
 
 class ModelExistsWarning(UserWarning):

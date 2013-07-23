@@ -132,6 +132,12 @@ class Solver(object):
                                                       itertools.repeat(float)))
         else:
             self.yobs = numpy.ndarray((len(tspan), 0))
+        exprs = model.expressions_dynamic()
+        if len(exprs):
+            self.yexpr = numpy.ndarray(len(tspan), zip(exprs.keys(),
+                                                       itertools.repeat(float)))
+        else:
+            self.yexpr = numpy.ndarray((len(tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
         self.integrator = ode(rhs).set_integrator(integrator, **options)
 
@@ -166,6 +172,8 @@ class Solver(object):
             # create parameter vector from the values in the model
             param_values = numpy.array([p.value for p in self.model.parameters])
 
+        subs = dict((p, param_values[i])
+                    for i, p in enumerate(self.model.parameters))
         if y0 is not None:
             # accept vector of species amounts as an argument
             if len(y0) != self.y.shape[1]:
@@ -174,8 +182,6 @@ class Solver(object):
                 y0 = numpy.array(y0)
         else:
             y0 = numpy.zeros((self.y.shape[1],))
-            subs = dict((p, param_values[i])
-                        for i, p in enumerate(self.model.parameters))
             for cp, value_obj in self.model.initial_conditions:
                 if value_obj in self.model.parameters:
                     pi = self.model.parameters.index(value_obj)
@@ -203,6 +209,13 @@ class Solver(object):
         for i, obs in enumerate(self.model.observables):
             self.yobs_view[:, i] = \
                 (self.y[:, obs.species] * obs.coefficients).sum(1)
+        obs_names = self.model.observables.keys()
+        obs_dict = dict((k, self.yobs[k]) for k in obs_names)
+        for expr in self.model.expressions_dynamic():
+            expr_subs = expr.expand_expr().subs(
+                [(p, p.value) for p in self.model.parameters])
+            func = sympy.lambdify(obs_names, expr_subs)
+            self.yexpr[expr.name] = func(**obs_dict)
 
 
 def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
