@@ -726,6 +726,9 @@ class Parameter(Component, sympy.Symbol):
     def __new__(cls, name, value=0.0, _export=True):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
+    def __getnewargs__(self):
+        return (self.name, self.value, self._export)
+
     def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
         self.value = float(value)
@@ -930,6 +933,9 @@ class Observable(Component, sympy.Symbol):
     def __new__(cls, name, reaction_pattern, match='molecules', _export=True):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
+    def __getnewargs__(self):
+        return (self.name, self.reaction_pattern, self.match, self._export)
+
     def __init__(self, name, reaction_pattern, match='molecules', _export=True):
         try:
             reaction_pattern = as_reaction_pattern(reaction_pattern)
@@ -978,6 +984,9 @@ class Expression(Component, sympy.Symbol):
 
     def __new__(cls, name, expr, _export=True):
         return super(sympy.Symbol, cls).__new__(cls, name)
+
+    def __getnewargs__(self):
+        return (self.name, self.expr, self._export)
 
     def __init__(self, name, expr, _export=True):
         Component.__init__(self, name, _export)
