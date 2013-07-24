@@ -49,7 +49,15 @@ def test_model_pickle():
     A = Monomer('A', _export=False)
     B = Monomer('B', ['x', 'y'], {'x': ['e', 'f']}, _export=False)
     k = Parameter('k', 1.0, _export=False)
-    bind = Rule('bind', A() + B(x='e', y=WILD) >> A() % B(x='f', y=None), k,
-                _export=False)
+    r = Rule('r', A() + B(x='e', y=WILD) >> A() % B(x='f', y=None), k,
+             _export=False)
+    o = Observable('o', A() % B(), _export=False)
+    e = Expression('e', k * o, _export=False)
+    c = Compartment('c', None, 3, k, _export=False)
+    for comp in [A, B, k, r, o, e, c]:
+        model.add_component(comp)
+    model.add_component(c)
+    Initial(A() ** c, k)
+    assert_equal(len(model.all_components()), 7)
     model2 = pickle.loads(pickle.dumps(model))
     check_model_against_component_list(model, model2.all_components())
