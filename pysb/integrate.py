@@ -212,8 +212,7 @@ class Solver(object):
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
         for expr in self.model.expressions_dynamic():
-            expr_subs = expr.expand_expr().subs(
-                [(p, p.value) for p in self.model.parameters])
+            expr_subs = expr.expand_expr().subs(subs)
             func = sympy.lambdify(obs_names, expr_subs)
             self.yexpr[expr.name] = func(**obs_dict)
 
