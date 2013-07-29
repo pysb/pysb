@@ -152,6 +152,9 @@ class Component(object):
         # clear the weakref to parent model (restored in Model.__setstate__)
         state = self.__dict__.copy()
         del state['model']
+        # Force _export to False; we don't want the unpickling process to
+        # trigger SelfExporter.export!
+        state['_export'] = False
         return state
 
     def _do_export(self):
@@ -727,7 +730,7 @@ class Parameter(Component, sympy.Symbol):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.value, self._export)
+        return (self.name, self.value, False)
 
     def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
@@ -934,7 +937,7 @@ class Observable(Component, sympy.Symbol):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.reaction_pattern, self.match, self._export)
+        return (self.name, self.reaction_pattern, self.match, False)
 
     def __init__(self, name, reaction_pattern, match='molecules', _export=True):
         try:
@@ -986,7 +989,7 @@ class Expression(Component, sympy.Symbol):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.expr, self._export)
+        return (self.name, self.expr, False)
 
     def __init__(self, name, expr, _export=True):
         Component.__init__(self, name, _export)
