@@ -158,7 +158,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp',
         output_file_basename = '%s_%d_%d_temp' % (model.name,
                                 os.getpid(), random.randint(0, 100000))
 
-    if os.path.exists(output_file_basename + '.bngl')
+    if os.path.exists(output_file_basename + '.bngl'):
         print "WARNING! File %s already exists!" % (output_file_basename + '.bngl')
         output_file_basename += '_1'
 
