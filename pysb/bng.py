@@ -170,7 +170,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip("at line")+"\n"+p_err.rstrip())
-
+        print "Wrote " + gdat_filename # FIXME
         output_arr = _parse_bng_outfile(gdat_filename)
         #ssa_file = open(ssa_filename, 'r')
         #output.write(ssa_file.read())
