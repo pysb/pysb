@@ -67,7 +67,7 @@ class Tropical:
         if verbose: print "Pruning Equations"
         self.pruned = self.pruned_equations(self.y[ignore:], rho)
         if verbose: print "Solving pruned equations"
-        self.solved_pruned = self.solve_pruned()
+        self.sol_pruned = self.solve_pruned()
     
         return self
 
@@ -208,8 +208,10 @@ class Tropical:
                 solve_for.append(i[0])
         variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
         sol = sympy.solve_poly_system(eqs, variables)
-        self.solve_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
-        return self.solve_pruned
+        
+        # This if 'effed right here! @$%#@$%@#$%@#$%!!!!
+        self.sol_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
+        return self.sol_pruned
 
     def equations_to_tropicalize(self):
         idx = list( set(range(len(self.model.odes))) - set(self.solve_pruned.keys()) )
@@ -221,7 +223,30 @@ class Tropical:
         for i in eqs.keys():
             for par in self.model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
 
+        self.eqs_for_tropicalization = eqs
+
         return eqs
+    
+    def final_tropicalization(self):
+        tropicalized = {}
+        
+        for j in sorted(self.eqs_for_tropicalization.keys()):
+            if type(self.eqs_for_tropicalization[j]) == sympy.Mul: print sympy.solve(sympy.log(j), dict = True) #If Mul=True there is only one monomial
+            elif self.eqs_for_tropicalization[j] == 0: print 'there are no monomials'
+            else:            
+                ar = self.eqs_for_tropicalization[j].args #List of the terms of each equation  
+                asd=0 
+                for l, k in enumerate(ar):
+                    p = k
+                    for f, h in enumerate(ar):
+                       if k != h:
+                          p *= sympy.Heaviside(sympy.log(abs(k)) - sympy.log(abs(h)))
+                    asd +=p
+                tropicalized[j] = asd
+
+        self.tropical_eqs = tropicalized
+
+        return tropicalized
 
 def tropicalization(eqs_for_tropicalization):
     tropicalized = {}

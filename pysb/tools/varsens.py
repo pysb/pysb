@@ -6,12 +6,22 @@ import sys
 from sobol_seq import i4_sobol_generate
 
 def varsens(objective, k, n, scaling, log_scaling=False, verbose=True):
-    if verbose: print "Generating Halton/Sobol sequences"
-    seq = ghalton.Halton(k) # half for A, and half for B
+    if verbose: print "Generating Low Discrepancy Sequence"
+    
+    # This is a known working strategy
+    #seq = ghalton.Halton(k) # half for A, and half for B
     #seq.get(2*(k*k-k)) # Burn away any face exploration off the Halton
-    M_1  = scale(numpy.array(seq.get(n)), scaling, log_scaling)  # See Eq (9)
-    x = numpy.transpose(i4_sobol_generate(k, n, k+numpy.random.randint(2**14)))
-    M_2  = scale(x, scaling, log_scaling)
+    #M_1  = scale(numpy.array(seq.get(n)), scaling, log_scaling)  # See Eq (9)
+    #x = numpy.transpose(i4_sobol_generate(k, n, k+numpy.random.randint(2**14)))
+    #M_2  = scale(x, scaling, log_scaling)
+
+    # This appears to work!
+    seq = ghalton.Halton(k*2)
+    seq.get(20*k) # Remove initial linear correlation
+    x = numpy.array(seq.get(n))
+    M_1 = scale(x[...,0:k    ], scaling, log_scaling) 
+    M_2 = scale(x[...,k:(2*k)], scaling, log_scaling) 
+    
     N_j  = generate_N_j(M_1, M_2)                                # See Eq (11)
     N_nj = generate_N_j(M_2, M_1)
     
@@ -128,13 +138,13 @@ def gi_function(xi, ai):
 model = [0, 0.5, 3, 9, 99, 99]
 
 # Analytical answer, Eq (34) divided by V(y), matches figure
-answer = 1.0/(3.0* ((numpy.array(model) + 1.0)**2.0))/0.567986
+answer = 1.0/(3.0* ((numpy.array(model) + 1.0)**2.0))
 numpy.round(answer, 3)
 
 
 def g_objective(x): return g_function(x, model)
 
-v = varsens(g_objective, 6, 1024*50, numpy.array([[0.0]*6, [1.0]*6]))
+v = varsens(g_objective, 6, 1024, numpy.array([[0.0]*6, [1.0]*6]))
 
 # http://www.jstor.org/stable/pdfplus/2676831.pdf
 #from numpy.polynomial.legendre import legval
