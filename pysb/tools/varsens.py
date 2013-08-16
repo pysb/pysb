@@ -21,14 +21,14 @@ def varsens(objective, k, n, scaling, log_scaling=False, verbose=True):
     x = numpy.array(seq.get(n))
     M_1 = scale(x[...,0:k    ], scaling, log_scaling) 
     M_2 = scale(x[...,k:(2*k)], scaling, log_scaling) 
-    
+
     N_j  = generate_N_j(M_1, M_2)                                # See Eq (11)
     N_nj = generate_N_j(M_2, M_1)
-    
-    (fM_1, fM_2, fN_j, fN_nj) = objective_values(M_1, M_2, N_j, N_nj, objective, verbose) 
-    
+
+    a = objective_values(M_1, M_2, N_j, N_nj, objective, verbose)
+
     if verbose: print "Final sensitivity calculation"
-    return getvarsens(fM_1, fM_2, fN_j, fN_nj)
+    return getvarsens(a, k, n)
 
 def scale(points, scaling, log_scaling):
     if log_scaling:
@@ -66,62 +66,35 @@ def objective_values(M_1, M_2, N_j, N_nj, objective, verbose=True): #, fileobj=N
     (low-discrepancy sequences)
     '''
 
-    # assign the arrays that will hold fM_1, fM_2 and fN_j_n
-    fM_1  = numpy.zeros(M_1.shape[0])
-    fM_2  = numpy.zeros(M_2.shape[0])
-    fN_j  = numpy.zeros([M_1.shape[1]] + [M_1.shape[0]]) # matrix is of shape (nparam, nsamples)
-    fN_nj = numpy.zeros([M_1.shape[1]] + [M_1.shape[0]])
+    n = M_1.shape[0]
+    k = M_1.shape[1]
+    a = numpy.zeros([k*2+2] + [n]) #construct the a_i, see Theorem 2
 
-    # First process the A and B matrices
-    if verbose: print "Processing f(M_1):"
-    for i in range(M_1.shape[0]):
-        fM_1[i]   = objective(M_1[i])
+    if verbose: print "Processing a_0:"
+    for i in range(n):
+        a[0][i]   = objective(M_1[i])
         if verbose: move_spinner(i)
 
-    if verbose: print "Processing f(M_2):"
-    for i in range(M_2.shape[0]):
-        fM_2[i]   = objective(M_2[i])
+    if verbose: print "Processing a_123...k:"
+    for i in range(n):
+        a[2*k+1][i] = objective(M_2[i])
         if verbose: move_spinner(i)
 
-    if verbose: print "Processing f(N_j)"
-    for i in range(N_j.shape[0]):
+    if verbose: print "Processing a_i"
+    for i in range(k):
         if verbose: print " * parameter %d"%i
-        for j in range(N_j.shape[1]):
-            fN_j[i][j] = objective(N_j[i][j])
+        for j in range(n):
+            a[i+1][j] = objective(N_j[i][j])
             if verbose: move_spinner(j)
 
-    if verbose: print "Processing f(N_nj)"
-    for i in range(N_j.shape[0]):
+    if verbose: print "Processing a_123...k(-i)"
+    for i in range(k):
         if verbose: print " * parameter %d"%i
-        for j in range(N_j.shape[1]):
-            fN_nj[i][j] = objective(N_nj[i][j])
+        for j in range(n):
+            a[i+k+1][j] = objective(N_nj[i][j])
             if verbose: move_spinner(j)
 
-    return fM_1, fM_2, fN_j, fN_nj
-
-def getvarsens(fM_1, fM_2, fN_j, fN_nj):
-    nparms   = fN_j.shape[0] # should be the number of parameters
-    nsamples = fN_j.shape[1] # should be the number of samples from the original matrix
-
-    E_2 = sum(fM_1*fM_2) / nsamples      # Eq (21)
-
-    # Estimate U_j and U_-j values and store them 
-    U_j  = numpy.sum(fM_1 * fN_j,  axis=1) / (nsamples - 1)  # Eq (12)
-    U_nj = numpy.sum(fM_1 * fN_nj, axis=1) / (nsamples - 1)  # Eq (unnumbered one after 18)
-
-    #estimate V(y) from fM_1 and fM_2, paper uses only fM_1, this is a better estimate
-    var_y = (numpy.var(fM_1, axis=0, ddof=1)+numpy.var(fM_2, axis=0, ddof=1))/2.0
-
-    #allocate the S_i and ST_i arrays
-    Sens  = numpy.zeros(nparms)
-    SensT = numpy.zeros(nparms)
-
-    # now get the S_i and ST_i, Eq (27) & Eq (28)
-    for j in range(nparms):
-        Sens[j]  =       ((U_j[j] - E_2) / var_y)
-        SensT[j] = 1.0 - ((U_nj[j]- E_2) / var_y)
-
-    return Sens, SensT, var_y, E_2
+    return a
 
 
 # Working on a test function here
