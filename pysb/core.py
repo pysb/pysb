@@ -22,6 +22,12 @@ def MatchOnce(pattern):
     return cp
 
 
+# A module may define a global with this name (_pysb_doctest_...) to request
+# that SelfExporter not issue any ModelExistsWarnings from doctests defined
+# therein. (This is the best method we could come up with to manage this
+# behavior, as doctest doesn't offer per-doctest setup/teardown.)
+_SUPPRESS_MEW = '_pysb_doctest_suppress_modelexistswarning'
+
 class SelfExporter(object):
 
     """
@@ -62,8 +68,14 @@ class SelfExporter(object):
             new_target_module = inspect.getmodule(caller_frame)
             if SelfExporter.default_model is not None \
                     and new_target_module is SelfExporter.target_module:
-                warnings.warn("Redefining model! (You can probably ignore this if you are running"
-                              " code interactively)", ModelExistsWarning, stacklevel)
+                # Warn, unless running a doctest whose containing module set the
+                # magic global which tells us to suppress it.
+                if not (
+                    caller_frame.f_code.co_filename.startswith('<doctest ') and
+                    caller_frame.f_globals.get(_SUPPRESS_MEW)):
+                    warnings.warn("Redefining model! (You can probably ignore "
+                                  "this if you are running code interactively)",
+                                  ModelExistsWarning, stacklevel)
                 SelfExporter.cleanup()
             SelfExporter.target_module = new_target_module
             SelfExporter.target_globals = caller_frame.f_globals
@@ -152,6 +164,9 @@ class Component(object):
         # clear the weakref to parent model (restored in Model.__setstate__)
         state = self.__dict__.copy()
         del state['model']
+        # Force _export to False; we don't want the unpickling process to
+        # trigger SelfExporter.export!
+        state['_export'] = False
         return state
 
     def _do_export(self):
@@ -727,7 +742,7 @@ class Parameter(Component, sympy.Symbol):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.value, self._export)
+        return (self.name, self.value, False)
 
     def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
@@ -934,7 +949,7 @@ class Observable(Component, sympy.Symbol):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.reaction_pattern, self.match, self._export)
+        return (self.name, self.reaction_pattern, self.match, False)
 
     def __init__(self, name, reaction_pattern, match='molecules', _export=True):
         try:
@@ -986,7 +1001,7 @@ class Expression(Component, sympy.Symbol):
         return super(sympy.Symbol, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.expr, self._export)
+        return (self.name, self.expr, False)
 
     def __init__(self, name, expr, _export=True):
         Component.__init__(self, name, _export)

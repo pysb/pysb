@@ -48,6 +48,9 @@ __all__ = ['equilibrate',
            'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport', 'pore_bind']
 
+# Suppress ModelExistsWarnings in our doctests.
+_pysb_doctest_suppress_modelexistswarning = True
+
 # Internal helper functions
 # =========================
 
