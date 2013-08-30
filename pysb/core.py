@@ -381,6 +381,8 @@ class MonomerPattern(object):
             return ReactionPattern([ComplexPattern([self], None), ComplexPattern([other], None)])
         if isinstance(other, ComplexPattern):
             return ReactionPattern([ComplexPattern([self], None), other])
+        elif other == None:
+        	return self
         else:
             return NotImplemented
 
@@ -545,6 +547,8 @@ class ComplexPattern(object):
             return ReactionPattern([self, other])
         elif isinstance(other, MonomerPattern):
             return ReactionPattern([self, ComplexPattern([other], None)])
+        elif other == None:
+        	return self
         else:
             return NotImplemented
 
@@ -620,6 +624,8 @@ class ReactionPattern(object):
             return ReactionPattern(self.complex_patterns + [ComplexPattern([other], None)])
         elif isinstance(other, ComplexPattern):
             return ReactionPattern(self.complex_patterns + [other])
+        elif other == None:
+        	return self
         else:
             return NotImplemented
 
