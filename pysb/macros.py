@@ -1100,8 +1100,14 @@ def catalyze_one_step(enzyme, substrate, product, kf):
 
     """
 
+    if isinstance(enzyme, Monomer):
+        enzyme = enzyme()
+    if isinstance(substrate, Monomer):
+        substrate = substrate()
+    if isinstance(product, Monomer):
+        product = product()
     return _macro_rule('one_step',
-                       enzyme() + substrate() >> enzyme() + product(),
+                       enzyme + substrate >> enzyme + product,
                        [kf], ['kf'])
 
 def catalyze_one_step_reversible(enzyme, substrate, product, klist):
@@ -1164,10 +1170,17 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
          ])
 
     """
+    
+    if isinstance(enzyme, Monomer):
+        enzyme = enzyme()
+    if isinstance(substrate, Monomer):
+        substrate = substrate()
+    if isinstance(product, Monomer):
+        product = product()
 
     components = catalyze_one_step(enzyme, substrate, product, klist[0])
 
-    components |= _macro_rule('reverse', product() >> substrate(),
+    components |= _macro_rule('reverse', product >> substrate,
                               [klist[1]], ['kr'])
     return components
 
