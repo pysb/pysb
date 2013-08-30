@@ -42,10 +42,9 @@ import functools
 import itertools
 
 __all__ = ['equilibrate',
-           'bind', 'bind_table', 'catalyze_degrade_one_step',
+           'bind', 'bind_table',
            'catalyze', 'catalyze_state',
-           'catalyze_one_step', 
-           'catalyze_one_step_reversible', 'catalyze_synthesis', 
+           'catalyze_one_step', 'catalyze_one_step_reversible',
            'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport', 'pore_bind', 'assemble_chain_sequential_base',
            'bind_complex', 'bind_table_complex']
@@ -60,6 +59,7 @@ def _complex_pattern_label(cp):
 
 def _monomer_pattern_label(mp):
     """Return a string label for a MonomerPattern."""
+    site_values = [str(x) for x in mp.site_conditions.values()
                             if x is not None
                             and not isinstance(x, list)
                             and not isinstance(x, tuple)
@@ -822,7 +822,7 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
     return components
 
 # Catalysis
-# =========	
+# =========
 
 def catalyze(enzyme, e_site, substrate, s_site, product, klist):
     """
@@ -1029,7 +1029,7 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
 
     return catalyze(enzyme, e_site, substrate({mod_site: state1}),
                     s_site, substrate({mod_site: state2}), klist)
-                    
+
 def catalyze_one_step(enzyme, substrate, product, kf):
     """
     Generate the one-step catalytic reaction E + S >> E + P.
@@ -1091,20 +1091,14 @@ def catalyze_one_step(enzyme, substrate, product, kf):
         Monomer('P')
         >>> catalyze_one_step(E, S, P, 1e-4) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('one_step_E_S_to_E_P', E + S >> E + P, one_step_E_S_to_E_P_kf),
+         Rule('one_step_E_S_to_E_P', E() + S() >> E() + P(), one_step_E_S_to_E_P_kf),
          Parameter('one_step_E_S_to_E_P_kf', 0.0001),
          ])
 
     """
 
-    if isinstance(enzyme, Monomer):
-        enzyme = enzyme()
-    if isinstance(substrate, Monomer):
-        substrate = substrate()
-    if isinstance(species, Monomer):
-        product = product()
     return _macro_rule('one_step',
-                       enzyme + substrate >> enzyme + product,
+                       enzyme() + substrate() >> enzyme() + product(),
                        [kf], ['kf'])
 
 def catalyze_one_step_reversible(enzyme, substrate, product, klist):
@@ -1160,23 +1154,17 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
         Monomer('P')
         >>> catalyze_one_step_reversible(E, S, P, [1e-1, 1e-4]) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('one_step_E_S_to_E_P', E + S >> E + P, one_step_E_S_to_E_P_kf),
+         Rule('one_step_E_S_to_E_P', E() + S() >> E() + P(), one_step_E_S_to_E_P_kf),
          Parameter('one_step_E_S_to_E_P_kf', 0.1),
-         Rule('reverse_P_to_S', P >> S, reverse_P_to_S_kr),
+         Rule('reverse_P_to_S', P() >> S(), reverse_P_to_S_kr),
          Parameter('reverse_P_to_S_kr', 0.0001),
          ])
 
     """
-    if isinstance(enzyme, Monomer):
-        enzyme = enzyme()
-    if isinstance(substrate, Monomer):
-        substrate = substrate()
-    if isinstance(species, Monomer):
-        product = product()
 
     components = catalyze_one_step(enzyme, substrate, product, klist[0])
 
-    components |= _macro_rule('reverse', product >> substrate,
+    components |= _macro_rule('reverse', product() >> substrate(),
                               [klist[1]], ['kr'])
     return components
 
@@ -1245,7 +1233,7 @@ def synthesize(species, ksynth):
     return _macro_rule('synthesize', None >> species, [ksynth], ['k'],
                        name_func=synthesize_name_func)
 
-def(species, kdeg):
+def degrade(species, kdeg):
     """
     Generate a reaction which degrades a species.
 
