@@ -5,7 +5,7 @@ from pysb.examples.tyson_oscillator import model
 from numpy import *
 from pysb.tools.tropicalize import *
 import matplotlib.pyplot as plt
-from pysb.tools.varsens import varsens
+from varsens import *
 
 generate_equations(model)
 
@@ -31,4 +31,4 @@ def osc_objective(params):
     x = odesolve(model, t)
     return sum((x['YT'] - ref['YT'])**2)
 
-v = varsens(osc_objective, len(params), 1024, scaling)
+v = Varsens(osc_objective, len(params), 1024, scaling)
