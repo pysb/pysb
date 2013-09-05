@@ -282,6 +282,9 @@ class Monomer(Component):
                     sorted(self.sites) == sorted(other.sites)) and \
                self.site_states   == other.site_states
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 class MonomerPattern(object):
 
     """
@@ -778,6 +781,9 @@ class Parameter(Component, sympy.Symbol):
                self.name  == other.name  and \
                self.value == other.value
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
@@ -835,6 +841,9 @@ class Compartment(Component):
                self.name   == other.name   and \
                self.parent == other.parent and \
                self.size   == other.size
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __repr__(self):
         return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \

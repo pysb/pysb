@@ -64,7 +64,7 @@ def test_parameter():
     p = Parameter("a", 2.3, _export=False)
     o = deepcopy(p)
     ok_(o==p)
-    o.value = 2.3
+    o.value = 2.4
     ok_(o!=p)
     o = deepcopy(p)
     o.name = "b"

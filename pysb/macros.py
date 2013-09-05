@@ -415,7 +415,7 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
-        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('A', ['a', 'b'])
         Monomer('A', ['a', 'b'])
         >>> Monomer('B', ['c', 'd'])
@@ -764,7 +764,7 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
     Execution:: 
 
         >>> Model() # doctest:+ELLIPSIS
-        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('R1', ['x', 'c1'])
         Monomer('R1', ['x', 'c1'])
         >>> Monomer('R2', ['x', 'c1'])
@@ -1085,7 +1085,7 @@ def catalyze_one_step(enzyme, substrate, product, kf):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
-        <Model '_interactive>_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('E', ['b'])
         Monomer('E', ['b'])
         >>> Monomer('S', ['b'])
@@ -1853,7 +1853,7 @@ def chain_species(subunit, site1, site2, size):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
-        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer('Unit', ['p1', 'p2'])
         >>> chain_species(Unit, 'p1', 'p2', 4)
@@ -1922,7 +1922,7 @@ def assemble_chain_sequential(subunit, site1, site2, max_size, ktable):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
-        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer('Unit', ['p1', 'p2'])
         >>> assemble_chain_sequential(Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2) # doctest:+NORMALIZE_WHITESPACE
@@ -2000,7 +2000,7 @@ def chain_species_base(base, basesite, subunit, site1, site2, size, comp=1):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
-        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer('Unit', ['p1', 'p2'])
         >>> Monomer('Base', ['b1', 'b2'])
@@ -2088,7 +2088,7 @@ def assemble_chain_sequential_base(base, basesite, subunit, site1, site2, max_si
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
-        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, compartments: 0) at ...>
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('Base', ['b1', 'b2'])
         Monomer('Base', ['b1', 'b2'])
         >>> Monomer('Unit', ['p1', 'p2'])
