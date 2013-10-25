@@ -1,6 +1,5 @@
 language: python
 python:
-  - "3.3"
   - "2.7"
   - "2.6"
 virtualenv:
@@ -9,4 +8,7 @@ before_install:
   - sudo apt-get install python-numpy python-scipy
 install:
   - pip install sympy
+  - wget http://bionetgen.googlecode.com/files/BioNetGen-2.2.5-stable.zip
+  - unzip BioNetGen-2.2.5-stable.zip
+  - export BNGHOME=`pwd`/BioNetGen-2.2.5-stable
 script: nosetests 
