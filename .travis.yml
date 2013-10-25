@@ -3,6 +3,8 @@ python:
   - "3.3"
   - "2.7"
   - "2.6"
-install:
-  - "pip install numpy scipy"
+virtualenv:
+  system_site_packages: true
+before_install:
+  - sudo apt-get install -qq python-numpy python-scipy python-sympy
 script: nosetests 
