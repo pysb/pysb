@@ -10,5 +10,5 @@ install:
   - pip install sympy
   - wget http://bionetgen.googlecode.com/files/BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
-  - export BNGHOME=`pwd`/BioNetGen-2.2.5-stable
+  - ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
 script: nosetests 
