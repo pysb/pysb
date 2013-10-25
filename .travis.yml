@@ -6,7 +6,7 @@ python:
 virtualenv:
   system_site_packages: true
 before_install:
-  - sudo apt-get build-dep python-numpy python-scipy python-sympy
+  - sudo apt-get install libblas-dev 
 install:
   - pip install numpy scipy sympy --use-mirrors
 script: nosetests 
