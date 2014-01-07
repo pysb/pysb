@@ -10,3 +10,5 @@ doc/_build
 MANIFEST
 RELEASE-VERSION
 .idea
+*.dylib
+*.so.*

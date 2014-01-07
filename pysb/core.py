@@ -92,7 +92,7 @@ class SelfExporter(object):
                     module_name = SelfExporter.target_module.__name__
                 else:
                     # user is defining a model interactively (not really supported, but we'll try)
-                    module_name = '<interactive>'
+                    module_name = '_interactive_'
                 obj.name = module_name   # internal name for identification
                 export_name = 'model'    # symbol name for export
         elif isinstance(obj, Component):
@@ -274,7 +274,17 @@ class Monomer(Component):
             value += ', %s' % repr(self.site_states)
         value += ')'
         return value
-    
+
+    def __eq__(self, other):
+        return type(self)         == type(other)         and \
+               self.name          == other.name          and \
+               ( (self.sites is None and other.sites is None) or \
+                    sorted(self.sites) == sorted(other.sites)) and \
+               self.site_states   == other.site_states
+               
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 
 class MonomerPattern(object):
 
@@ -390,6 +400,8 @@ class MonomerPattern(object):
             return ReactionPattern([ComplexPattern([self], None), ComplexPattern([other], None)])
         if isinstance(other, ComplexPattern):
             return ReactionPattern([ComplexPattern([self], None), other])
+        elif other == None:
+        	return self
         else:
             return NotImplemented
 
@@ -415,6 +427,12 @@ class MonomerPattern(object):
             return mp_new
         else:
             return NotImplemented
+
+    def __eq__(self, other):
+        return type(self)           == type(other)           and \
+               self.monomer         == other.monomer         and \
+               self.site_conditions == other.site_conditions and \
+               self.compartment     == other.compartment
 
     def __repr__(self):
         value = '%s(' % self.monomer.name
@@ -488,8 +506,9 @@ class ComplexPattern(object):
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
         return \
-            sorted((mp.monomer, mp.site_conditions) for mp in self.monomer_patterns) == \
-            sorted((mp.monomer, mp.site_conditions) for mp in other.monomer_patterns)
+            self.compartment == other.compartment and \
+            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in self.monomer_patterns) == \
+            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in other.monomer_patterns)
 
     def copy(self):
         """
@@ -547,6 +566,8 @@ class ComplexPattern(object):
             return ReactionPattern([self, other])
         elif isinstance(other, MonomerPattern):
             return ReactionPattern([self, ComplexPattern([other], None)])
+        elif other == None:
+        	return self
         else:
             return NotImplemented
 
@@ -622,6 +643,8 @@ class ReactionPattern(object):
             return ReactionPattern(self.complex_patterns + [ComplexPattern([other], None)])
         elif isinstance(other, ComplexPattern):
             return ReactionPattern(self.complex_patterns + [other])
+        elif other == None:
+        	return self
         else:
             return NotImplemented
 
@@ -754,6 +777,19 @@ class Parameter(Component, sympy.Symbol):
     def func(self):
         return sympy.Symbol
 
+    def __eq__(self, other):
+        return type(self) == type(other) and \
+               self.name  == other.name  and \
+               self.value == other.value
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __eq__(self, other):
+        return type(self) == type(other) and \
+               self.name  == other.name  and \
+               self.value == other.value
+
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
@@ -805,6 +841,15 @@ class Compartment(Component):
         self.parent = parent
         self.dimension = dimension
         self.size = size
+
+    def __eq__(self, other):
+        return type(self)  == type(other)  and \
+               self.name   == other.name   and \
+               self.parent == other.parent and \
+               self.size   == other.size
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __repr__(self):
         return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
