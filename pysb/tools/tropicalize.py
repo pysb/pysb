@@ -13,7 +13,12 @@ class FilterNdarray(Mapping):
         self.source = source
         self.t = 0
 
-    def __getitem__(self, key): return self.source[key.name][self.t]
+    def __getitem__(self, key):
+        # WARNING: This is a monkey patch when evalf sends a number to getitem instead of a symbol
+        try:
+            return self.source[key.name][self.t]
+        except:
+            return key.name
 
     def __len__(self): return len(self.source)
 
@@ -66,8 +71,10 @@ class Tropical:
         (self.conservation, self.conserve_var) = self.mass_conserved()
         if verbose: print "Pruning Equations"
         self.pruned = self.pruned_equations(self.y[ignore:], rho)
-        if verbose: print "Solving pruned equations"
-        self.sol_pruned = self.solve_pruned()
+
+# FIXME: THIS STEP IS BROKEN DUE TO THE ADDITION OF CYCLES
+        #if verbose: print "Solving pruned equations"
+        #self.sol_pruned = self.solve_pruned()
     
         return self
 
@@ -91,7 +98,7 @@ class Tropical:
                 for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
                 trace = y['s%d' % i]
                 for t in range(y.size):
-                    current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
+		    current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
                     if max == None or current > max:
                         max = current
                     if epsilon != None and current > epsilon:
