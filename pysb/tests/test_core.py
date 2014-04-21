@@ -61,3 +61,18 @@ def test_model_pickle():
     assert_equal(len(model.all_components()), 7)
     model2 = pickle.loads(pickle.dumps(model))
     check_model_against_component_list(model, model2.all_components())
+
+@with_model
+def test_monomer_as_reaction_pattern():
+    A = Monomer('A', _export=False)
+    as_reaction_pattern(A)
+
+@with_model
+def test_monomer_as_complex_pattern():
+    A = Monomer('A', _export=False)
+    as_complex_pattern(A)
+
+@with_model
+def test_observable_constructor_with_monomer():
+    A = Monomer('A', _export=False)
+    o = Observable('o', A, _export=False)

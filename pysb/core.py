@@ -274,7 +274,7 @@ class Monomer(Component):
             value += ', %s' % repr(self.site_states)
         value += ')'
         return value
-    
+
 
 class MonomerPattern(object):
 
@@ -683,6 +683,8 @@ def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
     if isinstance(v, ComplexPattern):
         return v
+    elif isinstance(v, Monomer):
+        return ComplexPattern([v()], None)
     elif isinstance(v, MonomerPattern):
         return ComplexPattern([v], None)
     else:
