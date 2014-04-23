@@ -169,7 +169,7 @@ class cupSODA(pysb.integrate.Solver):
             raise Exception("2D array 'y0' with dimensions N_SIMS x N_SPECIES must be defined.")
 
         # Generate reaction network if it doesn't already exist or if explicitly requested
-        if (len(model.reactions)==0 and len(model.species)==0) or options.get('gen_net')==True:
+        if ( len(model.reactions)==0 and len(model.species)==0 ) or options.get('gen_net')==True:
             pysb.bng.generate_equations(model)
 
         # Set variables
@@ -225,8 +225,7 @@ class cupSODA(pysb.integrate.Solver):
         atol_vector.close()
         
         # c_matrix
-        N_SIMS = len(self.k)
-        N_RXNS = len(self.k[0])
+        N_SIMS,N_RXNS = numpy.array(self.k).shape
         c_matrix = open(os.path.join(cupsoda_files,"c_matrix"), 'wb')
         for i in range(N_SIMS):
             line = ""
@@ -239,13 +238,13 @@ class cupSODA(pysb.integrate.Solver):
         
         # cs_vector
         cs_vector = open(os.path.join(cupsoda_files,"cs_vector"), 'wb')
-        #####FIXME
-#         obs_species = [False for i in self.model.species]
-        obs_species = [True for i in self.model.species]
+        #####FIXME - Shouldn't have to print out all species; this is a cupSODA problem
+#         obs_species = [False for sp in self.model.species]
+        obs_species = [True for sp in self.model.species]
         #####
         for obs in self.model.observables:
-            for sp in obs.species:
-                obs_species[sp] = True
+            for i in obs.species:
+                obs_species[i] = True
         first = True
         for i in range(len(obs_species)):
             if (obs_species[i]):
@@ -261,9 +260,8 @@ class cupSODA(pysb.integrate.Solver):
             for j in range(len(self.model.species)):
                 if j > 0: line += "\t"
                 stoich = 0
-                for k in range(len(self.model.reactions[i]['reactants'])):
-                    if j == self.model.reactions[i]['reactants'][k]:
-                        stoich += 1
+                for k in self.model.reactions[i]['reactants']:
+                    if j == k: stoich += 1
                 line += str(stoich)
             if (i < len(self.model.reactions)-1): left_side.write(line+"\n")
             else: left_side.write(line)
@@ -275,10 +273,22 @@ class cupSODA(pysb.integrate.Solver):
         else: modelkind.write("stochastic")
         modelkind.close()
         
+        # volume
+        if (self.vol):
+            volume = open(os.path.join(cupsoda_files,"volume"), 'wb')
+            volume.write(str(self.vol))
+            volume.close()
+            # Set population of __source() to 6.0221413e23*vol and warn the user
+            warnings.warn("Number units detected in cupSODA.run(). Setting the population " +
+                          "of __source() (if it exists) equal to 6.0221413e23*"+str(self.vol)+".")
+            for i, s in enumerate(self.model.species):
+                if str(s) == '__source()':
+                    self.y0[:,i] = [6.0221413e23*self.vol for n in self.y0]
+                    break
+        
         # MX_0
         N_SPECIES = len(self.y0[0])
         MX_0 = open(os.path.join(cupsoda_files,"MX_0"), 'wb')
-        init = [0.0 for j in self.model.species]
         for i in range(N_SIMS):
             line = ""
             for j in range(N_SPECIES):
@@ -295,9 +305,8 @@ class cupSODA(pysb.integrate.Solver):
             for j in range(len(self.model.species)):
                 if j > 0: line += "\t"
                 stoich = 0
-                for k in range(len(self.model.reactions[i]['products'])):
-                    if j == self.model.reactions[i]['products'][k]:
-                        stoich += 1
+                for k in self.model.reactions[i]['products']:
+                    if j == k: stoich += 1
                 line += str(stoich)
             if (i < len(self.model.reactions)-1): right_side.write(line+"\n")
             else: right_side.write(line)
@@ -311,23 +320,14 @@ class cupSODA(pysb.integrate.Solver):
         # t_vector
         t_vector = open(os.path.join(cupsoda_files,"t_vector"), 'wb')
         t_vector.write("\n")
-        for i in range(len(self.tspan)):
-            t_vector.write(str(float(self.tspan[i]))+"\n")
+        for t in self.tspan:
+            t_vector.write(str(float(t))+"\n")
         t_vector.close()
         
         # time_max
         time_max = open(os.path.join(cupsoda_files,"time_max"), 'wb')
-        time_max.write(str(float(self.tspan[len(self.tspan)-1])))
+        time_max.write(str(float(self.tspan[-1])))
         time_max.close()
-        
-        # volume
-        if (self.vol):
-            warnings.warn("'vol' argument detected in run_cupSODA(): Make sure your rate constants and " +
-                          "initial species amounts are in number units and that the population of the " +
-                          "__source() species (if it exists) equals 6.0221413e23*vol.")
-            volume = open(os.path.join(cupsoda_files,"volume"), 'wb')
-            volume.write(str(self.vol))
-            volume.close()
             
         # Build command
         command = [bin_path, cupsoda_files, str(self.n_blocks), self.outdir, prefix, str(self.gpu), str(0)]
