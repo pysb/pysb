@@ -37,9 +37,11 @@ class Solver(object):
         Time values over which to integrate. The first and last values define
         the time range, and the returned trajectories will be sampled at every
         value.
-    integrator : string, optional
+    integrator : string, optional (default: 'vode')
         Name of the integrator to use, taken from the list of integrators known
         to :py:class:`scipy.integrate.ode`.
+    verbose : bool, optional (default: False)
+        Verbose output 
     integrator_params
         Additional parameters for the integrator.
 
@@ -127,25 +129,25 @@ class Solver(object):
         options.update(integrator_options) # overwrite defaults
         self.model = model
         self.tspan = tspan
-        self.y = numpy.ndarray((len(tspan), len(model.species))) # species concentrations
-        self.ydot = numpy.ndarray(len(model.species))
+        self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
+        self.ydot = numpy.ndarray(len(self.model.species))
         
-        if len(model.observables):
-            self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
+        if len(self.model.observables):
+            self.yobs = numpy.ndarray(len(self.tspan), zip(self.model.observables.keys(),
                                                       itertools.repeat(float)))
         else:
-            self.yobs = numpy.ndarray((len(tspan), 0))
-        exprs = model.expressions_dynamic()
+            self.yobs = numpy.ndarray((len(self.tspan), 0))
+        exprs = self.model.expressions_dynamic()
         
         if len(exprs):
-            self.yexpr = numpy.ndarray(len(tspan), zip(exprs.keys(),
+            self.yexpr = numpy.ndarray(len(self.tspan), zip(exprs.keys(),
                                                        itertools.repeat(float)))
         else:
-            self.yexpr = numpy.ndarray((len(tspan), 0))
+            self.yexpr = numpy.ndarray((len(self.tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
         
         # Integrator
-        if (scipy.integrate._ode.find_integrator(integrator)):
+        if scipy.integrate._ode.find_integrator(integrator):
             self.integrator = ode(rhs).set_integrator(integrator, **options)
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
