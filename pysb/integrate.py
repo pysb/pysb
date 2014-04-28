@@ -221,7 +221,7 @@ class Solver(object):
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
         for expr in self.model.expressions_dynamic():
             expr_subs = expr.expand_expr().subs(subs)
-            func = sympy.lambdify(obs_names, expr_subs)
+            func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
 
