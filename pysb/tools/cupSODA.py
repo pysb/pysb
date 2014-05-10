@@ -257,9 +257,9 @@ class cupSODA(pysb.integrate.Solver):
             os.mkdir(cupsoda_files)
             
         # Number of sims, rxns, and species
-        N_SIMS,N_RXNS = numpy.array(self.k).shape
+        N_SIMS,N_RXNS = self.k.shape
         N_SPECIES = len(self.y0[0])
-            
+        
         # Figure out number of blocks to run on
         # FIXME: Need to figure out how to calculate an optimal number
         if not self.n_blocks:
@@ -285,7 +285,7 @@ class cupSODA(pysb.integrate.Solver):
         
         # cs_vector
         cs_vector = open(os.path.join(cupsoda_files,"cs_vector"), 'wb')
-        out_species = [i for i in range(len(self.model.species))]
+        out_species = range(len(self.model.species))
         if obs_species_only:
             out_species = [False for sp in self.model.species]
             for obs in self.model.observables:
@@ -382,7 +382,7 @@ class cupSODA(pysb.integrate.Solver):
         # Load concentration data if requested   
         if load_conc_data: self.load_data()
             
-    def load_data(self, indir=None, prefix=None, which_sims=None, out_species=None):
+    def load_data(self, indir=None, prefix=None, which_sims='ALL', out_species='ALL'):
         """Load simulation data from file.
 
         Returns nothing; fills the ``y``, ``yobs``, and ``yobs_view`` dictionary objects. 
@@ -408,21 +408,22 @@ class cupSODA(pysb.integrate.Solver):
         """
                 
         if not indir: indir = self.outdir
-        
         if not prefix: prefix = self.model.name
-                
+        
         FILES = []
-        if which_sims: 
+        if which_sims == 'ALL':
+            FILES = [file for file in os.listdir(indir) if re.match(prefix, file)]
+            if len(FILES)==0: 
+                raise Exception("Cannot find any output files to load data from.")
+        else:
             try:
                 FILES = [prefix+"_"+str(which_sims[i]) for i in range(len(which_sims))] # list of integers
             except TypeError:
                 FILES = [prefix+"_"+str(which_sims)] # single integer
-        else: # load all data files
-            FILES = [file for file in os.listdir(self.outdir) if re.match(prefix, file)]
-            if len(FILES)==0: raise Exception("Cannot find any output files to load data from.")
-            which_sims = [int(re.match(prefix+"_"+"(\d+)", file).group(1)) for file in FILES]
-            
-        if not out_species:
+
+        which_sims = [int(re.match(prefix+"_"+"(\d+)", file).group(1)) for file in FILES]
+        
+        if out_species == 'ALL':
             try:
                 out_species = numpy.loadtxt(os.path.join(indir,"__CUPSODA_FILES","cs_vector"), dtype=int)
             except IOError:
@@ -445,9 +446,12 @@ class cupSODA(pysb.integrate.Solver):
             if not os.path.isfile(file):
                 raise Exception("Cannot find input file "+file)
             if self.verbose: print "Reading "+file+" ...",
-            self.y[sim][:,out_species] = numpy.loadtxt(open(file, "rb"))[:,1:] # exclude first column, which is time
+            f = open(file, 'rb')
+            for i in range(len(self.y[sim])):
+                self.y[sim][i,out_species] = f.readline().split()[1:] # exclude first column (time)
+            f.close()
             if self.verbose: print "Done."
-#             if self.integrator.t < self.tspan[-1]:
+#             if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
 #                 self.y[i:, :] = 'nan'
                 
             # Calculate observables
