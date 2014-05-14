@@ -13,15 +13,6 @@ from StringIO import StringIO
 # Cached value of BNG path
 _bng_path = None
 
-def set_bng_path(dir):
-    global _bng_path
-    _bng_path = os.path.join(dir,'BNG2.pl')
-    # Make sure file exists and that it is not a directory
-    if not os.access(_bng_path, os.F_OK) or not os.path.isfile(_bng_path):
-        raise Exception('Could not find BNG2.pl in ' + os.path.abspath(dir) + '.')
-    # Make sure file has executable permissions
-    elif not os.access(_bng_path, os.X_OK):
-        raise Exception("BNG2.pl in " + os.path.abspath(dir) + " does not have executable permissions.")
 
 def _get_bng_path():
     """
@@ -196,7 +187,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
         os.chdir(working_dir)
     return output_arr
 
-def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
+def generate_network(model, cleanup=True, append_stdout=False):
     """
     Return the output from BNG's generate_network function given a model.
 
@@ -213,7 +204,7 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         finished. If False, leave them in place (in `output_dir`). Useful for
         debugging.
     append_stdout : bool, optional
-        If True, provide BNG2.pl's standard output stream as comment lines
+        If True, provide BNG.pl's standard output stream as comment lines
         appended to the net file contents. If False (default), do not append it.
 
     """
@@ -232,17 +223,9 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         bng_file.close()
         p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if verbose:
-            for line in iter(p.stdout.readline, b''):
-                print line,
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
-        ######
-#         p = subprocess.call(['perl', _get_bng_path(), bng_filename])
-#         if p:
-#             raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
-        ######
         net_file = open(net_filename, 'r')
         output.write(net_file.read())
         net_file.close()
@@ -257,7 +240,7 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     return output.getvalue()
 
 
-def generate_equations(model, verbose=False):
+def generate_equations(model):
     """
     Generate math expressions for reaction rates and species in a model.
 
@@ -275,7 +258,7 @@ def generate_equations(model, verbose=False):
     #   or, use a separate "math model" object to contain ODEs
     if model.odes:
         return
-    lines = iter(generate_network(model,verbose=verbose).split('\n'))
+    lines = iter(generate_network(model).split('\n'))
     try:
         while 'begin species' not in lines.next():
             pass
@@ -299,9 +282,9 @@ def generate_equations(model, verbose=False):
             rate = rate.rsplit('*')
             (rule_name, is_reverse) = re.match(r'#(\w+)(?:\((reverse)\))?', rule).groups()
             is_reverse = bool(is_reverse)
-#             r_names = ['s%d' % r for r in reactants]
-            r_names = ['__s%d' % r for r in reactants]
-            combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
+            r_names = ['s%d' % r for r in reactants]
+            combined_rate = sympy.Mul(
+                *[sympy.Symbol(t) for t in r_names + rate])
             rule = model.rules[rule_name]
             reaction = {
                 'reactants': reactants,
