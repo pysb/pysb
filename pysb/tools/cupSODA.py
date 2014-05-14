@@ -383,7 +383,7 @@ class cupSODA(pysb.integrate.Solver):
         if load_conc_data: self.load_data()
             
     def load_data(self, indir=None, prefix=None, which_sims='ALL', out_species='ALL'):
-        """Load simulation data from file.
+        """Load simulation data from file. 
 
         Returns nothing; fills the ``y``, ``yobs``, and ``yobs_view`` dictionary objects. 
         The keys are simulation numbers (ints) and the values are the same ndarrays as in
