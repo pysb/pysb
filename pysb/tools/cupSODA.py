@@ -260,10 +260,17 @@ class cupSODA(pysb.integrate.Solver):
         N_SIMS,N_RXNS = self.k.shape
         N_SPECIES = len(self.y0[0])
         
-        # Figure out number of blocks to run on
-        # FIXME: Need to figure out how to calculate an optimal number
+        # Simple default for number of blocks
         if not self.n_blocks:
-            self.n_blocks = 64
+            shared_memory_per_block = 48*1024 # bytes
+            default_threads_per_block = 32
+            n_species = len(self.model.species)
+            bytes_per_float = 8
+            memory_per_thread = (n_species+1)*bytes_per_float # +1 for time variable
+            upper_limit_threads_per_block = 512
+            max_threads_per_block = min( shared_memory_per_block/memory_per_thread , upper_limit_threads_per_block )
+            threads_per_block = min( max_threads_per_block , default_threads_per_block )
+            self.n_blocks = int(numpy.ceil(1.*N_SIMS/threads_per_block))
         
         # atol_vector 
         atol_vector = open(os.path.join(cupsoda_files,"atol_vector"), 'wb')
