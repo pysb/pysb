@@ -86,3 +86,26 @@ def test_compartment_initial_error():
     c2 = Compartment("C2")
     Initial(A(s=None)**c1, A_0)
     Initial(A(s=None)**c2, A_0)
+
+@with_model
+def test_monomer_pattern_add_to_none():
+    """Ensure that MonomerPattern + None returns a ReactionPattern."""
+    Monomer('A', ['s'])
+    ok_(isinstance(A() + None, ReactionPattern),
+        'A() + None did not return a ReactionPattern.')
+
+@with_model
+def test_complex_pattern_add_to_none():
+    """Ensure that ComplexPattern + None returns a ReactionPattern."""
+    Monomer('A', ['s'])
+    ok_(isinstance(A(s=1) % A(s=1) + None, ReactionPattern),
+        'A(s=1) % A(s=1) + None did not return a ReactionPattern.')
+
+@with_model
+def test_reaction_pattern_add_to_none():
+    """Ensure that ReactionPattern + None returns a ReactionPattern."""
+    Monomer('A', ['s'])
+    cp = A(s=1) % A(s=1)
+    rp = cp + cp
+    ok_(isinstance(rp + None, ReactionPattern),
+        'ReactionPattern + None did not return a ReactionPattern.')
