@@ -275,16 +275,6 @@ class Monomer(Component):
         value += ')'
         return value
 
-    def __eq__(self, other):
-        return type(self)         == type(other)         and \
-               self.name          == other.name          and \
-               ( (self.sites is None and other.sites is None) or \
-                    sorted(self.sites) == sorted(other.sites)) and \
-               self.site_states   == other.site_states
-               
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
 
 class MonomerPattern(object):
 
@@ -427,12 +417,6 @@ class MonomerPattern(object):
             return mp_new
         else:
             return NotImplemented
-
-    def __eq__(self, other):
-        return type(self)           == type(other)           and \
-               self.monomer         == other.monomer         and \
-               self.site_conditions == other.site_conditions and \
-               self.compartment     == other.compartment
 
     def __repr__(self):
         value = '%s(' % self.monomer.name
@@ -779,19 +763,6 @@ class Parameter(Component, sympy.Symbol):
     def func(self):
         return sympy.Symbol
 
-    def __eq__(self, other):
-        return type(self) == type(other) and \
-               self.name  == other.name  and \
-               self.value == other.value
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and \
-               self.name  == other.name  and \
-               self.value == other.value
-
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
@@ -843,15 +814,6 @@ class Compartment(Component):
         self.parent = parent
         self.dimension = dimension
         self.size = size
-
-    def __eq__(self, other):
-        return type(self)  == type(other)  and \
-               self.name   == other.name   and \
-               self.parent == other.parent and \
-               self.size   == other.size
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
     def __repr__(self):
         return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
