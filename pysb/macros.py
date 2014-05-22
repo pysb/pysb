@@ -1386,7 +1386,7 @@ def synthesize_degrade_table(table):
 
 def pore_species(subunit, site1, site2, size):
     """
-    Return a MonomerPattern representing a circular homomeric pore.
+    Return a ComplexPattern representing a circular homomeric pore.
 
     Parameters
     ----------
@@ -1399,7 +1399,7 @@ def pore_species(subunit, site1, site2, size):
 
     Returns
     -------
-    A MonomerPattern corresponding to the pore.
+    A ComplexPattern corresponding to the pore.
 
     Notes
     -----
@@ -1422,25 +1422,10 @@ def pore_species(subunit, site1, site2, size):
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer('Unit', ['p1', 'p2'])
         >>> pore_species(Unit, 'p1', 'p2', 4)
-        MatchOnce(Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=1))
+        MatchOnce(Unit(p1=4, p2=1) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4))
 
     """
-
-    _verify_sites(subunit, site1, site2)
-    if size <= 0:
-        raise ValueError("size must be an integer greater than 0")
-    if size == 1:
-        pore = subunit({site1: None, site2: None})
-    elif size == 2:
-        pore = subunit({site1: 1, site2: None}) % \
-               subunit({site1: None, site2: 1})
-    else:
-        # build up a ComplexPattern, starting with a single subunit
-        pore = subunit({site1: 1, site2: 2})
-        for i in range(2, size + 1):
-            pore %= subunit({site1: i, site2: i % size + 1})
-        pore.match_once = True
-    return pore
+    return polymer_species(subunit, site1, site2, size, closed=True)
 
 def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
     """
@@ -1494,14 +1479,14 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
         ComponentSet([
          Rule('assemble_pore_sequential_Unit_2',
               Unit(p1=None, p2=None) + Unit(p1=None, p2=None) <>
-                  Unit(p1=1, p2=None) % Unit(p1=None, p2=1),
+                  Unit(p1=None, p2=1) % Unit(p1=1, p2=None),
               assemble_pore_sequential_Unit_2_kf,
               assemble_pore_sequential_Unit_2_kr),
          Parameter('assemble_pore_sequential_Unit_2_kf', 0.0001),
          Parameter('assemble_pore_sequential_Unit_2_kr', 0.1),
          Rule('assemble_pore_sequential_Unit_3',
-              Unit(p1=None, p2=None) + Unit(p1=1, p2=None) % Unit(p1=None, p2=1) <>
-                  MatchOnce(Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=1)),
+              Unit(p1=None, p2=None) + Unit(p1=None, p2=1) % Unit(p1=1, p2=None) <>
+                  MatchOnce(Unit(p1=3, p2=1) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3)),
               assemble_pore_sequential_Unit_3_kf,
               assemble_pore_sequential_Unit_3_kr),
          Parameter('assemble_pore_sequential_Unit_3_kf', 0.0001),
@@ -1509,7 +1494,6 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
          ])
 
     """
-
     if len(ktable) != max_size - 1:
         raise ValueError("len(ktable) must be equal to max_size - 1")
 
@@ -1601,26 +1585,26 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
         ...                [[1e-4, 1e-1, 1]]) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
          Rule('pore_transport_complex_Unit_3_Cargomito',
-             MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
-                 Unit(p1=2, p2=3, sc_site=None) %
-                 Unit(p1=3, p2=1, sc_site=None)) +
+             MatchOnce(Unit(p1=3, p2=1, sc_site=None) %
+                 Unit(p1=1, p2=2, sc_site=None) %
+                 Unit(p1=2, p2=3, sc_site=None)) +
                  Cargo(c_site=None, loc='mito') <>
-             MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
+             MatchOnce(Unit(p1=3, p2=1, sc_site=4) %
+                 Unit(p1=1, p2=2, sc_site=None) %
                  Unit(p1=2, p2=3, sc_site=None) %
-                 Unit(p1=3, p2=1, sc_site=None) %
                  Cargo(c_site=4, loc='mito')),
              pore_transport_complex_Unit_3_Cargomito_kf,
              pore_transport_complex_Unit_3_Cargomito_kr),
          Parameter('pore_transport_complex_Unit_3_Cargomito_kf', 0.0001),
          Parameter('pore_transport_complex_Unit_3_Cargomito_kr', 0.1),
          Rule('pore_transport_dissociate_Unit_3_Cargocyto',
-             MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
+             MatchOnce(Unit(p1=3, p2=1, sc_site=4) %
+                 Unit(p1=1, p2=2, sc_site=None) %
                  Unit(p1=2, p2=3, sc_site=None) %
-                 Unit(p1=3, p2=1, sc_site=None) %
                  Cargo(c_site=4, loc='mito')) >>
-             MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
-                 Unit(p1=2, p2=3, sc_site=None) %
-                 Unit(p1=3, p2=1, sc_site=None)) +
+             MatchOnce(Unit(p1=3, p2=1, sc_site=None) %
+                 Unit(p1=1, p2=2, sc_site=None) %
+                 Unit(p1=2, p2=3, sc_site=None)) +
                  Cargo(c_site=None, loc='cyto'),
              pore_transport_dissociate_Unit_3_Cargocyto_kc),
          Parameter('pore_transport_dissociate_Unit_3_Cargocyto_kc', 1.0),
@@ -1748,13 +1732,13 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
         ...           Cargo(), 'c_site', [1e-4, 1e-1, 1]) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
          Rule('pore_bind_Unit_3_Cargo',
-             MatchOnce(Unit(p1=1, p2=2, sc_site=None) %
-                 Unit(p1=2, p2=3, sc_site=None) %
-                 Unit(p1=3, p2=1, sc_site=None)) +
+             MatchOnce(Unit(p1=3, p2=1, sc_site=None) %
+                 Unit(p1=1, p2=2, sc_site=None) %
+                 Unit(p1=2, p2=3, sc_site=None)) +
                  Cargo(c_site=None) <>
-             MatchOnce(Unit(p1=1, p2=2, sc_site=4) %
+             MatchOnce(Unit(p1=3, p2=1, sc_site=4) %
+                 Unit(p1=1, p2=2, sc_site=None) %
                  Unit(p1=2, p2=3, sc_site=None) %
-                 Unit(p1=3, p2=1, sc_site=None) %
                  Cargo(c_site=4)),
              pore_bind_Unit_3_Cargo_kf, pore_bind_Unit_3_Cargo_kr),
          Parameter('pore_bind_Unit_3_Cargo_kf', 0.0001),
@@ -1822,9 +1806,58 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
 # Chain assembly
 # =============
 
+def polymer_species(subunit, site1, site2, size, closed=False):
+    """
+    Return a ComplexPattern representing a linear or closed circular polymer.
+
+    Parameters
+    ----------
+    subunit : Monomer or MonomerPattern
+        The subunit of which the polymer is composed.
+    site1, site2 : string
+        The names of the sites where one copy of `subunit` binds to the next.
+    size : integer
+        The number of subunits in the polymer.
+    closed : boolean
+        If False (default), the polymer is linear, with unbound sites at each
+        end. If True, the polymer is a closed circle, like a ring or pore.
+
+    Returns
+    -------
+    A ComplexPattern corresponding to the polymer.
+
+    Notes
+    -----
+    Used by both chain_species and pore_species.
+
+    """
+    _verify_sites(subunit, site1, site2)
+    if size <= 0:
+        raise ValueError("size must be an integer greater than 0")
+    if size == 1:
+        polymer = subunit({site1: None, site2: None})
+    elif size == 2:
+        polymer = subunit({site1: None, site2: 1}) % \
+                  subunit({site1: 1, site2: None})
+    else:
+        # If a closed circle, use 0 as the bond number for the "seam";
+        # if linear, use None for the unbound ends
+        seam_site_num = size if closed else None
+        # First subunit
+        polymer = subunit({site1: seam_site_num, site2: 1})
+        # Build up the ComplexPattern for the polymer, starting with the first
+        # subunit
+        for i in range(1, size-1):
+            polymer %= subunit({site1: i, site2: i + 1})
+        # Attach the last subunit
+        polymer %= subunit({site1: size-1, site2: seam_site_num})
+        # Set ComplexPattern to MatchOnce
+        polymer.match_once = True
+    return polymer
+
 def chain_species(subunit, site1, site2, size):
     """
-    Return a MonomerPattern representing a chained species.
+    Return a ComplexPattern representing a linear, chained polymer.
 
     Parameters
     ----------
@@ -1837,7 +1870,7 @@ def chain_species(subunit, site1, site2, size):
 
     Returns
     -------
-    A MonomerPattern corresponding to the chain.
+    A ComplexPattern corresponding to the chain.
 
     Notes
     -----
@@ -1845,7 +1878,7 @@ def chain_species(subunit, site1, site2, size):
 
     Examples
     --------
-    Get the ComplexPattern object representing a pore of size 4::
+    Get the ComplexPattern object representing a chain of length 4::
 
         Model()
         Monomer('Unit', ['p1', 'p2'])
@@ -1861,23 +1894,7 @@ def chain_species(subunit, site1, site2, size):
         MatchOnce(Unit(p1=None, p2=1) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=None))
 
     """
-
-    _verify_sites(subunit, site1, site2)
-    if size <= 0:
-        raise ValueError("size must be an integer greater than 0")
-    if size == 1:
-        chainlink = subunit({site1: None, site2: None})
-    elif size == 2:
-        chainlink = subunit({site1: None, site2: 1}) % \
-               subunit({site1: 1, site2: None})
-    else:
-        # build up a ComplexPattern, starting with a single subunit
-        chainlink = subunit({site1: None, site2: 1})
-        for i in range(1, size-1):
-            chainlink %= subunit({site1: i, site2: i + 1})
-        chainlink %= subunit({site1: size-1, site2: None})
-        chainlink.match_once = True
-    return chainlink
+    return polymer_species(subunit, site1, site2, size, closed=False)
 
 def assemble_chain_sequential(subunit, site1, site2, max_size, ktable):
     """
