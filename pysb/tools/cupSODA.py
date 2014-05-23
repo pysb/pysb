@@ -18,7 +18,7 @@ default_integrator_options = {
         'atol': 1e-8,           # Absolute tolerance
         'rtol': 1e-8,           # Relative tolerance
         'vol': None,            # Volume
-        'n_blocks': 64,         # Number of GPU blocks
+        'n_blocks': None,         # Number of GPU blocks
         'gpu': 0,               # Which GPU
         'outdir': os.getcwd(),  # Output directory
         },
