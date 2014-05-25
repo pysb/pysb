@@ -42,7 +42,7 @@ class Solver(object):
         to :py:class:`scipy.integrate.ode`.
     verbose : bool, optional (default: False)
         Verbose output 
-    integrator_params
+    integrator_options
         Additional parameters for the integrator.
 
     Attributes

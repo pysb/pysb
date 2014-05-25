@@ -130,7 +130,7 @@ def _parse_bng_outfile(out_filename):
     return arr
 
 
-def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
+def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True, verbose=False, **additional_args):
     """
     Simulate a model with BNG's SSA simulator and return the trajectories.
 
@@ -148,15 +148,23 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
         If True (default), delete the temporary files after the simulation is
         finished. If False, leave them in place (in `output_dir`). Useful for
         debugging.
+    verbose: bool, optional
+        If True, print BNG screen output.
+    additional_args: kwargs, optional
+        Additional arguments to pass to BioNetGen
 
     """
-
+    
+    ssa_args = "t_end=>%f, n_steps=>%d" % (t_end, n_steps)
+    for key,val in additional_args.items(): ssa_args += ", "+key+"=>"+str(val)
+    if verbose: ssa_args += ", verbose=>1"
+        
     run_ssa_code = """
     begin actions
-    generate_network({overwrite=>1});
-    simulate_ssa({t_end=>%f, n_steps=>%d});\n
+    generate_network({overwrite=>1})
+    simulate_ssa({%s})
     end actions
-    """ % (t_end, n_steps)
+    """ % (ssa_args)
     
     gen = BngGenerator(model)
     bng_filename = '%s_%d_%d_temp.bngl' % (model.name,
@@ -176,6 +184,9 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True):
         bng_file.close()
         p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if verbose:
+            for line in iter(p.stdout.readline, b''):
+                print line,
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip("at line")+"\n"+p_err.rstrip())
