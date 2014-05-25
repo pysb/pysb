@@ -17,10 +17,8 @@ default_integrator_options = {
         'gen_net': False,       # Force network generation?
         'atol': 1e-8,           # Absolute tolerance
         'rtol': 1e-8,           # Relative tolerance
-        'vol': None,            # Volume
-        'n_blocks': None,         # Number of GPU blocks
+        'n_blocks': None,       # Number of GPU blocks
         'gpu': 0,               # Which GPU
-        'outdir': os.getcwd(),  # Output directory
         },
     }
 
@@ -89,18 +87,12 @@ class cupSODA(pysb.integrate.Solver):
     verbose : bool, optional (default: False)
         Verbose output 
     integrator_options :
-        * k        : 2D list of rate constants with dimensions N_SIMS x N_RXNS 
-                     (*REQUIRED)
-        * y0       : 2D list of initial species concentrations with dimensions 
-                     N_SIMS x N_SPECIES (*REQUIRED)
         * gen_net  : for models with already generated networks, force regeneration 
                      (default: False)
         * atol     : absolute tolerance (default: 1e-8)
         * rtol     : relative tolerance (default: 1e-8)
-        * vol      : system volume (default: None)
         * n_blocks : number of GPU blocks (default: 64)
         * gpu      : index of GPU to run on (default: 0)
-        * outdir   : output directory (default: os.getcwd())
 
     Attributes
     ----------
@@ -121,24 +113,24 @@ class cupSODA(pysb.integrate.Solver):
         Array views (sharing the same data buffer) on each array in ``yobs``. 
         Keys are simulation number, vals are arrays with dimensionality
         ``(len(tspan), len(model.observables))``.
-    k : list-like
-        Rate constants for all reactions for all simulations. Dimensions are 
-        ``(N_SIMS, len(model.reactions))``.
-    y0 : list-like
-        Initial species concentrations for all reactions for all simulations. 
-        Dimensions are ``(N_SIMS, len(model.species))``.
     atol : float
         Absolute tolerance.
     rtol : float
         Relative tolerance.
-    vol : float
-        System volume.
     n_blocks : int
         Number of GPU blocks.
     gpu : int
         Index of GPU to run on.
+    param_values : numpy.ndarray
+        Rate constants for all reactions for all simulations. Initialized to
+        'None'; required argument to self.run().
+    y0 : numpy.ndarray
+        Initial species concentrations for all reactions for all simulations. 
+        Initialized to 'None'; required argument to self.run().
+    vol : float
+        System volume. Initialized to 'None'; optional argument to self.run().
     outdir : string
-        Output directory.
+        Output directory. Initialized to 'None'; optional argument to self.run().
 
     Notes
     -----
@@ -159,10 +151,7 @@ class cupSODA(pysb.integrate.Solver):
        eventually be generalized to a MultiSolver class, for which cupSODA is just one 
        of multiple supported integrators. This is analogous to the Solver class, which 
        currently supports all of the integrators included in :py:class:`scipy.integrate.ode`.
-    4) Currently, the run() function concludes once the simulations have finished, i.e., 
-       no data is read in from the output files. This is only temporary and will 
-       eventually be changed.
-    5) The arrays 'y', 'yobs', and 'yobs_view' from the pysb.integrate.Solver base class
+    4) The arrays 'y', 'yobs', and 'yobs_view' from the pysb.integrate.Solver base class
        have been overridden as dictionaries in which the keys are simulation numbers (ints)
        and the values are the same ndarrays as in the base class. For efficiency, these
        objects are initialized as empty dictionaries and only filled if the 'load_conc_data'
@@ -183,12 +172,6 @@ class cupSODA(pysb.integrate.Solver):
             raise Exception("Integrator type '" + integrator + "' not recognized.")
         # overwrite defaults
         options.update(integrator_options)
-        
-        # Make sure 'k' and 'y0' have been defined
-        if 'k' not in options.keys():
-            raise Exception("2D array 'k' with dimensions N_SIMS x N_RXNS must be defined.")
-        if 'y0' not in options.keys():
-            raise Exception("2D array 'y0' with dimensions N_SIMS x N_SPECIES must be defined.")
 
         # Generate reaction network if it doesn't already exist or if explicitly requested
         if ( len(model.reactions)==0 and len(model.species)==0 ) or options.get('gen_net')==True:
@@ -197,33 +180,23 @@ class cupSODA(pysb.integrate.Solver):
         # Set variables
         self.model = model
         self.tspan = tspan
-        self.k = numpy.array(options.get('k'))
-        self.y0 = numpy.array(options.get('y0'))
         self.atol = options.get('atol')
         self.rtol = options.get('rtol')
-        self.vol = options.get('vol')
         self.n_blocks = options.get('n_blocks')
         self.gpu = options.get('gpu')
-        self.outdir = options.get('outdir')
-
-        # Error checks on 'k' and 'y0'
-        if len(self.k) != len(self.y0):
-            raise Exception("Lengths of 'k' (len=" + str(len(self.k)) +") and 'y0' (len=" + str(len(self.y0)) + ") must be equal.")
-        if len(self.k.shape) != 2 or self.k.shape[1] != len(model.reactions):
-            raise Exception("'k' must be a 2D array with dimensions N_SIMS x N_RXNS: k.shape=" + str(self.k.shape))
-        if len(self.y0.shape) != 2 or self.y0.shape[1] != len(model.species):
-            raise Exception("'y0' must be a 2D array with dimensions N_SIMS x N_SPECIES: y0.shape=" + str(self.y0.shape))
         
-        # If outdir doesn't exist, create it
-        if not os.path.exists(self.outdir):
-            os.makedirs(self.outdir)
+        # The following variables are set in self.run()
+        self.param_values = None
+        self.y0 = None
+        self.vol = None
+        self.outdir = None
             
         # Initialize 'y', 'yobs', and 'yobs_view' as empty dictionaries
         self.y = {}
         self.yobs = {}
         self.yobs_view = {}
 
-    def run(self, prefix=None, obs_species_only=True, load_conc_data=True):
+    def run(self, param_values, y0, vol=None, outdir=os.getcwd(), prefix=None, obs_species_only=True, load_conc_data=True):
         """Perform a set of integrations.
 
         Returns nothing; if load_conc_data=True, can access the object's 
@@ -231,6 +204,18 @@ class cupSODA(pysb.integrate.Solver):
 
         Parameters
         ----------
+        param_values : list-like
+            Rate constants for all reactions for all simulations. Dimensions are 
+            ``(N_SIMS, len(model.reactions))``.
+        y0 : list-like
+            Initial species concentrations for all reactions for all simulations. 
+            Dimensions are ``(N_SIMS, len(model.species))``.
+        vol : float, optional (default: None)
+            System volume. If provided, cupSODA will assume that species counts
+            are in number units and will automatically convert them to concentrations
+            by dividing by Avogadro's number * vol.
+        outdir : string, optional (default: os.getcwd())
+            Output directory.
         prefix : string, optional (default: model.name)
             Output files will be named "prefix_i", for i=[0,N_SIMS).
         obs_species_only : bool, optional (default: True)
@@ -242,6 +227,22 @@ class cupSODA(pysb.integrate.Solver):
             observables are set to 'nan'.
         """
         
+        self.param_values = numpy.array(param_values)
+        self.y0 = numpy.array(y0) 
+        self.vol = vol 
+        self.outdir = outdir
+        
+        # Error checks on 'param_values' and 'y0'
+        if len(self.param_values) != len(self.y0):
+            raise Exception("Lengths of 'param_values' (len=" + str(len(self.param_values)) +") and 'y0' (len=" + str(len(self.y0)) + ") must be equal.")
+        if len(self.param_values.shape) != 2 or self.param_values.shape[1] != len(self.model.reactions):
+            raise Exception("'param_values' must be a 2D array with dimensions N_SIMS x N_RXNS: param_values.shape=" + str(self.param_values.shape))
+        if len(self.y0.shape) != 2 or self.y0.shape[1] != len(self.model.species):
+            raise Exception("'y0' must be a 2D array with dimensions N_SIMS x N_SPECIES: y0.shape=" + str(self.y0.shape))
+        
+        # Create outdir if it doesn't exist
+        if not os.path.exists(self.outdir): os.makedirs(self.outdir)
+
         # Default prefix is model name
         if not prefix: prefix = self.model.name
         
@@ -257,7 +258,7 @@ class cupSODA(pysb.integrate.Solver):
             os.mkdir(cupsoda_files)
             
         # Number of sims, rxns, and species
-        N_SIMS,N_RXNS = self.k.shape
+        N_SIMS,N_RXNS = self.param_values.shape
         N_SPECIES = len(self.y0[0])
         
         # Simple default for number of blocks
@@ -285,7 +286,7 @@ class cupSODA(pysb.integrate.Solver):
             line = ""
             for j in range(N_RXNS):
                 if j > 0: line += "\t"
-                line += str(self.k[i][j])
+                line += str(self.param_values[i][j])
             c_matrix.write(line)
             if i < N_SIMS-1: c_matrix.write("\n")
         c_matrix.close()
