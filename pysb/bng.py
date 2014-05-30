@@ -99,7 +99,7 @@ def _parse_bng_outfile(out_filename):
 
     The column headers are separated by a differing number of spaces (not tabs).
     This function parses out the column names and then uses the numpy.loadtxt
-    method to load the outputfile into a numpy record array.
+    method to load the output file into a numpy record array.
 
     Parameters
     ----------
@@ -130,7 +130,7 @@ def _parse_bng_outfile(out_filename):
     return arr
 
 
-def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True, verbose=False, **additional_args):
+def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, **additional_args):
     """
     Simulate a model with BNG's SSA simulator and return the trajectories.
 
@@ -154,8 +154,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True, verbo
         Additional arguments to pass to BioNetGen
 
     """
-    
-    ssa_args = "t_end=>%f, n_steps=>%d" % (t_end, n_steps)
+    ssa_args = "t_start=>%f, t_end=>%f, n_steps=>%d" % (tspan[0], tspan[-1], len(tspan)-1)
     for key,val in additional_args.items(): ssa_args += ", "+key+"=>"+str(val)
     if verbose: ssa_args += ", verbose=>1"
         
@@ -191,7 +190,20 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True, verbo
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip("at line")+"\n"+p_err.rstrip())
 
-        output_arr = _parse_bng_outfile(gdat_filename)
+#         output_arr = _parse_bng_outfile(gdat_filename)        
+        cdat_arr = numpy.loadtxt(cdat_filename, skiprows=1)[:,1:] # exclude first column (time)
+        gdat_arr = numpy.loadtxt(gdat_filename, skiprows=1)[:,1:] # exclude first column (time)
+
+        species_names = ['__s%d' % i for i in range(len(model.species))]
+        yfull_dtype = zip(species_names, itertools.repeat(float))
+        if len(model.observables):
+            yfull_dtype += zip(model.observables.keys(), itertools.repeat(float))
+        yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
+        
+        yfull_view = yfull.view(float).reshape(len(yfull), -1)
+        yfull_view[:, :len(model.species)] = cdat_arr
+        yfull_view[:, len(model.species):] = gdat_arr
+
         #ssa_file = open(ssa_filename, 'r')
         #output.write(ssa_file.read())
         #net_file.close()
@@ -205,7 +217,8 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp', cleanup=True, verbo
                 if os.access(filename, os.F_OK):
                     os.unlink(filename)
         os.chdir(working_dir)
-    return output_arr
+#     return output_arr
+    return yfull
 
 def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     """
