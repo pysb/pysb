@@ -154,8 +154,8 @@ def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, **addi
         Additional arguments to pass to BioNetGen
 
     """
-    ssa_args = "t_start=>%f, t_end=>%f, n_steps=>%d" % (tspan[0], tspan[-1], len(tspan)-1)
-    for key,val in additional_args.items(): ssa_args += ", "+key+"=>"+str(val)
+    ssa_args = "sample_times=>%s" % str(list(tspan))
+    for key,val in additional_args.items(): ssa_args += ", %s=>%s" % (key,str(val))
     if verbose: ssa_args += ", verbose=>1"
         
     run_ssa_code = """
