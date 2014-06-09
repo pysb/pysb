@@ -196,7 +196,7 @@ def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, **addi
         else:
             gdat_arr = numpy.ndarray((len(cdat_arr), 0))
 
-        names = ['time'] + ['__s%d' % i for i in range(len(model.species))]
+        names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)] # -1 for time column
         yfull_dtype = zip(names, itertools.repeat(float))
         if len(model.observables):
             yfull_dtype += zip(model.observables.keys(), itertools.repeat(float))
