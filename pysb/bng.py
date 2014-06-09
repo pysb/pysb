@@ -84,10 +84,10 @@ class GenerateNetworkError(RuntimeError):
 
 _generate_network_code = """
 begin actions
-generate_network({overwrite=>1});
+generate_network({overwrite=>1})
 end actions
 """
-
+#generate_network({overwrite=>1, verbose=>1})
 
 def _parse_bng_outfile(out_filename):
     """
@@ -155,7 +155,7 @@ def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, **addi
 
     """
     ssa_args = "sample_times=>%s" % str(list(tspan))
-    for key,val in additional_args.items(): ssa_args += ", %s=>%s" % (key,str(val))
+    for key,val in additional_args.items(): ssa_args += ", %s=>%s" % (key,"\""+str(val)+"\"" if isinstance(val,str) else str(val))
     if verbose: ssa_args += ", verbose=>1"
         
     run_ssa_code = """
