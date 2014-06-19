@@ -130,7 +130,7 @@ def _parse_bng_outfile(out_filename):
     return arr
 
 
-def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, **additional_args):
+def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, n_runs=1, **additional_args):
     """
     Simulate a model with BNG's SSA simulator and return the trajectories.
 
@@ -159,15 +159,29 @@ def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, **addi
     if verbose: ssa_args += ", verbose=>1"
         
     run_ssa_code = """
-    begin actions
+begin actions
     generate_network({overwrite=>1})
     simulate_ssa({%s})
-    end actions
-    """ % (ssa_args)
+end actions
+""" % (ssa_args)
+
+    #####
+    '''
+    run_ssa_code =  "begin actions\n"
+    run_ssa_code += "\tgenerate_network({overwrite=>1})\n"
+    if n_runs == 1: 
+        run_ssa_code += "\tsimulate_ssa({%s})\n" % (ssa_args)
+    else:
+        for n in range(n_runs):
+            print n
+            run_ssa_code += "\tsimulate_ssa({%s, %s})\n" % (ssa_args, "suffix=>\""+str(n)+"\"")
+            run_ssa_code += "\tresetConcentrations()\n"
+    run_ssa_code += "end actions\n"
+    '''
+    #####
     
     gen = BngGenerator(model)
-    bng_filename = '%s_%d_%d_temp.bngl' % (model.name,
-                            os.getpid(), random.randint(0, 10000))
+    bng_filename = '%s_%d_%d_temp.bngl' % (model.name, os.getpid(), random.randint(0, 10000))
     gdat_filename = bng_filename.replace('.bngl', '.gdat')
     cdat_filename = bng_filename.replace('.bngl', '.cdat')
     net_filename = bng_filename.replace('.bngl', '.net')
@@ -213,13 +227,22 @@ def run_ssa(model, tspan, output_dir='/tmp', cleanup=True, verbose=False, **addi
         #    output.write("#\n# BioNetGen execution log follows\n# ==========")
         #    output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
     finally:
+        # Parse NET file if it hasn't already been done
+        if not model.species: 
+            net_file = open(net_filename, 'r')
+            output.write(net_file.read())
+            net_file.close()
+            lines = iter(output.getvalue().split('\n'))
+            _parse_netfile(model, lines)
+        # Clean up
         if cleanup:
             for filename in [bng_filename, gdat_filename,
                              cdat_filename, net_filename]:
                 if os.access(filename, os.F_OK):
                     os.unlink(filename)
+        # Move to working directory  
         os.chdir(working_dir)
-#     return output_arr
+
     return yfull
 
 def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
@@ -302,6 +325,11 @@ def generate_equations(model, verbose=False):
     if model.odes:
         return
     lines = iter(generate_network(model,verbose=verbose).split('\n'))
+    _parse_netfile(model, lines)
+
+
+def _parse_netfile(model, lines):
+    """Parse 'species', 'reactions', and 'groups' blocks from a BNGL net file."""
     try:
         while 'begin species' not in lines.next():
             pass
@@ -314,46 +342,12 @@ def generate_equations(model, verbose=False):
         while 'begin reactions' not in lines.next():
             pass
         model.odes = [sympy.numbers.Zero()] * len(model.species)
+        global reaction_cache
         reaction_cache = {}
         while True:
             line = lines.next()
             if 'end reactions' in line: break
-            (number, reactants, products, rate, rule) = line.strip().split()
-            # the -1 is to switch from one-based to zero-based indexing
-            reactants = tuple(int(r) - 1 for r in reactants.split(','))
-            products = tuple(int(p) - 1 for p in products.split(','))
-            rate = rate.rsplit('*')
-            (rule_name, is_reverse) = re.match(r'#(\w+)(?:\((reverse)\))?', rule).groups()
-            is_reverse = bool(is_reverse)
-#             r_names = ['s%d' % r for r in reactants]
-            r_names = ['__s%d' % r for r in reactants]
-            combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
-            rule = model.rules[rule_name]
-            reaction = {
-                'reactants': reactants,
-                'products': products,
-                'rate': combined_rate,
-                'rule': rule_name,
-                'reverse': is_reverse,
-                }
-            model.reactions.append(reaction)
-            key = (rule_name, reactants, products)
-            key_reverse = (rule_name, products, reactants)
-            reaction_bd = reaction_cache.get(key_reverse)
-            if reaction_bd is None:
-                # make a copy of the reaction dict
-                reaction_bd = dict(reaction)
-                # default to false until we find a matching reverse reaction
-                reaction_bd['reversible'] = False
-                reaction_cache[key] = reaction_bd
-                model.reactions_bidirectional.append(reaction_bd)
-            else:
-                reaction_bd['reversible'] = True
-                reaction_bd['rate'] -= combined_rate
-            for p in products:
-                model.odes[p] += combined_rate
-            for r in reactants:
-                model.odes[r] -= combined_rate
+            _parse_reaction(model, line)
         # fix up reactions whose reverse version we saw first
         for r in model.reactions_bidirectional:
             if r['reverse']:
@@ -371,7 +365,6 @@ def generate_equations(model, verbose=False):
 
     except StopIteration as e:
         pass
-
 
 def _parse_species(model, line):
     """Parse a 'species' line from a BNGL net file."""
@@ -416,6 +409,46 @@ def _parse_species(model, line):
     model.species.append(cp)
 
 
+def _parse_reaction(model, line):
+    """Parse a 'reaction' line from a BNGL net file."""
+    (number, reactants, products, rate, rule) = line.strip().split()
+    # the -1 is to switch from one-based to zero-based indexing
+    reactants = tuple(int(r) - 1 for r in reactants.split(','))
+    products = tuple(int(p) - 1 for p in products.split(','))
+    rate = rate.rsplit('*')
+    (rule_name, is_reverse) = re.match(r'#(\w+)(?:\((reverse)\))?', rule).groups()
+    is_reverse = bool(is_reverse)
+#             r_names = ['s%d' % r for r in reactants]
+    r_names = ['__s%d' % r for r in reactants]
+    combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
+    rule = model.rules[rule_name]
+    reaction = {
+        'reactants': reactants,
+        'products': products,
+        'rate': combined_rate,
+        'rule': rule_name,
+        'reverse': is_reverse,
+        }
+    model.reactions.append(reaction)
+    key = (rule_name, reactants, products)
+    key_reverse = (rule_name, products, reactants)
+    reaction_bd = reaction_cache.get(key_reverse)
+    if reaction_bd is None:
+        # make a copy of the reaction dict
+        reaction_bd = dict(reaction)
+        # default to false until we find a matching reverse reaction
+        reaction_bd['reversible'] = False
+        reaction_cache[key] = reaction_bd
+        model.reactions_bidirectional.append(reaction_bd)
+    else:
+        reaction_bd['reversible'] = True
+        reaction_bd['rate'] -= combined_rate
+    for p in products:
+        model.odes[p] += combined_rate
+    for r in reactants:
+        model.odes[r] -= combined_rate
+            
+            
 def _parse_group(model, line):
     """Parse a 'group' line from a BNGL net file."""
     # values are number (which we ignore), name, and species list
