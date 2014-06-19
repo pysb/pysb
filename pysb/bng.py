@@ -190,16 +190,25 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp',
         #    output.write("#\n# BioNetGen execution log follows\n# ==========")
         #    output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
     finally:
+        # Parse NET file if it hasn't already been done
+        if not model.species: 
+            net_file = open(net_filename, 'r')
+            output.write(net_file.read())
+            net_file.close()
+            lines = iter(output.getvalue().split('\n'))
+            _parse_netfile(model, lines)
+        # Clean up
         if cleanup:
             for filename in [bng_filename, gdat_filename,
                              cdat_filename, net_filename]:
                 if os.access(filename, os.F_OK):
                     os.unlink(filename)
+        # Move to working directory  
         os.chdir(working_dir)
     return output_arr
 
 
-def generate_network(model, cleanup=True, append_stdout=False):
+def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     """
     Return the output from BNG's generate_network function given a model.
 
@@ -216,7 +225,7 @@ def generate_network(model, cleanup=True, append_stdout=False):
         finished. If False, leave them in place (in `output_dir`). Useful for
         debugging.
     append_stdout : bool, optional
-        If True, provide BNG.pl's standard output stream as comment lines
+        If True, provide BNG2.pl's standard output stream as comment lines
         appended to the net file contents. If False (default), do not append it.
 
     """
@@ -235,6 +244,9 @@ def generate_network(model, cleanup=True, append_stdout=False):
         bng_file.close()
         p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if verbose:
+            for line in iter(p.stdout.readline, b''):
+                print line,
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
@@ -252,7 +264,7 @@ def generate_network(model, cleanup=True, append_stdout=False):
     return output.getvalue()
 
 
-def generate_equations(model):
+def generate_equations(model, verbose=False):
     """
     Generate math expressions for reaction rates and species in a model.
 
@@ -270,7 +282,12 @@ def generate_equations(model):
     #   or, use a separate "math model" object to contain ODEs
     if model.odes:
         return
-    lines = iter(generate_network(model).split('\n'))
+    lines = iter(generate_network(model, verbose=verbose).split('\n'))
+    _parse_netfile(model, lines)
+
+
+def _parse_netfile(model, lines):
+    """Parse 'species', 'reactions', and 'groups' blocks from a BNGL net file."""
     try:
         global new_reverse_convention
         (bng_version, bng_codename) = re.match(r'# Created by BioNetGen (\d+\.\d+\.\d+)(?:-(\w+))?$', lines.next()).groups()
@@ -290,47 +307,12 @@ def generate_equations(model):
         while 'begin reactions' not in lines.next():
             pass
         model.odes = [sympy.numbers.Zero()] * len(model.species)
+        global reaction_cache
         reaction_cache = {}
         while True:
             line = lines.next()
             if 'end reactions' in line: break
-            (number, reactants, products, rate, rule) = line.strip().split(' ', 4)
-            # the -1 is to switch from one-based to zero-based indexing
-            reactants = tuple(int(r) - 1 for r in reactants.split(','))
-            products = tuple(int(p) - 1 for p in products.split(','))
-            rate = rate.rsplit('*')
-            (rule_name, is_reverse, unit_conversion) = re.match(
-                r'#(\w+)(?:\((reverse)\))?(?: unit_conversion=(.*))?', rule).groups()
-            is_reverse = bool(is_reverse)
-            r_names = ['s%d' % r for r in reactants]
-            combined_rate = sympy.Mul(
-                *[sympy.Symbol(t) for t in r_names + rate])
-            rule = model.rules[rule_name]
-            reaction = {
-                'reactants': reactants,
-                'products': products,
-                'rate': combined_rate,
-                'rule': rule_name,
-                'reverse': is_reverse,
-                }
-            model.reactions.append(reaction)
-            key = (rule_name, reactants, products)
-            key_reverse = (rule_name, products, reactants)
-            reaction_bd = reaction_cache.get(key_reverse)
-            if reaction_bd is None:
-                # make a copy of the reaction dict
-                reaction_bd = dict(reaction)
-                # default to false until we find a matching reverse reaction
-                reaction_bd['reversible'] = False
-                reaction_cache[key] = reaction_bd
-                model.reactions_bidirectional.append(reaction_bd)
-            else:
-                reaction_bd['reversible'] = True
-                reaction_bd['rate'] -= combined_rate
-            for p in products:
-                model.odes[p] += combined_rate
-            for r in reactants:
-                model.odes[r] -= combined_rate
+            _parse_reaction(model, line)
         # fix up reactions whose reverse version we saw first
         for r in model.reactions_bidirectional:
             if r['reverse']:
@@ -348,7 +330,6 @@ def generate_equations(model):
 
     except StopIteration as e:
         pass
-
 
 def _parse_species(model, line):
     """Parse a 'species' line from a BNGL net file."""
@@ -439,8 +420,8 @@ def _parse_reaction(model, line):
         model.odes[p] += combined_rate
     for r in reactants:
         model.odes[r] -= combined_rate
-            
-            
+
+
 def _parse_group(model, line):
     """Parse a 'group' line from a BNGL net file."""
     # values are number (which we ignore), name, and species list
