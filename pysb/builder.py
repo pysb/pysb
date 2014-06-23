@@ -58,7 +58,6 @@ creating additional subclasses.
 """
 
 from pysb import *
-from bayessb.priors import Normal
 
 class Builder(object):
 
@@ -100,8 +99,7 @@ class Builder(object):
         self.model.add_component(m)
         return m
 
-    def parameter(self, name, value, factor=1, estimate=True,
-                  prior=Normal(-3, 2)):
+    def parameter(self, name, value, factor=1, prior=None):
         """Adds a parameter to the Builder's model instance.
 
         Examines the params_dict attribute of the Builder instance (which is
@@ -126,13 +124,11 @@ class Builder(object):
             The value of the parameter
         factor : number
             A scaling factor to be applied to the parameter value.
-        estimate : boolean
-            Specifies whether the parameter should be included among the
-            parameters to estimate, contained in the set
-            ``Builder.estimate_params``. Defaults to True.
         prior : instance of prior class from bayessb.priors
-            The prior object determining the prior probability of different
-            values for this parameter. Ignored if ``estimate`` is False.
+            The prior object describing the prior probability of different
+            values for this parameter, if the parameter should be included among
+            the parameters to estimate (contained in the set
+            ``Builder.estimate_params``).
         """
 
         if self.params_dict is None:

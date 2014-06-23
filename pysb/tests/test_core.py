@@ -31,6 +31,7 @@ def test_monomer_model():
     ok_(A in model.all_components())
     ok_(A not in model.all_components() - model.monomers)
 
+
 @with_model
 def test_initial():
     Monomer('A', ['s'])
@@ -76,3 +77,35 @@ def test_monomer_as_complex_pattern():
 def test_observable_constructor_with_monomer():
     A = Monomer('A', _export=False)
     o = Observable('o', A, _export=False)
+
+@with_model
+def test_compartment_initial_error():
+    Monomer('A', ['s'])
+    Parameter('A_0', 2.0)
+    c1 = Compartment("C1")
+    c2 = Compartment("C2")
+    Initial(A(s=None)**c1, A_0)
+    Initial(A(s=None)**c2, A_0)
+
+@with_model
+def test_monomer_pattern_add_to_none():
+    """Ensure that MonomerPattern + None returns a ReactionPattern."""
+    Monomer('A', ['s'])
+    ok_(isinstance(A() + None, ReactionPattern),
+        'A() + None did not return a ReactionPattern.')
+
+@with_model
+def test_complex_pattern_add_to_none():
+    """Ensure that ComplexPattern + None returns a ReactionPattern."""
+    Monomer('A', ['s'])
+    ok_(isinstance(A(s=1) % A(s=1) + None, ReactionPattern),
+        'A(s=1) % A(s=1) + None did not return a ReactionPattern.')
+
+@with_model
+def test_reaction_pattern_add_to_none():
+    """Ensure that ReactionPattern + None returns a ReactionPattern."""
+    Monomer('A', ['s'])
+    cp = A(s=1) % A(s=1)
+    rp = cp + cp
+    ok_(isinstance(rp + None, ReactionPattern),
+        'ReactionPattern + None did not return a ReactionPattern.')
