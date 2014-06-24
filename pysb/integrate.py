@@ -90,9 +90,21 @@ class Solver(object):
         
         code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
 #         code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
-        code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+#         code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
         for e in model.expressions:
-            code_eqs = re.sub(r'\b(%s)\b' % e.name, sympy.ccode(e.expand_expr()), code_eqs)
+            code_eqs = re.sub(r'\b(%s)\b' % e.name, sympy.ccode(e.expand_expr()), code_eqs)    
+
+        for obs in model.observables:
+            obs_string = ''
+            for i in range(len(obs.coefficients)):
+                if i > 0: obs_string += "+"
+                if obs.coefficients[i] > 1: obs_string += str(obs.coefficients[i])+"*"
+                obs_string += "__s"+str(obs.species[i])
+            if len(obs.coefficients) > 1: obs_string = '(' + obs_string + ')'
+            code_eqs = re.sub(r'\b(%s)\b' % obs.name, obs_string, code_eqs)
+
+        code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+
         for i, p in enumerate(model.parameters):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
         
@@ -189,8 +201,9 @@ class Solver(object):
             # create parameter vector from the values in the model
             param_values = numpy.array([p.value for p in self.model.parameters])
 
-        subs = dict((p, param_values[i])
-                    for i, p in enumerate(self.model.parameters))
+#         subs = dict((p, param_values[i]) for i, p in enumerate(self.model.parameters))
+        subs = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
+        
         if y0 is not None:
             # accept vector of species amounts as an argument
             if len(y0) != self.y.shape[1]:

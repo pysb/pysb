@@ -979,7 +979,7 @@ class Observable(Component, sympy.Symbol):
     species : list of integers
         List of species indexes for species matching the pattern.
     coefficients : list of integers
-        List of coefficients by which each species amount is to be multipled to
+        List of coefficients by which each species amount is to be multiplied to
         correct for multiple pattern matches within a species.
 
     Notes
