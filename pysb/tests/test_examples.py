@@ -17,10 +17,11 @@ def get_example_models():
                and not filename.startswith('__'):
             modelname = filename[:-3]  # strip .py
             package = 'pysb.examples.' + modelname
+            module = importlib.import_module(package)
+            # Reset do_export to the default in case the model changed it.
             # FIXME the self-export mechanism should be more self-contained so
             # this isn't needed here.
             SelfExporter.do_export = True
-            module = importlib.import_module(package)
             yield module.model
 
 expected_exceptions = {
