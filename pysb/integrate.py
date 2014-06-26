@@ -37,12 +37,10 @@ class Solver(object):
         Time values over which to integrate. The first and last values define
         the time range, and the returned trajectories will be sampled at every
         value.
-    integrator : string, optional (default: 'vode')
+    integrator : string, optional
         Name of the integrator to use, taken from the list of integrators known
         to :py:class:`scipy.integrate.ode`.
-    verbose : bool, optional (default: False)
-        Verbose output 
-    integrator_options
+    integrator_params
         Additional parameters for the integrator.
 
     Attributes
@@ -55,7 +53,7 @@ class Solver(object):
         Species trajectories. Dimensionality is ``(len(tspan),
         len(model.species))``.
     yobs : numpy.ndarray with record-style data-type
-        Observable trajectories. Length is ``len(tspan)`` and record names
+        Observable trajectories. Length is is ``len(tspan)`` and record names
         follow ``model.observables`` names.
     yobs_view : numpy.ndarray
         An array view (sharing the same data buffer) on ``yobs``. Dimensionality
@@ -71,6 +69,7 @@ class Solver(object):
     single Solver object and then call its ``run`` method as needed.
 
     """
+
     @staticmethod
     def _test_inline():
         """Detect whether scipy.weave.inline is functional."""
@@ -83,43 +82,35 @@ class Solver(object):
                     distutils.errors.CompileError, ImportError):
                 pass
 
-    def __init__(self, model, tspan, integrator='vode', verbose=False, **integrator_options):
-        
-        self.verbose = verbose
-        pysb.bng.generate_equations(model,self.verbose)
-        
-        code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
-#         code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
-#         code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+    def __init__(self, model, tspan, integrator='vode', **integrator_options):
+
+        pysb.bng.generate_equations(model)
+
+        code_eqs = '\n'.join(['ydot[%d] = %s;' %
+                              (i, sympy.ccode(model.odes[i]))
+                              for i in range(len(model.odes))])
+        code_eqs = re.sub(r's(\d+)',
+                          lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
         for e in model.expressions:
-            code_eqs = re.sub(r'\b(%s)\b' % e.name, sympy.ccode(e.expand_expr()), code_eqs)    
-
-        for obs in model.observables:
-            obs_string = ''
-            for i in range(len(obs.coefficients)):
-                if i > 0: obs_string += "+"
-                if obs.coefficients[i] > 1: obs_string += str(obs.coefficients[i])+"*"
-                obs_string += "__s"+str(obs.species[i])
-            if len(obs.coefficients) > 1: obs_string = '(' + obs_string + ')'
-            code_eqs = re.sub(r'\b(%s)\b' % obs.name, obs_string, code_eqs)
-
-        code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
-
+            code_eqs = re.sub(r'\b(%s)\b' % e.name,
+                              sympy.ccode(e.expand_expr()), code_eqs)
         for i, p in enumerate(model.parameters):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
-        
+
         Solver._test_inline()
-        
-        # If we can't use weave.inline to run the C code, compile it as Python code instead for use with
-        # exec. Note: C code with array indexing, basic math operations, and pow() just happens to also
-        # be valid Python.  If the equations ever have more complex things in them, this might fail.
+        # If we can't use weave.inline to run the C code, compile it as Python
+        # code instead for use with exec. Note: C code with array indexing,
+        # basic math operations, and pow() just happens to also be valid
+        # Python.  If the equations ever have more complex things in them, this
+        # might fail.
         if not Solver._use_inline:
             code_eqs_py = compile(code_eqs, '<%s odes>' % model.name, 'exec')
         else:
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
-                code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,'%s(\\1)' % macro, code_eqs)
-        
+                code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
+                                  '%s(\\1)' % macro, code_eqs)
+
         def rhs(t, y, p):
             ydot = self.ydot
             # note that the evaluated code sets ydot as a side effect
@@ -129,47 +120,33 @@ class Solver(object):
                 exec code_eqs_py in locals()
             return ydot
 
-        # build integrator options list from our defaults and any kwargs passed to this function
+        # build integrator options list from our defaults and any kwargs passed
+        # to this function
         options = {}
-        if default_integrator_options.get(integrator):
-            options.update(default_integrator_options[integrator]) # default options
-#         try:
-#             options.update(default_integrator_options[integrator])
-#         except KeyError as e:
-#             pass
-        
-        options.update(integrator_options) # overwrite defaults
+        try:
+            options.update(default_integrator_options[integrator])
+        except KeyError as e:
+            pass
+        options.update(integrator_options)
+
         self.model = model
         self.tspan = tspan
-        self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
-        self.ydot = numpy.ndarray(len(self.model.species))
-        
-        if len(self.model.observables):
-            self.yobs = numpy.ndarray(len(self.tspan), zip(self.model.observables.keys(),
+        self.y = numpy.ndarray((len(tspan), len(model.species)))
+        self.ydot = numpy.ndarray(len(model.species))
+        if len(model.observables):
+            self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
                                                       itertools.repeat(float)))
         else:
-            self.yobs = numpy.ndarray((len(self.tspan), 0))
-        exprs = self.model.expressions_dynamic()
-        
+            self.yobs = numpy.ndarray((len(tspan), 0))
+        exprs = model.expressions_dynamic()
         if len(exprs):
-            self.yexpr = numpy.ndarray(len(self.tspan), zip(exprs.keys(),
+            self.yexpr = numpy.ndarray(len(tspan), zip(exprs.keys(),
                                                        itertools.repeat(float)))
         else:
-            self.yexpr = numpy.ndarray((len(self.tspan), 0))
+            self.yexpr = numpy.ndarray((len(tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
-        
-        # Integrator
-        if scipy.integrate._ode.find_integrator(integrator):
-            self.integrator = ode(rhs).set_integrator(integrator, **options)
-        else:
-            raise Exception("Integrator type '" + integrator + "' not recognized.")
-        
-#         print type(self.integrator)
-# #        help(self.integrator)
-#         for i in range(len(self.integrator.__dict__['_integrator'].__dict__.keys())):
-#             print self.integrator.__dict__['_integrator'].__dict__.items()[i][0], ": ", self.integrator.__dict__['_integrator'].__dict__.items()[i][1]
-#         print "YUP" if scipy.integrate._ode.find_integrator("lsoda") else "NOPE"
-#         quit()
+        self.integrator = ode(rhs).set_integrator(integrator, **options)
+
 
     def run(self, param_values=None, y0=None):
         """Perform an integration.
@@ -194,16 +171,16 @@ class Solver(object):
         if param_values is not None:
             # accept vector of parameter values as an argument
             if len(param_values) != len(self.model.parameters):
-                raise Exception("param_values must be the same length as model.parameters")
+                raise Exception("param_values must be the same length as "
+                                "model.parameters")
             if not isinstance(param_values, numpy.ndarray):
                 param_values = numpy.array(param_values)
         else:
             # create parameter vector from the values in the model
             param_values = numpy.array([p.value for p in self.model.parameters])
 
-#         subs = dict((p, param_values[i]) for i, p in enumerate(self.model.parameters))
-        subs = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
-        
+        subs = dict((p, param_values[i])
+                    for i, p in enumerate(self.model.parameters))
         if y0 is not None:
             # accept vector of species amounts as an argument
             if len(y0) != self.y.shape[1]:
@@ -230,35 +207,25 @@ class Solver(object):
         self.integrator.set_f_params(param_values)
         self.y[0] = y0
         i = 1
-        if self.verbose: 
-            print "Integrating..."
-            print "\t"+"Time"
-            print "\t"+"----"
-            print "\t", self.integrator.t
-        while self.integrator.successful() and self.integrator.t < self.tspan[-1]:
-            self.y[i] = self.integrator.integrate(self.tspan[i]) # integration
+        while (self.integrator.successful() and
+               self.integrator.t < self.tspan[-1]):
+            self.y[i] = self.integrator.integrate(self.tspan[i])
             i += 1
-            ######
-#             self.integrator.integrate(self.tspan[i],step=True)
-#             if self.integrator.t >= self.tspan[i]: i += 1
-            ######
-            if self.verbose: print "\t", self.integrator.t
-        if self.verbose: print "...Done."
         if self.integrator.t < self.tspan[-1]:
             self.y[i:, :] = 'nan'
 
-        for i, obs in enumerate(self.model.observables): # calculate observables
+        for i, obs in enumerate(self.model.observables):
             self.yobs_view[:, i] = \
                 (self.y[:, obs.species] * obs.coefficients).sum(1)
-        
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
         for expr in self.model.expressions_dynamic():
             expr_subs = expr.expand_expr().subs(subs)
-            func = sympy.lambdify(obs_names, expr_subs)
+            func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
-def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbose=False,
+
+def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
              **integrator_options):
     """Integrate a model's ODEs over a given timespan.
 
@@ -334,8 +301,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbos
     >>> from pysb.examples.robertson import model
     >>> from numpy import linspace
     >>> numpy.set_printoptions(precision=4)
-    >>> yfull = odesolve(model, linspace(0, 40, 10)) # doctest:+ELLIPSIS
-    #...
+    >>> yfull = odesolve(model, linspace(0, 40, 10))
     >>> print yfull['A_total']   #doctest: +NORMALIZE_WHITESPACE
     [ 1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
     0.7158]
@@ -366,7 +332,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbos
 
     """
 
-    solver = Solver(model, tspan, integrator, verbose, **integrator_options)
+    solver = Solver(model, tspan, integrator, **integrator_options)
     solver.run(param_values, y0)
 
     species_names = ['__s%d' % i for i in range(solver.y.shape[1])]
@@ -380,3 +346,14 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbos
     yfull_view[:, solver.y.shape[1]:] = solver.yobs_view
 
     return yfull
+
+
+def setup_module(module):
+    """Doctest fixture for nose."""
+    # Distutils' temp directory creation code has a more-or-less unsuppressable
+    # print to stdout which will break the doctest which triggers it (via
+    # scipy.weave.inline). So here we run an end-to-end test of the inlining
+    # system to get that print out of the way at a point where it won't matter.
+    # As a bonus, the test harness is suppressing writes to stdout at this time
+    # anyway so the message is just swallowed silently.
+    Solver._test_inline()

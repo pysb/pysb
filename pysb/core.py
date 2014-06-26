@@ -275,16 +275,6 @@ class Monomer(Component):
         value += ')'
         return value
 
-    def __eq__(self, other):
-        return type(self)         == type(other)         and \
-               self.name          == other.name          and \
-               ( (self.sites is None and other.sites is None) or \
-                    sorted(self.sites) == sorted(other.sites)) and \
-               self.site_states   == other.site_states
-               
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
 
 class MonomerPattern(object):
 
@@ -401,7 +391,7 @@ class MonomerPattern(object):
         if isinstance(other, ComplexPattern):
             return ReactionPattern([ComplexPattern([self], None), other])
         elif other == None:
-        	return self
+            return as_reaction_pattern(self)
         else:
             return NotImplemented
 
@@ -427,12 +417,6 @@ class MonomerPattern(object):
             return mp_new
         else:
             return NotImplemented
-
-    def __eq__(self, other):
-        return type(self)           == type(other)           and \
-               self.monomer         == other.monomer         and \
-               self.site_conditions == other.site_conditions and \
-               self.compartment     == other.compartment
 
     def __repr__(self):
         value = '%s(' % self.monomer.name
@@ -567,7 +551,7 @@ class ComplexPattern(object):
         elif isinstance(other, MonomerPattern):
             return ReactionPattern([self, ComplexPattern([other], None)])
         elif other == None:
-        	return self
+            return as_reaction_pattern(self)
         else:
             return NotImplemented
 
@@ -644,7 +628,7 @@ class ReactionPattern(object):
         elif isinstance(other, ComplexPattern):
             return ReactionPattern(self.complex_patterns + [other])
         elif other == None:
-        	return self
+            return self
         else:
             return NotImplemented
 
@@ -706,6 +690,8 @@ def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
     if isinstance(v, ComplexPattern):
         return v
+    elif isinstance(v, Monomer):
+        return ComplexPattern([v()], None)
     elif isinstance(v, MonomerPattern):
         return ComplexPattern([v], None)
     else:
@@ -777,19 +763,6 @@ class Parameter(Component, sympy.Symbol):
     def func(self):
         return sympy.Symbol
 
-    def __eq__(self, other):
-        return type(self) == type(other) and \
-               self.name  == other.name  and \
-               self.value == other.value
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and \
-               self.name  == other.name  and \
-               self.value == other.value
-
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
@@ -841,15 +814,6 @@ class Compartment(Component):
         self.parent = parent
         self.dimension = dimension
         self.size = size
-
-    def __eq__(self, other):
-        return type(self)  == type(other)  and \
-               self.name   == other.name   and \
-               self.parent == other.parent and \
-               self.size   == other.size
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
     def __repr__(self):
         return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
@@ -979,7 +943,7 @@ class Observable(Component, sympy.Symbol):
     species : list of integers
         List of species indexes for species matching the pattern.
     coefficients : list of integers
-        List of coefficients by which each species amount is to be multiplied to
+        List of coefficients by which each species amount is to be multipled to
         correct for multiple pattern matches within a species.
 
     Notes
