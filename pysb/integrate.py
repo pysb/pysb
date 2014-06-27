@@ -71,6 +71,7 @@ class Solver(object):
     single Solver object and then call its ``run`` method as needed.
 
     """
+
     @staticmethod
     def _test_inline():
         """Detect whether scipy.weave.inline is functional."""
@@ -164,11 +165,9 @@ class Solver(object):
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
         
-#         print type(self.integrator)
 # #        help(self.integrator)
 #         for i in range(len(self.integrator.__dict__['_integrator'].__dict__.keys())):
 #             print self.integrator.__dict__['_integrator'].__dict__.items()[i][0], ": ", self.integrator.__dict__['_integrator'].__dict__.items()[i][1]
-#         print "YUP" if scipy.integrate._ode.find_integrator("lsoda") else "NOPE"
 #         quit()
 
     def run(self, param_values=None, y0=None):
@@ -250,12 +249,11 @@ class Solver(object):
         for i, obs in enumerate(self.model.observables): # calculate observables
             self.yobs_view[:, i] = \
                 (self.y[:, obs.species] * obs.coefficients).sum(1)
-        
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
         for expr in self.model.expressions_dynamic():
             expr_subs = expr.expand_expr().subs(subs)
-            func = sympy.lambdify(obs_names, expr_subs)
+            func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
 def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbose=False,
@@ -334,8 +332,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbos
     >>> from pysb.examples.robertson import model
     >>> from numpy import linspace
     >>> numpy.set_printoptions(precision=4)
-    >>> yfull = odesolve(model, linspace(0, 40, 10)) # doctest:+ELLIPSIS
-    #...
+    >>> yfull = odesolve(model, linspace(0, 40, 10))
     >>> print yfull['A_total']   #doctest: +NORMALIZE_WHITESPACE
     [ 1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
     0.7158]
@@ -380,3 +377,14 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbos
     yfull_view[:, solver.y.shape[1]:] = solver.yobs_view
 
     return yfull
+
+
+def setup_module(module):
+    """Doctest fixture for nose."""
+    # Distutils' temp directory creation code has a more-or-less unsuppressable
+    # print to stdout which will break the doctest which triggers it (via
+    # scipy.weave.inline). So here we run an end-to-end test of the inlining
+    # system to get that print out of the way at a point where it won't matter.
+    # As a bonus, the test harness is suppressing writes to stdout at this time
+    # anyway so the message is just swallowed silently.
+    Solver._test_inline()
