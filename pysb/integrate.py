@@ -90,10 +90,9 @@ class Solver(object):
         pysb.bng.generate_equations(model,self.verbose)
         
         code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
-#         code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
-#         code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+        
         for e in model.expressions:
-            code_eqs = re.sub(r'\b(%s)\b' % e.name, sympy.ccode(e.expand_expr()), code_eqs)    
+            code_eqs = re.sub(r'\b(%s)\b' % e.name, '('+sympy.ccode(e.expand_expr())+')', code_eqs)
 
         for obs in model.observables:
             obs_string = ''
