@@ -117,20 +117,8 @@ class cupSODA(pysb.integrate.Solver):
         Absolute tolerance.
     rtol : float
         Relative tolerance.
-    n_blocks : int
-        Number of GPU blocks.
-    gpu : int
-        Index of GPU to run on.
-    param_values : numpy.ndarray
-        Rate constants for all reactions for all simulations. Initialized to
-        'None'; required argument to self.run().
-    y0 : numpy.ndarray
-        Initial species concentrations for all reactions for all simulations. 
-        Initialized to 'None'; required argument to self.run().
-    vol : float
-        System volume. Initialized to 'None'; optional argument to self.run().
-    outdir : string
-        Output directory. Initialized to 'None'; optional argument to self.run().
+    outdir : string, optional (default: os.getcwd())
+            Output directory.
 
     Notes
     -----
@@ -182,21 +170,13 @@ class cupSODA(pysb.integrate.Solver):
         self.tspan = tspan
         self.atol = options.get('atol')
         self.rtol = options.get('rtol')
-        self.n_blocks = options.get('n_blocks')
-        self.gpu = options.get('gpu')
         
-        # The following variables are set in self.run()
-        self.param_values = None
-        self.y0 = None
-        self.vol = None
-        self.outdir = None
-            
         # Initialize 'y', 'yobs', and 'yobs_view' as empty dictionaries
         self.y = {}
         self.yobs = {}
         self.yobs_view = {}
 
-    def run(self, param_values, y0, vol=None, outdir=os.getcwd(), prefix=None, obs_species_only=True, load_conc_data=True):
+    def run(self, param_values, y0, gpu=0, n_blocks=None, vol=None, outdir=os.getcwd(), prefix=None, obs_species_only=True, load_conc_data=True):
         """Perform a set of integrations.
 
         Returns nothing; if load_conc_data=True, can access the object's 
@@ -210,6 +190,10 @@ class cupSODA(pysb.integrate.Solver):
         y0 : list-like
             Initial species concentrations for all reactions for all simulations. 
             Dimensions are ``(N_SIMS, len(model.species))``.
+        n_blocks : int, optional
+            Number of GPU blocks.
+        gpu : int, optional (default: 0)
+            Index of GPU to run on.
         vol : float, optional (default: None)
             System volume. If provided, cupSODA will assume that species counts
             are in number units and will automatically convert them to concentrations
@@ -227,18 +211,18 @@ class cupSODA(pysb.integrate.Solver):
             observables are set to 'nan'.
         """
         
-        self.param_values = numpy.array(param_values)
-        self.y0 = numpy.array(y0) 
-        self.vol = vol 
         self.outdir = outdir
         
+        param_values = numpy.array(param_values)
+        y0 = numpy.array(y0)
+        
         # Error checks on 'param_values' and 'y0'
-        if len(self.param_values) != len(self.y0):
-            raise Exception("Lengths of 'param_values' (len=" + str(len(self.param_values)) +") and 'y0' (len=" + str(len(self.y0)) + ") must be equal.")
-        if len(self.param_values.shape) != 2 or self.param_values.shape[1] != len(self.model.reactions):
+        if len(param_values) != len(y0):
+            raise Exception("Lengths of 'param_values' (len=" + str(len(param_values)) +") and 'y0' (len=" + str(len(y0)) + ") must be equal.")
+        if len(param_values.shape) != 2 or param_values.shape[1] != len(self.model.reactions):
             raise Exception("'param_values' must be a 2D array with dimensions N_SIMS x N_RXNS: param_values.shape=" + str(self.param_values.shape))
-        if len(self.y0.shape) != 2 or self.y0.shape[1] != len(self.model.species):
-            raise Exception("'y0' must be a 2D array with dimensions N_SIMS x N_SPECIES: y0.shape=" + str(self.y0.shape))
+        if len(y0.shape) != 2 or y0.shape[1] != len(self.model.species):
+            raise Exception("'y0' must be a 2D array with dimensions N_SIMS x N_SPECIES: y0.shape=" + str(y0.shape))
         
         # Create outdir if it doesn't exist
         if not os.path.exists(self.outdir): os.makedirs(self.outdir)
@@ -258,11 +242,11 @@ class cupSODA(pysb.integrate.Solver):
             os.mkdir(cupsoda_files)
             
         # Number of sims, rxns, and species
-        N_SIMS,N_RXNS = self.param_values.shape
-        N_SPECIES = len(self.y0[0])
+        N_SIMS,N_RXNS = param_values.shape
+        N_SPECIES = len(y0[0])
         
         # Simple default for number of blocks
-        if not self.n_blocks:
+        if not n_blocks:
             shared_memory_per_block = 48*1024 # bytes
             default_threads_per_block = 32
             n_species = len(self.model.species)
@@ -271,7 +255,7 @@ class cupSODA(pysb.integrate.Solver):
             upper_limit_threads_per_block = 512
             max_threads_per_block = min( shared_memory_per_block/memory_per_thread , upper_limit_threads_per_block )
             threads_per_block = min( max_threads_per_block , default_threads_per_block )
-            self.n_blocks = int(numpy.ceil(1.*N_SIMS/threads_per_block))
+            n_blocks = int(numpy.ceil(1.*N_SIMS/threads_per_block))
         
         # atol_vector 
         atol_vector = open(os.path.join(cupsoda_files,"atol_vector"), 'wb')
@@ -286,7 +270,7 @@ class cupSODA(pysb.integrate.Solver):
             line = ""
             for j in range(N_RXNS):
                 if j > 0: line += "\t"
-                line += str(self.param_values[i][j])
+                line += str(param_values[i][j])
             c_matrix.write(line)
             if i < N_SIMS-1: c_matrix.write("\n")
         c_matrix.close()
@@ -321,21 +305,21 @@ class cupSODA(pysb.integrate.Solver):
         
         # modelkind
         modelkind = open(os.path.join(cupsoda_files,"modelkind"), 'wb')
-        if not self.vol: modelkind.write("deterministic")
+        if not vol: modelkind.write("deterministic")
         else: modelkind.write("stochastic")
         modelkind.close()
         
         # volume
-        if (self.vol):
+        if (vol):
             volume = open(os.path.join(cupsoda_files,"volume"), 'wb')
-            volume.write(str(self.vol))
+            volume.write(str(vol))
             volume.close()
             # Set population of __source() to 6.0221413e23*vol and warn the user
             warnings.warn("Number units detected in cupSODA.run(). Setting the population " +
-                          "of __source() (if it exists) equal to 6.0221413e23*"+str(self.vol)+".")
+                          "of __source() (if it exists) equal to 6.0221413e23*"+str(vol)+".")
             for i, s in enumerate(self.model.species):
                 if str(s) == '__source()':
-                    self.y0[:,i] = [6.0221413e23*self.vol for n in self.y0]
+                    y0[:,i] = [6.0221413e23*vol for n in y0]
                     break
         
         # MX_0
@@ -344,7 +328,7 @@ class cupSODA(pysb.integrate.Solver):
             line = ""
             for j in range(N_SPECIES):
                 if j > 0: line += "\t"
-                line += str(self.y0[i][j])
+                line += str(y0[i][j])
             MX_0.write(line)
             if i < N_SIMS-1: MX_0.write("\n")
         MX_0.close()
@@ -381,7 +365,7 @@ class cupSODA(pysb.integrate.Solver):
         time_max.close()
             
         # Build command
-        command = [bin_path, cupsoda_files, str(self.n_blocks), self.outdir, prefix, str(self.gpu), str(0)]
+        command = [bin_path, cupsoda_files, str(n_blocks), self.outdir, prefix, str(gpu), str(0)]
         print "Running cupSODA: " + ' '.join(command)
         
         # Run simulation
