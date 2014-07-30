@@ -18,6 +18,7 @@ from sympy.functions.special.delta_functions import Heaviside
 from sympy import simplify
 from sympy import Mul
 from sympy import log
+
 import pysb
 import pysb.bng
 import sympy
@@ -30,36 +31,56 @@ import copy
 from sympy.parsing.sympy_parser import parse_expr
 from collections import Mapping
 import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+from sympy import lambdify
 
+from pysb.bng import generate_equations
+from pysb.integrate import odesolve
+from pysb.examples.tyson_oscillator_harris import model
+from numpy import *
+from sympy import sqrt
+import matplotlib.pyplot as plt
 
+generate_equations(model)
+t = linspace(0, 100, 10001)
+x = odesolve(model, t)
 
 
 
 def find_slaves(model, t, ignore=15, epsilon=1e-6):
-    return ['s0', 's1', 's5']
+    
     slaves = []
-
+    
     generate_equations(model)
     x = odesolve(model, t)
     x = x[ignore:] # Ignore first couple points
     t = t[ignore:]
     names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
-    x = x[names] # Only concrete species are considered
+    x = x[names] # Only concrete species are considered This creates model.odes which contains the math
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
-
+    a = [] #list of solved polynomial equations
+    b = []    
     for i, eq in enumerate(model.odes): # i is equation number
         eq   = eq.subs('s%d' % i, 's%dstar' % i)
         sol  = solve(eq, Symbol('s%dstar' % i)) # Find equation of imposed trace
         for j in range(len(sol)):  # j is solution j for equation i
-            prueba = zeros(len(x))
             for p in model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
-            # This is the loop that kills performance
-            #prueba = Abs(sol[j].evalf(subs=x) - x)
-            for l, tt in enumerate(t):
-                prueba[l] = Abs(sol[j].evalf(subs={n:x[tt][n] for n in names}) - x[tt]['s%d'%i])
-            if (prueba.max() <= epsilon): slaves.append("s%d" % i)
-            print prueba.max()
+            a.append(sol[j]) 
+            b.append(i)    
+#         print i,j
+    for k,e in enumerate(a):
+        args = [] #arguments to put in lambdify function
+        variables = [atom for atom in a[k].atoms(Symbol) if not re.match(r'\d',str(atom))]
+        f = lambdify(variables, a[k], 'numpy')
+        variables_l = list(variables)
+       # print variables
+        for u,l in enumerate(variables_l):
+            args.append(x[:][str(l)])
+        print 's%d'%b[k], abs(f(*args) - x[:]['s%d'%b[k]])
+        
+    
+        
     return slaves
 
 # The output type may change, as needed for a graph package
@@ -206,6 +227,8 @@ def diff_alg_system(model):
     var_ready = []
     eqs_to_add = copy.deepcopy(model.odes)
     eqs_to_add_dict = {}
+
+
     var = find_slaves(model, t, ignore=15, epsilon=1e-6)
     eqs = pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1)
     w = mass_conserved(model)[1]
@@ -228,8 +251,8 @@ def diff_alg_system(model):
         
     eqs_to_add_ready = copy.deepcopy(eqs_to_add_dict)    
 
-    for i in eqs_to_add_dict: #Changes s2 to (d/dt)s2
-        eqs_to_add_ready[Symbol('(d/dt)%s'%i)] = eqs_to_add_ready.pop(i)
+#    for i in eqs_to_add_dict: #Changes s2 to (d/dt)s2
+#        eqs_to_add_ready[Symbol('(d/dt)%s'%i)] = eqs_to_add_ready.pop(i)
     for l in eqs_to_add_ready.keys(): #Substitutes the values of the algebraic system
         for i, j in enumerate(sol_dict): eqs_to_add_ready[l]=eqs_to_add_ready[l].subs(sol_dict.keys()[i], sol_dict.values()[i])
     
@@ -270,15 +293,87 @@ def tropicalization(model):
                 borders[j] = bor  # this adds the arguments of the heaviside functions to the borders dict.    
                 asd +=p
             tropicalized[j] = asd
-    return borders    
+    return borders, tropicalized    
 
 def visualization(model):
     prueba = linspace(0, 100, 10001)
     eqs_to_graph = tropicalization(model)
     for l in sorted(eqs_to_graph.keys()):
         for i, j in enumerate(sorted(eqs_to_graph[l])):
-            print solve(j, Symbol('s6'), dict=True)
+            if j.has(Symbol('s6')) == False: print solve(j, Symbol('s4'), dict=True)              
+            else:  print solve(j, Symbol('s6'), dict=True)
             plt.loglog(s4, )
-            plt.show()
+            plt.show()   
+    t = linspace(0.0001,1, 10001)
+    t1 = linspace(1,1,10001)
+    s = 0.00912870929175277*sqrt(1/t)
 
- 
+    plt.ion
+    plt.xlabel('s4')
+    plt.ylabel('s6')
+    plt.loglog(t, s, color='b')
+    plt.loglog(t,0.018*t,color='c') 
+    plt.loglog(t, 0.00555555555555556/t, color= 'm')
+    plt.loglog(t,0.0100000000000000*t1, color='k')
+    plt.loglog(0.833333333333333*t1, t, color='g' )
+    plt.show() 
+
+
+#Numerical solution of the tropical differential equations
+
+def diff_equa_to_solve(y, t):
+    variables = []
+    equations = []
+    rhs_exprs = []
+    ydot = [1,1,1]
+    new_variables = {}
+    
+    tropical_system = tropicalization(model)[1]
+
+    for i in tropical_system:
+        variables.append(i) 
+
+    for i, j in enumerate(variables):
+        equations.append(tropical_system[j])
+    new_variables[j] = 'y[%d]'%i
+
+    for i in range(len(equations)):
+       equations[i] = equations[i].subs('C0',1 )    
+
+    for i, j in enumerate(variables):
+            tempstring = re.sub(r's(\d+)', lambda m: new_variables[Symbol(((m.group())))], str(equations[i]))       
+            rhs_exprs.append(compile(tempstring, '<ydot[%s]>' % i, 'eval'))  
+    rhs_locals = {'y':y}
+    for i in range(len(equations)):
+        ydot[i] = eval(rhs_exprs[i], rhs_locals)
+    
+    return ydot
+
+    variables_ready = []
+    
+    tropical_system = tropicalization(model)[1]
+    
+    for i in tropical_system:
+       variables_ready.append(i)
+       
+    variables0=copy.deepcopy(variables_ready)
+    
+    #Initial conditions
+    for i, j in enumerate(variables0):
+       variables0[i]=variables0[i].subs(j, float(raw_input("Enter value of initial conditions of % s"%j  )))
+       
+    #Value of cycle constants
+    
+    #Ode solver parameters
+    abserr = float(raw_input("Enter abserr parameter: "))
+    relerr = float(raw_input("Enter relerr parameter: "))
+    stoptime = float(raw_input("Enter stoptime parameter: "))
+    numpoints = int(raw_input("Enter number of points parameter: "))
+    
+    t = [stoptime * float(i) / (numpoints - 1) for i in range(numpoints)]
+    
+    sol = odeint(diff_equa_to_solve, variables0, t)
+
+
+
+find_slaves(model,t)
