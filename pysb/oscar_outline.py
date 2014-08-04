@@ -18,6 +18,7 @@ from sympy.functions.special.delta_functions import Heaviside
 from sympy import simplify
 from sympy import Mul
 from sympy import log
+from collections import defaultdict
 
 import pysb
 import pysb.bng
@@ -34,23 +35,22 @@ import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from sympy import lambdify
 
+
 from pysb.bng import generate_equations
 from pysb.integrate import odesolve
 from pysb.examples.tyson_oscillator_harris import model
-from numpy import *
+import numpy
 from sympy import sqrt
 import matplotlib.pyplot as plt
 
+
 generate_equations(model)
-t = linspace(0, 100, 10001)
+t = numpy.linspace(0, 100, 10001)
 x = odesolve(model, t)
 
 
-
-def find_slaves(model, t, ignore=15, epsilon=1e-6):
-    
+def find_slaves(model, t, ignore=20, epsilon=1e-2):   
     slaves = []
-    
     generate_equations(model)
     x = odesolve(model, t)
     x = x[ignore:] # Ignore first couple points
@@ -60,7 +60,8 @@ def find_slaves(model, t, ignore=15, epsilon=1e-6):
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
     a = [] #list of solved polynomial equations
-    b = []    
+    c = defaultdict(list)
+    b = []
     for i, eq in enumerate(model.odes): # i is equation number
         eq   = eq.subs('s%d' % i, 's%dstar' % i)
         sol  = solve(eq, Symbol('s%dstar' % i)) # Find equation of imposed trace
@@ -72,12 +73,18 @@ def find_slaves(model, t, ignore=15, epsilon=1e-6):
     for k,e in enumerate(a):
         args = [] #arguments to put in lambdify function
         variables = [atom for atom in a[k].atoms(Symbol) if not re.match(r'\d',str(atom))]
-        f = lambdify(variables, a[k], 'numpy')
+        f = lambdify(variables, a[k], modules = dict(sqrt=numpy.lib.scimath.sqrt) )
         variables_l = list(variables)
        # print variables
         for u,l in enumerate(variables_l):
             args.append(x[:][str(l)])
-        print 's%d'%b[k], abs(f(*args) - x[:]['s%d'%b[k]])
+        hey = abs(numpy.log(f(*args)) - numpy.log(x[:]['s%d'%b[k]]))
+        if hey.max() <= epsilon : slaves.append('s%d'%b[k])
+        #print hey.max()
+#        c['s%d'%b[k]].append(f(*args))
+    #print slaves
+    
+             
         
     
         
@@ -136,7 +143,7 @@ def find_cycles(model):
                 r_link(graph, s, p, **attr_reversible)
  #   networkx.draw(graph) 
  #   plt.show() 
-    return networkx.simple_cycles(graph) #graph.edges() returns the edges
+    return list(networkx.simple_cycles(graph)) #graph.edges() returns the edges
 
 #This function finds conservation laws from the conserved cycles
 def mass_conserved(model):
@@ -146,7 +153,6 @@ def mass_conserved(model):
     for i, item in enumerate(c):
         b = 0
         u = 0
-        del item[len(item)-1]
         for j, specie in enumerate(item):
             b += model.odes[int(re.findall(r'\d+', c[i][j])[0])]
         if b == 0:
@@ -155,14 +161,15 @@ def mass_conserved(model):
                 u += sympy.Symbol(c[i][l])    
             h.append(u-sympy.Symbol('C%d'%i))
             print 'cycle%d'%i, 'is conserved'
+    #print h,g
             
     return h, g
 
 # Might need a "Prune" equation function
 
 # Large time sink, tropicalization step is needed in here, i.e. maximum
-def slave_equations(model, t, ignore=15, epsilon=1e-6):
-    slaves = find_slaves(model, t, ignore=15, epsilon=1e-6)
+def slave_equations(model, t, ignore=15, epsilon=1e-2):
+    slaves = find_slaves(model, t, ignore=15, epsilon=1e-2)
     slave_conserved_eqs = {}
     for i, j in enumerate(slaves):
         slave_conserved_eqs[j] = model.odes[int(re.findall(r'\d+', slaves[i])[0])] 
@@ -176,13 +183,18 @@ def slave_equations(model, t, ignore=15, epsilon=1e-6):
 #                 's1': Symbol('k1')*(Symbol('k8')+Symbol('k9'))/(Symbol('k3')*Symbol('k8')*(Symbol('C1')-Symbol('s5')-Symbol('s6'))),
 #                 's4': (Symbol('C1')-Symbol('s5')-Symbol('s6'))*Symbol('k8')/(Symbol('k8')+Symbol('k9'))
 #               } # Stub
+    print slave_conserved_eqs
     return slave_conserved_eqs
 
-def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
+def find_nearest(array,value):
+    idx = (numpy.abs(array-value)).argmin()
+    return array[idx]
 
-    k8, s5, k9, s0, k3, s1, k1, s2, k2, k3, k6, s6 = symbols('k8 s5 k9 s0 k3 s1 k1 s2 k2 k3 k6 s6')
-    a = [k8*s5-k9*s0, -k8*s5+k9*s0, k1*s2-k2*s1-k3*s0*s1]
-    return a
+def pruned_equations(model, t, ignore=15, epsilon=1e-2, rho=10):
+
+    #k8, s5, k9, s0, k3, s1, k1, s2, k2, k3, k6, s6 = symbols('k8 s5 k9 s0 k3 s1 k1 s2 k2 k3 k6 s6')
+    #a = [k8*s5-k9*s0, -k8*s5+k9*s0, k1*s2-k2*s1-k3*s0*s1]
+    #return a
 
     generate_equations(model)
     x = odesolve(model, t)
@@ -191,33 +203,51 @@ def pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1):
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
     conservation = mass_conserved(model)[0]
-
-    pruned_eqs = slave_equations(model, t, ignore=15, epsilon=1e-6)
+    print conservation
+    pruned_eqs = slave_equations(model, t, ignore=15, epsilon=1e-2)
     eq = copy.deepcopy(pruned_eqs)
+    
     for i, j in enumerate(eq):
-        ble = re.findall(r'\b\S+\b', str(j)) #Creates a list of the monomials of each slave equation
+        ble = eq[j].as_coefficients_dict().keys()#Creates a list of the monomials of each slave equation
         for l, m in enumerate(ble): #Compares the monomials to find the pruned system
-            m_ready=parse_expr(m)
-            m_elim=parse_expr(m)
+            m_ready = m
+            m_elim = m
             for p in model.parameters: m_ready = m_ready.subs(p.name, p.value) # Substitute parameters
-            elim=zeros(len(x))
             for k in range(len(ble)):
                 if (k+l+1) <= (len(ble)-1):
-                    ble_ready = parse_expr(ble[k+l+1])
-                    ble_elim = parse_expr(ble[k+l+1])
+                    ble_ready = ble[k+l+1]
+                    ble_elim = ble[k+l+1]
                     for p in model.parameters: ble_ready = ble_ready.subs(p.name, p.value) # Substitute parameters
-                    for s, tt in enumerate(t):
-                        elim[s] = m_ready.evalf(subs={n:x[tt][n] for n in names}) - ble_ready.evalf(subs={n:x[tt][n] for n in names})  
-                    if elim.max() > 0 and abs(elim.max()) > rho:
-                       pruned_eqs[i] = pruned_eqs[i].subs(ble_elim, 0)
-                    else: pass
-                    if elim.max() < 0 and abs(elim.max()) > rho:
-                       pruned_eqs[i] = pruned_eqs[i].subs(m_elim, 0) 
-                    else: pass
-                else: pass 
-    for i, l in enumerate(conservation): #Add the conservation laws to the pruned system
-        pruned_eqs.append(l)
+                    args2 = []
+                    args1 = []
+                    variables_ble_ready = [atom for atom in ble_ready.atoms(Symbol) if not re.match(r'\d',str(atom))]
+                    variables_m_ready = [atom for atom in m_ready.atoms(Symbol) if not re.match(r'\d',str(atom))]
+                    f_ble = lambdify(variables_ble_ready, ble_ready, 'numpy' )
+                    f_m = lambdify(variables_m_ready, m_ready, 'numpy' )
+                    for uu,ll in enumerate(variables_ble_ready):
+                        args2.append(x[:][str(ll)])
+                    for w,s in enumerate(variables_m_ready):
+                        args1.append(x[:][str(s)])
+                    hey_pruned = f_m(*args1) - f_ble(*args2)
+                    diff = find_nearest(hey_pruned, 0)
+                    if diff > 0 and abs(diff) > rho:
+                       pruned_eqs[j] = pruned_eqs[j].subs(ble_elim, 0)
+                    if diff < 0 and diff > rho:
+                       pruned_eqs[j] = pruned_eqs[j].subs(m_elim, 0)
+#                    for s, tt in enumerate(t):
+#                        elim[s] = m_ready.evalf(subs={n:x[tt][n] for n in names}) - ble_ready.evalf(subs={n:x[tt][n] for n in names})  
+#                    if elim.max() > 0 and abs(elim.max()) > rho:
+#                       pruned_eqs[j] = pruned_eqs[j].subs(ble_elim, 0)
+#                    else: pass
+#                    if elim.max() < 0 and abs(elim.max()) > rho:
+#                       pruned_eqs[j] = pruned_eqs[j].subs(m_elim, 0) 
+#                    else: pass
+#                else: pass 
+    #for i, l in enumerate(conservation): #Add the conservation laws to the pruned system
+    #    pruned_eqs.append(l)
+    print pruned_eqs
     return pruned_eqs
+
  
 
 def diff_alg_system(model):
@@ -375,5 +405,6 @@ def diff_equa_to_solve(y, t):
     sol = odeint(diff_equa_to_solve, variables0, t)
 
 
+slave_equations(model, t)
+pruned_equations(model, t, ignore=15)
 
-find_slaves(model,t)
