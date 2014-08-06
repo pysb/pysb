@@ -48,7 +48,6 @@ generate_equations(model)
 t = numpy.linspace(0, 100, 10001)
 x = odesolve(model, t)
 
-
 def find_slaves(model, t, ignore=20, epsilon=1e-2):   
     slaves = []
     generate_equations(model)
@@ -168,8 +167,8 @@ def mass_conserved(model):
 # Might need a "Prune" equation function
 
 # Large time sink, tropicalization step is needed in here, i.e. maximum
-def slave_equations(model, t, ignore=15, epsilon=1e-2):
-    slaves = find_slaves(model, t, ignore=15, epsilon=1e-2)
+def slave_equations(model, t, ignore=20, epsilon=1e-2):
+    slaves = find_slaves(model, t, ignore=20, epsilon=1e-2)
     slave_conserved_eqs = {}
     for i, j in enumerate(slaves):
         slave_conserved_eqs[j] = model.odes[int(re.findall(r'\d+', slaves[i])[0])] 
@@ -190,7 +189,7 @@ def find_nearest(array,value):
     idx = (numpy.abs(array-value)).argmin()
     return array[idx]
 
-def pruned_equations(model, t, ignore=15, epsilon=1e-2, rho=10):
+def pruned_equations(model, t, ignore=20, epsilon=1e-2, rho=5):
 
     #k8, s5, k9, s0, k3, s1, k1, s2, k2, k3, k6, s6 = symbols('k8 s5 k9 s0 k3 s1 k1 s2 k2 k3 k6 s6')
     #a = [k8*s5-k9*s0, -k8*s5+k9*s0, k1*s2-k2*s1-k3*s0*s1]
@@ -198,12 +197,13 @@ def pruned_equations(model, t, ignore=15, epsilon=1e-2, rho=10):
 
     generate_equations(model)
     x = odesolve(model, t)
+    x = x[ignore:] # Ignore first couple points
+    t = t[ignore:]
     names = [n for n in filter(lambda n: n.startswith('__'), x.dtype.names)]
     x = x[names] # Only concrete species are considered
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
     conservation = mass_conserved(model)[0]
-    print conservation
     pruned_eqs = slave_equations(model, t, ignore=15, epsilon=1e-2)
     eq = copy.deepcopy(pruned_eqs)
     
@@ -230,63 +230,59 @@ def pruned_equations(model, t, ignore=15, epsilon=1e-2, rho=10):
                         args1.append(x[:][str(s)])
                     hey_pruned = f_m(*args1) - f_ble(*args2)
                     diff = find_nearest(hey_pruned, 0)
-                    if diff > 0 and abs(diff) > rho:
+                    diff_pru = numpy.abs(diff)
+                    if diff > 0 and diff_pru > rho:
                        pruned_eqs[j] = pruned_eqs[j].subs(ble_elim, 0)
-                    if diff < 0 and diff > rho:
+                    if diff < 0 and diff_pru > rho:\
                        pruned_eqs[j] = pruned_eqs[j].subs(m_elim, 0)
-#                    for s, tt in enumerate(t):
-#                        elim[s] = m_ready.evalf(subs={n:x[tt][n] for n in names}) - ble_ready.evalf(subs={n:x[tt][n] for n in names})  
-#                    if elim.max() > 0 and abs(elim.max()) > rho:
-#                       pruned_eqs[j] = pruned_eqs[j].subs(ble_elim, 0)
-#                    else: pass
-#                    if elim.max() < 0 and abs(elim.max()) > rho:
-#                       pruned_eqs[j] = pruned_eqs[j].subs(m_elim, 0) 
-#                    else: pass
-#                else: pass 
-    #for i, l in enumerate(conservation): #Add the conservation laws to the pruned system
-    #    pruned_eqs.append(l)
-    print pruned_eqs
+    for i, l in enumerate(conservation): #Add the conservation laws to the pruned system
+        pruned_eqs['cons%d'%i]=l
     return pruned_eqs
 
- 
 
 def diff_alg_system(model):
     sol_dict = {}
     index_slaves = []
-    slaves = find_slaves(model, t, ignore=15, epsilon=1e-6)
+    slaves = find_slaves(model, t, ignore=20, epsilon=1e-2)
     var_ready = []
     eqs_to_add = copy.deepcopy(model.odes)
     eqs_to_add_dict = {}
 
 
-    var = find_slaves(model, t, ignore=15, epsilon=1e-6)
-    eqs = pruned_equations(model, t, ignore=15, epsilon=1e-6, rho=1)
+
+    var = find_slaves(model, t, ignore=20, epsilon=1e-2)
+    eqs = pruned_equations(model, t, ignore=20, epsilon=1e-2, rho=5)
+    eqs_l = []
     w = mass_conserved(model)[1]
     cycle_eqs = mass_conserved(model)[0]
-    for i in cycle_eqs:
-        eqs.append(i)
-    for i in w: #Adds the variable of s2 cycle, it is required because the solver doesnt know if s2 or C2 is theconstant 
+    
+    for i,j in enumerate(eqs):
+        eqs_l.append(eqs[j])    
+ 
+    for i in w: #Adds the variable of s2 cycle, it is required because the solver doesn't know if s2 or C2 is the constant 
         if len(i) == 1:
-            var.append(i[0])   
+            var.append(i[0])
     for j in var:
         var_ready.append(Symbol(j))
-    sol = solve_poly_system(eqs, var_ready)
+    sol = solve_poly_system(eqs_l, var_ready)
     for i, j in enumerate(var_ready):
-        sol_dict[j] = sol[0][i] 
-
+        sol_dict[j] = sol[0][i]
+    print sol_dict
     for i, j in enumerate(eqs_to_add):
         eqs_to_add_dict[Symbol('s%d'%i)] = j
     for i in slaves:
         del eqs_to_add_dict[Symbol('%s'%i)]
+    print eqs_to_add_dict
         
     eqs_to_add_ready = copy.deepcopy(eqs_to_add_dict)    
 
 #    for i in eqs_to_add_dict: #Changes s2 to (d/dt)s2
 #        eqs_to_add_ready[Symbol('(d/dt)%s'%i)] = eqs_to_add_ready.pop(i)
     for l in eqs_to_add_ready.keys(): #Substitutes the values of the algebraic system
-        for i, j in enumerate(sol_dict): eqs_to_add_ready[l]=eqs_to_add_ready[l].subs(sol_dict.keys()[i], sol_dict.values()[i])
-    
-    return eqs_to_add_ready
+        print l
+        for i, j in enumerate(sol_dict):
+            eqs_to_add_ready[l]=eqs_to_add_ready[l].subs(sol_dict.keys()[i], sol_dict.values()[i])
+    return eqs_to_add_ready 
 
 
 def remove_minus_sign(expr):
@@ -304,10 +300,10 @@ def tropicalization(model):
     tropicalized = {}
     borders = {}
 
-    for i in eqs_for_tropicalization.keys():
-        for par in model.parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters and simplify 
+#    for i in eqs_for_tropicalization.keys():
+#        for par in model.parameters: eqs_for_tropicalization[i] = simplify(eqs_for_tropicalization[i].subs(par.name, par.value)) # Substitute parameters and simplify
 
-    for j in sorted(eqs_for_tropicalization.keys()):
+    for j in eqs_for_tropicalization.keys():
         if type(eqs_for_tropicalization[j]) == Mul: print solve(log(j), dict = True) #If Mul=True there is only one monomial
         elif eqs_for_tropicalization[j] == 0: print 'there are not monomials'
         else:            
@@ -323,6 +319,7 @@ def tropicalization(model):
                 borders[j] = bor  # this adds the arguments of the heaviside functions to the borders dict.    
                 asd +=p
             tropicalized[j] = asd
+    print tropicalized
     return borders, tropicalized    
 
 def visualization(model):
@@ -404,7 +401,5 @@ def diff_equa_to_solve(y, t):
     
     sol = odeint(diff_equa_to_solve, variables0, t)
 
-
-slave_equations(model, t)
-pruned_equations(model, t, ignore=15)
+tropicalization(model)
 
