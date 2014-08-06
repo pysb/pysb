@@ -249,7 +249,7 @@ def diff_alg_system(model):
     eqs_to_add_dict = {}
 
 
-
+ 
     var = find_slaves(model, t, ignore=20, epsilon=1e-2)
     eqs = pruned_equations(model, t, ignore=20, epsilon=1e-2, rho=5)
     eqs_l = []
