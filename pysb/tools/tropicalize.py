@@ -98,7 +98,7 @@ class Tropical:
                 for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
                 trace = y['s%d' % i]
                 for t in range(y.size):
-		    current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
+                    current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
                     if max == None or current > max:
                         max = current
                     if epsilon != None and current > epsilon:
