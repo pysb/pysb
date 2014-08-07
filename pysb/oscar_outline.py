@@ -182,7 +182,6 @@ def slave_equations(model, t, ignore=20, epsilon=1e-2):
 #                 's1': Symbol('k1')*(Symbol('k8')+Symbol('k9'))/(Symbol('k3')*Symbol('k8')*(Symbol('C1')-Symbol('s5')-Symbol('s6'))),
 #                 's4': (Symbol('C1')-Symbol('s5')-Symbol('s6'))*Symbol('k8')/(Symbol('k8')+Symbol('k9'))
 #               } # Stub
-    print slave_conserved_eqs
     return slave_conserved_eqs
 
 def find_nearest(array,value):
@@ -272,14 +271,12 @@ def diff_alg_system(model):
         eqs_to_add_dict[Symbol('s%d'%i)] = j
     for i in slaves:
         del eqs_to_add_dict[Symbol('%s'%i)]
-    print eqs_to_add_dict
         
     eqs_to_add_ready = copy.deepcopy(eqs_to_add_dict)    
 
 #    for i in eqs_to_add_dict: #Changes s2 to (d/dt)s2
 #        eqs_to_add_ready[Symbol('(d/dt)%s'%i)] = eqs_to_add_ready.pop(i)
     for l in eqs_to_add_ready.keys(): #Substitutes the values of the algebraic system
-        print l
         for i, j in enumerate(sol_dict):
             eqs_to_add_ready[l]=eqs_to_add_ready[l].subs(sol_dict.keys()[i], sol_dict.values()[i])
     return eqs_to_add_ready 
@@ -319,7 +316,6 @@ def tropicalization(model):
                 borders[j] = bor  # this adds the arguments of the heaviside functions to the borders dict.    
                 asd +=p
             tropicalized[j] = asd
-    print tropicalized
     return borders, tropicalized    
 
 def visualization(model):
