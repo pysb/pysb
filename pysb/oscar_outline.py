@@ -15,7 +15,7 @@ from sympy.functions.elementary.complexes import Abs
 from sympy import solve_poly_system
 from sympy import log
 from sympy.functions.special.delta_functions import Heaviside
-from sympy import simplify
+from sympy import simplify 
 from sympy import Mul
 from sympy import log
 from collections import defaultdict
