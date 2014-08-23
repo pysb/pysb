@@ -382,7 +382,8 @@ def _parse_netfile(model, lines):
 def _parse_species(model, line):
     """Parse a 'species' line from a BNGL net file."""
     index, species, value = line.strip().split()
-    complex_compartment_name, complex_string = re.match(r'(?:@(\w+)::)?(.*)', species).groups()
+    species_compartment_name, complex_string = re.match(r'(?:@(\w+)::)?(.*)', species).groups()
+    species_compartment = model.compartments.get(species_compartment_name)
     monomer_strings = complex_string.split('.')
     monomer_patterns = []
     for ms in monomer_strings:
@@ -414,22 +415,25 @@ def _parse_species(model, line):
                 site_conditions[site_name] = condition
         monomer = model.monomers[monomer_name]
         monomer_compartment = model.compartments.get(monomer_compartment_name)
-        mp = pysb.core.MonomerPattern(monomer, site_conditions, monomer_compartment)
+        # Compartment prefix notation in BNGL means "assign this compartment to
+        # all molecules without their own explicit compartment".
+        compartment = monomer_compartment or species_compartment
+        mp = pysb.core.MonomerPattern(monomer, site_conditions, compartment)
         monomer_patterns.append(mp)
 
-    complex_compartment = model.compartments.get(complex_compartment_name)
-    cp = pysb.core.ComplexPattern(monomer_patterns, complex_compartment)
+    cp = pysb.core.ComplexPattern(monomer_patterns, None)
     model.species.append(cp)
 
 
 def _parse_reaction(model, line):
     """Parse a 'reaction' line from a BNGL net file."""
-    (number, reactants, products, rate, rule) = line.strip().split()
+    (number, reactants, products, rate, rule) = line.strip().split(' ', 4)
     # the -1 is to switch from one-based to zero-based indexing
     reactants = tuple(int(r) - 1 for r in reactants.split(','))
     products = tuple(int(p) - 1 for p in products.split(','))
     rate = rate.rsplit('*')
-    (rule_name, is_reverse) = re.match(r'#(\w+)(?:\((reverse)\))?', rule).groups()
+    (rule_name, is_reverse, unit_conversion) = re.match(
+                r'#(\w+)(?:\((reverse)\))?(?: unit_conversion=(.*))?', rule).groups()
     is_reverse = bool(is_reverse)
 #             r_names = ['s%d' % r for r in reactants]
     r_names = ['__s%d' % r for r in reactants]
