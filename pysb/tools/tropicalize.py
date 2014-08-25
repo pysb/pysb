@@ -66,7 +66,7 @@ class Tropical:
         if verbose: print "Constructing Graph"
         self.construct_graph()
         if verbose: print "Computing Cycles"
-        self.cycles = [c[0:(len(c)-1)]  for c in networkx.simple_cycles(self.graph) ]
+        self.cycles = list(networkx.simple_cycles(self.graph))
         if verbose: print "Computing Conservation laws"
         (self.conservation, self.conserve_var) = self.mass_conserved()
         if verbose: print "Pruning Equations"
@@ -79,43 +79,54 @@ class Tropical:
         return self
 
     # Compute imposed distances of a model
-    def imposed_distance(self, y, verbose=False, epsilon=None):
+    def imposed_distance(self, y, verbose=False, epsilon):
         distances = []
-
-        symy = FilterNdarray(y) # Create a filtered view of the ode solution, suitable for sympy
+        self.slaves = []
+        a = [] #list of solved polynomial equations
+        b = []
+#        symy = FilterNdarray(y) # Create a filtered view of the ode solution, suitable for sympy
 
         # Loop through all equations (i is equation number)
         for i, eq in enumerate(self.model.odes):
             eq        = eq.subs('s%d' % i, 's%dstar' % i)
             sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
-            max       = None # maximum for a single solution
-            min       = None # Minimum between all possible solution
-
-            # The minimum of the maximum of all possible solutions
-            # Note: It should prefer real solutions over complex, but this isn't coded to do that 
-            #       and the current test case is all complex
             for j in range(len(sol)):  # j is solution j for equation i (mostly likely never greater than 2)
                 for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
-                trace = y['s%d' % i]
-                for t in range(y.size):
-                    current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
-                    if max == None or current > max:
-                        max = current
-                    if epsilon != None and current > epsilon:
-                        break
-                if j==0:
-                    min = max
-                else:
-                    if max < min: min = max
-            distances.append(min)
-            if verbose: print "  * Equation",i," distance =",max
-        return distances
-
-    def find_slaves(self, distances, epsilon):
-        self.slaves = []
-        for i,d in enumerate(distances):
-            if (d != None and d < epsilon): self.slaves.append(i)
+                a.append(sol[j])
+                b.append(i)
+        for k,e in enumerate(a):
+            args = [] #arguments to put in lambdify function
+            variables = [atom for atom in a[k].atoms(Symbol) if not re.match(r'\d',str(atom))]
+            f = sympy.lambdify(variables, a[k], modules = dict(sqrt=numpy.lib.scimath.sqrt) )
+            variables_l = list(variables)
+       # print variables
+        for u,l in enumerate(variables_l):
+            args.append(y[:][str(l)])
+        hey = abs(f(*args) - y[:]['s%d'%b[k]])
+        if hey.max() <= epsilon : self.slaves.append('s%d'%b[k])
+        #print hey.max()                
+                
+#                 
+#                 trace = y['s%d' % i]
+#                 for t in range(y.size):
+#                     current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
+#                     if max == None or current > max:
+#                         max = current
+#                     if epsilon != None and current > epsilon:
+#                         break
+#                 if j==0:
+#                     min = max
+#                 else:
+#                     if max < min: min = max
+#             distances.append(min)
+#             if verbose: print "  * Equation",i," distance =",max
         return self.slaves
+
+#     def find_slaves(self, distances, epsilon):
+#         self.slaves = []
+#         for i,d in enumerate(distances):
+#             if (d != None and d < epsilon): self.slaves.append(i)
+#         return self.slaves
 
     # This is a function which builds the edges according to the nodes
     def r_link(self, graph, s, r, **attrs):
