@@ -8,32 +8,32 @@ from pysb.integrate import odesolve
 from collections    import Mapping
 
 # Helper class to use evalf with a ndarray
-class FilterNdarray(Mapping):
-    def __init__(self, source):
-        self.source = source
-        self.t = 0
-
-    def __getitem__(self, key):
-        # WARNING: This is a monkey patch when evalf sends a number to getitem instead of a symbol
-        try:
-            return self.source[key.name][self.t]
-        except:
-            return key.name
-
-    def __len__(self): return len(self.source)
-
-    def __iter__(self):
-        for key in self.source:
-            yield key
-
-    def set_time(self, t):
-        self.t = t
-        return self
+# class FilterNdarray(Mapping):
+#     def __init__(self, source):
+#         self.source = source
+#         self.t = 0
+# 
+#     def __getitem__(self, key):
+#         # WARNING: This is a monkey patch when evalf sends a number to getitem instead of a symbol
+#         try:
+#             return self.source[key.name][self.t]
+#         except:
+#             return key.name
+# 
+#     def __len__(self): return len(self.source)
+# 
+#     def __iter__(self):
+#         for key in self.source:
+#             yield key
+# 
+#     def set_time(self, t):
+#         self.t = t
+#         return self
 
 class Tropical:
     def __init__(self, model):
         self.model            = model
-        self.t                = None # timerange used
+        self.t                = numpy.linspace(0, 100, 10001) # timerange used
         self.y                = None # odes solution, numpy array
         self.slaves           = None
         self.graph            = None
@@ -49,9 +49,9 @@ class Tropical:
              len(self.cycles),
              id(self))
 
-    def tropicalize(self, t, ignore=1, epsilon=0.1, rho=1, verbose=False):
+    def tropicalize(self, ignore=10, epsilon=0.0001, rho=1, verbose=True):
         if verbose: print "Solving Simulation"
-        self.y = odesolve(self.model, t)
+        self.y = odesolve(self.model, self.t)
     
         # Only concrete species are considered, and the names must be made to match
         names           = [n for n in filter(lambda n: n.startswith('__'), self.y.dtype.names)]
@@ -59,10 +59,8 @@ class Tropical:
         names           = [n.replace('__','') for n in names]
         self.y.dtype    = [(n,'<f8') for n in names]
     
-        if verbose: print "Computing Imposed Distances"
-        # Not saving imposed distance, since it's shortcutting
-        dist = self.imposed_distance(self.y[ignore:], verbose, epsilon)
-        self.find_slaves(dist, epsilon)
+        if verbose: print "Getting slaved species"
+        self.find_slaves(self.y[ignore:], verbose, epsilon)
         if verbose: print "Constructing Graph"
         self.construct_graph()
         if verbose: print "Computing Cycles"
@@ -75,16 +73,15 @@ class Tropical:
 # FIXME: THIS STEP IS BROKEN DUE TO THE ADDITION OF CYCLES
         #if verbose: print "Solving pruned equations"
         #self.sol_pruned = self.solve_pruned()
-    
+        
         return self
 
     # Compute imposed distances of a model
-    def imposed_distance(self, y, verbose=False, epsilon):
+    def find_slaves(self, y, verbose=False, epsilon=None):
         distances = []
         self.slaves = []
         a = [] #list of solved polynomial equations
         b = []
-#        symy = FilterNdarray(y) # Create a filtered view of the ode solution, suitable for sympy
 
         # Loop through all equations (i is equation number)
         for i, eq in enumerate(self.model.odes):
@@ -96,37 +93,20 @@ class Tropical:
                 b.append(i)
         for k,e in enumerate(a):
             args = [] #arguments to put in lambdify function
-            variables = [atom for atom in a[k].atoms(Symbol) if not re.match(r'\d',str(atom))]
+            variables = [atom for atom in a[k].atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
             f = sympy.lambdify(variables, a[k], modules = dict(sqrt=numpy.lib.scimath.sqrt) )
             variables_l = list(variables)
        # print variables
-        for u,l in enumerate(variables_l):
-            args.append(y[:][str(l)])
-        hey = abs(f(*args) - y[:]['s%d'%b[k]])
-        if hey.max() <= epsilon : self.slaves.append('s%d'%b[k])
+            for u,l in enumerate(variables_l):
+                args.append(y[:][str(l)])
+            hey = abs(f(*args) - y[:]['s%d'%b[k]])
+            if hey.max() <= epsilon : self.slaves.append(b[k])
         #print hey.max()                
                 
 #                 
-#                 trace = y['s%d' % i]
-#                 for t in range(y.size):
-#                     current = abs(sol[j].evalf(subs=symy.set_time(t)) - trace[t])
-#                     if max == None or current > max:
-#                         max = current
-#                     if epsilon != None and current > epsilon:
-#                         break
-#                 if j==0:
-#                     min = max
-#                 else:
-#                     if max < min: min = max
-#             distances.append(min)
-#             if verbose: print "  * Equation",i," distance =",max
+
         return self.slaves
 
-#     def find_slaves(self, distances, epsilon):
-#         self.slaves = []
-#         for i,d in enumerate(distances):
-#             if (d != None and d < epsilon): self.slaves.append(i)
-#         return self.slaves
 
     # This is a function which builds the edges according to the nodes
     def r_link(self, graph, s, r, **attrs):
@@ -178,9 +158,9 @@ class Tropical:
     def slave_equations(self):
         if(self.model.odes == None or self.model.odes == []):
             eq = self.model.odes
-        slave_conserved_eqs = []
+        slave_conserved_eqs = {}
         for i, j in enumerate(self.slaves):
-            slave_conserved_eqs.append(self.model.odes[self.slaves[i]])
+            slave_conserved_eqs[j] = self.model.odes[self.slaves[i]]
         return slave_conserved_eqs
 
     def find_nearest_zero(self, array):
@@ -191,10 +171,9 @@ class Tropical:
     def pruned_equations(self, y, rho=1):
         pruned_eqs = self.slave_equations()
         eqs        = copy.deepcopy(pruned_eqs)
-        symy       = FilterNdarray (y)
 
-        for i, eq in enumerate(eqs):
-            ble = eq.as_coefficients_dict().keys() # Get monomials
+        for i, j in enumerate(eqs):
+            ble = eqs[j].as_coefficients_dict().keys() # Get monomials
             for l, m in enumerate(ble): #Compares the monomials to find the pruned system
                 m_ready = m # Monomial to compute with
                 m_elim  = m # Monomial to save
@@ -204,15 +183,26 @@ class Tropical:
                         ble_ready = ble[k+l+1] # Monomial to compute with
                         ble_elim  = ble[k+l+1] # Monomial to save
                         for p in self.model.parameters: ble_ready = ble_ready.subs(p.name, p.value) # Substitute parameters
-                        diff = [m_ready.evalf(subs=symy.set_time(t)) - ble_ready.evalf(subs=symy.set_time(t)) for t in range(y.size)]
-                        diff = self.find_nearest_zero(diff)
-                        #print i, eq, l, m, k, diff
-                        if diff > 0 and abs(diff) > rho:
-                           pruned_eqs[i] = pruned_eqs[i].subs(ble_elim, 0)
-                        if diff < 0 and abs(diff) > rho:
-                           pruned_eqs[i] = pruned_eqs[i].subs(m_elim, 0)
-        for law in self.conservation: #Add the conservation laws to the pruned system
-            pruned_eqs.append(law)
+                        args2 = []
+                        args1 = []
+                        variables_ble_ready = [atom for atom in ble_ready.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
+                        variables_m_ready = [atom for atom in m_ready.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
+                        f_ble = sympy.lambdify(variables_ble_ready, ble_ready, 'numpy' )
+                        f_m = sympy.lambdify(variables_m_ready, m_ready, 'numpy' )
+                        for uu,ll in enumerate(variables_ble_ready):
+                            args2.append(y[:][str(ll)])
+                        for w,s in enumerate(variables_m_ready):
+                            args1.append(y[:][str(s)])
+                        hey_pruned = f_m(*args1) - f_ble(*args2)
+                        diff = self.find_nearest_zero(hey_pruned)
+                        diff_pru = numpy.abs(diff)
+                        if diff > 0 and diff_pru > rho:
+                            pruned_eqs[j] = pruned_eqs[j].subs(ble_elim, 0)
+                        if diff < 0 and diff_pru > rho:\
+                            pruned_eqs[j] = pruned_eqs[j].subs(m_elim, 0)   
+                            
+        for i, l in enumerate(self.conservation): #Add the conservation laws to the pruned system
+            pruned_eqs['cons%d'%i]=l
         self.pruned = pruned_eqs
         return pruned_eqs
 
@@ -283,3 +273,7 @@ def tropicalization(eqs_for_tropicalization):
                 asd +=p
             tropicalized[j] = asd
     return tropicalized
+
+from pysb.examples.tyson_oscillator import model
+tro = Tropical(model)
+tro.tropicalize()

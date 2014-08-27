@@ -157,16 +157,6 @@ def slave_equations(model, t, ignore=20, epsilon=1e-2):
     slave_conserved_eqs = {}
     for i, j in enumerate(slaves):
         slave_conserved_eqs[j] = model.odes[slaves[i]] 
-
-#        slave_conserved_eqs.setdefault(j,[]).append(model.odes[int(re.findall(r'\d+', slaves[i])[0])])
-        
-    # Solve the slave equations here
-    # Stubbed computation
-#    slave_eq = {
-#                 's0': (Symbol('C1')-Symbol('s5')-Symbol('s6'))*Symbol('k9')/(Symbol('k8')+Symbol('k9')),
-#                 's1': Symbol('k1')*(Symbol('k8')+Symbol('k9'))/(Symbol('k3')*Symbol('k8')*(Symbol('C1')-Symbol('s5')-Symbol('s6'))),
-#                 's4': (Symbol('C1')-Symbol('s5')-Symbol('s6'))*Symbol('k8')/(Symbol('k8')+Symbol('k9'))
-#               } # Stub
     print slave_conserved_eqs
     return slave_conserved_eqs
 
@@ -189,7 +179,7 @@ def pruned_equations(model, t, ignore=20, epsilon=1e-2, rho=5):
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
     conservation = mass_conserved(model)[0]
-    pruned_eqs = slave_equations(model, t, ignore=15, epsilon=1e-2)
+    pruned_eqs = slave_equations(model, t)
     eq = copy.deepcopy(pruned_eqs)
     
     for i, j in enumerate(eq):
@@ -384,6 +374,6 @@ def diff_equa_to_solve(y, t):
     
     sol = odeint(diff_equa_to_solve, variables0, t)
 
-# mass_conserved(model)
-#find_slaves(model, t)
+#mass_conserved(model)
+find_slaves(model, t)
 
