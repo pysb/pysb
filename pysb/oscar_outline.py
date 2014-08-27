@@ -48,7 +48,7 @@ generate_equations(model)
 t = numpy.linspace(0, 100, 10001)
 x = odesolve(model, t)
 
-def find_slaves(model, t, ignore=20, epsilon=1e-2):   
+def find_slaves(model, t, ignore=10, epsilon=0.001):   
     slaves = []
     generate_equations(model)
     x = odesolve(model, t)
@@ -59,7 +59,6 @@ def find_slaves(model, t, ignore=20, epsilon=1e-2):
     names = [n.replace('__','') for n in names]
     x.dtype = [(n,'<f8') for n in names]
     a = [] #list of solved polynomial equations
-    c = defaultdict(list)
     b = []
     for i, eq in enumerate(model.odes): # i is equation number
         eq   = eq.subs('s%d' % i, 's%dstar' % i)
@@ -77,16 +76,11 @@ def find_slaves(model, t, ignore=20, epsilon=1e-2):
        # print variables
         for u,l in enumerate(variables_l):
             args.append(x[:][str(l)])
-        hey = abs(numpy.log(f(*args)) - numpy.log(x[:]['s%d'%b[k]]))
-        if hey.max() <= epsilon : slaves.append('s%d'%b[k])
+        hey = abs(f(*args) - x[:]['s%d'%b[k]])
+        if hey.max() <= epsilon : slaves.append(b[k])
         #print hey.max()
 #        c['s%d'%b[k]].append(f(*args))
-    #print slaves
-    
-             
-        
-    
-        
+    print slaves
     return slaves
 
 # The output type may change, as needed for a graph package
@@ -94,7 +88,7 @@ def find_slaves(model, t, ignore=20, epsilon=1e-2):
 
 # This is a function which builds the edges according to the nodes
 def r_link(graph, s, r, **attrs):
-    nodes = ('s%d' % s, 's%d' % r)
+    nodes = (s, r)
     if attrs.get('_flip'):
         del attrs['_flip']
         nodes = reversed(nodes)
@@ -120,19 +114,9 @@ def find_cycles(model):
     graph = networkx.DiGraph(rankdir="LR")
     ic_species = [cp for cp, parameter in model.initial_conditions]
     for i, cp in enumerate(model.species):
-        species_node = 's%d' % i
-        slabel = re.sub(r'% ', r'%\\l', str(cp))
-        slabel += '\\l'
-        color = "#ccffcc"
-        # color species with an initial condition differently
-        if len([s for s in ic_species if s.is_equivalent_to(cp)]):
-            color = "#aaffff"
+        species_node =  i
         graph.add_node(species_node,
-                       label=species_node,
-                       shape="Mrecord",
-                       fillcolor=color, style="filled", color="transparent",
-                       fontsize="12",
-                       margin="0.06,0")
+                       label=species_node)
     for i, reaction in enumerate(model.reactions):       
         reactants = set(reaction['reactants'])
         products = set(reaction['products']) 
@@ -149,18 +133,19 @@ def mass_conserved(model):
     c = find_cycles(model)
     h = []
     g = []
+    print c
     for i, item in enumerate(c):
         b = 0
         u = 0
         for j, specie in enumerate(item):
-            b += model.odes[int(re.findall(r'\d+', c[i][j])[0])]
+            b += model.odes[c[i][j]]
         if b == 0:
             g.append(item)
             for l,k in enumerate(item):
-                u += sympy.Symbol(c[i][l])    
+                u += sympy.Symbol('s%d' % c[i][l])    
             h.append(u-sympy.Symbol('C%d'%i))
-            print 'cycle%d'%i, 'is conserved'
-    #print h,g
+#            print 'cycle%d'%i, 'is conserved'
+    print h,g
             
     return h, g
 
@@ -168,10 +153,10 @@ def mass_conserved(model):
 
 # Large time sink, tropicalization step is needed in here, i.e. maximum
 def slave_equations(model, t, ignore=20, epsilon=1e-2):
-    slaves = find_slaves(model, t, ignore=20, epsilon=1e-2)
+    slaves = find_slaves(model, t)
     slave_conserved_eqs = {}
     for i, j in enumerate(slaves):
-        slave_conserved_eqs[j] = model.odes[int(re.findall(r'\d+', slaves[i])[0])] 
+        slave_conserved_eqs[j] = model.odes[slaves[i]] 
 
 #        slave_conserved_eqs.setdefault(j,[]).append(model.odes[int(re.findall(r'\d+', slaves[i])[0])])
         
@@ -182,6 +167,7 @@ def slave_equations(model, t, ignore=20, epsilon=1e-2):
 #                 's1': Symbol('k1')*(Symbol('k8')+Symbol('k9'))/(Symbol('k3')*Symbol('k8')*(Symbol('C1')-Symbol('s5')-Symbol('s6'))),
 #                 's4': (Symbol('C1')-Symbol('s5')-Symbol('s6'))*Symbol('k8')/(Symbol('k8')+Symbol('k9'))
 #               } # Stub
+    print slave_conserved_eqs
     return slave_conserved_eqs
 
 def find_nearest(array,value):
@@ -266,7 +252,7 @@ def diff_alg_system(model):
     sol = solve_poly_system(eqs_l, var_ready)
     for i, j in enumerate(var_ready):
         sol_dict[j] = sol[0][i]
-    print sol_dict
+#    print sol_dict
     for i, j in enumerate(eqs_to_add):
         eqs_to_add_dict[Symbol('s%d'%i)] = j
     for i in slaves:
@@ -316,6 +302,7 @@ def tropicalization(model):
                 borders[j] = bor  # this adds the arguments of the heaviside functions to the borders dict.    
                 asd +=p
             tropicalized[j] = asd
+#    print tropicalized
     return borders, tropicalized    
 
 def visualization(model):
@@ -397,5 +384,6 @@ def diff_equa_to_solve(y, t):
     
     sol = odeint(diff_equa_to_solve, variables0, t)
 
-tropicalization(model)
+# mass_conserved(model)
+#find_slaves(model, t)
 
