@@ -38,7 +38,7 @@ from sympy import lambdify
 
 from pysb.bng import generate_equations
 from pysb.integrate import odesolve
-from pysb.examples.tyson_oscillator_harris import model
+from pysb.examples.tyson_oscillator import model
 import numpy
 from sympy import sqrt
 import matplotlib.pyplot as plt
