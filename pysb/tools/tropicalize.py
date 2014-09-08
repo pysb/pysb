@@ -49,7 +49,7 @@ class Tropical:
              len(self.cycles),
              id(self))
 
-    def tropicalize(self, ignore=10, epsilon=0.0001, rho=1, verbose=True):
+    def tropicalize(self, ignore=10, epsilon=0.0001, rho=0.001, verbose=True):
         if verbose: print "Solving Simulation"
         self.y = odesolve(self.model, self.t)
     
@@ -71,9 +71,13 @@ class Tropical:
         self.pruned = self.pruned_equations(self.y[ignore:], rho)
 
 # FIXME: THIS STEP IS BROKEN DUE TO THE ADDITION OF CYCLES
-        #if verbose: print "Solving pruned equations"
-        #self.sol_pruned = self.solve_pruned()
-        
+        if verbose: print "Solving pruned equations"
+        self.sol_pruned = self.solve_pruned()
+        if verbose: print "equation to tropicalize"
+        self.eqs_for_tropicalization = self.equations_to_tropicalize()
+        if verbose: print "Getting tropicalized equations"
+        self.tropical_eqs = self.final_tropicalization()
+        print self.tropical_eqs
         return self
 
     # Compute imposed distances of a model
@@ -209,24 +213,31 @@ class Tropical:
     def solve_pruned(self):
         solve_for = copy.deepcopy(self.slaves)
         eqs       = copy.deepcopy(self.pruned)
-
+        eqs_l = []
+        sol_dict = {}
+        for i in eqs.keys():
+            eqs_l.append(eqs[i])
+#         for j in range(len(eqs_l)):  # j is solution j for equation i
+#             for p in model.parameters: eqs_l[j] = eqs_l[j].subs(p.name, p.value)
         # Locate single protein conserved (s2 in tyson, the solver now knows what is constant)
         for i in self.conserve_var:
             if len(i) == 1:
                 solve_for.append(i[0])
         variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
-        sol = sympy.solve_poly_system(eqs, variables)
-        
+        sol = sympy.solve(eqs_l, variables)
+        print eqs
+        print sol
         # This if 'effed right here! @$%#@$%@#$%@#$%!!!!
         self.sol_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
+        
         return self.sol_pruned
 
     def equations_to_tropicalize(self):
-        idx = list( set(range(len(self.model.odes))) - set(self.solve_pruned.keys()) )
+        idx = list(set(range(len(self.model.odes))) - set(self.sol_pruned.keys()))
         eqs = { i:self.model.odes[i] for i in idx }
 
         for l in eqs.keys(): #Substitutes the values of the algebraic system
-            for k in self.solved_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.solved_pruned[k])
+            for k in self.sol_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.sol_pruned[k])
 
         for i in eqs.keys():
             for par in self.model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
@@ -253,7 +264,6 @@ class Tropical:
                 tropicalized[j] = asd
 
         self.tropical_eqs = tropicalized
-
         return tropicalized
 
 def tropicalization(eqs_for_tropicalization):
@@ -275,5 +285,7 @@ def tropicalization(eqs_for_tropicalization):
     return tropicalized
 
 from pysb.examples.tyson_oscillator import model
+#from earm.lopez_embedded import model
 tro = Tropical(model)
 tro.tropicalize()
+#tro.final_tropicalization()
