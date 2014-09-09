@@ -49,7 +49,7 @@ class Tropical:
              len(self.cycles),
              id(self))
 
-    def tropicalize(self, ignore=10, epsilon=0.0001, rho=0.001, verbose=True):
+    def tropicalize(self, ignore=10, epsilon=2, rho=3, verbose=True):
         if verbose: print "Solving Simulation"
         self.y = odesolve(self.model, self.t)
     
@@ -58,9 +58,11 @@ class Tropical:
         self.y          = self.y[names]
         names           = [n.replace('__','') for n in names]
         self.y.dtype    = [(n,'<f8') for n in names]
+
     
         if verbose: print "Getting slaved species"
         self.find_slaves(self.y[ignore:], verbose, epsilon)
+        print self.find_slaves(self.y[ignore:], verbose, epsilon)
         if verbose: print "Constructing Graph"
         self.construct_graph()
         if verbose: print "Computing Cycles"
@@ -77,8 +79,9 @@ class Tropical:
         self.eqs_for_tropicalization = self.equations_to_tropicalize()
         if verbose: print "Getting tropicalized equations"
         self.tropical_eqs = self.final_tropicalization()
-        print self.tropical_eqs
-        return self
+        self.range_dominating_monomials()
+        
+        return 
 
     # Compute imposed distances of a model
     def find_slaves(self, y, verbose=False, epsilon=None):
@@ -208,6 +211,7 @@ class Tropical:
         for i, l in enumerate(self.conservation): #Add the conservation laws to the pruned system
             pruned_eqs['cons%d'%i]=l
         self.pruned = pruned_eqs
+        print self.pruned
         return pruned_eqs
 
     def solve_pruned(self):
@@ -224,9 +228,8 @@ class Tropical:
             if len(i) == 1:
                 solve_for.append(i[0])
         variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
-        sol = sympy.solve(eqs_l, variables)
-        print eqs
-        print sol
+        
+        sol = sympy.solve(eqs_l, variables)  
         # This if 'effed right here! @$%#@$%@#$%@#$%!!!!
         self.sol_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
         
@@ -250,7 +253,7 @@ class Tropical:
         tropicalized = {}
         
         for j in sorted(self.eqs_for_tropicalization.keys()):
-            if type(self.eqs_for_tropicalization[j]) == sympy.Mul: print sympy.solve(sympy.log(j), dict = True) #If Mul=True there is only one monomial
+            if type(self.eqs_for_tropicalization[j]) == sympy.Mul: print  sympy.solve(sympy.log(j), dict = True) #If Mul=True there is only one monomial
             elif self.eqs_for_tropicalization[j] == 0: print 'there are no monomials'
             else:            
                 ar = self.eqs_for_tropicalization[j].args #List of the terms of each equation  
@@ -266,23 +269,9 @@ class Tropical:
         self.tropical_eqs = tropicalized
         return tropicalized
 
-def tropicalization(eqs_for_tropicalization):
-    tropicalized = {}
-
-    for j in sorted(eqs_for_tropicalization.keys()):
-        if type(eqs_for_tropicalization[j]) == sympy.Mul: print sympy.solve(sympy.log(j), dict = True) #If Mul=True there is only one monomial
-        elif eqs_for_tropicalization[j] == 0: print 'there are not monomials'
-        else:            
-            ar = eqs_for_tropicalization[j].args #List of the terms of each equation  
-            asd=0 
-            for l, k in enumerate(ar):
-                p = k
-                for f, h in enumerate(ar):
-                   if k != h:
-                      p *= sympy.Heaviside(sympy.log(abs(k)) - sympy.log(abs(h)))
-                asd +=p
-            tropicalized[j] = asd
-    return tropicalized
+    def range_dominating_monomials(self):
+        tropical_system = self.final_tropicalization()
+        print tropical_system
 
 from pysb.examples.tyson_oscillator import model
 #from earm.lopez_embedded import model
