@@ -266,26 +266,29 @@ class Tropical:
         self.tropical_eqs = tropicalized
         return tropicalized
 
+
     def range_dominating_monomials(self):
         tropical_system = self.final_tropicalization()
+        monomial_ranges = {}
         print tropical_system
         for i in tropical_system.keys():
            yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
            for j in yuju: #j is a monomial of tropical_system[i]
+               j_old = copy.deepcopy(j)
+               monomial_ranges[j_old] = []
                args1 = []
                concentrations = []
                var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'[0-9-C-k]',str(atom))] #Variables of monomial j
                for k in range(len(var_to_study)):
-                   concentrations.append(numpy.linspace(0,2,3))
-               comb = list(itertools.product(*concentrations)) #all possible combinations of concentrations
+                   concentrations.append(numpy.linspace(0.1,10,100))
+               comb = list(itertools.product(*concentrations)) #all possible combinations of concentration            
                comb_array = numpy.array(comb).transpose()
                for par in self.model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
-               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 1))
-               print j, var_to_study
+               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 0.123))
                f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=sympy.Heaviside, log=sympy.log, Abs=sympy.Abs) )
-               for u in range(len(var_to_study)):
-                   args1.append(comb_array[u][:])
-               f1(*args1)
+               for co in range(len(comb)):
+                   if f1(*comb[co]) != 0: monomial_ranges[j_old].append(comb[co])
+
                
                
                
