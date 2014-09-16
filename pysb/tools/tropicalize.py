@@ -4,6 +4,7 @@ import re
 import copy
 import numpy
 import sympy.parsing.sympy_parser
+import itertools
 from pysb.integrate import odesolve
 from collections    import Mapping
 
@@ -62,7 +63,6 @@ class Tropical:
     
         if verbose: print "Getting slaved species"
         self.find_slaves(self.y[ignore:], verbose, epsilon)
-        print self.find_slaves(self.y[ignore:], verbose, epsilon)
         if verbose: print "Constructing Graph"
         self.construct_graph()
         if verbose: print "Computing Cycles"
@@ -71,8 +71,6 @@ class Tropical:
         (self.conservation, self.conserve_var) = self.mass_conserved()
         if verbose: print "Pruning Equations"
         self.pruned = self.pruned_equations(self.y[ignore:], rho)
-
-# FIXME: THIS STEP IS BROKEN DUE TO THE ADDITION OF CYCLES
         if verbose: print "Solving pruned equations"
         self.sol_pruned = self.solve_pruned()
         if verbose: print "equation to tropicalize"
@@ -98,20 +96,18 @@ class Tropical:
                 for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
                 a.append(sol[j])
                 b.append(i)
-        for k,e in enumerate(a):
-            args = [] #arguments to put in lambdify function
+        for k,e in enumerate(a):    # a is the list of solution of polinomial equations, b is the list of differential equations
+            args = [] #arguments to put in the lambdify function
             variables = [atom for atom in a[k].atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
             f = sympy.lambdify(variables, a[k], modules = dict(sqrt=numpy.lib.scimath.sqrt) )
-            variables_l = list(variables)
-       # print variables
-            for u,l in enumerate(variables_l):
+#            variables_l = list(variables)
+            for u,l in enumerate(variables):
                 args.append(y[:][str(l)])
+            print args[0].shape
             hey = abs(f(*args) - y[:]['s%d'%b[k]])
             if hey.max() <= epsilon : self.slaves.append(b[k])
         #print hey.max()                
                 
-#                 
-
         return self.slaves
 
 
@@ -211,7 +207,6 @@ class Tropical:
         for i, l in enumerate(self.conservation): #Add the conservation laws to the pruned system
             pruned_eqs['cons%d'%i]=l
         self.pruned = pruned_eqs
-        print self.pruned
         return pruned_eqs
 
     def solve_pruned(self):
@@ -221,9 +216,11 @@ class Tropical:
         sol_dict = {}
         for i in eqs.keys():
             eqs_l.append(eqs[i])
+            
 #         for j in range(len(eqs_l)):  # j is solution j for equation i
 #             for p in model.parameters: eqs_l[j] = eqs_l[j].subs(p.name, p.value)
         # Locate single protein conserved (s2 in tyson, the solver now knows what is constant)
+        
         for i in self.conserve_var:
             if len(i) == 1:
                 solve_for.append(i[0])
@@ -242,8 +239,8 @@ class Tropical:
         for l in eqs.keys(): #Substitutes the values of the algebraic system
             for k in self.sol_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.sol_pruned[k])
 
-        for i in eqs.keys():
-            for par in self.model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
+#         for i in eqs.keys():
+#             for par in self.model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
 
         self.eqs_for_tropicalization = eqs
 
@@ -272,6 +269,35 @@ class Tropical:
     def range_dominating_monomials(self):
         tropical_system = self.final_tropicalization()
         print tropical_system
+        for i in tropical_system.keys():
+           yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
+           for j in yuju: #j is a monomial of tropical_system[i]
+               args1 = []
+               concentrations = []
+               var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'[0-9-C-k]',str(atom))] #Variables of monomial j
+               for k in range(len(var_to_study)):
+                   concentrations.append(numpy.linspace(0,2,3))
+               comb = list(itertools.product(*concentrations)) #all possible combinations of concentrations
+               comb_array = numpy.array(comb).transpose()
+               for par in self.model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
+               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 1))
+               print j, var_to_study
+               f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=sympy.Heaviside, log=sympy.log, Abs=sympy.Abs) )
+               for u in range(len(var_to_study)):
+                   args1.append(comb_array[u][:])
+               f1(*args1)
+               
+               
+               
+              
+            
+#          concentrations = []
+#          for q in tropical_system.keys():
+#              variables_to_study = [atom for atom in tropical_system[q].atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
+#              for i in range(len(variables_to_study)):
+#                  concentrations.append(numpy.linspace(0,100,101))
+#             
+            
 
 from pysb.examples.tyson_oscillator import model
 #from earm.lopez_embedded import model
