@@ -5,31 +5,10 @@ import copy
 import numpy
 import sympy.parsing.sympy_parser
 import itertools
+import matplotlib.pyplot as plt
 from pysb.integrate import odesolve
 from collections    import Mapping
 
-# Helper class to use evalf with a ndarray
-# class FilterNdarray(Mapping):
-#     def __init__(self, source):
-#         self.source = source
-#         self.t = 0
-# 
-#     def __getitem__(self, key):
-#         # WARNING: This is a monkey patch when evalf sends a number to getitem instead of a symbol
-#         try:
-#             return self.source[key.name][self.t]
-#         except:
-#             return key.name
-# 
-#     def __len__(self): return len(self.source)
-# 
-#     def __iter__(self):
-#         for key in self.source:
-#             yield key
-# 
-#     def set_time(self, t):
-#         self.t = t
-#         return self
 
 class Tropical:
     def __init__(self, model):
@@ -77,7 +56,7 @@ class Tropical:
         self.eqs_for_tropicalization = self.equations_to_tropicalize()
         if verbose: print "Getting tropicalized equations"
         self.tropical_eqs = self.final_tropicalization()
-        self.range_dominating_monomials()
+        self.range_dominating_monomials(self.y)
         
         return 
 
@@ -103,7 +82,6 @@ class Tropical:
 #            variables_l = list(variables)
             for u,l in enumerate(variables):
                 args.append(y[:][str(l)])
-            print args[0].shape
             hey = abs(f(*args) - y[:]['s%d'%b[k]])
             if hey.max() <= epsilon : self.slaves.append(b[k])
         #print hey.max()                
@@ -267,27 +245,38 @@ class Tropical:
         return tropicalized
 
 
-    def range_dominating_monomials(self):
+    def range_dominating_monomials(self, y):
         tropical_system = self.final_tropicalization()
         monomial_ranges = {}
-        print tropical_system
         for i in tropical_system.keys():
            yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
-           for j in yuju: #j is a monomial of tropical_system[i]
+           for q, j in enumerate(yuju): #j is a monomial of tropical_system[i]
                j_old = copy.deepcopy(j)
+               x_points = []
+               prueba_y = []
                monomial_ranges[j_old] = []
                args1 = []
                concentrations = []
                var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'[0-9-C-k]',str(atom))] #Variables of monomial j
-               for k in range(len(var_to_study)):
-                   concentrations.append(numpy.linspace(0.1,10,100))
-               comb = list(itertools.product(*concentrations)) #all possible combinations of concentration            
-               comb_array = numpy.array(comb).transpose()
+#                for k in range(len(var_to_study)):
+#                    concentrations.append(numpy.linspace(0.1,10,100))
+#                comb = list(itertools.product(*concentrations)) #all possible combinations of concentration            
+#                comb_array = numpy.array(comb).transpose()
                for par in self.model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
-               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 0.123))
+               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 15))
                f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=sympy.Heaviside, log=sympy.log, Abs=sympy.Abs) )
-               for co in range(len(comb)):
-                   if f1(*comb[co]) != 0: monomial_ranges[j_old].append(comb[co])
+               for ti in self.t:
+                   arg_f1 = []
+                   for va in var_to_study:
+                       arg_f1.append(y[ti][str(va)])
+                   if f1(*arg_f1) != 0: 
+                       x_points.append(ti) #monomial_ranges[j_old].append(comb[co])
+                       prueba_y.append(mon)
+               plt.scatter(x_points,prueba_y, hold=True)
+#               plt.axis([0,x_points[len(x_points)-1],0,prueba_y[]])
+        plt.show() 
+                        
+                   
 
                
                
