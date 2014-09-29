@@ -6,14 +6,15 @@ import numpy
 import sympy.parsing.sympy_parser
 import itertools
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from pysb.integrate import odesolve
-from collections    import Mapping
+from collections    import Mapping 
 
 
 class Tropical:
     def __init__(self, model):
         self.model            = model
-        self.t                = numpy.linspace(0, 100, 10001) # timerange used
+        self.t                = numpy.linspace(0, 100, 1001) # timerange used
         self.y                = None # odes solution, numpy array
         self.slaves           = None
         self.graph            = None
@@ -39,7 +40,6 @@ class Tropical:
         names           = [n.replace('__','') for n in names]
         self.y.dtype    = [(n,'<f8') for n in names]
 
-    
         if verbose: print "Getting slaved species"
         self.find_slaves(self.y[ignore:], verbose, epsilon)
         if verbose: print "Constructing Graph"
@@ -56,7 +56,7 @@ class Tropical:
         self.eqs_for_tropicalization = self.equations_to_tropicalize()
         if verbose: print "Getting tropicalized equations"
         self.tropical_eqs = self.final_tropicalization()
-        self.range_dominating_monomials(self.y)
+        self.range_dominating_monomials(self.y[1:])
         
         return 
 
@@ -83,8 +83,7 @@ class Tropical:
             for u,l in enumerate(variables):
                 args.append(y[:][str(l)])
             hey = abs(f(*args) - y[:]['s%d'%b[k]])
-            if hey.max() <= epsilon : self.slaves.append(b[k])
-        #print hey.max()                
+            if hey.max() <= epsilon : self.slaves.append(b[k])            
                 
         return self.slaves
 
@@ -203,16 +202,22 @@ class Tropical:
             if len(i) == 1:
                 solve_for.append(i[0])
         variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
-        
-        sol = sympy.solve(eqs_l, variables)  
+        sol = sympy.solve(eqs_l, variables)
+        if len(sol) == 0:
+            self.sol_pruned = { j:sympy.Symbol('s%d'%j) for i, j in enumerate(solve_for) }
+        else:
+            self.sol_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
         # This if 'effed right here! @$%#@$%@#$%@#$%!!!!
-        self.sol_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
+        
+        
         
         return self.sol_pruned
 
     def equations_to_tropicalize(self):
         idx = list(set(range(len(self.model.odes))) - set(self.sol_pruned.keys()))
         eqs = { i:self.model.odes[i] for i in idx }
+        
+        
 
         for l in eqs.keys(): #Substitutes the values of the algebraic system
             for k in self.sol_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.sol_pruned[k])
@@ -245,37 +250,50 @@ class Tropical:
         return tropicalized
 
 
-    def range_dominating_monomials(self, y):
+    def range_dominating_monomials(self, y):  
         tropical_system = self.final_tropicalization()
-        monomial_ranges = {}
+        print tropical_system
+        count = 0
+        monomials = []
+        colors = iter(cm.rainbow(numpy.linspace(0, 1, len(y))))
         for i in tropical_system.keys():
            yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
            for q, j in enumerate(yuju): #j is a monomial of tropical_system[i]
+
+               monomials.append('s%d'%i + '--->' + str(j)[:15])
+               y_pos = numpy.arange(1,len(monomials)+1)
+               count = count + 1
                j_old = copy.deepcopy(j)
                x_points = []
                prueba_y = []
-               monomial_ranges[j_old] = []
                args1 = []
                concentrations = []
-               var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'[0-9-C-k]',str(atom))] #Variables of monomial j
-#                for k in range(len(var_to_study)):
-#                    concentrations.append(numpy.linspace(0.1,10,100))
-#                comb = list(itertools.product(*concentrations)) #all possible combinations of concentration            
-#                comb_array = numpy.array(comb).transpose()
+               print j
+               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 100))
+               j = sympy.simplify(j.subs(sympy.Symbol('C2'), 0))
+               print j
                for par in self.model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
-               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 15))
+               var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))] #Variables of monomial 
+ #              j = sympy.simplify(j.subs(sympy.Symbol('C0'), 100))
                f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=sympy.Heaviside, log=sympy.log, Abs=sympy.Abs) )
-               for ti in self.t:
+               for ti in range(len(self.t)-1):
                    arg_f1 = []
                    for va in var_to_study:
-                       arg_f1.append(y[ti][str(va)])
+
+                       arg_f1.append(y[ti][str(va)])    
                    if f1(*arg_f1) != 0: 
-                       x_points.append(ti) #monomial_ranges[j_old].append(comb[co])
-                       prueba_y.append(mon)
-               plt.scatter(x_points,prueba_y, hold=True)
+                       x_points.append(self.t[ti]) 
+                       prueba_y.append(count)
+                       
+               plt.scatter(x_points,prueba_y, color = next(colors) )
+               plt.yticks(y_pos, monomials)
+        plt.show()
+        
+        
+
 #               plt.axis([0,x_points[len(x_points)-1],0,prueba_y[]])
-        plt.show() 
-                        
+
+        
                    
 
                
