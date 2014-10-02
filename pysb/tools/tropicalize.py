@@ -14,13 +14,14 @@ from collections    import Mapping
 class Tropical:
     def __init__(self, model):
         self.model            = model
-        self.t                = numpy.linspace(0, 100, 1001) # timerange used
+        self.t                = numpy.linspace(0, 100, 10001) # timerange used
         self.y                = None # odes solution, numpy array
         self.slaves           = None
         self.graph            = None
         self.cycles           = []
         self.conservation     = None
         self.conserve_var     = None
+        self.value_conservation = {}
         self.full_names       = {}
 
     def __repr__(self):
@@ -33,6 +34,7 @@ class Tropical:
     def tropicalize(self, ignore=10, epsilon=2, rho=3, verbose=True):
         if verbose: print "Solving Simulation"
         self.y = odesolve(self.model, self.t)
+
     
         # Only concrete species are considered, and the names must be made to match
         names           = [n for n in filter(lambda n: n.startswith('__'), self.y.dtype.names)]
@@ -47,7 +49,7 @@ class Tropical:
         if verbose: print "Computing Cycles"
         self.cycles = list(networkx.simple_cycles(self.graph))
         if verbose: print "Computing Conservation laws"
-        (self.conservation, self.conserve_var) = self.mass_conserved()
+        (self.conservation, self.conserve_var, self.value_conservation) = self.mass_conserved(self.y[ignore:])
         if verbose: print "Pruning Equations"
         self.pruned = self.pruned_equations(self.y[ignore:], rho)
         if verbose: print "Solving pruned equations"
@@ -56,7 +58,7 @@ class Tropical:
         self.eqs_for_tropicalization = self.equations_to_tropicalize()
         if verbose: print "Getting tropicalized equations"
         self.tropical_eqs = self.final_tropicalization()
-        self.range_dominating_monomials(self.y[1:])
+        self.range_dominating_monomials(self.y[ignore:])
         
         return 
 
@@ -116,11 +118,12 @@ class Tropical:
         return self.graph
 
     #This function finds conservation laws from the conserved cycles
-    def mass_conserved(self, verbose=False):
+    def mass_conserved(self, y, verbose=False):
         if(self.model.odes == None or self.model.odes == []):
             pysb.bng.generate_equations(self.model)
         h = [] # Array to hold conservation equation
         g = [] # Array to hold corresponding lists of free variables in conservation equations
+        value_constants = {} #Dictionary that storage the value of each constant
         for i, item in enumerate(self.cycles):
             b = 0
             u = 0
@@ -132,8 +135,16 @@ class Tropical:
                     u += sympy.Symbol('s%d' % self.cycles[i][l])    
                 h.append(u-sympy.Symbol('C%d'%i))
                 if verbose: print '  cycle%d'%i, 'is conserved'
-        (self.conservation, self.conserve_var) = h,g
-        return h, g
+        
+        for i in h:
+            constant_to_solve = [atom for atom in i.atoms(sympy.Symbol) if re.match(r'[C]',str(atom))]
+            solution = sympy.solve(i, constant_to_solve ,implicit = True)
+            solution_ready = solution[0]
+            for q in solution_ready.atoms(sympy.Symbol): solution_ready = solution_ready.subs(q, y[0][str(q)])
+            value_constants[constant_to_solve[0]] = solution_ready
+            
+        (self.conservation, self.conserve_var, self.value_conservation) = h, g, value_constants     
+        return h, g, value_constants
 
     def slave_equations(self):
         if(self.model.odes == None or self.model.odes == []):
@@ -203,12 +214,13 @@ class Tropical:
                 solve_for.append(i[0])
         variables =  [sympy.Symbol('s%d' %var) for var in solve_for ]
         sol = sympy.solve(eqs_l, variables)
+
         if len(sol) == 0:
             self.sol_pruned = { j:sympy.Symbol('s%d'%j) for i, j in enumerate(solve_for) }
         else:
             self.sol_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
+
         # This if 'effed right here! @$%#@$%@#$%@#$%!!!!
-        
         
         
         return self.sol_pruned
@@ -217,14 +229,14 @@ class Tropical:
         idx = list(set(range(len(self.model.odes))) - set(self.sol_pruned.keys()))
         eqs = { i:self.model.odes[i] for i in idx }
         
-        
+        print eqs
 
         for l in eqs.keys(): #Substitutes the values of the algebraic system
-            for k in self.sol_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.sol_pruned[k])
-
+#             for k in self.sol_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.sol_pruned[k])
+            for q in self.value_conservation.keys(): eqs[l] = eqs[l].subs(q, self.value_conservation[q])
+        print eqs
 #         for i in eqs.keys():
 #             for par in self.model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
-
         self.eqs_for_tropicalization = eqs
 
         return eqs
@@ -268,18 +280,15 @@ class Tropical:
                prueba_y = []
                args1 = []
                concentrations = []
-               print j
                j = sympy.simplify(j.subs(sympy.Symbol('C0'), 100))
                j = sympy.simplify(j.subs(sympy.Symbol('C2'), 0))
-               print j
                for par in self.model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
                var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))] #Variables of monomial 
  #              j = sympy.simplify(j.subs(sympy.Symbol('C0'), 100))
                f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=sympy.Heaviside, log=sympy.log, Abs=sympy.Abs) )
-               for ti in range(len(self.t)-1):
+               for ti in range(len(self.t)-10):
                    arg_f1 = []
                    for va in var_to_study:
-
                        arg_f1.append(y[ti][str(va)])    
                    if f1(*arg_f1) != 0: 
                        x_points.append(self.t[ti]) 
@@ -287,6 +296,7 @@ class Tropical:
                        
                plt.scatter(x_points,prueba_y, color = next(colors) )
                plt.yticks(y_pos, monomials)
+        plt.xlim(0, 100)
         plt.show()
         
         
@@ -309,8 +319,8 @@ class Tropical:
 #             
             
 
-from pysb.examples.tyson_oscillator import model
-#from earm.lopez_embedded import model
+#from pysb.examples.tyson_oscillator import model
+from earm.lopez_embedded import model
 tro = Tropical(model)
 tro.tropicalize()
 #tro.final_tropicalization()
