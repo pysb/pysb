@@ -78,7 +78,6 @@ class Tropical:
                 for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value)    # Substitute parameters
                 a.append(sol[j])
                 b.append(i)
-                print i,j
         for k,e in enumerate(a):    # a is the list of solution of polinomial equations, b is the list of differential equations
             args = []               #arguments to put in the lambdify function
             variables = [atom for atom in a[k].atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
@@ -267,7 +266,7 @@ class Tropical:
            plt.subplot(311)
            yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
            for q, j in enumerate(yuju):                            #j is a monomial of tropical_system[i]
-               monomials.append('s%d'%i + '--->' + str(j).partition('*Heaviside')[0])
+               monomials.append(str(j).partition('*Heaviside')[0])
                y_pos = numpy.arange(1,len(monomials)+1, 1)
                count = len(monomials)
                arg_f1 = []
@@ -289,14 +288,28 @@ class Tropical:
                plt.scatter(x_points, prueba_y, color = next(colors) )
                plt.xlim(0, self.t[len(self.t)-1])
                plt.ylim(0, len(yuju)+1)
-               plt.title('Tropicalization' + ' ' + str(self.model.species[i]) )
+               plt.title('Tropicalization' + ' ' + str(self.model.species[i]) )               
            plt.yticks(y_pos, monomials)
+           
            plt.subplot(312)
-           plt.plot(self.t[1:], mols_time)
+           
+           plt.plot(self.t[1:], mols_time, '*-')
            for i in vertical:
-               plt.axvline(x=i, color = 'r')
+               plt.axvline(x=i, color = 'r')     
+                                
+           for ii in monomials:
+               arg_test = []
+               test = sympy.sympify(ii)
+               for par in self.model.parameters: test = sympy.simplify(test.subs(par.name, par.value))
+               var_test = [atom for atom in test.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
+               print test, var_test
+               f_test = sympy.lambdify(var_test, test, 'numpy')
+               for v in var_test:
+                   arg_test.append(y[:][str(v)])
+               plt.plot(self.t[1:], f_test(*arg_test))               
            plt.xlabel('time')
            plt.ylabel('molecules/second')
+
            
            plt.subplot(313)
            all_variables_ready = list(set([item for sublist in all_variables for item in sublist]))
