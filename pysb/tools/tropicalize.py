@@ -9,13 +9,17 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from pysb.integrate import odesolve
 from collections    import Mapping 
+from matplotlib.backends.backend_pdf import PdfPages
 
+
+def Heaviside_num(x):
+    return 0.5*(numpy.sign(x)+1)
 
 class Tropical:
     def __init__(self, model):
         self.model            = model
-        self.t                = numpy.linspace(0, 100, 10001) # timerange used
-        self.y                = None # odes solution, numpy array
+        self.t                = numpy.linspace(0, 20000, 20001)          # timerange used
+        self.y                = None                                     # odes solution, numpy array
         self.slaves           = None
         self.graph            = None
         self.cycles           = []
@@ -31,17 +35,16 @@ class Tropical:
              len(self.cycles),
              id(self))
 
-    def tropicalize(self, ignore=10, epsilon=2, rho=3, verbose=True):
+    def tropicalize(self, ignore=1, epsilon=2, rho=3, verbose=True):
         if verbose: print "Solving Simulation"
         self.y = odesolve(self.model, self.t)
-
-    
+        
         # Only concrete species are considered, and the names must be made to match
         names           = [n for n in filter(lambda n: n.startswith('__'), self.y.dtype.names)]
         self.y          = self.y[names]
         names           = [n.replace('__','') for n in names]
-        self.y.dtype    = [(n,'<f8') for n in names]
-
+        self.y.dtype    = [(n,'<f8') for n in names]    
+          
         if verbose: print "Getting slaved species"
         self.find_slaves(self.y[ignore:], verbose, epsilon)
         if verbose: print "Constructing Graph"
@@ -62,26 +65,24 @@ class Tropical:
         
         return 
 
-    # Compute imposed distances of a model
     def find_slaves(self, y, verbose=False, epsilon=None):
-        distances = []
         self.slaves = []
-        a = [] #list of solved polynomial equations
-        b = []
+        a = []               # list of solved polynomial equations
+        b = []               # b is the list of differential equations   
 
         # Loop through all equations (i is equation number)
         for i, eq in enumerate(self.model.odes):
             eq        = eq.subs('s%d' % i, 's%dstar' % i)
-            sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i)) # Find equation of imposed trace
-            for j in range(len(sol)):  # j is solution j for equation i (mostly likely never greater than 2)
-                for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value) # Substitute parameters
+            sol       = sympy.solve(eq, sympy.Symbol('s%dstar' % i))        # Find equation of imposed trace
+            for j in range(len(sol)):        # j is solution j for equation i (mostly likely never greater than 2)
+                for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value)    # Substitute parameters
                 a.append(sol[j])
                 b.append(i)
+                print i,j
         for k,e in enumerate(a):    # a is the list of solution of polinomial equations, b is the list of differential equations
-            args = [] #arguments to put in the lambdify function
+            args = []               #arguments to put in the lambdify function
             variables = [atom for atom in a[k].atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
             f = sympy.lambdify(variables, a[k], modules = dict(sqrt=numpy.lib.scimath.sqrt) )
-#            variables_l = list(variables)
             for u,l in enumerate(variables):
                 args.append(y[:][str(l)])
             hey = abs(f(*args) - y[:]['s%d'%b[k]])
@@ -205,9 +206,6 @@ class Tropical:
         for i in eqs.keys():
             eqs_l.append(eqs[i])
             
-#         for j in range(len(eqs_l)):  # j is solution j for equation i
-#             for p in model.parameters: eqs_l[j] = eqs_l[j].subs(p.name, p.value)
-        # Locate single protein conserved (s2 in tyson, the solver now knows what is constant)
         
         for i in self.conserve_var:
             if len(i) == 1:
@@ -219,22 +217,16 @@ class Tropical:
             self.sol_pruned = { j:sympy.Symbol('s%d'%j) for i, j in enumerate(solve_for) }
         else:
             self.sol_pruned = { j:sol[0][i] for i, j in enumerate(solve_for) }
-
-        # This if 'effed right here! @$%#@$%@#$%@#$%!!!!
-        
-        
+       
         return self.sol_pruned
 
     def equations_to_tropicalize(self):
         idx = list(set(range(len(self.model.odes))) - set(self.sol_pruned.keys()))
         eqs = { i:self.model.odes[i] for i in idx }
-        
-        print eqs
 
         for l in eqs.keys(): #Substitutes the values of the algebraic system
 #             for k in self.sol_pruned.keys(): eqs[l]=eqs[l].subs(sympy.Symbol('s%d' % k), self.sol_pruned[k])
             for q in self.value_conservation.keys(): eqs[l] = eqs[l].subs(q, self.value_conservation[q])
-        print eqs
 #         for i in eqs.keys():
 #             for par in self.model.parameters: eqs[i] = sympy.simplify(eqs[i].subs(par.name, par.value))
         self.eqs_for_tropicalization = eqs
@@ -262,65 +254,112 @@ class Tropical:
         return tropicalized
 
 
-    def range_dominating_monomials(self, y):  
+    def range_dominating_monomials(self, y): 
         tropical_system = self.final_tropicalization()
-        print tropical_system
-        count = 0
-        monomials = []
-        colors = iter(cm.rainbow(numpy.linspace(0, 1, len(y))))
-        for i in tropical_system.keys():
+        colors = itertools.cycle(["b", "g", "c", "m", "y", "k" ])
+        for i in tropical_system.keys():                            # i = Name of species tropicalized
+           all_variables = [] 
+           count = 0
+           monomials = []
+           vertical = []
+           mols_time = numpy.zeros(20000)
+           plt.figure(1)
+           plt.subplot(311)
            yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
-           for q, j in enumerate(yuju): #j is a monomial of tropical_system[i]
-
-               monomials.append('s%d'%i + '--->' + str(j)[:15])
-               y_pos = numpy.arange(1,len(monomials)+1)
-               count = count + 1
-               j_old = copy.deepcopy(j)
-               x_points = []
-               prueba_y = []
-               args1 = []
-               concentrations = []
-               j = sympy.simplify(j.subs(sympy.Symbol('C0'), 100))
-               j = sympy.simplify(j.subs(sympy.Symbol('C2'), 0))
+           for q, j in enumerate(yuju):                            #j is a monomial of tropical_system[i]
+               monomials.append('s%d'%i + '--->' + str(j).partition('*Heaviside')[0])
+               y_pos = numpy.arange(1,len(monomials)+1, 1)
+               count = len(monomials)
+               arg_f1 = []
                for par in self.model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
                var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))] #Variables of monomial 
- #              j = sympy.simplify(j.subs(sympy.Symbol('C0'), 100))
-               f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=sympy.Heaviside, log=sympy.log, Abs=sympy.Abs) )
-               for ti in range(len(self.t)-10):
-                   arg_f1 = []
-                   for va in var_to_study:
-                       arg_f1.append(y[ti][str(va)])    
-                   if f1(*arg_f1) != 0: 
-                       x_points.append(self.t[ti]) 
-                       prueba_y.append(count)
-                       
-               plt.scatter(x_points,prueba_y, color = next(colors) )
-               plt.yticks(y_pos, monomials)
-        plt.xlim(0, 100)
-        plt.show()
-        
-        
+               all_variables.append(var_to_study)
+               f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=Heaviside_num, log=numpy.log, Abs=numpy.abs)) 
+               for va in var_to_study:
+                   arg_f1.append(y[:][str(va)])    
+               x_concentration = numpy.nonzero(f1(*arg_f1))[0].tolist() # Gives the positions of nonzero numbers
+               if len(x_concentration) > 0: vertical.append(x_concentration[-1])
+               for ij in range(len(x_concentration)-1):
+                   if x_concentration[ij] == x_concentration[ij+1]-1:
+                      pass
+                   else: vertical.append(x_concentration[ij])
+               mols_time = mols_time + f1(*arg_f1)
+               x_points = [self.t[x] for x in x_concentration] 
+               prueba_y = numpy.repeat(count, len(x_points))
+               plt.scatter(x_points, prueba_y, color = next(colors) )
+               plt.xlim(0, self.t[len(self.t)-1])
+               plt.ylim(0, len(yuju)+1)
+               plt.title('Tropicalization' + ' ' + str(self.model.species[i]) )
+           plt.yticks(y_pos, monomials)
+           plt.subplot(312)
+           plt.plot(self.t[1:], mols_time)
+           for i in vertical:
+               plt.axvline(x=i, color = 'r')
+           plt.xlabel('time')
+           plt.ylabel('molecules/second')
+           
+           plt.subplot(313)
+           all_variables_ready = list(set([item for sublist in all_variables for item in sublist]))
+           for w in all_variables_ready:
+               plt.plot(self.t[1:],y[:][str(w)], label=str(w) + '=' + str(model.species[int(re.findall(r'[0-9]', str(w))[0])]) )
+               plt.xlim(0, self.t[len(self.t)-1])
+               plt.xlabel('time')
+               plt.ylabel('Number of molecules')
+               for i in vertical:
+                   plt.axvline(x=i, color = 'r')
+               lgd = plt.legend(bbox_to_anchor=(0.5,-0.5), loc='lower center', ncol=3)
+           plt.show()
+#           plt.savefig('s%d'%i, bbox_extra_artists=(lgd,), bbox_inches='tight', dpi=800)      
+           plt.clf()
 
-#               plt.axis([0,x_points[len(x_points)-1],0,prueba_y[]])
+# This prints all the species in a model
+#         for i in range(len(self.model.species)):
+#             plt.plot(self.t[10:],y[:]['s%d'%i], label=str(self.model.species[i]))
+#             plt.xlabel('time')
+#             plt.ylabel('Number of molecules')
+#             plt.title('Tyson cycle')
+#         plt.show()
+             
 
-        
-                   
-
-               
-               
-               
-              
-            
-#          concentrations = []
-#          for q in tropical_system.keys():
-#              variables_to_study = [atom for atom in tropical_system[q].atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
-#              for i in range(len(variables_to_study)):
-#                  concentrations.append(numpy.linspace(0,100,101))
-#             
-            
 
 #from pysb.examples.tyson_oscillator import model
 from earm.lopez_embedded import model
 tro = Tropical(model)
 tro.tropicalize()
+#tro.final_tropicalization() 
+
+######################################################################## Change of parameters
+"""
 #tro.final_tropicalization()
+rate_params = model.parameters_rules()
+param_values = numpy.array([p.value for p in model.parameters])
+rate_mask = numpy.array([p in rate_params for p in model.parameters])
+k_ids = [p.value for p in model.parameters_rules()]
+position = numpy.log10(param_values[rate_mask])
+t=  numpy.linspace(0, 100, 1001)
+import pysb
+solver = pysb.integrate.Solver(model,t,integrator='vode')
+solver.run(param_values)
+plt.figure(1)
+plt.subplot(212)
+plt.plot(t,solver.y[:,5],'o-',label = 'before')
+nummol = numpy.copy(solver.y[40:41].T.reshape(6))
+for i in numpy.linspace(0.1,1,5):
+
+    #Y=np.copy(x)
+    #param_values[rate_mask] = 10 ** Y
+
+    rate_params = model.parameters_rules()
+    param_values = numpy.array([p.value for p in model.parameters])
+    rate_mask = numpy.array([p in rate_params for p in model.parameters])
+    k_ids = [p.value for p in model.parameters_rules()]
+    param_values[6] = param_values[6]*i
+
+    solver.run(param_values,y0=nummol)
+    plt.plot(t[41:],solver.y[:-41,5],'x-',label=str(i))
+    plt.legend(loc=0)
+    plt.tight_layout()
+    plt.title('k4p')
+    #plt.b
+plt.show()
+"""
