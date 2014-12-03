@@ -130,7 +130,7 @@ def _parse_bng_outfile(out_filename):
     return arr
 
 
-def run_ssa(model, tspan, output_dir='/tmp', output_file_basename=None, cleanup=True, verbose=False, n_runs=1, **additional_args):
+def run_ssa(model, tspan, param_values=None, output_dir='/tmp', output_file_basename=None, cleanup=True, verbose=False, n_runs=1, **additional_args):
     """
     Simulate a model with BNG's SSA simulator and return the trajectories.
 
@@ -158,7 +158,7 @@ def run_ssa(model, tspan, output_dir='/tmp', output_file_basename=None, cleanup=
         Additional arguments to pass to BioNetGen
 
     """
-    ssa_args = "sample_times=>%s" % str(list(tspan))
+    ssa_args = "t_start=>%s,sample_times=>%s" % (str(tspan[0]),str(list(tspan)))
     for key,val in additional_args.items(): ssa_args += ", %s=>%s" % (key,"\""+str(val)+"\"" if isinstance(val,str) else str(val))
     if verbose: ssa_args += ", verbose=>1"
         
@@ -183,6 +183,12 @@ end actions
     run_ssa_code += "end actions\n"
     '''
     #####
+    
+    if param_values is not None:
+        if len(param_values) != len(model.parameters):
+            raise Exception("param_values must be the same length as model.parameters")
+        for i in range(len(param_values)):
+            model.parameters[i].value = param_values[i]
     
     gen = BngGenerator(model)
     if output_file_basename is None:

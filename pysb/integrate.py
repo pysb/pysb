@@ -164,9 +164,9 @@ class Solver(object):
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
         
-# #        help(self.integrator)
-#         for i in range(len(self.integrator.__dict__['_integrator'].__dict__.keys())):
-#             print self.integrator.__dict__['_integrator'].__dict__.items()[i][0], ": ", self.integrator.__dict__['_integrator'].__dict__.items()[i][1]
+#         help(self.integrator)
+#         for (key, val) in self.integrator.__dict__['_integrator'].__dict__.items():
+#             print key, ": ", val
 #         quit()
 
     def run(self, param_values=None, y0=None):
