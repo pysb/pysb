@@ -3,9 +3,9 @@ from pysb.macros import *
 
 model = Model('Tyson1991')
 
-NA = Parameter("NA", 6.0221413e23)
-V = Parameter("VOL", 1e-20)
-NA_V = NA.value*V.value
+Parameter("NA", 6.0221413e23)
+Parameter("VOL", 1e-20)
+NA_V = NA.value*VOL.value
 
 Parameter('k1', 0.015*NA_V)
 # Parameter('k1', 0.015)
@@ -50,8 +50,10 @@ cyclin(Y='P', b=1) % cdc2(Y='U', b=1) + cyclin(Y='P', b=2) % cdc2(Y='U', b=2) + 
 # Rule 6
 #Rule('Dissociation', cyclin(Y='P', b=1) % cdc2(Y='U', b=1) >> cyclin(Y='P', b=None) + cdc2(Y='U', b=None), k6)
 Rule('Dissociation', cyclin(Y='P', b=1) % cdc2(Y='U', b=1) >> cdc2(Y='U', b=None), k6)
+
 # Rule 7
 #degrade(cyclin(Y='P', b=None), k7)
+
 # Rule 8 and 9
 equilibrate(cdc2(Y='U', b=None), cdc2(Y='P', b=None), [k8, k9])
 
