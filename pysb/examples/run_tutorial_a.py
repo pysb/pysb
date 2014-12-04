@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+"""Run the first example in the tutorial and print the results."""
+
 from pysb.integrate import Solver
 from tutorial_a import model
 
