@@ -40,7 +40,6 @@ at https://github.com/pysb/pysb.git\n""" % rv_filename)
                     'pysb.export', 'pysb.testing'],
           scripts=['scripts/pysb_export'],
           requires=['numpy', 'scipy', 'sympy'],
-          cmdclass = {'test': test},
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
             'Development Status :: 4 - Beta',
@@ -54,22 +53,6 @@ at https://github.com/pysb/pysb.git\n""" % rv_filename)
             'Topic :: Scientific/Engineering :: Mathematics',
             ],
           )
-
-class test(distutils.cmd.Command):
-    description = "run tests (requires nose)"
-    user_options = []
-    def initialize_options(self):
-        pass
-    def finalize_options(self):
-        pass
-    def run(self):
-        import nose
-        from nose.plugins.manager import DefaultPluginManager
-        excludes = [r'^examples$', r'^deprecated$']
-        config = nose.config.Config(exclude=map(re.compile, excludes),
-                                    plugins=DefaultPluginManager(),
-                                    env=os.environ)
-        nose.run(defaultTest='pysb', config=config, argv=['', '--with-doctest'])
 
 class GitError(Exception):
     pass

@@ -1,0 +1,13 @@
+language: python
+python:
+  - "2.7"
+virtualenv:
+  system_site_packages: true
+before_install:
+  - sudo apt-get install python-numpy python-scipy python-matplotlib
+install:
+  - pip install sympy
+  - wget http://bionetgen.googlecode.com/files/BioNetGen-2.2.5-stable.zip
+  - unzip BioNetGen-2.2.5-stable.zip
+  - sudo ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
+script: nosetests
