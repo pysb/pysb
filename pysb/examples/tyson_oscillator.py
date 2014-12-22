@@ -50,9 +50,11 @@ cyclin(Y='P', b=1) % cdc2(Y='U', b=1) + cyclin(Y='P', b=2) % cdc2(Y='U', b=2) + 
 # Rule 6
 #Rule('Dissociation', cyclin(Y='P', b=1) % cdc2(Y='U', b=1) >> cyclin(Y='P', b=None) + cdc2(Y='U', b=None), k6)
 Rule('Dissociation', cyclin(Y='P', b=1) % cdc2(Y='U', b=1) >> cdc2(Y='U', b=None), k6)
+
 # Rule 7
 #degrade(cyclin(Y='P', b=None), k7)
-# Rule 8 and 9
+
+# Rules 8 and 9
 equilibrate(cdc2(Y='U', b=None), cdc2(Y='P', b=None), [k8, k9])
 
 Observable("YT", cyclin()) # Total Cyclin
