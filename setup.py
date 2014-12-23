@@ -18,7 +18,7 @@ def main():
           author_email='jmuhlich@bitflood.org',
           url='http://pysb.org/',
           packages=['pysb', 'pysb.generator', 'pysb.tools', 'pysb.examples',
-                    'pysb.export', 'pysb.testing'],
+                    'pysb.export', 'pysb.testing', 'pysb.tests'],
           scripts=['scripts/pysb_export'],
           requires=['numpy', 'scipy', 'sympy'],
           keywords=['systems', 'biology', 'model', 'rules'],
