@@ -318,7 +318,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     >>> print yfull[0:4, 1:3]
     Traceback (most recent call last):
       ...
-    IndexError: too many indices
+    IndexError: too many indices for array
     >>> yarray = yfull.view(float).reshape(len(yfull), -1)
     >>> print yarray.shape
     (10, 6)
