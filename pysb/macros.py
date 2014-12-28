@@ -604,18 +604,25 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
             #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
             i = 0
             identical_monomers = []
+            other_monomers = []
             for mon in s1.monomer_patterns:
                 #Only change the binding site for the first monomer that matches.  Keep any others unchanged to add to final complex that is returned.
-                if mon.monomer.name == m1.monomer.name:
+                if mon.monomer.name == m1.monomer.name and mon.site_conditions==m1.site_conditions:
                     i += 1
                     if i == 1:
-                        s1complexpatub = m1({site1:None})
-                        s1complexpatb = m1({site1:50})
+                        s1complexpatub = mon({site1:None})
+                        s1complexpatb = mon({site1:50})
                     else:
                         identical_monomers.append(mon)
+                else:
+                    other_monomers.append(mon)
+            
+            #Throw an error if no monomer pattern in the complex matched the pattern given for m1
+            if i == 0:
+                raise ValueError("No monomer pattern in complex '%s' matches the pattern given for m1, '%s'." % (s1, m1))
+                    
             #Build up ComplexPattern for use in rule (with state of given binding site on m1 specified).
-            for mon in s1.monomer_patterns:
-                if mon.monomer.name != m1.monomer.name:
+            for mon in other_monomers:
                     s1complexpatub %= mon
                     s1complexpatb %= mon
             if identical_monomers:
@@ -633,18 +640,22 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         
     #If no complexes given, revert to normal bind macro.
     if (isinstance(s1, MonomerPattern) or isinstance(s1, Monomer)) and (isinstance(s2, MonomerPattern) or isinstance(s2, Monomer)):
+        #print 'two monomers'
         _verify_sites(s1, site1)
         _verify_sites(s2, site2)
         return bind(s1, site1, s2, site2, klist)
 
     #Create rules if only one complex or the other is present.
     elif isinstance(s1, ComplexPattern) and (isinstance(s2, MonomerPattern) or isinstance(s2, Monomer)):
+        #print 's1=complex and s2=monomer'
         return comp_mono_func(s1, site1, s2, site2, m1)
     elif (isinstance(s1, MonomerPattern) or isinstance(s1, Monomer)) and isinstance(s2, ComplexPattern):
+        #print 's1=monomer and s2=complex'
         return comp_mono_func(s2, site2, s1, site1, m2)
     
     #Create rule when both s1 and s2 are complexes.    
     else:
+        #print 'two complexes'
         _verify_sites_complex(s1, site1)
         _verify_sites_complex(s2, site2)
         #Retrieve a dictionary specifiying the MonomerPattern within the complex that contains the given binding site.
@@ -668,10 +679,18 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
                 if isinstance(stateint, int):
                     if stateint > maxint:
                         maxint = stateint
+        match = 'N'
         for monomer in s2.monomer_patterns:
+            if m2 != None:
+                if m2.site_conditions == monomer.site_conditions and m2.monomer.name == monomer.monomer.name:
+                    match = 'Y'        
             for site, stateint in monomer.site_conditions.items():
                 if isinstance(stateint, int):
                     monomer.site_conditions[site] += maxint
+            if match == 'Y':
+                m2.site_conditions = monomer.site_conditions
+            match = 'N'
+            
         #Actually create rules
         s1complexpatub, s1complexpatb = check_sites_comp_build(s1, site1, m1, specsitesdict1)
         s2complexpatub, s2complexpatb = check_sites_comp_build(s2, site2, m2, specsitesdict2)
