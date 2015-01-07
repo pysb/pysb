@@ -26,7 +26,7 @@ def serialize_component_list(model, filename):
     """
 
     f = open(filename, 'w')
-    pickle.dump(model.all_components().values(), f)
+    pickle.dump(list(model.all_components().values()), f)
     f.close()
 
 def check_model_against_component_list(model, component_list):
@@ -48,8 +48,9 @@ def check_model_against_component_list(model, component_list):
            "%d components." % \
            (model.name, len(model.all_components().values()), len(component_list))
 
+    model_components = list(model.all_components().values())
     for i, comp in enumerate(component_list):
-        model_comp_str = repr(model.all_components().values()[i])
+        model_comp_str = repr(model_components[i])
         comp_str = repr(comp) 
         assert comp_str == model_comp_str, \
                "Model %s does not match reference version: " \
