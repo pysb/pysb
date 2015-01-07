@@ -302,7 +302,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     >>> from numpy import linspace
     >>> numpy.set_printoptions(precision=4)
     >>> yfull = odesolve(model, linspace(0, 40, 10))
-    >>> print yfull['A_total']   #doctest: +NORMALIZE_WHITESPACE
+    >>> print yfull['A_total']             #doctest: +NORMALIZE_WHITESPACE
     [ 1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
     0.7158]
 
@@ -312,13 +312,13 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
 
     >>> print yfull.shape
     (10,)
-    >>> print yfull.dtype   #doctest: +NORMALIZE_WHITESPACE
+    >>> print yfull.dtype                  #doctest: +NORMALIZE_WHITESPACE
     [('__s0', '<f8'), ('__s1', '<f8'), ('__s2', '<f8'), ('A_total', '<f8'),
     ('B_total', '<f8'), ('C_total', '<f8')]
-    >>> print yfull[0:4, 1:3]
+    >>> print yfull[0:4, 1:3]              #doctest: +ELLIPSIS
     Traceback (most recent call last):
       ...
-    IndexError: too many indices for array
+    IndexError: too many indices...
     >>> yarray = yfull.view(float).reshape(len(yfull), -1)
     >>> print yarray.shape
     (10, 6)
