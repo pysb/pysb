@@ -13,6 +13,12 @@ try:
     reload
 except NameError:
     from imp import reload
+try:
+    basestring
+except NameError:
+    # Under Python 3, do not pretend that bytes are a valid string
+    basestring = str
+    long = int
 
 def Initial(*args):
     """Declare an initial condition (see Model.initial)."""
