@@ -6,7 +6,7 @@ import sympy
 import re
 import sys
 import os
-from StringIO import StringIO
+from io import StringIO
 
 
 def run(model):
