@@ -504,10 +504,11 @@ class ComplexPattern(object):
         #   so some sort of canonicalization of that numbering is necessary.
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
-        return \
-            self.compartment == other.compartment and \
-            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in self.monomer_patterns) == \
-            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in other.monomer_patterns)
+        return (self.compartment == other.compartment and
+                sorted((repr(mp.monomer), mp.site_conditions, mp.compartment)
+                       for mp in self.monomer_patterns) ==
+                sorted((repr(mp.monomer), mp.site_conditions, mp.compartment)
+                       for mp in other.monomer_patterns))
 
     def copy(self):
         """
