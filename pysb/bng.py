@@ -7,7 +7,10 @@ import re
 import itertools
 import sympy
 import numpy
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 
 # Cached value of BNG path
