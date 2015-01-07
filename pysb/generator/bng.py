@@ -138,7 +138,7 @@ class BngGenerator(object):
 
 def format_monomer_site(monomer, site):
     ret = site
-    if monomer.site_states.has_key(site):
+    if site in monomer.site_states:
         for state in monomer.site_states[site]:
             ret += '~' + state
     return ret
