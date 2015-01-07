@@ -32,6 +32,7 @@ Analysis: An Introduction, J. Walsh, ed., Academic Press, 1966, pp. 178-182.
 # which integrates the system and plots the trajectories.
 
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -75,7 +76,7 @@ if __name__ == '__main__':
     substitutions.update(('s%d' % i, 'y%d' % (i+1))
                          for i in range(len(model.odes)))
 
-    print __doc__, "\n", model, "\n"
+    print(__doc__, "\n", model, "\n")
 
     # Iterate over each equation
     for i, eq in enumerate(model.odes):
@@ -83,9 +84,9 @@ if __name__ == '__main__':
         # mappings we built above
         eq_sub = eq.subs(substitutions)
         # Display the equation
-        print 'y%d\' = %s' % (i+1, eq_sub)
+        print('y%d\' = %s' % (i+1, eq_sub))
 
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid. Please see\n" \
-        "run_robertson.py for example usage."
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid. Please see run_robertson.py for example usage.""")

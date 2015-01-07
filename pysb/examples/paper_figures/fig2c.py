@@ -1,5 +1,6 @@
 """Elements for Figure 2C from the PySB publication"""
 
+from __future__ import print_function
 from pysb import *
 from pysb.macros import bind_table
 from pysb.bng import generate_network, generate_equations
@@ -53,13 +54,13 @@ generate_equations(model)
 num_rules = len(model.rules)
 num_odes = len(model.odes)
 
-print "BNGL Rules"
-print "=========="
-print num_rules, "rules"
-print
-print "ODEs"
-print "===="
-print num_odes, "ODEs"
+print("BNGL Rules")
+print("==========")
+print(num_rules, "rules")
+print()
+print("ODEs")
+print("====")
+print(num_odes, "ODEs")
 
 def test_fig2c():
     assert num_rules == 28, "number of rules not as expected"

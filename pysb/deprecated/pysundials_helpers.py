@@ -1,3 +1,4 @@
+from __future__ import print_function
 from scipy.integrate._ode import IntegratorBase
 from pysundials import cvode as _cvode, nvecserial
 import ctypes
@@ -64,7 +65,7 @@ class cvode(IntegratorBase):
         flag = _cvode.CVode(self.cvode_mem, t1, self.y, tret, _cvode.CV_NORMAL)
         if flag < 0:
             self.success = 0
-            print "cvodes error: %d (see SUNDIALS manual for more information)" % flag
+            print("cvodes error: %d (see SUNDIALS manual for more information)" % flag)
         return (self.y, t1)
 
 IntegratorBase.integrator_classes.append(cvode)

@@ -4,6 +4,7 @@ bax_pore_sequential.py). Inhibition of pore formation by Mcl-1 is also
 implemented.
 """
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -61,8 +62,8 @@ Observable('BAX4_inh', BAX(inh=ANY, t1=1, t2=3) % BAX(t1=4, t2=1) % BAX(t1=2, t2
 
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid. Please see\n" \
-        "run_bax_pore.py for example usage."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid. Please see run_bax_pore.py for example usage.""")

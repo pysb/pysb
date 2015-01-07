@@ -1,5 +1,6 @@
 """Produce contact map for Figure 5D from the PySB publication"""
 
+from __future__ import print_function
 import pysb.integrate
 import pysb.util
 import numpy as np
@@ -58,11 +59,11 @@ def objective_func(x, rate_mask, lb, ub):
     if caller_func in {'anneal', '_minimize_anneal'}:
         caller_locals = caller_frame.f_locals
         if caller_locals['n'] == 1:
-            print caller_locals['best_state'].cost, caller_locals['current_state'].cost
+            print(caller_locals['best_state'].cost, caller_locals['current_state'].cost)
         
     # Apply hard bounds
     if np.any((x < lb) | (x > ub)):
-        print "bounds-check failed"
+        print("bounds-check failed")
         return np.inf
 
     # Simulate model with rates taken from x (which is log transformed)
@@ -167,7 +168,7 @@ def estimate(start_values=None):
 
     # Display annealing results
     for v in ('xmin', 'Jmin', 'Tfinal', 'feval', 'iters', 'accept', 'retval'):
-        print "%s: %s" % (v, locals()[v])
+        print("%s: %s" % (v, locals()[v]))
 
     return params_estimated
 

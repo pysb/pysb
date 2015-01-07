@@ -3,6 +3,7 @@
 # Bug-fixes and changes by Carlos Lopez 2012
 #
 
+from __future__ import print_function
 import numpy
 from numpy import asarray, tan, exp, ones, squeeze, sign, \
      all, log, sqrt, pi, shape, array, minimum, where
@@ -51,9 +52,9 @@ class base_schedule(object):
         x0 : array
             The starting parameters vector.
         """
-        print "============================================================"
-        print "FINDING INITIAL TEMPERATURE WITH A COEFF OF VARIANCE OF", self.cvar
-        print "============================================================"
+        print("============================================================")
+        print("FINDING INITIAL TEMPERATURE WITH A COEFF OF VARIANCE OF", self.cvar)
+        print("============================================================")
 
         assert(not self.dims is None)
         lrange = self.lower
@@ -63,7 +64,7 @@ class base_schedule(object):
         fmin = _double_max
         x0 = best_state.x
         for _ in range(self.Ninit):
-            print "sampling T step:", _
+            print("sampling T step:", _)
             samp = squeeze(random.uniform(0, 1, size=self.dims)) - 0.5
             samp = samp/0.5
             varx0 = x0 * samp * cvar # random number within the cvar range
@@ -78,9 +79,9 @@ class base_schedule(object):
                 best_state.x = array(x0)
 
         self.T0 = (fmax-fmin)*1.5
-        print "================================="
-        print "SET INITIAL TEMPERATURE TO:", self.T0
-        print "================================="
+        print("=================================")
+        print("SET INITIAL TEMPERATURE TO:", self.T0)
+        print("=================================")
         return best_state.x
 
     def accept_test(self, dE):
@@ -295,9 +296,9 @@ def anneal(func, x0, args=(), schedule='fast', full_output=0,
             retval = 0
             if abs(af[-1]-best_state.cost) > feps*10:
                 retval = 5
-                print "Warning: Cooled to %f at %s but this is not" \
-                      % (squeeze(last_state.cost), str(squeeze(last_state.x))) \
-                      + " the smallest point found."
+                print("Warning: Cooled to %f at %s but this is not "
+                      "the smallest point found."
+                      % (squeeze(last_state.cost), squeeze(last_state.x)))
             break
         if (Tf is not None) and (schedule.T < Tf):
             retval = 1
@@ -306,7 +307,7 @@ def anneal(func, x0, args=(), schedule='fast', full_output=0,
             retval = 2
             break
         if (iters > maxiter):
-            print "Warning: Maximum number of iterations exceeded."
+            print("Warning: Maximum number of iterations exceeded.")
             retval = 3
             break
         if (maxaccept is not None) and (schedule.accepted > maxaccept):
@@ -325,12 +326,12 @@ if __name__ == "__main__":
     from numpy import cos
     # minimum expected at ~-0.195
     func = lambda x: cos(14.5*x-0.3) + (x+0.2)*x
-    print anneal(func,1.0,full_output=1,upper=3.0,lower=-3.0,feps=1e-4,maxiter=2000,schedule='cauchy')
-    print anneal(func,1.0,full_output=1,upper=3.0,lower=-3.0,feps=1e-4,maxiter=2000,schedule='fast')
-    print anneal(func,1.0,full_output=1,upper=3.0,lower=-3.0,feps=1e-4,maxiter=2000,schedule='boltzmann')
+    print(anneal(func,1.0,full_output=1,upper=3.0,lower=-3.0,feps=1e-4,maxiter=2000,schedule='cauchy'))
+    print(anneal(func,1.0,full_output=1,upper=3.0,lower=-3.0,feps=1e-4,maxiter=2000,schedule='fast'))
+    print(anneal(func,1.0,full_output=1,upper=3.0,lower=-3.0,feps=1e-4,maxiter=2000,schedule='boltzmann'))
 
     # minimum expected at ~[-0.195, -0.1]
     func = lambda x: cos(14.5*x[0]-0.3) + (x[1]+0.2)*x[1] + (x[0]+0.2)*x[0]
-    print anneal(func,[1.0, 1.0],full_output=1,upper=[3.0, 3.0],lower=[-3.0, -3.0],feps=1e-4,maxiter=2000,schedule='cauchy')
-    print anneal(func,[1.0, 1.0],full_output=1,upper=[3.0, 3.0],lower=[-3.0, -3.0],feps=1e-4,maxiter=2000,schedule='fast')
-    print anneal(func,[1.0, 1.0],full_output=1,upper=[3.0, 3.0],lower=[-3.0, -3.0],feps=1e-4,maxiter=2000,schedule='boltzmann')
+    print(anneal(func,[1.0, 1.0],full_output=1,upper=[3.0, 3.0],lower=[-3.0, -3.0],feps=1e-4,maxiter=2000,schedule='cauchy'))
+    print(anneal(func,[1.0, 1.0],full_output=1,upper=[3.0, 3.0],lower=[-3.0, -3.0],feps=1e-4,maxiter=2000,schedule='fast'))
+    print(anneal(func,[1.0, 1.0],full_output=1,upper=[3.0, 3.0],lower=[-3.0, -3.0],feps=1e-4,maxiter=2000,schedule='boltzmann'))

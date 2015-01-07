@@ -1,3 +1,4 @@
+from __future__ import print_function as _
 import pysb.core
 from pysb.generator.bng import BngGenerator
 import os
@@ -162,7 +163,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp',
                                 os.getpid(), random.randint(0, 100000))
 
     if os.path.exists(output_file_basename + '.bngl'):
-        print "WARNING! File %s already exists!" % (output_file_basename + '.bngl')
+        print("WARNING! File %s.bngl already exists!" % output_file_basename)
         output_file_basename += '_1'
 
     bng_filename = output_file_basename + '.bngl'
@@ -184,7 +185,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp',
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip("at line")+"\n"+p_err.rstrip())
-        print "Wrote " + gdat_filename # FIXME
+        print("Wrote " + gdat_filename) # FIXME
         output_arr = _parse_bng_outfile(gdat_filename)
         #ssa_file = open(ssa_filename, 'r')
         #output.write(ssa_file.read())
