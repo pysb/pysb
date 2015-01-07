@@ -9,7 +9,10 @@ import weakref
 import copy
 import itertools
 import sympy
-
+try:
+    reload
+except NameError:
+    from imp import reload
 
 def Initial(*args):
     """Declare an initial condition (see Model.initial)."""
