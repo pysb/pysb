@@ -9,6 +9,11 @@ import sympy
 import re
 import itertools
 
+def _exec(code, locals):
+    # This is function call under Python 3, and a statement with a
+    # tuple under Python 2. The effect should be the same.
+    exec(code, locals)
+
 # some sane default options for a few well-known integrators
 default_integrator_options = {
     'vode': {
@@ -117,7 +122,7 @@ class Solver(object):
             if Solver._use_inline:
                 inline(code_eqs, ['ydot', 't', 'y', 'p']);
             else:
-                exec code_eqs_py in locals()
+                _exec(code_eqs_py, locals())
             return ydot
 
         # build integrator options list from our defaults and any kwargs passed
