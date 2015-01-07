@@ -2,8 +2,13 @@ import pysb.core
 import pysb.bng
 import numpy
 from scipy.integrate import ode
-from scipy.weave import inline
-import scipy.weave.build_tools
+try:
+    from scipy.weave import inline
+except ImportError:
+    inline = None
+else:
+    import scipy.weave.build_tools
+
 import distutils.errors
 import sympy
 import re
@@ -81,8 +86,9 @@ class Solver(object):
         if not hasattr(Solver, '_use_inline'):
             Solver._use_inline = False
             try:
-                inline('int i;', force=1)
-                Solver._use_inline = True
+                if inline is not None:
+                    inline('int i;', force=1)
+                    Solver._use_inline = True
             except (scipy.weave.build_tools.CompileError,
                     distutils.errors.CompileError, ImportError):
                 pass
