@@ -8,6 +8,10 @@ import distutils.errors
 import sympy
 import re
 import itertools
+try:
+    from future_builtins import zip
+except ImportError:
+    pass
 
 # some sane default options for a few well-known integrators
 default_integrator_options = {
@@ -211,8 +215,8 @@ class Solver(object):
         self.jac = numpy.zeros((len(model.odes), len(model.species)))
         # Initialize record array for observable timecourses
         if len(model.observables):
-            self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
-                                                      itertools.repeat(float)))
+            self.yobs = numpy.ndarray(len(tspan), list(zip(model.observables.keys(),
+                                                      itertools.repeat(float))))
         else:
             self.yobs = numpy.ndarray((len(tspan), 0))
         # Initialize view of observables record array
@@ -220,8 +224,8 @@ class Solver(object):
         # Initialize array for expression timecourses
         exprs = model.expressions_dynamic()
         if len(exprs):
-            self.yexpr = numpy.ndarray(len(tspan), zip(exprs.keys(),
-                                                       itertools.repeat(float)))
+            self.yexpr = numpy.ndarray(len(tspan), list(zip(exprs.keys(),
+                                                       itertools.repeat(float))))
         else:
             self.yexpr = numpy.ndarray((len(tspan), 0))
 
@@ -421,7 +425,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     solver.run(param_values, y0)
 
     species_names = ['__s%d' % i for i in range(solver.y.shape[1])]
-    yfull_dtype = zip(species_names, itertools.repeat(float))
+    yfull_dtype = list(zip(species_names, itertools.repeat(float)))
     if len(solver.yobs.dtype):
         yfull_dtype += solver.yobs.dtype.descr
     yfull = numpy.ndarray(len(solver.y), yfull_dtype)

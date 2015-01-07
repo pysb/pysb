@@ -21,6 +21,10 @@ import random
 import re
 import sympy
 import numpy as np
+try:
+    from future_builtins import zip
+except ImportError:
+    pass
 
 def run_simulation(model, **kwargs):
     """Runs the given model using KaSim and returns the parsed results.
@@ -321,7 +325,7 @@ def parse_kasim_outfile(out_filename):
             else: column_names.append(raw_name)
 
         # Create the dtype argument for the numpy record array
-        dt = zip(column_names, ('float',)*len(column_names))
+        dt = list(zip(column_names, ('float',)*len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
         arr = np.loadtxt(out_filename, dtype=dt, skiprows=1)

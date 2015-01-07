@@ -11,7 +11,10 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-
+try:
+    from future_builtins import zip
+except ImportError:
+    pass
 
 # Cached value of BNG path
 _bng_path = None
@@ -112,7 +115,7 @@ def _parse_bng_outfile(out_filename):
         column_names = [raw_name for raw_name in raw_names if not raw_name == '']
 
         # Create the dtype argument for the numpy record array
-        dt = zip(column_names, ('float',)*len(column_names))
+        dt = list(zip(column_names, ('float',)*len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
         arr = numpy.loadtxt(out_filename, dtype=dt, skiprows=1)
