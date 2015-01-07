@@ -10,7 +10,7 @@ reserved_list = [
     'reaction_rules',
     'observables',
     ]
-reserved = dict([r, r.upper()] for r in reserved_list)
+reserved = dict((r, r.upper()) for r in reserved_list)
 
 tokens = [
     'ID',
@@ -29,7 +29,7 @@ tokens = [
     'LPAREN',
     'RPAREN',
     'NEWLINE',
-    ] + reserved.values()
+    ] + list(reserved.values())
 
 t_COMMA       = r','
 t_PLUS        = r'\+'
