@@ -1368,7 +1368,7 @@ class Model(object):
         """
         # FIXME I don't even want to think about the inefficiency of this, but at least it works
         try:
-            return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
+            return next((i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)))
         except StopIteration:
             return None
 
