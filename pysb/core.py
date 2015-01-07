@@ -690,7 +690,7 @@ class RuleExpression(object):
         self.is_reversible = is_reversible
 
     def __repr__(self):
-        operator = '<>' if self.is_reversible else '>>'
+        operator = '!=' if self.is_reversible else '>>'
         return '%s %s %s' % (repr(self.reactant_pattern), operator,
                              repr(self.product_pattern))
 
