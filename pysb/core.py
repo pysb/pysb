@@ -101,7 +101,7 @@ class SelfExporter(object):
             SelfExporter.default_model.add_component(obj)
 
         # load obj into target namespace under obj.name
-        if SelfExporter.target_globals.has_key(export_name):
+        if export_name in SelfExporter.target_globals:
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
 
@@ -429,7 +429,7 @@ class MonomerPattern(object):
         value += ', '.join([
                 k + '=' + repr(self.site_conditions[k])
                 for k in self.monomer.sites
-                if self.site_conditions.has_key(k)
+                if k in self.site_conditions
                 ])
         value += ')'
         if self.compartment is not None:
