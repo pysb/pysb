@@ -272,20 +272,20 @@ def generate_equations(model):
         return
     lines = iter(generate_network(model).split('\n'))
     try:
-        while 'begin species' not in lines.next():
+        while 'begin species' not in next(lines):
             pass
         model.species = []
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end species' in line: break
             _parse_species(model, line)
 
-        while 'begin reactions' not in lines.next():
+        while 'begin reactions' not in next(lines):
             pass
         model.odes = [sympy.numbers.Zero()] * len(model.species)
         reaction_cache = {}
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end reactions' in line: break
             (number, reactants, products, rate, rule) = line.strip().split(' ', 4)
             # the -1 is to switch from one-based to zero-based indexing
@@ -332,10 +332,10 @@ def generate_equations(model):
             # now the 'reverse' value is no longer needed
             del r['reverse']
 
-        while 'begin groups' not in lines.next():
+        while 'begin groups' not in next(lines):
             pass
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end groups' in line: break
             _parse_group(model, line)
 
