@@ -11,8 +11,7 @@ The other functions are used internally and manage the execution of the Kappa
 software and the parsing of the data into a Numpy format.
 """
 
-__author__ = "johnbachman"
-
+from __future__ import print_function as _
 import pysb
 from pysb.generator.kappa import KappaGenerator
 import os
@@ -25,6 +24,9 @@ try:
     from future_builtins import zip
 except ImportError:
     pass
+
+__author__ = "johnbachman"
+
 
 def run_simulation(model, **kwargs):
     """Runs the given model using KaSim and returns the parsed results.
@@ -163,7 +165,7 @@ def run_complx(gen, kappa_filename, args):
         kappa_file.write(gen.get_content())
         kappa_file.close()
         cmd = 'complx ' + ' '.join(args) + ' ' + kappa_filename
-        print "Command: " + cmd
+        print("Command: " + cmd)
         p = subprocess.Popen(['complx'] + args + [kappa_filename],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         #p.communicate()
@@ -265,7 +267,7 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
 
         kappa_file.close()
 
-        print "Running kasim"
+        print("Running kasim")
         p = subprocess.Popen(['KaSim'] + args)
                            #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         p.communicate()

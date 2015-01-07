@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import pysb
 import pysb.bng
 import sympy
@@ -129,14 +130,14 @@ if __name__ == '__main__':
         # (use the imp package and import as some safe name?)
         model_module = __import__(model_name)
     except Exception as e:
-        print "Error in model script:\n"
+        print("Error in model script:\n")
         raise
     # grab the 'model' variable from the module
     try:
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    # print run(model)
+    # print(run(model))
     run(model)
 
 

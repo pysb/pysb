@@ -10,6 +10,7 @@ http://www.nature.com/msb/journal/v5/n1/full/msb200874.html
 Implemented by: Jeremy Muhlich
 """
 
+from __future__ import print_function
 from pysb import *
 from pysb.macros import catalyze_state
 
@@ -83,7 +84,8 @@ Observable('ppERK', ERK(t185='p', y187='p'))
 
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid.""")
