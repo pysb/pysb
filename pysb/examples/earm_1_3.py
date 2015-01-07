@@ -172,7 +172,7 @@ def show_rates():
     # FIXME kf14-kf21 need to be un-scaled by v to make the table look right
     print ("%-20s        " * 3) % ('forward', 'reverse', 'catalytic')
     print '-' * (9 + 11 + 7) * 3
-    for i in range(1,29) + [31]:
+    for i in list(range(1,29)) + [31]:
         for t in ('f', 'r', 'c'):
             n = 'k%s%d' % (t,i)
             p = model.parameters.get(n)
