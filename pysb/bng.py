@@ -238,7 +238,8 @@ def generate_network(model, cleanup=True, append_stdout=False):
         bng_file.write(_generate_network_code)
         bng_file.close()
         p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             universal_newlines=True)
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
