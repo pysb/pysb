@@ -41,12 +41,12 @@ def check_model_against_component_list(model, component_list):
     To serialize the list of components to create a record of a
     validated state, see :py:func:`serialize_component_list`.
     """
-    assert len(model.all_components().values()) == len(component_list), \
+    assert len(model.all_components()) == len(component_list), \
            "Model %s does not have the same " \
            "number of components as the previously validated version. " \
            "The validated model has %d components, current model has " \
            "%d components." % \
-           (model.name, len(model.all_components().values()), len(component_list))
+           (model.name, len(model.all_components()), len(component_list))
 
     model_components = list(model.all_components().values())
     for i, comp in enumerate(component_list):

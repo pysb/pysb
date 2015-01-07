@@ -240,12 +240,12 @@ class Monomer(Component):
         for site in sites:
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
-        sites_dup = [site for site in sites_seen.keys() if sites_seen[site] > 1]
+        sites_dup = [site for site, count in sites_seen.items() if count > 1]
         if sites_dup:
             raise Exception("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
-        unknown_sites = [site for site in site_states.keys() if not site in sites_seen]
+        unknown_sites = [site for site in site_states if not site in sites_seen]
         if unknown_sites:
             raise Exception("Unknown sites in site_states: " + str(unknown_sites))
         # ensure site_states values are all strings
@@ -322,7 +322,7 @@ class MonomerPattern(object):
 
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
-        unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites]
+        unknown_sites = [site for site in site_conditions if site not in monomer.sites]
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
