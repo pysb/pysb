@@ -2,8 +2,13 @@ import pysb.core
 import pysb.bng
 import numpy
 from scipy.integrate import ode
-from scipy.weave import inline
-import scipy.weave.build_tools
+try:
+    from scipy.weave import inline as weave_inline
+except ImportError:
+    weave_inline = None
+else:
+    import scipy.weave.build_tools
+
 import distutils.errors
 import sympy
 import re
@@ -90,8 +95,9 @@ class Solver(object):
         if not hasattr(Solver, '_use_inline'):
             Solver._use_inline = False
             try:
-                inline('int i;', force=1)
-                Solver._use_inline = True
+                if weave_inline is not None:
+                    weave_inline('int i;', force=1)
+                    Solver._use_inline = True
             except (scipy.weave.build_tools.CompileError,
                     distutils.errors.CompileError, ImportError):
                 pass
@@ -145,7 +151,7 @@ class Solver(object):
             ydot = self.ydot
             # note that the evaluated code sets ydot as a side effect
             if Solver._use_inline:
-                inline(code_eqs, ['ydot', 't', 'y', 'p']);
+                weave_inline(code_eqs, ['ydot', 't', 'y', 'p']);
             else:
                 _exec(code_eqs_py, locals())
             return ydot
@@ -197,7 +203,7 @@ class Solver(object):
             jac = self.jac
             # note that the evaluated code sets jac as a side effect
             if Solver._use_inline:
-                inline(jac_eqs, ['jac', 't', 'y', 'p']);
+                weave_inline(jac_eqs, ['jac', 't', 'y', 'p']);
             else:
                 _exec(jac_eqs_py, locals())
             return jac
