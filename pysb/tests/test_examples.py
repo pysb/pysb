@@ -7,7 +7,9 @@ import importlib
 def test_generate_network():
     """Run network generation on all example models"""
     for model in get_example_models():
-        yield (check_generate_network, model)
+        fn = lambda: check_generate_network(model)
+        fn.description = "Generate network from {}".format(model.name)
+        yield fn
 
 def get_example_models():
     """Generator that yields the model objects for all example models"""
