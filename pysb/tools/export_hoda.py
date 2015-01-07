@@ -128,7 +128,7 @@ if __name__ == '__main__':
         # which we use, there will be trouble
         # (use the imp package and import as some safe name?)
         model_module = __import__(model_name)
-    except StandardError as e:
+    except Exception as e:
         print "Error in model script:\n"
         raise
     # grab the 'model' variable from the module
