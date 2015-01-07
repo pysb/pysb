@@ -1,5 +1,5 @@
-from pysb.bng import generate_network, NoInitialConditionsError
-from pysb.core import SelfExporter
+from pysb.bng import generate_network
+from pysb.core import SelfExporter, NoInitialConditionsError
 import traceback
 import os
 import importlib

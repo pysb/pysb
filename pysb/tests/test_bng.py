@@ -1,7 +1,7 @@
 from pysb.testing import *
 from pysb import *
 from pysb.bng import *
-from pysb.core import as_complex_pattern
+from pysb import NoInitialConditionsError, NoRulesError
 
 @with_model
 def test_generate_network():
