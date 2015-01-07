@@ -134,14 +134,14 @@ class Solver(object):
         self.y = numpy.ndarray((len(tspan), len(model.species)))
         self.ydot = numpy.ndarray(len(model.species))
         if len(model.observables):
-            self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
-                                                      itertools.repeat(float)))
+            self.yobs = numpy.ndarray(len(tspan), list(zip(model.observables.keys(),
+                                                      itertools.repeat(float))))
         else:
             self.yobs = numpy.ndarray((len(tspan), 0))
         exprs = model.expressions_dynamic()
         if len(exprs):
-            self.yexpr = numpy.ndarray(len(tspan), zip(exprs.keys(),
-                                                       itertools.repeat(float)))
+            self.yexpr = numpy.ndarray(len(tspan), list(zip(exprs.keys(),
+                                                       itertools.repeat(float))))
         else:
             self.yexpr = numpy.ndarray((len(tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
@@ -336,7 +336,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     solver.run(param_values, y0)
 
     species_names = ['__s%d' % i for i in range(solver.y.shape[1])]
-    yfull_dtype = zip(species_names, itertools.repeat(float))
+    yfull_dtype = list(zip(species_names, itertools.repeat(float)))
     if len(solver.yobs.dtype):
         yfull_dtype += solver.yobs.dtype.descr
     yfull = numpy.ndarray(len(solver.y), yfull_dtype)

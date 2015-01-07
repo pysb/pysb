@@ -95,7 +95,7 @@ def render_species_as_dot(species_list, graph_name=""):
                             label=monomer_label, shape="none", fontname="Arial",
                             fontsize=8)
         for bi, sites in bonds.items():
-            node_names, port_names = zip(*sites)
+            node_names, port_names = list(zip(*sites))
             sgraph.add_edge(node_names, tailport=port_names[0],
                             headport=port_names[1], label=str(bi))
     return graph.string()
