@@ -1,4 +1,5 @@
 import pysb
+from pysb.core import NoInitialConditionsError
 
 class KappaGenerator(object):
 
@@ -84,7 +85,7 @@ class KappaGenerator(object):
 
     def generate_species(self):
         if not self.model.initial_conditions:
-            raise Exception("BNG generator requires initial conditions.")
+            raise NoInitialConditionsError()
         species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
         #max_length = max(len(code) for code in species_codes)
         max_length = 0

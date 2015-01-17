@@ -1461,6 +1461,15 @@ class DuplicateSiteError(ValueError):
 class UnknownSiteError(ValueError):
     pass
 
+class NoInitialConditionsError(RuntimeError):
+    """Model initial_conditions is empty."""
+    def __init__(self):
+        RuntimeError.__init__(self, "Model has no initial conditions")
+
+class NoRulesError(RuntimeError):
+    """Model rules is empty."""
+    def __init__(self):
+        RuntimeError.__init__(self, "Model has no rules")
 
 class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     """
