@@ -222,8 +222,14 @@ class Monomer(Component):
 
     """
 
-    def __init__(self, name, sites=[], site_states={}, _export=True):
+    def __init__(self, name, sites=None, site_states=None, _export=True):
         Component.__init__(self, name, _export)
+
+        # Create default empty containers.
+        if sites is None:
+            sites = []
+        if site_states is None:
+            site_states = {}
 
         # ensure sites is some kind of list (presumably of strings) but not a string itself
         if not isinstance(sites, collections.Iterable) or isinstance(sites, basestring):
@@ -1475,12 +1481,13 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     # The implementation is based on a list instead of a linked list (as
     # OrderedSet is), since we only allow add and retrieve, not delete.
 
-    def __init__(self, iterable=[]):
+    def __init__(self, iterable=None):
         self._elements = []
         self._map = {}
         self._index_map = {}
-        for value in iterable:
-            self.add(value)
+        if iterable is not None:
+            for value in iterable:
+                self.add(value)
 
     def __iter__(self):
         return iter(self._elements)
