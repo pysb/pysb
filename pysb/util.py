@@ -1,8 +1,9 @@
+from __future__ import print_function as _
 from pysb import ComponentSet
 import pysb.core
 import inspect
 import numpy
-import cStringIO
+import io
 
 __all__ = ['alias_model_components', 'rules_using_parameter']
 
@@ -43,7 +44,7 @@ def synthetic_data(model, tspan, obs_list=None, sigma=0.1):
 def get_param_num(model, name):
     for i in range(len(model.parameters)):
         if model.parameters[i].name == name:
-            print i, model.parameters[i]
+            print(i, model.parameters[i])
             break
     return i
 
@@ -56,7 +57,7 @@ def write_params(model,paramarr, name=None):
     if name is not None:
         fobj = open(name, 'w')
     else:
-        fobj = cStringIO.StringIO()
+        fobj = io.StringIO()
     for i in range(len(model.parameters)):
         fobj.write("%s, %.17g\n"%(model.parameters[i].name, paramarr[i]))
     if name is None:

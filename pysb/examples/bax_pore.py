@@ -4,6 +4,7 @@ bax_pore_sequential.py). Inhibition of pore formation by Mcl-1 is also
 implemented.
 """
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -19,7 +20,7 @@ Annotation(MCL1, 'http://identifiers.org/uniprot/Q07820')
 Parameter('kdimf', 1e-6)
 Parameter('kdimr', 1e-7)
 Rule('bax_dim',
-     BAX(t1=None, t2=None) + BAX(t1=None, t2=None) <>
+     BAX(t1=None, t2=None) + BAX(t1=None, t2=None) !=
      BAX(t1=1, t2=None) % BAX(t1=None, t2=1),
      kdimf, kdimr)
 
@@ -27,7 +28,7 @@ Rule('bax_dim',
 Parameter('ktetf', 1e-3)
 Parameter('ktetr', 1e-4)
 Rule('bax_tet',
-     BAX(t1=1, t2=None) % BAX(t1=None, t2=1) + BAX(t1=2, t2=None) % BAX(t1=None, t2=2) <>
+     BAX(t1=1, t2=None) % BAX(t1=None, t2=1) + BAX(t1=2, t2=None) % BAX(t1=None, t2=2) !=
      BAX(t1=1, t2=3) % BAX(t1=4, t2=1) % BAX(t1=2, t2=4) % BAX(t1=3, t2=2),
      ktetf, ktetr)
 
@@ -35,7 +36,7 @@ Rule('bax_tet',
 Parameter('kbaxmcl1f', 1e-5)
 Parameter('kbaxmcl1r', 1e-6)
 Rule('bax_inh_mcl1',
-     BAX(inh=None) + MCL1(b=None) <>
+     BAX(inh=None) + MCL1(b=None) !=
      BAX(inh=1)    % MCL1(b=1),
      kbaxmcl1f, kbaxmcl1r)
 
@@ -61,8 +62,8 @@ Observable('BAX4_inh', BAX(inh=ANY, t1=1, t2=3) % BAX(t1=4, t2=1) % BAX(t1=2, t2
 
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid. Please see\n" \
-        "run_bax_pore.py for example usage."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid. Please see run_bax_pore.py for example usage.""")

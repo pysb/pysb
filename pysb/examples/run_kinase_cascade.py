@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 from pysb.integrate import odesolve
 from pylab import linspace, plot, legend, show
 
@@ -7,7 +8,7 @@ from kinase_cascade import model
 
 
 tspan = linspace(0, 1200)
-print "Simulating..."
+print("Simulating...")
 yfull = odesolve(model, tspan)
 plot(tspan, yfull['ppMEK'], label='ppMEK')
 plot(tspan, yfull['ppERK'], label='ppERK')

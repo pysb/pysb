@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Simulate the bax_pore_sequential model and plot the results."""
 
+from __future__ import print_function
 from pylab import *
 from pysb.integrate import odesolve
 
@@ -10,7 +11,7 @@ from bax_pore_sequential import model, max_size
 # System is very stiff, and using logspace instead of linspace to produce the
 # vector of time points happens to help with the integration
 t = logspace(-3, 5) # 1e-3 to 1e5
-print "Simulating..."
+print("Simulating...")
 x = odesolve(model, t)
 
 # Plot trajectory of each pore

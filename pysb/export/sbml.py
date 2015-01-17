@@ -14,7 +14,10 @@ import sympy
 from sympy.printing.mathml import MathMLPrinter
 import itertools
 import textwrap
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 def indent(text, n=0):
     """Re-indent a multi-line string, stripping leading newlines and trailing

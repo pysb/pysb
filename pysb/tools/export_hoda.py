@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import pysb
 import pysb.bng
 import sympy
 import re
 import sys
 import os
-from StringIO import StringIO
+from io import StringIO
 
 
 def run(model):
@@ -128,15 +129,15 @@ if __name__ == '__main__':
         # which we use, there will be trouble
         # (use the imp package and import as some safe name?)
         model_module = __import__(model_name)
-    except StandardError as e:
-        print "Error in model script:\n"
+    except Exception as e:
+        print("Error in model script:\n")
         raise
     # grab the 'model' variable from the module
     try:
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    # print run(model)
+    # print(run(model))
     run(model)
 
 

@@ -2,12 +2,22 @@ import pysb.core
 import pysb.bng
 import numpy
 from scipy.integrate import ode
-from scipy.weave import inline
-import scipy.weave.build_tools
+try:
+    from scipy.weave import inline
+except ImportError:
+    inline = None
+else:
+    import scipy.weave.build_tools
+
 import distutils.errors
 import sympy
 import re
 import itertools
+
+def _exec(code, locals):
+    # This is function call under Python 3, and a statement with a
+    # tuple under Python 2. The effect should be the same.
+    exec(code, locals)
 
 # some sane default options for a few well-known integrators
 default_integrator_options = {
@@ -76,8 +86,9 @@ class Solver(object):
         if not hasattr(Solver, '_use_inline'):
             Solver._use_inline = False
             try:
-                inline('int i;', force=1)
-                Solver._use_inline = True
+                if inline is not None:
+                    inline('int i;', force=1)
+                    Solver._use_inline = True
             except (scipy.weave.build_tools.CompileError,
                     distutils.errors.CompileError, ImportError):
                 pass
@@ -117,7 +128,7 @@ class Solver(object):
             if Solver._use_inline:
                 inline(code_eqs, ['ydot', 't', 'y', 'p']);
             else:
-                exec code_eqs_py in locals()
+                _exec(code_eqs_py, locals())
             return ydot
 
         # build integrator options list from our defaults and any kwargs passed
@@ -134,14 +145,14 @@ class Solver(object):
         self.y = numpy.ndarray((len(tspan), len(model.species)))
         self.ydot = numpy.ndarray(len(model.species))
         if len(model.observables):
-            self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
-                                                      itertools.repeat(float)))
+            self.yobs = numpy.ndarray(len(tspan), list(zip(model.observables.keys(),
+                                                      itertools.repeat(float))))
         else:
             self.yobs = numpy.ndarray((len(tspan), 0))
         exprs = model.expressions_dynamic()
         if len(exprs):
-            self.yexpr = numpy.ndarray(len(tspan), zip(exprs.keys(),
-                                                       itertools.repeat(float)))
+            self.yexpr = numpy.ndarray(len(tspan), list(zip(exprs.keys(),
+                                                       itertools.repeat(float))))
         else:
             self.yexpr = numpy.ndarray((len(tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
@@ -302,7 +313,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     >>> from numpy import linspace
     >>> numpy.set_printoptions(precision=4)
     >>> yfull = odesolve(model, linspace(0, 40, 10))
-    >>> print yfull['A_total']   #doctest: +NORMALIZE_WHITESPACE
+    >>> print(yfull['A_total'])            #doctest: +NORMALIZE_WHITESPACE
     [ 1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
     0.7158]
 
@@ -310,21 +321,21 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     integer indexing (note that the view's data buffer is shared with the
     original array so there is no extra memory cost):
 
-    >>> print yfull.shape
+    >>> print(yfull.shape)
     (10,)
-    >>> print yfull.dtype   #doctest: +NORMALIZE_WHITESPACE
+    >>> print(yfull.dtype)                 #doctest: +NORMALIZE_WHITESPACE
     [('__s0', '<f8'), ('__s1', '<f8'), ('__s2', '<f8'), ('A_total', '<f8'),
     ('B_total', '<f8'), ('C_total', '<f8')]
-    >>> print yfull[0:4, 1:3]
+    >>> print(yfull[0:4, 1:3])             #doctest: +ELLIPSIS
     Traceback (most recent call last):
       ...
-    IndexError: too many indices for array
+    IndexError: too many indices...
     >>> yarray = yfull.view(float).reshape(len(yfull), -1)
-    >>> print yarray.shape
+    >>> print(yarray.shape)
     (10, 6)
-    >>> print yarray.dtype
+    >>> print(yarray.dtype)
     float64
-    >>> print yarray[0:4, 1:3]
+    >>> print(yarray[0:4, 1:3])
     [[  0.0000e+00   0.0000e+00]
      [  2.1672e-05   1.0093e-01]
      [  1.6980e-05   1.4943e-01]
@@ -336,7 +347,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     solver.run(param_values, y0)
 
     species_names = ['__s%d' % i for i in range(solver.y.shape[1])]
-    yfull_dtype = zip(species_names, itertools.repeat(float))
+    yfull_dtype = list(zip(species_names, itertools.repeat(float)))
     if len(solver.yobs.dtype):
         yfull_dtype += solver.yobs.dtype.descr
     yfull = numpy.ndarray(len(solver.y), yfull_dtype)

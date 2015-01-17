@@ -3,6 +3,7 @@
 (This is the example shown on the pysb.org home page.)
 """
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -22,7 +23,7 @@ Initial(L(s=None), L_0)
 Initial(R(s=None), R_0)
 
 # Declare the binding rule
-Rule('L_binds_R', L(s=None) + R(s=None) <> L(s=1) % R(s=1), kf, kr)
+Rule('L_binds_R', L(s=None) + R(s=None) != L(s=1) % R(s=1), kf, kr)
 
 # Observe the complex
 Observable('LR', L(s=1) % R(s=1))
@@ -30,10 +31,10 @@ Observable('LR', L(s=1) % R(s=1))
 if __name__ == '__main__':
     from pylab import linspace, plot, xlabel, ylabel, show
     from pysb.integrate import odesolve
-    print __doc__
+    print(__doc__)
     # Simulate the model through 40 seconds
     time = linspace(0, 40, 100)
-    print "Simulating..."
+    print("Simulating...")
     x = odesolve(model, time)
     # Plot the trajectory of LR
     plot(time, x['LR'])

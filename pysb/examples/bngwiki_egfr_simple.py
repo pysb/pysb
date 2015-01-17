@@ -3,6 +3,7 @@
 http://bionetgen.org/index.php/Egfr_simple
 """
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -59,12 +60,12 @@ Observable('Sos1_act', EGFR(Y1068=1) % Grb2(SH2=1, SH3=2) % Sos1(PxxP=2))
 
 # Ligand-receptor binding
 Rule('egf_bind_egfr',
-     EGFR(L=None, CR1=None) + EGF(R=None) <> EGFR(L=1, CR1=None) % EGF(R=1),
+     EGFR(L=None, CR1=None) + EGF(R=None) != EGFR(L=1, CR1=None) % EGF(R=1),
      kp1, km1)
 
 # Receptor-aggregation
 Rule('egfr_dimerize',
-     EGFR(L=ANY, CR1=None) + EGFR(L=ANY, CR1=None) <>
+     EGFR(L=ANY, CR1=None) + EGFR(L=ANY, CR1=None) !=
      EGFR(L=ANY, CR1=1) % EGFR(L=ANY, CR1=1),
      kp2, km2)
 
@@ -78,12 +79,12 @@ Rule('egfr_dephos',
 
 # Grb2 binding to pY1068
 Rule('grb2_bind_egfr',
-     EGFR(Y1068='P') + Grb2(SH2=None) <> EGFR(Y1068=('P',1)) % Grb2(SH2=1),
+     EGFR(Y1068='P') + Grb2(SH2=None) != EGFR(Y1068=('P',1)) % Grb2(SH2=1),
      kp4, km4)
 
 # Grb2 binding to Sos1
 Rule('sos1_bind_grb2',
-     Grb2(SH3=None) + Sos1(PxxP=None) <> Grb2(SH3=1) % Sos1(PxxP=1),
+     Grb2(SH3=None) + Sos1(PxxP=None) != Grb2(SH3=1) % Sos1(PxxP=1),
      kp5, km5)
 
 # Receptor dimer internalization/degradation
@@ -93,7 +94,8 @@ Rule('egfr_dimer_degrade',
 
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid.""")

@@ -43,7 +43,7 @@ subclass could be created as follows::
             k2 = self.parameter('k2', 1, prior=Uniform(-5, -1))
             A = self['A']
             B = self['B']
-            self.rule('A_B_bind', A(b=None) + B(b=None) <> A(b=1) % B(b=1),
+            self.rule('A_B_bind', A(b=None) + B(b=None) != A(b=1) % B(b=1),
                       k1, k2)
 
 This motif, implemented as a method, does several things: it manages the

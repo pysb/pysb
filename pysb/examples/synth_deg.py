@@ -1,5 +1,6 @@
 """A trivial example of synthesis and degradation rules"""
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -17,7 +18,8 @@ Initial(A(), A_0)
 Observable('A_total', A())
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid.""")
