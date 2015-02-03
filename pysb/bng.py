@@ -130,7 +130,7 @@ def _parse_bng_outfile(out_filename):
     return arr
 
 
-def run_ssa(model, tspan, param_values=None, output_dir='/tmp', output_file_basename=None, cleanup=True, verbose=False, n_runs=1, **additional_args):
+def run_ssa(model, tspan, param_values=None, output_dir=os.getcwd(), output_file_basename=None, cleanup=True, verbose=False, n_runs=1, **additional_args):
     """
     Simulate a model with BNG's SSA simulator and return the trajectories.
 
