@@ -43,7 +43,7 @@ import itertools
 
 __all__ = ['equilibrate',
            'bind', 'bind_table',
-           'catalyze', 'catalyze_state', 'catalyze_complex',
+           'catalyze', 'catalyze_state',
            'catalyze_one_step', 'catalyze_one_step_reversible',
            'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport', 'pore_bind', 'assemble_chain_sequential_base',
@@ -968,128 +968,7 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     return components
 
-def catalyze_complex(enzyme, e_site, substrate, s_site, product, klist, m1=None, m2=None):
-    """ Generate the two-step catalytic reaction E + S <> E:S >> E + P, while allowing complexes to serve as enzyme, substrate and/or product.
-        
-        E:S1 + S:S2 <> E:S1:S:S2 >> E:S1 + P:S2
-        
-        Parameters
-        ----------
-        enzyme, substrate, product : Monomer, MonomerPattern, or ComplexPattern
-        Monomers or complexes participating in the binding reaction.
-        
-        e_site, s_site : string
-        The names of the sites on `enzyme` and `substrate` (respectively) where
-        they bind each other to form the E:S complex.
-        
-        klist : list of 3 Parameters or list of 3 numbers
-        Forward, reverse and catalytic rate constants (in that order). If
-        Parameters are passed, they will be used directly in the generated
-        Rules. If numbers are passed, Parameters will be created with
-        automatically generated names based on the names and states of enzyme,
-        substrate and product and these parameters will be included at the end
-        of the returned component list.
-        
-        m1, m2 : Monomer or MonomerPattern
-        If enzyme or substrate binding site is present in multiple monomers
-        within a complex, the specific monomer desired for binding must be specified.
-        
-        Returns
-        -------
-        components : ComponentSet
-        The generated components. Contains the bidirectional binding Rule
-        and optionally three Parameters if klist was given as numbers.
-        """
-    if isinstance(m1, Monomer):
-        m1 = m1()
-    if isinstance(m2, Monomer):
-        m2 = m2()
-        
-    def build_complex(s1, site1, m1):
-        _verify_sites_complex(s1, site1)
-        #Retrieve a dictionary specifying the MonomerPattern within the complex that contains the given binding site.
-        specsitesdict = _verify_sites_complex(s1, site1)
-        s1complexpatub, s1complexpatb = check_sites_comp_build(s1, site1, m1, specsitesdict)
-        return s1complexpatb, s1complexpatub
 
-    def check_sites_comp_build(s1, site1, m1, specsitesdict):
-        #Return error if binding site exists on multiple monomers and a monomer for binding (m1) hasn't been specified.
-        if len(specsitesdict) > 1 and m1==None:
-            raise ValueError("Binding site '%s' present in more than one monomer in complex '%s'.  Specify variable m1, the monomer used for binding within the complex." % (site1, s1))
-        if not s1.is_concrete:
-            raise ValueError("Complex '%s' must be concrete." % (s1))
-            #If the given binding site is only present in one monomer in the complex:
-        if m1==None:
-            #Build up ComplexPattern for use in rule (with state of given binding site specified).
-            s1complexpatub = specsitesdict.keys()[0]({site1:None})
-            s1complexpatb = specsitesdict.keys()[0]({site1:50})
-            for monomer in s1.monomer_patterns:
-                if monomer not in specsitesdict.keys():
-                    s1complexpatub %= monomer
-                    s1complexpatb %= monomer
-    
-        #If the binding site is present on more than one monomer in the complex, the monomer must be specified by the user.  Use specified m1 to build ComplexPattern.
-        else:
-            #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
-            i = 0
-            identical_monomers = []
-            for mon in s1.monomer_patterns:
-                #Only change the binding site for the first monomer that matches.  Keep any others unchanged to add to final complex that is returned.
-                if mon.monomer.name == m1.monomer.name:
-                    i += 1
-                    if i == 1:
-                        s1complexpatub = m1({site1:None})
-                        s1complexpatb = m1({site1:50})
-                    else:
-                        identical_monomers.append(mon)
-            #Build up ComplexPattern for use in rule (with state of given binding site  on m1 specified).
-            for mon in s1.monomer_patterns:
-                if mon.monomer.name != m1.monomer.name:
-                    s1complexpatub %= mon
-                    s1complexpatb %= mon
-            if identical_monomers:
-                for i in range(len(identical_monomers)):
-                    s1complexpatub %= identical_monomers[i]
-                    s1complexpatb %= identical_monomers[i]
-    
-        return s1complexpatub, s1complexpatb
-
-    #If no complexes exist in the reaction, revert to catalyze().
-    if (isinstance(enzyme, MonomerPattern) or isinstance(enzyme, Monomer)) and (isinstance(substrate, MonomerPattern) or isinstance(substrate, Monomer)):
-        _verify_sites(enzyme, e_site)
-        _verify_sites(substrate, s_site)
-        return catalyze(enzyme, e_site, substrate, s_site, product, klist,)
-    
-    # Build E:S
-    if isinstance(enzyme, ComplexPattern):
-        enzymepatb, enzyme_free = build_complex(enzyme, e_site, m1)
-    else:
-        enzymepatb, enzyme_free = enzyme({e_site: 1}), enzyme({e_site: None})
-            
-    if isinstance(substrate, ComplexPattern):
-        substratepatb, substratepatub = build_complex(substrate, s_site, m2)
-    else:
-        substratepatb = substrate({s_site: 50})
-        
-        """if s_site in substrate.site_conditions:
-            substrate_free = substrate()
-            s_state = (substrate.site_conditions[s_site], 1)
-        else:
-            substrate_free = substrate({s_site: None})
-            s_state = 1
-        substratepatb = substrate({s_site: s_state})
-        """
-
-            
-    es_complex = enzymepatb % substratepatb
-            
-    # Use bind complex to binding rule.
-
-    components = bind_complex(enzyme, e_site, substrate, s_site, klist[0:2], m1, m2)
-    components |= _macro_rule('catalyze',
-                              es_complex >> enzyme_free + product,
-                              [klist[2]], ['kc'])
-    return components
 
 def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
                    state1, state2, klist):
