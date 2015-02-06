@@ -336,9 +336,9 @@ class Tropical:
 
 
 #from pysb.examples.tyson_oscillator import model
-from earm.lopez_embedded import model
-tro = Tropical(model)
-tro.tropicalize()
+#from earm.lopez_embedded import model
+#tro = Tropical(model)
+#tro.tropicalize()
 #tro.final_tropicalization() 
 
 ######################################################################## Change of parameters
