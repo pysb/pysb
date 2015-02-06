@@ -43,7 +43,7 @@ import itertools
 
 __all__ = ['equilibrate',
            'bind', 'bind_table',
-           'catalyze', 'catalyze_state',
+           'catalyze', 'catalyze_state', 'catalyze_complex',
            'catalyze_one_step', 'catalyze_one_step_reversible',
            'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport', 'pore_bind', 'assemble_chain_sequential_base',
@@ -139,7 +139,11 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
         >>> from pysb.macros import _macro_rule
         >>> 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('A', ['s'])
         Monomer('A', ['s'])
         >>> Monomer('B', ['s'])
@@ -292,7 +296,11 @@ def equilibrate(s1, s2, klist):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('A')
         Monomer('A')
         >>> Monomer('B')
@@ -347,7 +355,11 @@ def bind(s1, site1, s2, site2, klist):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('A', ['x'])
         Monomer('A', ['x'])
         >>> Monomer('B', ['y'])
@@ -363,6 +375,12 @@ def bind(s1, site1, s2, site2, klist):
 
     _verify_sites(s1, site1)
     _verify_sites(s2, site2)
+
+    def bind_name_func(rule_expression):
+        # Get ComplexPatterns
+        react_cps = rule_expression.reactant_pattern.complex_patterns
+        # Build the label components
+        return '_'.join(_complex_pattern_label(cp) for cp in react_cps)
 
     return _macro_rule('bind',
                        s1({site1: None}) + s2({site2: None}) <>
@@ -441,7 +459,11 @@ def bind_table(bindtable, row_site, col_site, kf=None):
     Execution:: 
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('R1', ['x'])
         Monomer('R1', ['x'])
         >>> Monomer('R2', ['x'])
@@ -604,25 +626,18 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
             #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
             i = 0
             identical_monomers = []
-            other_monomers = []
             for mon in s1.monomer_patterns:
                 #Only change the binding site for the first monomer that matches.  Keep any others unchanged to add to final complex that is returned.
-                if mon.monomer.name == m1.monomer.name and mon.site_conditions==m1.site_conditions:
+                if mon.monomer.name == m1.monomer.name:
                     i += 1
                     if i == 1:
-                        s1complexpatub = mon({site1:None})
-                        s1complexpatb = mon({site1:50})
+                        s1complexpatub = m1({site1:None})
+                        s1complexpatb = m1({site1:50})
                     else:
                         identical_monomers.append(mon)
-                else:
-                    other_monomers.append(mon)
-            
-            #Throw an error if no monomer pattern in the complex matched the pattern given for m1
-            if i == 0:
-                raise ValueError("No monomer pattern in complex '%s' matches the pattern given for m1, '%s'." % (s1, m1))
-                    
             #Build up ComplexPattern for use in rule (with state of given binding site on m1 specified).
-            for mon in other_monomers:
+            for mon in s1.monomer_patterns:
+                if mon.monomer.name != m1.monomer.name:
                     s1complexpatub %= mon
                     s1complexpatb %= mon
             if identical_monomers:
@@ -640,22 +655,18 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         
     #If no complexes given, revert to normal bind macro.
     if (isinstance(s1, MonomerPattern) or isinstance(s1, Monomer)) and (isinstance(s2, MonomerPattern) or isinstance(s2, Monomer)):
-        #print 'two monomers'
         _verify_sites(s1, site1)
         _verify_sites(s2, site2)
         return bind(s1, site1, s2, site2, klist)
 
     #Create rules if only one complex or the other is present.
     elif isinstance(s1, ComplexPattern) and (isinstance(s2, MonomerPattern) or isinstance(s2, Monomer)):
-        #print 's1=complex and s2=monomer'
         return comp_mono_func(s1, site1, s2, site2, m1)
     elif (isinstance(s1, MonomerPattern) or isinstance(s1, Monomer)) and isinstance(s2, ComplexPattern):
-        #print 's1=monomer and s2=complex'
         return comp_mono_func(s2, site2, s1, site1, m2)
     
     #Create rule when both s1 and s2 are complexes.    
     else:
-        #print 'two complexes'
         _verify_sites_complex(s1, site1)
         _verify_sites_complex(s2, site2)
         #Retrieve a dictionary specifiying the MonomerPattern within the complex that contains the given binding site.
@@ -679,18 +690,10 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
                 if isinstance(stateint, int):
                     if stateint > maxint:
                         maxint = stateint
-        match = 'N'
         for monomer in s2.monomer_patterns:
-            if m2 != None:
-                if m2.site_conditions == monomer.site_conditions and m2.monomer.name == monomer.monomer.name:
-                    match = 'Y'        
             for site, stateint in monomer.site_conditions.items():
                 if isinstance(stateint, int):
                     monomer.site_conditions[site] += maxint
-            if match == 'Y':
-                m2.site_conditions = monomer.site_conditions
-            match = 'N'
-            
         #Actually create rules
         s1complexpatub, s1complexpatb = check_sites_comp_build(s1, site1, m1, specsitesdict1)
         s2complexpatub, s2complexpatb = check_sites_comp_build(s2, site2, m2, specsitesdict2)
@@ -877,7 +880,11 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('E', ['b'])
         Monomer('E', ['b'])
         >>> Monomer('S', ['b'])
@@ -905,7 +912,11 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('Kinase', ['b'])
         Monomer('Kinase', ['b'])
         >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
@@ -957,7 +968,128 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
 
     return components
 
+def catalyze_complex(enzyme, e_site, substrate, s_site, product, klist, m1=None, m2=None):
+    """ Generate the two-step catalytic reaction E + S <> E:S >> E + P, while allowing complexes to serve as enzyme, substrate and/or product.
+        
+        E:S1 + S:S2 <> E:S1:S:S2 >> E:S1 + P:S2
+        
+        Parameters
+        ----------
+        enzyme, substrate, product : Monomer, MonomerPattern, or ComplexPattern
+        Monomers or complexes participating in the binding reaction.
+        
+        e_site, s_site : string
+        The names of the sites on `enzyme` and `substrate` (respectively) where
+        they bind each other to form the E:S complex.
+        
+        klist : list of 3 Parameters or list of 3 numbers
+        Forward, reverse and catalytic rate constants (in that order). If
+        Parameters are passed, they will be used directly in the generated
+        Rules. If numbers are passed, Parameters will be created with
+        automatically generated names based on the names and states of enzyme,
+        substrate and product and these parameters will be included at the end
+        of the returned component list.
+        
+        m1, m2 : Monomer or MonomerPattern
+        If enzyme or substrate binding site is present in multiple monomers
+        within a complex, the specific monomer desired for binding must be specified.
+        
+        Returns
+        -------
+        components : ComponentSet
+        The generated components. Contains the bidirectional binding Rule
+        and optionally three Parameters if klist was given as numbers.
+        """
+    if isinstance(m1, Monomer):
+        m1 = m1()
+    if isinstance(m2, Monomer):
+        m2 = m2()
+        
+    def build_complex(s1, site1, m1):
+        _verify_sites_complex(s1, site1)
+        #Retrieve a dictionary specifying the MonomerPattern within the complex that contains the given binding site.
+        specsitesdict = _verify_sites_complex(s1, site1)
+        s1complexpatub, s1complexpatb = check_sites_comp_build(s1, site1, m1, specsitesdict)
+        return s1complexpatb, s1complexpatub
 
+    def check_sites_comp_build(s1, site1, m1, specsitesdict):
+        #Return error if binding site exists on multiple monomers and a monomer for binding (m1) hasn't been specified.
+        if len(specsitesdict) > 1 and m1==None:
+            raise ValueError("Binding site '%s' present in more than one monomer in complex '%s'.  Specify variable m1, the monomer used for binding within the complex." % (site1, s1))
+        if not s1.is_concrete:
+            raise ValueError("Complex '%s' must be concrete." % (s1))
+            #If the given binding site is only present in one monomer in the complex:
+        if m1==None:
+            #Build up ComplexPattern for use in rule (with state of given binding site specified).
+            s1complexpatub = specsitesdict.keys()[0]({site1:None})
+            s1complexpatb = specsitesdict.keys()[0]({site1:50})
+            for monomer in s1.monomer_patterns:
+                if monomer not in specsitesdict.keys():
+                    s1complexpatub %= monomer
+                    s1complexpatb %= monomer
+    
+        #If the binding site is present on more than one monomer in the complex, the monomer must be specified by the user.  Use specified m1 to build ComplexPattern.
+        else:
+            #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
+            i = 0
+            identical_monomers = []
+            for mon in s1.monomer_patterns:
+                #Only change the binding site for the first monomer that matches.  Keep any others unchanged to add to final complex that is returned.
+                if mon.monomer.name == m1.monomer.name:
+                    i += 1
+                    if i == 1:
+                        s1complexpatub = m1({site1:None})
+                        s1complexpatb = m1({site1:50})
+                    else:
+                        identical_monomers.append(mon)
+            #Build up ComplexPattern for use in rule (with state of given binding site  on m1 specified).
+            for mon in s1.monomer_patterns:
+                if mon.monomer.name != m1.monomer.name:
+                    s1complexpatub %= mon
+                    s1complexpatb %= mon
+            if identical_monomers:
+                for i in range(len(identical_monomers)):
+                    s1complexpatub %= identical_monomers[i]
+                    s1complexpatb %= identical_monomers[i]
+    
+        return s1complexpatub, s1complexpatb
+
+    #If no complexes exist in the reaction, revert to catalyze().
+    if (isinstance(enzyme, MonomerPattern) or isinstance(enzyme, Monomer)) and (isinstance(substrate, MonomerPattern) or isinstance(substrate, Monomer)):
+        _verify_sites(enzyme, e_site)
+        _verify_sites(substrate, s_site)
+        return catalyze(enzyme, e_site, substrate, s_site, product, klist,)
+    
+    # Build E:S
+    if isinstance(enzyme, ComplexPattern):
+        enzymepatb, enzyme_free = build_complex(enzyme, e_site, m1)
+    else:
+        enzymepatb, enzyme_free = enzyme({e_site: 1}), enzyme({e_site: None})
+            
+    if isinstance(substrate, ComplexPattern):
+        substratepatb, substratepatub = build_complex(substrate, s_site, m2)
+    else:
+        substratepatb = substrate({s_site: 50})
+        
+        """if s_site in substrate.site_conditions:
+            substrate_free = substrate()
+            s_state = (substrate.site_conditions[s_site], 1)
+        else:
+            substrate_free = substrate({s_site: None})
+            s_state = 1
+        substratepatb = substrate({s_site: s_state})
+        """
+
+            
+    es_complex = enzymepatb % substratepatb
+            
+    # Use bind complex to binding rule.
+
+    components = bind_complex(enzyme, e_site, substrate, s_site, klist[0:2], m1, m2)
+    components |= _macro_rule('catalyze',
+                              es_complex >> enzyme_free + product,
+                              [klist[2]], ['kc'])
+    return components
 
 def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
                    state1, state2, klist):
@@ -1017,7 +1149,11 @@ def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('Kinase', ['b'])
         Monomer('Kinase', ['b'])
         >>> Monomer('Substrate', ['b', 'y'], {'y': ('U', 'P')})
@@ -1093,7 +1229,11 @@ def catalyze_one_step(enzyme, substrate, product, kf):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('E', ['b'])
         Monomer('E', ['b'])
         >>> Monomer('S', ['b'])
@@ -1162,7 +1302,11 @@ def catalyze_one_step_reversible(enzyme, substrate, product, klist):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('E', ['b'])
         Monomer('E', ['b'])
         >>> Monomer('S', ['b'])
@@ -1233,7 +1377,11 @@ def synthesize(species, ksynth):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         >>> synthesize(A(x=None, y='e'), 1e-4) # doctest:+NORMALIZE_WHITESPACE
@@ -1293,7 +1441,11 @@ def degrade(species, kdeg):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('B', ['x'])
         Monomer('B', ['x'])
         >>> degrade(B(), 1e-6) # doctest:+NORMALIZE_WHITESPACE
@@ -1359,7 +1511,11 @@ def synthesize_degrade_table(table):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         Monomer('A', ['x', 'y'], {'y': ['e', 'f']})
         >>> Monomer('B', ['x'])
@@ -1543,7 +1699,11 @@ def pore_species(subunit, site1, site2, size):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer('Unit', ['p1', 'p2'])
         >>> pore_species(Unit, 'p1', 'p2', 4)
@@ -1596,7 +1756,11 @@ def assemble_pore_sequential(subunit, site1, site2, max_size, ktable):
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('Unit', ['p1', 'p2'])
         Monomer('Unit', ['p1', 'p2'])
         >>> assemble_pore_sequential(Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2) # doctest:+NORMALIZE_WHITESPACE
@@ -1681,7 +1845,11 @@ def pore_transport(subunit, sp_site1, sp_site2, sc_site, min_size, max_size,
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('Unit', ['p1', 'p2', 'sc_site'])
         Monomer('Unit', ['p1', 'p2', 'sc_site'])
         >>> Monomer('Cargo', ['c_site', 'loc'], {'loc':['mito', 'cyto']})
@@ -1829,7 +1997,11 @@ def pore_bind(subunit, sp_site1, sp_site2, sc_site, size, cargo, c_site,
     Execution::
 
         >>> Model() # doctest:+ELLIPSIS
+<<<<<<< HEAD
+        <Model '<interactive>' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+=======
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+>>>>>>> 48b7e79af3cf6fe5acf5be90136e829d6476cd7a
         >>> Monomer('Unit', ['p1', 'p2', 'sc_site'])
         Monomer('Unit', ['p1', 'p2', 'sc_site'])
         >>> Monomer('Cargo', ['c_site'])
