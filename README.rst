@@ -1,8 +1,6 @@
 PySB
 ====
 
-.. image:: https://api.travis-ci.org/pysb/pysb.png
-
 Python Systems Biology modeling framework
 
 http://pysb.org/

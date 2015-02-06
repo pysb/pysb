@@ -86,11 +86,8 @@ class Solver(object):
 
         pysb.bng.generate_equations(model)
 
-        code_eqs = '\n'.join(['ydot[%d] = %s;' %
-                              (i, sympy.ccode(model.odes[i]))
-                              for i in range(len(model.odes))])
-        code_eqs = re.sub(r's(\d+)',
-                          lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
+        code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
+        code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
         for e in model.expressions:
             code_eqs = re.sub(r'\b(%s)\b' % e.name,
                               sympy.ccode(e.expand_expr()), code_eqs)
@@ -98,11 +95,9 @@ class Solver(object):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
 
         Solver._test_inline()
-        # If we can't use weave.inline to run the C code, compile it as Python
-        # code instead for use with exec. Note: C code with array indexing,
-        # basic math operations, and pow() just happens to also be valid
-        # Python.  If the equations ever have more complex things in them, this
-        # might fail.
+        # If we can't use weave.inline to run the C code, compile it as Python code instead for use with
+        # exec. Note: C code with array indexing, basic math operations, and pow() just happens to also
+        # be valid Python.  If the equations ever have more complex things in them, this might fail.
         if not Solver._use_inline:
             code_eqs_py = compile(code_eqs, '<%s odes>' % model.name, 'exec')
         else:
@@ -120,8 +115,7 @@ class Solver(object):
                 exec code_eqs_py in locals()
             return ydot
 
-        # build integrator options list from our defaults and any kwargs passed
-        # to this function
+        # build integrator options list from our defaults and any kwargs passed to this function
         options = {}
         try:
             options.update(default_integrator_options[integrator])
@@ -171,8 +165,7 @@ class Solver(object):
         if param_values is not None:
             # accept vector of parameter values as an argument
             if len(param_values) != len(self.model.parameters):
-                raise Exception("param_values must be the same length as "
-                                "model.parameters")
+                raise Exception("param_values must be the same length as model.parameters")
             if not isinstance(param_values, numpy.ndarray):
                 param_values = numpy.array(param_values)
         else:
@@ -207,8 +200,7 @@ class Solver(object):
         self.integrator.set_f_params(param_values)
         self.y[0] = y0
         i = 1
-        while (self.integrator.successful() and
-               self.integrator.t < self.tspan[-1]):
+        while self.integrator.successful() and self.integrator.t < self.tspan[-1]:
             self.y[i] = self.integrator.integrate(self.tspan[i])
             i += 1
         if self.integrator.t < self.tspan[-1]:
@@ -221,7 +213,7 @@ class Solver(object):
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
         for expr in self.model.expressions_dynamic():
             expr_subs = expr.expand_expr().subs(subs)
-            func = sympy.lambdify(obs_names, expr_subs, "numpy")
+            func = sympy.lambdify(obs_names, expr_subs)
             self.yexpr[expr.name] = func(**obs_dict)
 
 

@@ -11,12 +11,10 @@ def with_model(func):
         SelfExporter.target_module = func.__module__
         SelfExporter.target_globals = func.func_globals
         SelfExporter.target_globals['model'] = model
-        try:
-            # call the actual test function
-            func(*args, **kwargs)
-        finally:
-            # clean up the globals
-            SelfExporter.cleanup()
+        # call the actual test function
+        func(*args, **kwargs)
+        # clean up the globals
+        SelfExporter.cleanup()
     return make_decorator(func)(inner)
 
 def serialize_component_list(model, filename):
