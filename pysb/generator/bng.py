@@ -211,7 +211,8 @@ def warn_caller(message):
     warnings.warn(message, stacklevel=stacklevel)
 
 def sympy_to_muparser(expr):
-    code = sympy.fcode(expr)
+#     code = sympy.fcode(expr)
+    code = sympy.ccode(expr)
     code = code.replace('\n     @', '')
     code = code.replace('**', '^')
     return code
