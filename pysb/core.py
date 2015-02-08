@@ -1016,18 +1016,31 @@ class Expression(Component, sympy.Symbol):
         Component.__init__(self, name, _export)
         self.expr = expr
 
-    def expand_expr(self):
+#     def expand_expr(self):
+#         """Return expr rewritten in terms of terminal symbols only."""
+#         subs = ((a, a.expand_expr()) for a in self.expr.atoms()
+#                 if isinstance(a, Expression))
+#         return self.expr.subs(subs)
+    
+    def expand_expr(self, model):
         """Return expr rewritten in terms of terminal symbols only."""
-        subs = ((a, a.expand_expr()) for a in self.expr.atoms()
-                if isinstance(a, Expression))
+        subs = [ (a, model.expressions[str(a)].expand_expr(model)) 
+                 for a in self.expr.atoms()
+                 if str(a) in [e.name for e in model.expressions] ]
         return self.expr.subs(subs)
 
-    def is_constant_expression(self):
-        """Return True if all terminal symbols are Parameters or numbers."""
-        return all(isinstance(a, Parameter) or
-                   (isinstance(a, Expression) and a.is_constant_expression()) or
+#     def is_constant_expression(self):
+#         """Return True if all terminal symbols are Parameters or numbers."""
+#         return all(isinstance(a, Parameter) or
+#                    (isinstance(a, Expression) and a.is_constant_expression()) or
+#                    isinstance(a, sympy.Number)
+#                    for a in self.expr.atoms())
+
+    def is_constant_expression(self, model):
+        """Return True if all terminal symbols are Parameters or numbers."""        
+        return all(str(a) in [p.name for p in model.parameters] or
                    isinstance(a, sympy.Number)
-                   for a in self.expr.atoms())
+                   for a in self.expand_expr(model).atoms())
 
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
@@ -1205,11 +1218,17 @@ class Model(object):
         cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
         return self.parameters - cset_used
 
+#     def expressions_constant(self):
+#         """Return a ComponentSet of constant expressions."""
+#         cset = ComponentSet(e for e in self.expressions
+#                             if all(isinstance(a, (Parameter, sympy.Number))
+#                                    for a in e.expand_expr().atoms()))
+#         return cset
+    
     def expressions_constant(self):
         """Return a ComponentSet of constant expressions."""
         cset = ComponentSet(e for e in self.expressions
-                            if all(isinstance(a, (Parameter, sympy.Number))
-                                   for a in e.expand_expr().atoms()))
+                            if e.is_constant_expression(self))
         return cset
 
     def expressions_dynamic(self):
@@ -1462,7 +1481,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
 
     It behaves mostly like an ordered set, but components can also be retrieved
     by name *or* index by using the [] operator (like a combination of a dict
-    and a list). Components can not be removed or replaced, but they can be
+    and a list). Components cannot be removed or replaced, but they can be
     renamed. Iteration returns the component objects.
 
     Parameters

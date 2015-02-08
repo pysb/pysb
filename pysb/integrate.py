@@ -92,7 +92,7 @@ class Solver(object):
         code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
         
         for e in model.expressions:
-            code_eqs = re.sub(r'\b(%s)\b' % e.name, '('+sympy.ccode(e.expand_expr())+')', code_eqs)
+            code_eqs = re.sub(r'\b(%s)\b' % e.name, '('+sympy.ccode(e.expand_expr(model))+')', code_eqs)
 
         for obs in model.observables:
             obs_string = ''
@@ -215,7 +215,7 @@ class Solver(object):
                     pi = self.model.parameters.index(value_obj)
                     value = param_values[pi]
                 elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr().evalf(subs=subs)
+                    value = value_obj.expand_expr(model).evalf(subs=subs)
                 else:
                     raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)
@@ -251,7 +251,7 @@ class Solver(object):
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
         for expr in self.model.expressions_dynamic():
-            expr_subs = expr.expand_expr().subs(subs)
+            expr_subs = expr.expand_expr(model).subs(subs)
             func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
