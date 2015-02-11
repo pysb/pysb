@@ -324,7 +324,7 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     return output.getvalue()
 
 
-def generate_equations(model, verbose=False):
+def generate_equations(model, cleanup=True, verbose=False):
     """
     Generate math expressions for reaction rates and species in a model.
 
@@ -342,7 +342,7 @@ def generate_equations(model, verbose=False):
     #   or, use a separate "math model" object to contain ODEs
     if model.odes:
         return
-    lines = iter(generate_network(model,verbose=verbose).split('\n'))
+    lines = iter(generate_network(model,cleanup,verbose=verbose).split('\n'))
     _parse_netfile(model, lines)
 
 

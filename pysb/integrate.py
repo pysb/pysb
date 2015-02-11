@@ -84,10 +84,10 @@ class Solver(object):
                     distutils.errors.CompileError, ImportError):
                 pass
 
-    def __init__(self, model, tspan, integrator='vode', verbose=False, **integrator_options):
+    def __init__(self, model, tspan, integrator='vode', cleanup=True, verbose=False, **integrator_options):
         
         self.verbose = verbose
-        pysb.bng.generate_equations(model,self.verbose)
+        pysb.bng.generate_equations(model,cleanup,self.verbose)
         
         code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
         
@@ -255,7 +255,7 @@ class Solver(object):
             func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
-def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbose=False,
+def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', cleanup=True, verbose=False,
              **integrator_options):
     """Integrate a model's ODEs over a given timespan.
 
@@ -362,7 +362,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbos
 
     """
 
-    solver = Solver(model, tspan, integrator, verbose, **integrator_options)
+    solver = Solver(model, tspan, integrator, cleanup, verbose, **integrator_options)
     solver.run(param_values, y0)
 
     species_names = ['__s%d' % i for i in range(solver.y.shape[1])]
