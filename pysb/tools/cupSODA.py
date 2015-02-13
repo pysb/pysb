@@ -1,3 +1,4 @@
+import pysb
 import os
 import warnings
 import numpy
@@ -5,7 +6,7 @@ import scipy
 import subprocess
 import re
 import itertools
-import pysb
+from scipy.constants import N_A
 
 _cupsoda_path = None
 
@@ -197,7 +198,7 @@ class cupSODA(pysb.integrate.Solver):
         vol : float, optional (default: None)
             System volume. If provided, cupSODA will assume that species counts
             are in number units and will automatically convert them to concentrations
-            by dividing by Avogadro's number * vol.
+            by dividing by N_A*vol (N_A = Avogadro's number).
         outdir : string, optional (default: os.getcwd())
             Output directory.
         prefix : string, optional (default: model.name)
@@ -314,14 +315,13 @@ class cupSODA(pysb.integrate.Solver):
             volume = open(os.path.join(cupsoda_files,"volume"), 'wb')
             volume.write(str(vol))
             volume.close()
-            # Set population of __source() to 6.0221413e23*vol and warn the user
+            # Set population of __source() to N_A*vol and warn the user
             warnings.warn("Number units detected in cupSODA.run(). Setting the population " +
-                          "of __source() (if it exists) equal to 6.0221413e23*"+str(vol)+".")
-            for i, s in enumerate(self.model.species):
-                if str(s) == '__source()':
-                    y0[:,i] = [6.0221413e23*vol for n in y0]
+                          "of __source() (if it exists) equal to %g*%g." % (N_A,vol))
+            for i,sp in enumerate(self.model.species):
+                if str(sp) == '__source()':
+                    y0[:,i] = N_A*vol
                     break
-        
         # MX_0
         MX_0 = open(os.path.join(cupsoda_files,"MX_0"), 'wb')
         for i in range(N_SIMS):
