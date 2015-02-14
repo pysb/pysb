@@ -1128,6 +1128,9 @@ class Model(object):
         self.reactions_bidirectional = []
         self.initial_conditions = []
         self.annotations = []
+        #####
+        self.diffusivities = []
+        #####
         if self._export:
             SelfExporter.export(self)
         if self.base is not None:
