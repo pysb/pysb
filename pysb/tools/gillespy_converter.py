@@ -1,7 +1,7 @@
 import gillespy
 import re
 import sympy
-import bng
+from pysb import bng
 
     
 class pysb2gill(gillespy.Model):
