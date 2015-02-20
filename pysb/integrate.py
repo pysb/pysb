@@ -60,6 +60,12 @@ class Solver(object):
     yobs_view : numpy.ndarray
         An array view (sharing the same data buffer) on ``yobs``. Dimensionality
         is ``(len(tspan), len(model.observables))``.
+    yexpr : numpy.ndarray with record-style data-type
+        Expression trajectories. Length is ``len(tspan)`` and record names
+        follow ``model.expressions_dynamic()`` names.
+    yexpr_view : numpy.ndarray
+        An array view (sharing the same data buffer) on ``yexpr``. Dimensionality
+        is ``(len(tspan), len(model.expressions_dynamic()))``.
     integrator : scipy.integrate.ode
         Integrator object.
 
@@ -143,20 +149,21 @@ class Solver(object):
         self.tspan = tspan
         self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
         self.ydot = numpy.ndarray(len(self.model.species))
-        
+        # observables
         if len(self.model.observables):
             self.yobs = numpy.ndarray(len(self.tspan), zip(self.model.observables.keys(),
                                                       itertools.repeat(float)))
         else:
             self.yobs = numpy.ndarray((len(self.tspan), 0))
+        self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
+        # expressions
         exprs = self.model.expressions_dynamic()
-        
         if len(exprs):
             self.yexpr = numpy.ndarray(len(self.tspan), zip(exprs.keys(),
                                                        itertools.repeat(float)))
         else:
             self.yexpr = numpy.ndarray((len(self.tspan), 0))
-        self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
+        self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
         
         # Integrator
         if scipy.integrate._ode.find_integrator(integrator):
@@ -215,7 +222,7 @@ class Solver(object):
                     pi = self.model.parameters.index(value_obj)
                     value = param_values[pi]
                 elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr(model).evalf(subs=subs)
+                    value = value_obj.expand_expr(self.model).evalf(subs=subs)
                 else:
                     raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)
@@ -246,12 +253,12 @@ class Solver(object):
             self.y[i:, :] = 'nan'
 
         for i, obs in enumerate(self.model.observables): # calculate observables
-            self.yobs_view[:, i] = \
-                (self.y[:, obs.species] * obs.coefficients).sum(1)
+            self.yobs_view[:, i] = (self.y[:, obs.species] * obs.coefficients).sum(1)
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
+        
         for expr in self.model.expressions_dynamic():
-            expr_subs = expr.expand_expr(model).subs(subs)
+            expr_subs = expr.expand_expr(self.model).subs(subs)
             func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
@@ -369,11 +376,20 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', cleanu
     yfull_dtype = zip(species_names, itertools.repeat(float))
     if len(solver.yobs.dtype):
         yfull_dtype += solver.yobs.dtype.descr
+    if len(solver.yexpr.dtype):
+        yfull_dtype += solver.yexpr.dtype.descr
     yfull = numpy.ndarray(len(solver.y), yfull_dtype)
 
+    n_sp = solver.y.shape[1]
+    n_ob = solver.yobs_view.shape[1]
+    n_ex = solver.yexpr_view.shape[1]
+
     yfull_view = yfull.view(float).reshape(len(yfull), -1)
-    yfull_view[:, :solver.y.shape[1]] = solver.y
-    yfull_view[:, solver.y.shape[1]:] = solver.yobs_view
+    yfull_view[:,:n_sp] = solver.y
+    yfull_view[:,n_sp:n_sp+n_ob] = solver.yobs_view
+    yfull_view[:,n_sp+n_ob:n_sp+n_ob+n_ex] = solver.yexpr_view
+#     yfull_view[:, :solver.y.shape[1]] = solver.y
+#     yfull_view[:, solver.y.shape[1]:] = solver.yobs_view
 
     return yfull
 
