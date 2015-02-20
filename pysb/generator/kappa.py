@@ -1,5 +1,6 @@
 import pysb
-from pysb.generator.bng import sympy_to_muparser
+import sympy
+from re import sub
 
 class KappaGenerator(object):
 
@@ -31,11 +32,17 @@ class KappaGenerator(object):
     def generate_parameters(self):
         #self.__content += "begin parameters\n"
         #max_length = max(len(p.name) for p in self.model.parameters)
+        names = [x.name for x in self.model.parameters] + [x.name for x in self.model.expressions]
         for p in self.model.parameters:
-            self.__content += ("%%var \'%s\' %e\n") % (p.name, p.value)
+            self.__content += ("%%var: \'%s\' %e\n") % (p.name, p.value)
         for e in self.model.expressions:
-            self.__content += ("%%var \'%s\' %s\n") % (e.name, e.expr)
+            sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
+            str_expr = str(sympy_to_muparser(e.expr))
+            for n in sym_names:
+                str_expr = str_expr.replace(n,"\'%s\'"%n)
+            self.__content += ("%%var: \'%s\' %s\n") % (e.name, str_expr.replace('**','^'))
         #self.__content += "end parameters\n\n"
+        self.__content += "\n"
 
     #def generate_compartments(self):
     #    self.__content += "begin compartments\n"
@@ -162,7 +169,15 @@ def format_site_condition(site, state):
     else:
         raise Exception("Kappa generator has encountered an unknown element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
-    
+
+def sympy_to_muparser(expr):
+    code = sympy.fcode(expr)
+    code = code.replace('\n @', '')
+    code = code.replace('**', '^')
+    # kasim syntax cannot handle Fortran scientific notation (must use 'e' instead of 'd')
+    code = sub('(?<=[0-9])d','e',code)
+    return code
+
 class InvalidExpressionException(Exception):
     """complx syntax does not allow Expressions"""
     pass
