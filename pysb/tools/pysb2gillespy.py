@@ -62,6 +62,7 @@ def _translate_reactions(model):
             if len(obs.coefficients) > 1: 
                 obs_string = '(' + obs_string + ')'
             rate = re.sub(r'%s' % obs.name, obs_string, rate)
+        # create reaction
         rxn_list.append(gillespy.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
                                           reactants = reactants,\
                                           products = products,\
