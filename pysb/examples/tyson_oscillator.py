@@ -1,11 +1,11 @@
 from pysb import *
 from pysb.macros import *
+from scipy.constants import N_A
 
-model = Model('Tyson1991')
+Model()
 
-NA = Parameter("NA", 6.0221413e23)
-V = Parameter("VOL", 1e-20)
-NA_V = NA.value*V.value
+VOL = 1e-20
+NA_V = N_A*VOL
 
 Parameter('k1', 0.015*NA_V)
 # Parameter('k1', 0.015)
@@ -59,7 +59,7 @@ equilibrate(cdc2(Y='U', b=None), cdc2(Y='P', b=None), [k8, k9])
 
 Observable("YT", cyclin()) # Total Cyclin
 Observable("CT", cdc2()) # Total CDC2
-#Observable("M", cyclin(Y='P', b=1) % cdc2(Y='U', b=1) ) # Active Complex
+Observable("M", cyclin(Y='P', b=1) % cdc2(Y='U', b=1) ) # Active Complex
 
 Observable("Y1", cdc2(Y='U', b=None))
 Observable("Y2", cdc2(Y='P', b=None))
