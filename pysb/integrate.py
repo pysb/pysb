@@ -252,11 +252,13 @@ class Solver(object):
         if self.integrator.t < self.tspan[-1]:
             self.y[i:, :] = 'nan'
 
-        for i, obs in enumerate(self.model.observables): # calculate observables
+        # calculate observables
+        for i, obs in enumerate(self.model.observables): 
             self.yobs_view[:, i] = (self.y[:, obs.species] * obs.coefficients).sum(1)
+        
+        # calculate expressions
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
-        
         for expr in self.model.expressions_dynamic():
             expr_subs = expr.expand_expr(self.model).subs(subs)
             func = sympy.lambdify(obs_names, expr_subs, "numpy")
@@ -388,8 +390,6 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', cleanu
     yfull_view[:,:n_sp] = solver.y
     yfull_view[:,n_sp:n_sp+n_ob] = solver.yobs_view
     yfull_view[:,n_sp+n_ob:n_sp+n_ob+n_ex] = solver.yexpr_view
-#     yfull_view[:, :solver.y.shape[1]] = solver.y
-#     yfull_view[:, solver.y.shape[1]:] = solver.yobs_view
 
     return yfull
 
