@@ -85,50 +85,74 @@ def _translate(model, param_values=None, y0=None, verbose=False):
     return gsp_model
 
 def run_stochkit(model, tspan, param_values=None, y0=None, n_runs=1, seed=None, verbose=False, **additional_args):
-    
+
     generate_equations(model, verbose=verbose)
     gsp_model = _translate(model, param_values=None, y0=None, verbose=verbose)
     trajectories = gillespy.StochKitSolver.run(gsp_model, t=(tspan[-1]-tspan[0]), number_of_trajectories=n_runs, increment=(tspan[1]-tspan[0]), seed=seed, **additional_args)
+
+    # time (just in case they aren't the same for all sims -- possible in BNG)
+    t = np.array(trajectories)[:,:,0]
     
-    # create output array dtype
-    names = ['time'] + ['__s%d' % i for i in range(len(model.species))] 
-    yfull_dtype = zip(names, itertools.repeat(float))
-    if len(model.observables):
-        yfull_dtype += zip(model.observables.keys(), itertools.repeat(float))
-    if len(model.expressions_dynamic()):
-        yfull_dtype += zip(model.expressions_dynamic().keys(), itertools.repeat(float))
+    # species
+    y = np.array(trajectories)[:,:,1:]
 
     # loop over simulations
-    yfull = []
+    yobs = []
+    yobs_view = []
+    yexpr = []
+    yexpr_view = []
     for n in range(n_runs):
         
-        yfull.append(np.ndarray(len(tspan), yfull_dtype))
-        yfull_view = yfull[-1].view(float).reshape((len(tspan), -1))
-        
-        # time
-        yfull_view[:,0] = trajectories[n][:,0]
-
-        # species
-        yfull_view[:,1:1+len(model.species)] = trajectories[n][:,1:]
-        
-        # calculate observables
+        # observables
+        if len(model.observables):
+            yobs.append(np.ndarray(len(t[n]), zip(model.observables.keys(), itertools.repeat(float))))
+        else:
+            yobs.append(numpy.ndarray((len(t[n]), 0)))
+        yobs_view.append(yobs[-1].view(float).reshape(len(yobs[-1]), -1))
         for i,obs in enumerate(model.observables):
-            index = 1+len(model.species)+i
-            obs_species = np.array(obs.species)+1 # element 0 is time
-            yfull_view[:,index] = (trajectories[n][:,obs_species] * obs.coefficients).sum(axis=1)
-            
-        # calculate expressions
+            yobs_view[-1][:,i] = (y[n,:,obs.species] * obs.coefficients).sum(axis=1)
+        
+        # expressions
+        exprs = model.expressions_dynamic()
+        if len(exprs):
+            yexpr.append(numpy.ndarray(len(t[n]), zip(exprs.keys(), itertools.repeat(float))))
+        else:
+            yexpr.append(np.ndarray((len(t[n]), 0)))
+        yexpr_view.append(yexpr[-1].view(float).reshape(len(yexpr[-1]), -1))
         if not param_values:
             param_values = [p.value for p in model.parameters]
         p_subs = { p.name : param_values[i] for i,p in enumerate(model.parameters) }
         obs_names = model.observables.keys()
-        obs_dict = { name : yfull_view[:,1+len(model.species)+i] for i,name in enumerate(obs_names) }
+        obs_dict = { name : yobs_view[-1][:,i] for i,name in enumerate(obs_names) }
         for i,expr in enumerate(model.expressions_dynamic()):
-            index = 1+len(model.species)+len(model.observables)+i
             expr_subs = expr.expand_expr(model).subs(p_subs)
             func = sympy.lambdify(obs_names, expr_subs, "numpy")
-            yfull_view[:,index] = func(**obs_dict)
+            yexpr_view[-1][:,i] = func(**obs_dict)
+        
+    yobs = np.array(yobs)
+    yobs_view = np.array(yobs_view)
+    yexpr = np.array(yexpr)
+    yexpr_view = np.array(yexpr_view)
+    
+    # full output
+    sp_names = ['__s%d' % i for i in range(len(model.species))] 
+    yfull_dtype = zip(sp_names, itertools.repeat(float))
+    if len(model.observables):
+        yfull_dtype += zip(model.observables.keys(), itertools.repeat(float))
+    if len(model.expressions_dynamic()):
+        yfull_dtype += zip(model.expressions_dynamic().keys(), itertools.repeat(float))
+    yfull = []
+    for n in range(n_runs):
+        yfull.append(np.ndarray(len(t[n]), yfull_dtype))
+        yfull_view = yfull[-1].view(float).reshape((len(yfull[-1]), -1))
+        n_sp = y[n].shape[1]
+        n_ob = yobs_view[n].shape[1]
+        n_ex = yexpr_view[n].shape[1]
+        yfull_view[:,:n_sp] = y[n]
+        yfull_view[:,n_sp:n_sp+n_ob] = yobs_view[n]
+        yfull_view[:,n_sp+n_ob:n_sp+n_ob+n_ex] = yexpr_view[n]
         
     yfull = np.array(yfull)
-    return yfull
-        
+
+    return t, yfull
+    
