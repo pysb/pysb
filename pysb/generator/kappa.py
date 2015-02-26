@@ -161,8 +161,8 @@ def format_site_condition(site, state):
     elif type(state) == str:
         state_code = '~' + state
     elif type(state) == tuple:
-        if state[1] == pysb.ANY:
-            state = (state[1], '_')
+        if state[1] == pysb.core.ANY:
+            state = (state[0], '_')
         state_code = '~%s!%s' % state if state[1] != pysb.WILD else '~%s?' % state[0]
     elif state == pysb.ANY:
         state_code = '!_'
