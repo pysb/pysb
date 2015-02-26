@@ -40,6 +40,9 @@ class Solver(object):
     integrator : string, optional (default: 'vode')
         Name of the integrator to use, taken from the list of integrators known
         to :py:class:`scipy.integrate.ode`.
+    cleanup : bool, optional
+        If True (default), delete the temporary files after the simulation is
+        finished. If False, leave them in place. Useful for debugging.
     verbose : bool, optional (default: False)
         Verbose output 
     integrator_options
@@ -149,6 +152,7 @@ class Solver(object):
         self.tspan = tspan
         self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
         self.ydot = numpy.ndarray(len(self.model.species))
+        
         # observables
         if len(self.model.observables):
             self.yobs = numpy.ndarray(len(self.tspan), zip(self.model.observables.keys(),
@@ -156,6 +160,7 @@ class Solver(object):
         else:
             self.yobs = numpy.ndarray((len(self.tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
+        
         # expressions
         exprs = self.model.expressions_dynamic()
         if len(exprs):
