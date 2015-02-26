@@ -1,3 +1,4 @@
+from pysb.simulate import Simulator
 import gillespy
 from pysb.bng import generate_equations
 import re
@@ -77,82 +78,105 @@ def _translate_reactions(model):
                                           propensity_function = rate))        
     return rxn_list
     
-def _translate(model, param_values=None, y0=None, verbose=False):
+def _translate(model, param_values=None, y0=None):
     gsp_model = gillespy.Model(model.name)
     gsp_model.add_parameter(_translate_parameters(model, param_values))
     gsp_model.add_species(_translate_species(model, y0))
     gsp_model.add_reaction(_translate_reactions(model))
     return gsp_model
 
+class StochKitSimulator(Simulator):
+        
+    def __init__(self, model, tspan=None, cleanup=True, verbose=False):
+        super(StochKitSimulator, self).__init__(model, tspan, verbose)
+        generate_equations(self.model, cleanup, self.verbose)
+    
+    def run(self, tspan=None, param_values=None, y0=None, n_runs=1, seed=None, **additional_args):
+
+        if tspan is not None:
+            self.tspan = tspan
+        elif self.tspan is None:
+            raise Exception("'tspan' must be defined.")
+        
+        gsp_model = _translate(self.model, param_values, y0)
+        trajectories = gillespy.StochKitSolver.run(gsp_model, t=(self.tspan[-1]-self.tspan[0]), number_of_trajectories=n_runs, \
+                                                   increment=(self.tspan[1]-self.tspan[0]), seed=seed, **additional_args)
+    
+        # output time points (in case they aren't the same tspan, which is possible in BNG)
+        self.tout = np.array(trajectories)[:,:,0] + self.tspan[0]
+        # species
+        self.y = np.array(trajectories)[:,:,1:]
+        # observables and expressions
+        self._calc_yobs_yexpr(param_values)
+        
+    def _calc_yobs_yexpr(self, param_values=None):
+        
+        self.yobs = []
+        self.yobs_view = []
+        self.yexpr = []
+        self.yexpr_view = []
+        
+        # loop over simulations
+        for n in range(len(self.y)):
+            
+            # observables
+            if len(self.model.observables):
+                self.yobs.append(np.ndarray(len(self.tout[n]), zip(self.model.observables.keys(), itertools.repeat(float))))
+            else:
+                self.yobs.append(np.ndarray((len(self.tout[n]), 0)))
+            self.yobs_view.append(self.yobs[-1].view(float).reshape(len(self.yobs[-1]), -1))
+            for i,obs in enumerate(self.model.observables):
+                self.yobs_view[-1][:,i] = (self.y[n][:,obs.species] * obs.coefficients).sum(axis=1)
+            
+            # expressions
+            exprs = self.model.expressions_dynamic()
+            if len(exprs):
+                self.yexpr.append(np.ndarray(len(self.tout[n]), zip(exprs.keys(), itertools.repeat(float))))
+            else:
+                self.yexpr.append(np.ndarray((len(self.tout[n]), 0)))
+            self.yexpr_view.append(self.yexpr[-1].view(float).reshape(len(self.yexpr[-1]), -1))
+            if not param_values:
+                param_values = [p.value for p in self.model.parameters]
+            p_subs = { p.name : param_values[i] for i,p in enumerate(self.model.parameters) }
+            obs_names = self.model.observables.keys()
+            obs_dict = { name : self.yobs_view[-1][:,i] for i,name in enumerate(obs_names) }
+            for i,expr in enumerate(self.model.expressions_dynamic()):
+                expr_subs = expr.expand_expr(self.model).subs(p_subs)
+                func = sympy.lambdify(obs_names, expr_subs, "numpy")
+                self.yexpr_view[-1][:,i] = func(**obs_dict)
+            
+        self.yobs = np.array(self.yobs)
+        self.yobs_view = np.array(self.yobs_view)
+        self.yexpr = np.array(self.yexpr)
+        self.yexpr_view = np.array(self.yexpr_view)
+    
+    def get_yfull(self):
+        
+        sp_names = ['__s%d' % i for i in range(len(self.model.species))] 
+        yfull_dtype = zip(sp_names, itertools.repeat(float))
+        if len(self.model.observables):
+            yfull_dtype += zip(self.model.observables.keys(), itertools.repeat(float))
+        if len(self.model.expressions_dynamic()):
+            yfull_dtype += zip(self.model.expressions_dynamic().keys(), itertools.repeat(float))
+        yfull = []
+        # loop over simulations
+        for n in range(len(self.y)):
+            yfull.append(np.ndarray(len(self.tout[n]), yfull_dtype))
+            yfull_view = yfull[-1].view(float).reshape((len(yfull[-1]), -1))
+            n_sp = self.y[n].shape[1]
+            n_ob = self.yobs_view[n].shape[1]
+            n_ex = self.yexpr_view[n].shape[1]
+            yfull_view[:,:n_sp] = self.y[n]
+            yfull_view[:,n_sp:n_sp+n_ob] = self.yobs_view[n]
+            yfull_view[:,n_sp+n_ob:n_sp+n_ob+n_ex] = self.yexpr_view[n]
+            
+        yfull = np.array(yfull)
+        return yfull
+
 def run_stochkit(model, tspan, param_values=None, y0=None, n_runs=1, seed=None, verbose=False, **additional_args):
 
-    generate_equations(model, verbose=verbose)
-    gsp_model = _translate(model, param_values=None, y0=None, verbose=verbose)
-    trajectories = gillespy.StochKitSolver.run(gsp_model, t=(tspan[-1]-tspan[0]), number_of_trajectories=n_runs, increment=(tspan[1]-tspan[0]), seed=seed, **additional_args)
-
-    # time (just in case they aren't the same for all sims -- possible in BNG)
-    t = np.array(trajectories)[:,:,0]
-    
-    # species
-    y = np.array(trajectories)[:,:,1:]
-
-    # loop over simulations
-    yobs = []
-    yobs_view = []
-    yexpr = []
-    yexpr_view = []
-    for n in range(n_runs):
-        
-        # observables
-        if len(model.observables):
-            yobs.append(np.ndarray(len(t[n]), zip(model.observables.keys(), itertools.repeat(float))))
-        else:
-            yobs.append(numpy.ndarray((len(t[n]), 0)))
-        yobs_view.append(yobs[-1].view(float).reshape(len(yobs[-1]), -1))
-        for i,obs in enumerate(model.observables):
-            yobs_view[-1][:,i] = (y[n,:,obs.species] * obs.coefficients).sum(axis=1)
-        
-        # expressions
-        exprs = model.expressions_dynamic()
-        if len(exprs):
-            yexpr.append(numpy.ndarray(len(t[n]), zip(exprs.keys(), itertools.repeat(float))))
-        else:
-            yexpr.append(np.ndarray((len(t[n]), 0)))
-        yexpr_view.append(yexpr[-1].view(float).reshape(len(yexpr[-1]), -1))
-        if not param_values:
-            param_values = [p.value for p in model.parameters]
-        p_subs = { p.name : param_values[i] for i,p in enumerate(model.parameters) }
-        obs_names = model.observables.keys()
-        obs_dict = { name : yobs_view[-1][:,i] for i,name in enumerate(obs_names) }
-        for i,expr in enumerate(model.expressions_dynamic()):
-            expr_subs = expr.expand_expr(model).subs(p_subs)
-            func = sympy.lambdify(obs_names, expr_subs, "numpy")
-            yexpr_view[-1][:,i] = func(**obs_dict)
-        
-    yobs = np.array(yobs)
-    yobs_view = np.array(yobs_view)
-    yexpr = np.array(yexpr)
-    yexpr_view = np.array(yexpr_view)
-    
-    # full output
-    sp_names = ['__s%d' % i for i in range(len(model.species))] 
-    yfull_dtype = zip(sp_names, itertools.repeat(float))
-    if len(model.observables):
-        yfull_dtype += zip(model.observables.keys(), itertools.repeat(float))
-    if len(model.expressions_dynamic()):
-        yfull_dtype += zip(model.expressions_dynamic().keys(), itertools.repeat(float))
-    yfull = []
-    for n in range(n_runs):
-        yfull.append(np.ndarray(len(t[n]), yfull_dtype))
-        yfull_view = yfull[-1].view(float).reshape((len(yfull[-1]), -1))
-        n_sp = y[n].shape[1]
-        n_ob = yobs_view[n].shape[1]
-        n_ex = yexpr_view[n].shape[1]
-        yfull_view[:,:n_sp] = y[n]
-        yfull_view[:,n_sp:n_sp+n_ob] = yobs_view[n]
-        yfull_view[:,n_sp+n_ob:n_sp+n_ob+n_ex] = yexpr_view[n]
-        
-    yfull = np.array(yfull)
-
-    return t, yfull
+    sim = StochKitSimulator(model, verbose=verbose)
+    sim.run(tspan, param_values, y0, n_runs, seed, **additional_args)
+    yfull = sim.get_yfull()
+    return sim.tout, yfull
     
