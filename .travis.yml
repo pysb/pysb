@@ -3,6 +3,10 @@ sudo: false
 python:
 - '2.7'
 - '3.4'
+addons:
+    apt:
+        packages:
+            ocaml-native-compilers
 before_install:
 - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
 - chmod +x miniconda.sh
@@ -17,6 +21,11 @@ before_install:
     -O BioNetGen-2.2.6-stable.tar.gz
 - tar xzf BioNetGen-2.2.6-stable.tar.gz
 - export BNGPATH=`pwd`/BioNetGen-2.2.6-stable
+- wget https://github.com/Kappa-Dev/KaSim/archive/KaSim3.zip
+- unzip KaSim3.zip
+- cd KaSim-KaSim3
+- make
+- export KAPPA_HOME=`pwd`/KaSim
 install:
   python setup.py build --build-lib=build/lib
 script:
