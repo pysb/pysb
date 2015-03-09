@@ -5,9 +5,15 @@ virtualenv:
   system_site_packages: true
 before_install:
   - sudo apt-get install python-scipy
+  - sudo apt-get install ocaml-native-compilers
 install:
   - pip install sympy
   - wget http://bionetgen.googlecode.com/files/BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
   - sudo ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
+  - wget https://github.com/Kappa-Dev/KaSim/archive/KaSim3.zip
+  - unzip KaSim3.zip
+  - cd KaSim-KaSim3
+  - make
+  - sudo ln -s `pwd`/KaSim /usr/local/share/KaSim
 script: nosetests
