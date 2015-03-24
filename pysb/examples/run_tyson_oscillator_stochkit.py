@@ -1,5 +1,5 @@
 from pysb.examples.tyson_oscillator import model 
-from pysb.tools.pysb2gillespy import run_stochkit
+from pysb.tools.stochkit import run_stochkit
 import numpy as np
 import matplotlib.pyplot as plt
 
