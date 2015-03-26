@@ -10,22 +10,24 @@ def _translate_parameters(model, param_values=None):
     # Error check
     if param_values and len(param_values) != len(model.parameters):
         raise Exception("len(param_values) must equal len(model.parameters)")
-    param_list = []
     unused = model.parameters_unused()
+    param_list = (len(model.parameters)-len(unused)) * [None]
+    count = 0
     for i,p in enumerate(model.parameters):
         if p not in unused:
             if param_values:
                 val=param_values[i]
             else:
                 val=p.value
-            param_list.append(gillespy.Parameter(name=p.name, expression=val))
+            param_list[count] = gillespy.Parameter(name=p.name, expression=val)
+            count += 1
     return param_list
 
 def _translate_species(model, y0=None):
     # Error check
     if y0 and len(y0) != len(model.species):
         raise Exception("len(y0) must equal len(model.species)")            
-    species_list = []
+    species_list = len(model.species) * [None]
     for i,sp in enumerate(model.species):
         val = 0.
         if y0:
@@ -34,11 +36,11 @@ def _translate_species(model, y0=None):
             for ic in model.initial_conditions:
                 if str(ic[0]) == str(sp):
                     val=np.round(ic[1].value)
-        species_list.append(gillespy.Species(name="__s%d" % i,initial_value=val))
+        species_list[i] = gillespy.Species(name="__s%d" % i,initial_value=val)
     return species_list
     
 def _translate_reactions(model):
-    rxn_list = []
+    rxn_list = len(model.reactions) * [None]
     for n,rxn in enumerate(model.reactions):
         reactants = {}
         products = {}
@@ -72,10 +74,10 @@ def _translate_reactions(model):
                 obs_string = '(' + obs_string + ')'
             rate = re.sub(r'%s' % obs.name, obs_string, rate)
         # create reaction
-        rxn_list.append(gillespy.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
-                                          reactants = reactants,\
-                                          products = products,\
-                                          propensity_function = rate))        
+        rxn_list[n] = gillespy.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
+                                        reactants = reactants,\
+                                        products = products,\
+                                        propensity_function = rate) 
     return rxn_list
     
 def _translate(model, param_values=None, y0=None):
@@ -111,39 +113,39 @@ class StochKitSimulator(Simulator):
         
     def _calc_yobs_yexpr(self, param_values=None):
         
-        self.yobs = []
-        self.yobs_view = []
-        self.yexpr = []
-        self.yexpr_view = []
+        self.yobs = len(self.y) * [None]
+        self.yobs_view = len(self.y) * [None]
+        self.yexpr = len(self.y) * [None]
+        self.yexpr_view = len(self.y) * [None]
         
         # loop over simulations
         for n in range(len(self.y)):
             
             # observables
             if len(self.model.observables):
-                self.yobs.append(np.ndarray(len(self.tout[n]), zip(self.model.observables.keys(), itertools.repeat(float))))
+                self.yobs[n] = np.ndarray(len(self.tout[n]), zip(self.model.observables.keys(), itertools.repeat(float)))
             else:
-                self.yobs.append(np.ndarray((len(self.tout[n]), 0)))
-            self.yobs_view.append(self.yobs[-1].view(float).reshape(len(self.yobs[-1]), -1))
+                self.yobs[n] = np.ndarray((len(self.tout[n]), 0))
+            self.yobs_view[n] = self.yobs[n].view(float).reshape(len(self.yobs[n]), -1)
             for i,obs in enumerate(self.model.observables):
-                self.yobs_view[-1][:,i] = (self.y[n][:,obs.species] * obs.coefficients).sum(axis=1)
+                self.yobs_view[n][:,i] = (self.y[n][:,obs.species] * obs.coefficients).sum(axis=1)
             
             # expressions
             exprs = self.model.expressions_dynamic()
             if len(exprs):
-                self.yexpr.append(np.ndarray(len(self.tout[n]), zip(exprs.keys(), itertools.repeat(float))))
+                self.yexpr[n] = np.ndarray(len(self.tout[n]), zip(exprs.keys(), itertools.repeat(float)))
             else:
-                self.yexpr.append(np.ndarray((len(self.tout[n]), 0)))
-            self.yexpr_view.append(self.yexpr[-1].view(float).reshape(len(self.yexpr[-1]), -1))
+                self.yexpr[n] = np.ndarray((len(self.tout[n]), 0))
+            self.yexpr_view[n] = self.yexpr[n].view(float).reshape(len(self.yexpr[n]), -1)
             if not param_values:
                 param_values = [p.value for p in self.model.parameters]
             p_subs = { p.name : param_values[i] for i,p in enumerate(self.model.parameters) }
             obs_names = self.model.observables.keys()
-            obs_dict = { name : self.yobs_view[-1][:,i] for i,name in enumerate(obs_names) }
+            obs_dict = { name : self.yobs_view[n][:,i] for i,name in enumerate(obs_names) }
             for i,expr in enumerate(self.model.expressions_dynamic()):
                 expr_subs = expr.expand_expr(self.model).subs(p_subs)
                 func = sympy.lambdify(obs_names, expr_subs, "numpy")
-                self.yexpr_view[-1][:,i] = func(**obs_dict)
+                self.yexpr_view[n][:,i] = func(**obs_dict)
             
         self.yobs = np.array(self.yobs)
         self.yobs_view = np.array(self.yobs_view)
@@ -158,11 +160,11 @@ class StochKitSimulator(Simulator):
             yfull_dtype += zip(self.model.observables.keys(), itertools.repeat(float))
         if len(self.model.expressions_dynamic()):
             yfull_dtype += zip(self.model.expressions_dynamic().keys(), itertools.repeat(float))
-        yfull = []
+        yfull = len(self.y) * [None]
         # loop over simulations
         for n in range(len(self.y)):
-            yfull.append(np.ndarray(len(self.tout[n]), yfull_dtype))
-            yfull_view = yfull[-1].view(float).reshape((len(yfull[-1]), -1))
+            yfull[n] = np.ndarray(len(self.tout[n]), yfull_dtype)
+            yfull_view = yfull[n].view(float).reshape((len(yfull[n]), -1))
             n_sp = self.y[n].shape[1]
             n_ob = self.yobs_view[n].shape[1]
             n_ex = self.yexpr_view[n].shape[1]
