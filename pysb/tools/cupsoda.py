@@ -1,12 +1,12 @@
-import pysb
+from pysb.simulate import Simulator
+from pysb.bng import generate_equations
+import numpy as np
+from scipy.constants import N_A
 import os
 import warnings
-import numpy
-import scipy
 import subprocess
 import re
 import itertools
-from scipy.constants import N_A
 
 _cupsoda_path = None
 
@@ -15,11 +15,13 @@ _cupsoda_path = None
 # Obviously, the only integrator currently supported is "cupSODA" (case insensitive).
 default_integrator_options = {
     'cupsoda': {
-        'gen_net': False,       # Force network generation?
-        'atol': 1e-8,           # Absolute tolerance
-        'rtol': 1e-8,           # Relative tolerance
-        'n_blocks': None,       # Number of GPU blocks
-        'gpu': 0,               # Which GPU
+        'atol': 1e-8,               # absolute tolerance
+        'rtol': 1e-8,               # relative tolerance
+        'n_blocks': None,           # number of GPU blocks
+        'gpu': 0,                   # which GPU
+        'vol': None,                # volume
+        'obs_species_only': True,   # print only observable species
+        'load_ydata': True,         # load conc data after simulation
         },
     }
 
@@ -38,7 +40,7 @@ def _get_cupSODA_path():
     Return the path to the cupSODA executable.
 
     Looks for the cupSODA executable in a few hard-coded standard locations
-    or in a user-defined location set via set_cupSODA_path().
+    or in a user-defined location set via ``set_cupSODA_path``.
 
     """
     global _cupsoda_path
@@ -73,27 +75,33 @@ def _get_cupSODA_path():
     _cupsoda_path = bin_path
     return bin_path
 
-class cupSODA(pysb.integrate.Solver):
-    """An interface for parallel numerical integration of models.
+class CupSODASimulator(Simulator):
+    """An interface for running cupSODA, a CUDA implementation of LSODA.
     Parameters
     ----------
     model : pysb.Model
         Model to integrate.
-    tspan : vector-like
+    tspan : vector-like, optional (default: None)
         Time values at which the integrations are sampled. The first and last values 
         define the time range.
+    cleanup : bool, optional
+        If True (default), delete the temporary files after the simulation is
+        finished. If False, leave them in place. Useful for debugging.
+    verbose : bool, optional (default: False)
+        Verbose output 
     integrator : string, optional (default: 'cupsoda')
         Name of the integrator to use, taken from the integrators listed in 
         pysb.tools.cupSODA.default_integrator_options.
-    verbose : bool, optional (default: False)
-        Verbose output 
     integrator_options :
-        * gen_net  : for models with already generated networks, force regeneration 
-                     (default: False)
-        * atol     : absolute tolerance (default: 1e-8)
-        * rtol     : relative tolerance (default: 1e-8)
-        * n_blocks : number of GPU blocks (default: 64)
-        * gpu      : index of GPU to run on (default: 0)
+        * atol             : absolute tolerance (default: 1e-8)
+        * rtol             : relative tolerance (default: 1e-8)
+        * n_blocks         : number of GPU blocks (default: 64)
+        * gpu              : index of GPU to run on (default: 0)
+        * vol              : volume (required if number units; default: None)
+        * obs_species_only : print only the concentrations of species in observables 
+                             (default: True)
+        * load_ydata       : read species concentrations from output files after simulation 
+                             (default: True)
 
     Attributes
     ----------
@@ -101,19 +109,24 @@ class cupSODA(pysb.integrate.Solver):
         Verbose output.
     model : pysb.Model
         Model passed to the constructor.
-    tspan : vector-like
+    tspan : vector-like, optional 
         Time values passed to the constructor.
-    y : dict{ int : numpy.ndarray }
-        Species trajectories for each simulation. Keys are simulation number,
-        vals are arrays with dimensionality ``(len(tspan), len(model.species))``.
-    yobs : dict{ int : numpy.ndarray (with record-style data-type) }
-        Observable trajectories for each simulation. Keys are simulation number,
-        vals are arrays with length ``len(tspan)``; record names follow 
-        ``model.observables`` names.
-    yobs_view : dict{ int : numpy.ndarray }
-        Array views (sharing the same data buffer) on each array in ``yobs``. 
-        Keys are simulation number, vals are arrays with dimensionality
-        ``(len(tspan), len(model.observables))``.
+    y : numpy.ndarray
+        Species trajectories for each simulation. Dimensionality is
+        ``(n_sims, len(tspan), len(model.species))``.
+    yobs : numpy.ndarray (with record-style data-type)
+        Observable trajectories for each simulation. Dimensionality is
+        ``(n_sims, len(tspan))``; record names follow ``model.observables`` 
+        names.
+    yobs_view : numpy.ndarray
+        Array view (sharing the same data buffer) on ``yobs``. 
+        Dimensionality is ``(n_sims, len(tspan), len(model.observables))``.
+    yexpr : numpy.ndarray with record-style data-type
+        Expression trajectories. Dimensionality is ``(n_sims, len(tspan))`` 
+        and record names follow ``model.expressions_dynamic()`` names.
+    yexpr_view : numpy.ndarray
+        An array view (sharing the same data buffer) on ``yexpr``. Dimensionality
+        is ``(n_sims, len(tspan), len(model.expressions_dynamic()))``.
     atol : float
         Absolute tolerance.
     rtol : float
@@ -148,39 +161,25 @@ class cupSODA(pysb.integrate.Solver):
        method is called directly.
     """
     
-    def __init__(self, model, tspan, integrator='cupsoda', verbose=False, **integrator_options):
+    def __init__(self, model, tspan=None, cleanup=True, verbose=False, integrator='cupsoda', **integrator_options):
+        super(CupSODASimulator, self).__init__(model, tspan, verbose)
+        generate_equations(self.model, cleanup, self.verbose)
 
-        self.verbose = verbose
-
-        # Build integrator options list from our defaults and any kwargs passed to this function
-        options = {}
+        # Set integrator options to defaults
+        self.options = {}
         integrator = integrator.lower() # case insensitive
         if default_integrator_options.get(integrator.lower()):
-            options.update(default_integrator_options[integrator]) # default options
+            self.options.update(default_integrator_options[integrator])
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
-        # overwrite defaults
-        options.update(integrator_options)
-
-        # Generate reaction network if it doesn't already exist or if explicitly requested
-        if ( len(model.reactions)==0 and len(model.species)==0 ) or options.get('gen_net')==True:
-            pysb.bng.generate_equations(model,self.verbose)
-
-        # Set variables
-        self.model = model
-        self.tspan = tspan
-        self.atol = options.get('atol')
-        self.rtol = options.get('rtol')
         
-        # Initialize 'y', 'yobs', and 'yobs_view' as empty dictionaries
-        self.y = {}
-        self.yobs = {}
-        self.yobs_view = {}
+        # overwrite default integrator options
+        self.options.update(integrator_options)   
 
-    def run(self, param_values, y0, gpu=0, n_blocks=None, vol=None, outdir=os.getcwd(), prefix=None, obs_species_only=True, load_conc_data=True):
+    def run(self, param_values, y0, tspan=None, outdir=os.getcwd(), prefix=None, **integrator_options):
         """Perform a set of integrations.
 
-        Returns nothing; if load_conc_data=True, can access the object's 
+        Returns nothing; if load_ydata=True, can access the object's 
         ``y``, ``yobs``, or ``yobs_view`` attributes to retrieve the results.
 
         Parameters
@@ -191,31 +190,35 @@ class cupSODA(pysb.integrate.Solver):
         y0 : list-like
             Initial species concentrations for all reactions for all simulations. 
             Dimensions are ``(N_SIMS, len(model.species))``.
-        n_blocks : int, optional
-            Number of GPU blocks.
-        gpu : int, optional (default: 0)
-            Index of GPU to run on.
-        vol : float, optional (default: None)
-            System volume. If provided, cupSODA will assume that species counts
-            are in number units and will automatically convert them to concentrations
-            by dividing by N_A*vol (N_A = Avogadro's number).
+        tspan : vector-like, optional
+            Time values (exception thrown if set to None both here and in constructor).
         outdir : string, optional (default: os.getcwd())
             Output directory.
         prefix : string, optional (default: model.name)
             Output files will be named "prefix_i", for i=[0,N_SIMS).
-        obs_species_only : bool, optional (default: True)
-            Specifies whether to print only the concentrations of species in observables. 
-            A value of 'False' forces concentrations for *all* species to be printed.
-        load_conc_data: bool, optional (default: True)
-            Specifies whether species concentrations should be read in from output files 
-            after simulation. If obs_species_only=True, concentrations of species not in 
-            observables are set to 'nan'.
+        integrator_options : See CupSODASimulator constructor.
+        
+        Notes
+        -----
+        If 'vol' is provided, cupSODA will assume that species counts are in number units 
+        and will automatically convert them to concentrations by dividing by N_A*vol 
+        (N_A = Avogadro's number).
+        
+        If load_ydata=True and obs_species_only=True, concentrations of species not in 
+        observables are set to 'nan'.
         """
+        # make sure tspan is defined somewhere
+        if tspan is not None:
+            self.tspan = tspan
+        elif self.tspan is None:
+            raise Exception("'tspan' must be defined.")
         
-        self.outdir = outdir
+        # overwrite default integrator options
+        self.options.update(integrator_options)        
         
-        param_values = numpy.array(param_values)
-        y0 = numpy.array(y0)
+        # just to be safe
+        param_values = np.array(param_values)
+        y0 = np.array(y0)
         
         # Error checks on 'param_values' and 'y0'
         if len(param_values) != len(y0):
@@ -226,10 +229,13 @@ class cupSODA(pysb.integrate.Solver):
             raise Exception("'y0' must be a 2D array with dimensions N_SIMS x N_SPECIES: y0.shape=" + str(y0.shape))
         
         # Create outdir if it doesn't exist
-        if not os.path.exists(self.outdir): os.makedirs(self.outdir)
+        self.outdir = outdir
+        if not os.path.exists(self.outdir): 
+            os.makedirs(self.outdir)
 
         # Default prefix is model name
-        if not prefix: prefix = self.model.name
+        if not prefix: 
+            prefix = self.model.name
         
         # Path to cupSODA executable
         bin_path = _get_cupSODA_path() 
@@ -241,12 +247,9 @@ class cupSODA(pysb.integrate.Solver):
                 os.remove(os.path.join(cupsoda_files,f))
         else:
             os.mkdir(cupsoda_files)
-            
-        # Number of sims, rxns, and species
-        N_SIMS,N_RXNS = param_values.shape
-        N_SPECIES = len(y0[0])
         
         # Simple default for number of blocks
+        n_blocks = self.options.get('n_blocks')
         if not n_blocks:
             shared_memory_per_block = 48*1024 # bytes
             default_threads_per_block = 32
@@ -256,30 +259,52 @@ class cupSODA(pysb.integrate.Solver):
             upper_limit_threads_per_block = 512
             max_threads_per_block = min( shared_memory_per_block/memory_per_thread , upper_limit_threads_per_block )
             threads_per_block = min( max_threads_per_block , default_threads_per_block )
-            n_blocks = int(numpy.ceil(1.*N_SIMS/threads_per_block))
+            n_sims = param_values.shape[0]
+            n_blocks = int(np.ceil(1.*n_sims/threads_per_block))
+        
+        # Create cupSODA input files
+        self._create_input_files(cupsoda_files, param_values, y0)
+            
+        # Build command
+        command = [bin_path, cupsoda_files, str(n_blocks), self.outdir, prefix, str(self.options.get('gpu')), str(0)]
+        print "Running cupSODA: " + ' '.join(command)
+        
+        # Run simulation
+        subprocess.call(command)
+
+        # Load concentration data if requested   
+        if self.options.get('load_ydata'):
+            self._get_y(prefix=prefix)
+            self._calc_yobs_yexpr(param_values)
+    
+    def _create_input_files(self, cupsoda_files, param_values, y0):
+        
+        # Number of sims, rxns, and species
+        n_sims,n_rxns = param_values.shape
+        n_species = len(y0[0])
         
         # atol_vector 
         atol_vector = open(os.path.join(cupsoda_files,"atol_vector"), 'wb')
         for i in range(len(self.model.species)):
-            atol_vector.write(str(self.atol))
+            atol_vector.write(str(self.options.get('atol')))
             if i < len(self.model.species)-1: atol_vector.write("\n")
         atol_vector.close()
         
         # c_matrix
         c_matrix = open(os.path.join(cupsoda_files,"c_matrix"), 'wb')
-        for i in range(N_SIMS):
+        for i in range(n_sims):
             line = ""
-            for j in range(N_RXNS):
+            for j in range(n_rxns):
                 if j > 0: line += "\t"
                 line += str(param_values[i][j])
             c_matrix.write(line)
-            if i < N_SIMS-1: c_matrix.write("\n")
+            if i < n_sims-1: c_matrix.write("\n")
         c_matrix.close()
         
         # cs_vector
         cs_vector = open(os.path.join(cupsoda_files,"cs_vector"), 'wb')
         out_species = range(len(self.model.species))
-        if obs_species_only:
+        if self.options.get('obs_species_only'):
             out_species = [False for sp in self.model.species]
             for obs in self.model.observables:
                 for i in obs.species:
@@ -306,8 +331,11 @@ class cupSODA(pysb.integrate.Solver):
         
         # modelkind
         modelkind = open(os.path.join(cupsoda_files,"modelkind"), 'wb')
-        if not vol: modelkind.write("deterministic")
-        else: modelkind.write("stochastic")
+        vol = self.options.get('vol')
+        if not vol: 
+            modelkind.write("deterministic")
+        else: 
+            modelkind.write("stochastic")
         modelkind.close()
         
         # volume
@@ -324,13 +352,13 @@ class cupSODA(pysb.integrate.Solver):
                     break
         # MX_0
         MX_0 = open(os.path.join(cupsoda_files,"MX_0"), 'wb')
-        for i in range(N_SIMS):
+        for i in range(n_sims):
             line = ""
-            for j in range(N_SPECIES):
+            for j in range(n_species):
                 if j > 0: line += "\t"
                 line += str(y0[i][j])
             MX_0.write(line)
-            if i < N_SIMS-1: MX_0.write("\n")
+            if i < n_sims-1: MX_0.write("\n")
         MX_0.close()
         
         # right_side
@@ -349,7 +377,7 @@ class cupSODA(pysb.integrate.Solver):
         
         # rtol
         rtol = open(os.path.join(cupsoda_files,"rtol"), 'wb')
-        rtol.write(str(self.rtol))
+        rtol.write(str(self.options.get('rtol')))
         rtol.close()
         
         # t_vector
@@ -362,24 +390,12 @@ class cupSODA(pysb.integrate.Solver):
         # time_max
         time_max = open(os.path.join(cupsoda_files,"time_max"), 'wb')
         time_max.write(str(float(self.tspan[-1])))
-        time_max.close()
-            
-        # Build command
-        command = [bin_path, cupsoda_files, str(n_blocks), self.outdir, prefix, str(gpu), str(0)]
-        print "Running cupSODA: " + ' '.join(command)
-        
-        # Run simulation
-        subprocess.call(command)
+        time_max.close() 
+    
+    def _get_y(self, indir=None, prefix=None, out_species=None):
+        """Read simulation results from output files. 
 
-        # Load concentration data if requested   
-        if load_conc_data: self.load_data()
-            
-    def load_data(self, indir=None, prefix=None, which_sims='ALL', out_species='ALL'):
-        """Load simulation data from file. 
-
-        Returns nothing; fills the ``y``, ``yobs``, and ``yobs_view`` dictionary objects. 
-        The keys are simulation numbers (ints) and the values are the same ndarrays as in
-        the pysb.integrate.Solver base class.
+        Returns nothing. Fills the ``y`` and ``tout`` arrays.
 
         Parameters
         ----------
@@ -387,65 +403,60 @@ class cupSODA(pysb.integrate.Solver):
             Directory where data files are located.
         prefix : string, optional (default: model.name)
             Prefix for output filenames (e.g., "egfr" for egfr_0,...).
-        which_sims : integer or list of integers, optional 
-            Which data files to read concentration data from. If not specified, all data
-            files present in 'indir' are read and the elements of 'which_sims' are based on 
-            the names of the files (e.g., if the files are egfr_0, egfr_3, egfr_5, then 
-            which_sims=[0,3,5]).
         out_species: integer or list of integers, optional 
             Indices of species present in the data file (e.g., in cupSODA.run(), if
             obs_species_only=True then only species involved in observables are output to 
             file). If not specified, an attempt will be made to read them from the 
-            'cs_vector' file in 'indir/__CUPSODA_FILES/'. 
+            'cs_vector' file in 'indir/__CUPSODA_FILES/'.
         """
-                
-        if not indir: indir = self.outdir
-        if not prefix: prefix = self.model.name
-        
-        FILES = []
-        if which_sims == 'ALL':
-            FILES = [file for file in os.listdir(indir) if re.match(prefix, file)]
-            if len(FILES)==0: 
-                raise Exception("Cannot find any output files to load data from.")
-        else:
+        if indir is None: 
+            indir = self.outdir
+        if prefix is None: 
+            prefix = self.model.name
+        if out_species is None:
             try:
-                FILES = [prefix+"_"+str(which_sims[i]) for i in range(len(which_sims))] # list of integers
-            except TypeError:
-                FILES = [prefix+"_"+str(which_sims)] # single integer
-
-        which_sims = [int(re.match(prefix+"_"+"(\d+)", file).group(1)) for file in FILES]
-        
-        if out_species == 'ALL':
-            try:
-                out_species = numpy.loadtxt(os.path.join(indir,"__CUPSODA_FILES","cs_vector"), dtype=int)
+                out_species = np.loadtxt(os.path.join(indir,"__CUPSODA_FILES","cs_vector"), dtype=int)
             except IOError:
                 print "ERROR: Cannot determine which species have been printed to file. Either provide an"
                 print "'out_species' array or place the '__CUPSODA_FILES' directory in the input directory."
                 raise
-                
-        # Species concentrations and observables
-        for sim in which_sims:
-            # Create dictionaries: keys are sim numbers (ints), vals are ndarrays of concentrations
-            self.y[sim] = numpy.ones((len(self.tspan), len(self.model.species)))*float('nan')
-            if len(self.model.observables):
-                self.yobs[sim] = numpy.empty(shape=len(self.tspan), dtype=zip(self.model.observables.keys(), itertools.repeat(float)))
-            else:
-                self.yobs[sim] = numpy.zeros((len(self.tspan), 0))
-            self.yobs_view[sim] = self.yobs[sim].view(float).reshape((len(self.tspan), -1))
-
+        
+        FILES = [file for file in os.listdir(indir) if re.match(prefix, file)]
+        if len(FILES)==0: 
+            raise Exception("Cannot find any output files to load data from.")
+        
+        self.y = len(FILES) * [None]
+        self.tout = len(FILES) * [None]
+        for n in range(len(self.y)):
+            self.y[n] = np.ones((len(self.tspan), len(self.model.species)))*float('nan')
+            self.tout[n] = np.ones(len(self.tspan))*float('nan')
             # Read data from file
-            file = os.path.join(indir,prefix)+"_"+str(sim)
+            file = os.path.join(indir,prefix)+"_"+str(n)
             if not os.path.isfile(file):
                 raise Exception("Cannot find input file "+file)
-            if self.verbose: print "Reading "+file+" ...",
+            if self.verbose: 
+                print "Reading "+file+" ...",
             f = open(file, 'rb')
-            for i in range(len(self.y[sim])):
-                self.y[sim][i,out_species] = f.readline().split()[1:] # exclude first column (time)
+            for i in range(len(self.y[n])):
+                data = f.readline().split()
+                self.tout[n][i] = data[0]
+                self.y[n][i,out_species] = data[1:] # exclude first column (time)
             f.close()
             if self.verbose: print "Done."
 #             if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
 #                 self.y[i:, :] = 'nan'
-                
-            # Calculate observables
-            for j, obs in enumerate(self.model.observables):
-                self.yobs_view[sim][:,j] = (self.y[sim][:,obs.species] * obs.coefficients).sum(axis=1)
+        self.tout = np.array(self.tout)
+        self.y = np.array(self.y)
+        
+    def _calc_yobs_yexpr(self, param_values=None):
+        super(CupSODASimulator, self)._calc_yobs_yexpr()
+        
+    def get_yfull(self):
+        return super(CupSODASimulator, self).get_yfull()
+
+def run_cupSODA(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
+
+    sim = CupSODASimulator(model, verbose=verbose, **integrator_options)
+    sim.run(param_values, y0, tspan, outdir, prefix)
+    yfull = sim.get_yfull()
+    return sim.tout, yfull
