@@ -22,6 +22,10 @@ default_integrator_options = {
         'vol': None,                # volume
         'obs_species_only': True,   # print only observable species
         'load_ydata': True,         # load conc data after simulation
+        'memory_usage': 0,          # memory usage type: 
+                                    # 0: global memory (default; suggested for medium-large models)
+                                    # 1: shared memory 
+                                    # 2: both shared and constant memory
         },
     }
 
@@ -102,6 +106,10 @@ class CupSODASimulator(Simulator):
                              (default: True)
         * load_ydata       : read species concentrations from output files after simulation 
                              (default: True)
+        * memory_usage     : type of memory usage (default: 0)
+                             * 0: global memory (suggested for medium-large models)
+                             * 1: shared memory 
+                             * 2: both shared and constant memory
 
     Attributes
     ----------
@@ -111,6 +119,9 @@ class CupSODASimulator(Simulator):
         Model passed to the constructor.
     tspan : vector-like, optional 
         Time values passed to the constructor.
+    tout: numpy.ndarray
+        Time points returned by the simulator (may be different from ``tspan``
+        if simulation is interrupted for some reason).
     y : numpy.ndarray
         Species trajectories for each simulation. Dimensionality is
         ``(n_sims, len(tspan), len(model.species))``.
@@ -127,10 +138,6 @@ class CupSODASimulator(Simulator):
     yexpr_view : numpy.ndarray
         An array view (sharing the same data buffer) on ``yexpr``. Dimensionality
         is ``(n_sims, len(tspan), len(model.expressions_dynamic()))``.
-    atol : float
-        Absolute tolerance.
-    rtol : float
-        Relative tolerance.
     outdir : string, optional (default: os.getcwd())
             Output directory.
 
@@ -266,7 +273,9 @@ class CupSODASimulator(Simulator):
         self._create_input_files(cupsoda_files, param_values, y0)
             
         # Build command
-        command = [bin_path, cupsoda_files, str(n_blocks), self.outdir, prefix, str(self.options.get('gpu')), str(0)]
+        # ./cupSODA input_model_folder blocks output_folder simulation_file_prefix gpu_number fitness_calculation memory_use dump        
+        command = [bin_path, cupsoda_files, str(n_blocks), self.outdir, prefix, str(self.options['gpu']), \
+                   '0', str(self.options['memory_usage']), '1' if self.verbose else '0']
         print "Running cupSODA: " + ' '.join(command)
         
         # Run simulation

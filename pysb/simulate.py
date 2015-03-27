@@ -19,12 +19,12 @@ class Simulator:
 
     Attributes
     ----------
+    verbose: bool
+        Verbosity flag passed to the constructor.
     model : pysb.Model
         Model passed to the constructor.
     tspan : vector-like
         Time values passed to the constructor.
-    verbose: bool
-        Verbosity flag passed to the constructor.
     tout: numpy.ndarray
         Time points returned by the simulator (may be different from ``tspan``
         if simulation is interrupted for some reason).
@@ -97,15 +97,12 @@ class Simulator:
     def _calc_yobs_yexpr(self, param_values=None):
         """Calculate ``yobs`` and ``yexpr`` based on values of ``y`` obtained 
         in ``run``."""
-        
         self.yobs = len(self.y) * [None]
         self.yobs_view = len(self.y) * [None]
         self.yexpr = len(self.y) * [None]
         self.yexpr_view = len(self.y) * [None]
-        
         # loop over simulations
         for n in range(len(self.y)):
-            
             # observables
             if len(self.model.observables):
                 self.yobs[n] = np.ndarray(len(self.tout[n]), zip(self.model.observables.keys(), itertools.repeat(float)))
@@ -114,7 +111,6 @@ class Simulator:
             self.yobs_view[n] = self.yobs[n].view(float).reshape(len(self.yobs[n]), -1)
             for i,obs in enumerate(self.model.observables):
                 self.yobs_view[n][:,i] = (self.y[n][:,obs.species] * obs.coefficients).sum(axis=1)
-            
             # expressions
             exprs = self.model.expressions_dynamic()
             if len(exprs):
@@ -131,7 +127,6 @@ class Simulator:
                 expr_subs = expr.expand_expr(self.model).subs(p_subs)
                 func = sympy.lambdify(obs_names, expr_subs, "numpy")
                 self.yexpr_view[n][:,i] = func(**obs_dict)
-            
         self.yobs = np.array(self.yobs)
         self.yobs_view = np.array(self.yobs_view)
         self.yexpr = np.array(self.yexpr)
@@ -141,7 +136,6 @@ class Simulator:
     def get_yfull(self):
         """Aggregate species, observables, and expressions trajectories into
         a numpy.ndarray with record-style data-type for return to the user."""
-        
         sp_names = ['__s%d' % i for i in range(len(self.model.species))] 
         yfull_dtype = zip(sp_names, itertools.repeat(float))
         if len(self.model.observables):
