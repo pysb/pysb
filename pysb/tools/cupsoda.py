@@ -79,7 +79,7 @@ def _get_cupSODA_path():
     _cupsoda_path = bin_path
     return bin_path
 
-class CupSODASimulator(Simulator):
+class CupSODASolver(Simulator):
     """An interface for running cupSODA, a CUDA implementation of LSODA.
     Parameters
     ----------
