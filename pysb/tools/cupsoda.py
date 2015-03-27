@@ -169,7 +169,7 @@ class CupSODASolver(Simulator):
     """
     
     def __init__(self, model, tspan=None, cleanup=True, verbose=False, integrator='cupsoda', **integrator_options):
-        super(CupSODASimulator, self).__init__(model, tspan, verbose)
+        super(CupSODASolver, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
 
         # Set integrator options to defaults
@@ -279,7 +279,7 @@ class CupSODASolver(Simulator):
         print "Running cupSODA: " + ' '.join(command)
         
         # Run simulation
-        subprocess.call(command)
+#         subprocess.call(command)
 
         # Load concentration data if requested   
         if self.options.get('load_ydata'):
@@ -458,10 +458,10 @@ class CupSODASolver(Simulator):
         self.y = np.array(self.y)
         
     def _calc_yobs_yexpr(self, param_values=None):
-        super(CupSODASimulator, self)._calc_yobs_yexpr()
+        super(CupSODASolver, self)._calc_yobs_yexpr()
         
     def get_yfull(self):
-        return super(CupSODASimulator, self).get_yfull()
+        return super(CupSODASolver, self).get_yfull()
 
 def run_cupSODA(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
 
