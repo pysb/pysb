@@ -15,7 +15,7 @@ _cupsoda_path = None
 # Obviously, the only integrator currently supported is "cupSODA" (case insensitive).
 default_integrator_options = {
     'cupsoda': {
-        'max_steps': None,          # max no. of internal iterations (LSODA's MXSTEP)
+        'max_steps': 2000,          # max no. of internal iterations (LSODA's MXSTEP)
         'atol': 1e-8,               # absolute tolerance
         'rtol': 1e-8,               # relative tolerance
         'n_blocks': None,           # number of GPU blocks
@@ -341,10 +341,9 @@ class CupSODASolver(Simulator):
         left_side.close()
         
         # max_steps
-        if self.options['max_steps'] is not None:
-            mxsteps = open(os.path.join(cupsoda_files,"max_steps"), 'wb')
-            mxsteps.write(str(self.options['max_steps']))
-            mxsteps.close()
+        mxsteps = open(os.path.join(cupsoda_files,"max_steps"), 'wb')
+        mxsteps.write(str(self.options['max_steps']))
+        mxsteps.close()
         
         # modelkind
         modelkind = open(os.path.join(cupsoda_files,"modelkind"), 'wb')
