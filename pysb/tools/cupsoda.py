@@ -15,6 +15,7 @@ _cupsoda_path = None
 # Obviously, the only integrator currently supported is "cupSODA" (case insensitive).
 default_integrator_options = {
     'cupsoda': {
+        'max_steps': None,          # max no. of internal iterations (LSODA's MXSTEP)
         'atol': 1e-8,               # absolute tolerance
         'rtol': 1e-8,               # relative tolerance
         'n_blocks': None,           # number of GPU blocks
@@ -97,6 +98,7 @@ class CupSODASolver(Simulator):
         Name of the integrator to use, taken from the integrators listed in 
         pysb.tools.cupSODA.default_integrator_options.
     integrator_options :
+        * max_steps        : max no. of internal iterations (LSODA's MXSTEP) (default: None)
         * atol             : absolute tolerance (default: 1e-8)
         * rtol             : relative tolerance (default: 1e-8)
         * n_blocks         : number of GPU blocks (default: 64)
@@ -279,7 +281,7 @@ class CupSODASolver(Simulator):
         print "Running cupSODA: " + ' '.join(command)
         
         # Run simulation
-#         subprocess.call(command)
+        subprocess.call(command)
 
         # Load concentration data if requested   
         if self.options.get('load_ydata'):
@@ -338,9 +340,15 @@ class CupSODASolver(Simulator):
             else: left_side.write(line)
         left_side.close()
         
+        # max_steps
+        if self.options['max_steps'] is not None:
+            mxsteps = open(os.path.join(cupsoda_files,"max_steps"), 'wb')
+            mxsteps.write(str(self.options['max_steps']))
+            mxsteps.close()
+        
         # modelkind
         modelkind = open(os.path.join(cupsoda_files,"modelkind"), 'wb')
-        vol = self.options.get('vol')
+        vol = self.options['vol']
         if not vol: 
             modelkind.write("deterministic")
         else: 
@@ -348,7 +356,7 @@ class CupSODASolver(Simulator):
         modelkind.close()
         
         # volume
-        if (vol):
+        if vol:
             volume = open(os.path.join(cupsoda_files,"volume"), 'wb')
             volume.write(str(vol))
             volume.close()
