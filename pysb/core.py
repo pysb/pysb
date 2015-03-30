@@ -275,12 +275,6 @@ class Monomer(Component):
         value += ')'
         return value
 
-    def __eq__(self, other):
-        return type(self)         == type(other)         and \
-               self.name          == other.name          and \
-               ( (self.sites is None and other.sites is None) or \
-                    sorted(self.sites) == sorted(other.sites)) and \
-               self.site_states   == other.site_states
 
 class MonomerPattern(object):
 
@@ -396,6 +390,8 @@ class MonomerPattern(object):
             return ReactionPattern([ComplexPattern([self], None), ComplexPattern([other], None)])
         if isinstance(other, ComplexPattern):
             return ReactionPattern([ComplexPattern([self], None), other])
+        elif other == None:
+            return as_reaction_pattern(self)
         else:
             return NotImplemented
 
@@ -421,12 +417,6 @@ class MonomerPattern(object):
             return mp_new
         else:
             return NotImplemented
-
-    def __eq__(self, other):
-        return type(self)           == type(other)           and \
-               self.monomer         == other.monomer         and \
-               self.site_conditions == other.site_conditions and \
-               self.compartment     == other.compartment
 
     def __repr__(self):
         value = '%s(' % self.monomer.name
@@ -560,6 +550,8 @@ class ComplexPattern(object):
             return ReactionPattern([self, other])
         elif isinstance(other, MonomerPattern):
             return ReactionPattern([self, ComplexPattern([other], None)])
+        elif other == None:
+            return as_reaction_pattern(self)
         else:
             return NotImplemented
 
@@ -635,6 +627,8 @@ class ReactionPattern(object):
             return ReactionPattern(self.complex_patterns + [ComplexPattern([other], None)])
         elif isinstance(other, ComplexPattern):
             return ReactionPattern(self.complex_patterns + [other])
+        elif other == None:
+            return self
         else:
             return NotImplemented
 
@@ -696,8 +690,10 @@ def as_complex_pattern(v):
     """Internal helper to 'upgrade' a MonomerPattern to a ComplexPattern."""
     if isinstance(v, ComplexPattern):
         return v
+    elif isinstance(v, Monomer):
+        return ComplexPattern([v()], None)
     elif isinstance(v, MonomerPattern):
-        return ComplexPattern([MonomerPattern(v.monomer, v.site_conditions, None)], v.compartment)
+        return ComplexPattern([v], None)
     else:
         raise InvalidComplexPatternException
 
@@ -767,11 +763,6 @@ class Parameter(Component, sympy.Symbol):
     def func(self):
         return sympy.Symbol
 
-    def __eq__(self, other):
-        return type(self) == type(other) and \
-               self.name  == other.name  and \
-               self.value == other.value
-
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
@@ -823,12 +814,6 @@ class Compartment(Component):
         self.parent = parent
         self.dimension = dimension
         self.size = size
-
-    def __eq__(self, other):
-        return type(self)  == type(other)  and \
-               self.name   == other.name   and \
-               self.parent == other.parent and \
-               self.size   == other.size
 
     def __repr__(self):
         return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
