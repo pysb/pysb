@@ -15,6 +15,7 @@ _cupsoda_path = None
 # Obviously, the only integrator currently supported is "cupSODA" (case insensitive).
 default_integrator_options = {
     'cupsoda': {
+        'max_steps': 20000,          # max no. of internal iterations (LSODA's MXSTEP)
         'atol': 1e-8,               # absolute tolerance
         'rtol': 1e-8,               # relative tolerance
         'n_blocks': None,           # number of GPU blocks
@@ -79,7 +80,7 @@ def _get_cupSODA_path():
     _cupsoda_path = bin_path
     return bin_path
 
-class CupSODASimulator(Simulator):
+class CupSODASolver(Simulator):
     """An interface for running cupSODA, a CUDA implementation of LSODA.
     Parameters
     ----------
@@ -97,6 +98,7 @@ class CupSODASimulator(Simulator):
         Name of the integrator to use, taken from the integrators listed in 
         pysb.tools.cupSODA.default_integrator_options.
     integrator_options :
+        * max_steps        : max no. of internal iterations (LSODA's MXSTEP) (default: None)
         * atol             : absolute tolerance (default: 1e-8)
         * rtol             : relative tolerance (default: 1e-8)
         * n_blocks         : number of GPU blocks (default: 64)
@@ -169,7 +171,7 @@ class CupSODASimulator(Simulator):
     """
     
     def __init__(self, model, tspan=None, cleanup=True, verbose=False, integrator='cupsoda', **integrator_options):
-        super(CupSODASimulator, self).__init__(model, tspan, verbose)
+        super(CupSODASolver, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
 
         # Set integrator options to defaults
@@ -338,9 +340,14 @@ class CupSODASimulator(Simulator):
             else: left_side.write(line)
         left_side.close()
         
+        # max_steps
+        mxsteps = open(os.path.join(cupsoda_files,"max_steps"), 'wb')
+        mxsteps.write(str(self.options['max_steps']))
+        mxsteps.close()
+        
         # modelkind
         modelkind = open(os.path.join(cupsoda_files,"modelkind"), 'wb')
-        vol = self.options.get('vol')
+        vol = self.options['vol']
         if not vol: 
             modelkind.write("deterministic")
         else: 
@@ -348,7 +355,7 @@ class CupSODASimulator(Simulator):
         modelkind.close()
         
         # volume
-        if (vol):
+        if vol:
             volume = open(os.path.join(cupsoda_files,"volume"), 'wb')
             volume.write(str(vol))
             volume.close()
@@ -458,10 +465,10 @@ class CupSODASimulator(Simulator):
         self.y = np.array(self.y)
         
     def _calc_yobs_yexpr(self, param_values=None):
-        super(CupSODASimulator, self)._calc_yobs_yexpr()
+        super(CupSODASolver, self)._calc_yobs_yexpr()
         
     def get_yfull(self):
-        return super(CupSODASimulator, self).get_yfull()
+        return super(CupSODASolver, self).get_yfull()
 
 def run_cupSODA(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
 
