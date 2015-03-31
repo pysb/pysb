@@ -8,16 +8,20 @@ import pygraphviz
 import re
 import networkx as nx
 from  networkx.utils.decorators import is_string_like
-
+import numpy as np
 
 def create_visualization_bngl(model):
     # creates all visualize types using bngl visualization
     
     commands = """ 
+    #visualize({type=>'process'})
     visualize({type=>'contactmap'}) \n 
     visualize({type=>'ruleviz_pattern'}) \n 
     visualize({type=>'ruleviz_operation'}) \n
-    visualize({type=>'regulatory','background'=>1,suffix=>1}) 
+    visualize({type=>'regulatory','background'=>1,suffix=>1})
+    visualize({type=>'regulatory','background'=>1,'groups' =>1, suffix=>2}) 
+    visualize({type=>'regulatory','background'=>1,collapse=>1, suffix=>3})
+    visualize({type=>'regulatory','background'=>1,'groups' =>1,collapse=>1, suffix=>4})
     """
     bng_filename = 'visualize%s.bngl' % model.name
     bng_file = open(bng_filename, 'w')
@@ -35,8 +39,8 @@ def rgb_to_hex(n):
     # Red and green scale rgb to hex
     
     n = int(n *100)
-    R = (255 * n) / 100
-    G = (255 * (100 - n)) / 100
+    R = (255 * (100 - n)) / 100
+    G = (255 * n) / 100
     B =  0
     return '#%02x%02x%02x' % (R,G,B)
 
@@ -51,11 +55,21 @@ def create_png_image_from_dot(model,colors,savename):
         slabel = re.sub(r'% ', r'%\\l', str(cp))
         slabel += '\\l'
         
+        
+#         if colors[i] < 10**(-12.):
+#             outline_color = "black"
+#             color = "yellow"
+#         if colors[i] == 1.:
+#             outline_color = "black"
+#             color = "blue"
+        #else:
+        outline_color = "transparent"
         color = rgb_to_hex(colors[i])
         graph.add_node(species_node,
-                       label=species_node,
+                       #label=species_node,
+                       label = slabel,
                        shape="Mrecord",
-                       fillcolor=color, style="filled", color="transparent",
+                       fillcolor=color, style="filled", color=outline_color,
                        fontsize="12",
                        margin="0.06,0")
     for i, reaction in enumerate(model.reactions):       
@@ -66,7 +80,14 @@ def create_png_image_from_dot(model,colors,savename):
             for p in products:
                 r_link(graph, s, p, **attr_reversible)    
     print "saved image as %s" % savename
-    
+    #multiple programs exist to render graphs
+    #dot filter for drawing directed graphs
+    #neato filter for drawing undirected graphs
+    #twopi filter for radial layouts of graphs
+    #circo filter for circular layout of graphs
+    #fdp  filter for drawing undirected graphs
+    #sfdp filter for drawing large undirected graphs
+    graph.draw( savename,prog="dot")
 
 def generate_gml(G):
 
