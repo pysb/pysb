@@ -181,7 +181,7 @@ class Solver(object):
 #             print key, ": ", val
 #         quit()
 
-    def run(self, param_values=None, y0=None):
+    def run(self, param_values=None, y0=None,initial_changes=None):
         """Perform an integration.
 
         Returns nothing; access the Solver object's ``y``, ``yobs``, or
@@ -220,6 +220,22 @@ class Solver(object):
                 raise Exception("y0 must be the same length as model.species")
             if not isinstance(y0, numpy.ndarray):
                 y0 = numpy.array(y0)
+        elif initial_changes is not None:
+            y0 = numpy.zeros((self.y.shape[1],))
+            for cp, value_obj in self.model.initial_conditions:
+                if value_obj.name in initial_changes:
+                    value = initial_changes[value_obj.name]
+                elif value_obj in self.model.parameters:
+                    pi = self.model.parameters.index(value_obj)
+                    value = param_values[pi]
+                elif value_obj in self.model.expressions:
+                    value = value_obj.expand_expr(self.model).evalf(subs=subs)
+                else:
+                    raise ValueError("Unexpected initial condition value type")
+                si = self.model.get_species_index(cp)
+                if si is None:
+                    raise Exception("Species not found in model: %s" % repr(cp))
+                y0[si] = value
         else:
             y0 = numpy.zeros((self.y.shape[1],))
             for cp, value_obj in self.model.initial_conditions:
