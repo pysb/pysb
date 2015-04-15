@@ -117,6 +117,7 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
     components : ComponentSet
         The generated components. Contains the generated Rule and up to two
         generated Parameter objects (if klist was given as numbers).
+
     Notes
     -----
     The default naming scheme (if `name_func` is not passed) follows the form::
@@ -211,6 +212,7 @@ def _verify_sites(m, *site_list):
         If any of the sites are not found.
 
     """
+
     if isinstance(m, ComplexPattern):
         return _verify_sites_complex(m, *site_list)
     else:
