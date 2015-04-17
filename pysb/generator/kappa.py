@@ -108,7 +108,13 @@ class KappaGenerator(object):
         for obs in self.model.observables:
             name = '\'' + obs.name + '\''
             observable_code = format_reactionpattern(obs.reaction_pattern)
-            self.__content += ("%%obs: %s %s\n") % (name, observable_code)
+            # In the newer KaSim syntax, observables are simply variables
+            # defined to match Kappa expressions
+            if self.dialect == 'kasim':
+                self.__content += ("%%obs: %s |%s|\n") % (name, observable_code)
+            else:
+                self.__content += ("%%obs: %s %s\n") % (name, observable_code)
+
         self.__content += "\n"
 
     def generate_species(self):
