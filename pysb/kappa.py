@@ -55,10 +55,7 @@ def run_simulation(model, **kwargs):
     return parse_kasim_outfile(outs['out'])
 
 def influence_map(model, do_open=False, **kwargs):
-    """Generates the influence map.
-
-    Runs KaSim with no events or points and sets the dump_influence_map
-    argument to True.
+    """Generates the influence map via KaSa.
 
     Parameters
     ----------
@@ -66,79 +63,58 @@ def influence_map(model, do_open=False, **kwargs):
         The model for generating the influence map.
     do_open : boolean
         If do_open is set to True, then calls the :py:func:`open_file` method
-        to display the influence map using the default program for opening .gv
+        to display the influence map using the default program for opening .dot
         files (e.g., GraphViz).
     **kwargs : other keyword arguments
         Any other keyword arguments are passed to the function
-        :py:func:`run_kasim`.
+        :py:func:`run_kasa`.
 
     Returns
     -------
     string
-        Returns the name of the .gv (GraphViz) file where the influence map
-        has been stored. This can subsequently be used to build a networkx or
-        PyGraphViz graph.
+        Returns the name of the .dot file where the influence map
+        has been stored.
     """
 
-    kasim_dict = run_kasim(model, time=0, points=0, dump_influence_map=True,
-                           **kwargs)
-    im_filename = kasim_dict['im']
+    kasa_dict = run_kasa(model, influence_map=True, contact_map=False,
+                         **kwargs)
+    im_filename = kasa_dict['im']
 
     if do_open:
         open_file(im_filename)
 
     return im_filename
 
-def contact_map(model, output_dir='.', base_filename=None, do_open=False, 
-                **kwargs):
-    """Runs complx with arguments for generating the contact map.
+def contact_map(model, do_open=False, **kwargs):
+    """Generates the contact map via KaSa.
 
     Parameters
     ----------
     model : pysb.core.Model
-        The model for generating the contact map.
-    output_dir : string
-        The subdirectory in which to generate the Kappa (.ka) file for the
-        model and all output files produced by complx. Default value is '.'
-        Note that only relative paths can be specified; paths are relative
-        to the directory where the current Python instance is running.
-        If the specified directory does not exist, an Exception is thrown.
-    base_filename : string
-        The base filename to be used for generation of the Kappa (.ka) file and
-        all output files produced by complx. Defaults to a string of the form::
-
-            '%s_%d_%d_temp' % (model.name, os.getpid(), random.randint(0,10000))
-
-        The contact map filenames append '_cm.jpg' and '_cm.dot' to this base
-        filename; the reachable complexes filename appends '_rch.dot'.
+        The model for generating the influence map.
     do_open : boolean
         If do_open is set to True, then calls the :py:func:`open_file` method
-        to display the contact map using the default program for opening .jpg
-        files.
+        to display the influence map using the default program for opening .dot
+        files (e.g., GraphViz).
     **kwargs : other keyword arguments
-        Any other keyword arguments are passed through to the function
-        :py:func:`run_complx`.
+        Any other keyword arguments are passed to the function
+        :py:func:`run_kasa`.
 
+    Returns
+    -------
+    string
+        Returns the name of the .dot file where the contact map
+        has been stored.
     """
 
-    gen = KappaGenerator(model, dialect='complx')
-
-    if not base_filename:
-        base_filename = '%s/%s_%d_%d_temp' % (output_dir,
-                         model.name, os.getpid(), random.randint(0, 10000))
-
-    kappa_filename = base_filename + '.ka'
-    jpg_filename = base_filename + '_cm.jpg'
-    dot_filename = base_filename + '_cm.dot'
-    reachables_filename = base_filename + '_rch.dot'
-
-    args = ['--output-high-res-contact-map-jpg', jpg_filename,
-            '--output-high-res-contact-map-dot', dot_filename,
-            '--output-reachable-complexes', reachables_filename]
-    run_complx(gen, kappa_filename, args, **kwargs)
+    kasa_dict = run_kasa(model, influence_map=False, contact_map=True,
+                         **kwargs)
+    cm_filename = kasa_dict['cm']
 
     if do_open:
-        open_file(jpg_filename)
+        open_file(cm_filename)
+
+    return cm_filename
 
 
 ### "PRIVATE" Functions ###############################################
