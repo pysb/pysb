@@ -23,16 +23,16 @@ class KappaGenerator(object):
         # but prohibited in complx
         if (self.dialect == 'kasim'):
             self.generate_molecule_types() 
-            self.generate_parameters() # parameters/variables/expressions allowed in kasim
+            # Parameters, variables, and expressions are allowed in kasim
+            self.generate_parameters()
 
         self.generate_reaction_rules()
         self.generate_observables()
         self.generate_species()
 
     def generate_parameters(self):
-        #self.__content += "begin parameters\n"
-        #max_length = max(len(p.name) for p in self.model.parameters)
-        names = [x.name for x in self.model.parameters] + [x.name for x in self.model.expressions]
+        names = [x.name for x in self.model.parameters] + \
+                [x.name for x in self.model.expressions]
         for p in self.model.parameters:
             self.__content += ("%%var: \'%s\' %e\n") % (p.name, p.value)
         for e in self.model.expressions:
@@ -40,8 +40,8 @@ class KappaGenerator(object):
             str_expr = str(sympy_to_muparser(e.expr))
             for n in sym_names:
                 str_expr = str_expr.replace(n,"\'%s\'"%n)
-            self.__content += ("%%var: \'%s\' %s\n") % (e.name, str_expr.replace('**','^'))
-        #self.__content += "end parameters\n\n"
+            self.__content += ("%%var: \'%s\' %s\n") % \
+                              (e.name, str_expr.replace('**','^'))
         self.__content += "\n"
 
     #def generate_compartments(self):
@@ -51,8 +51,9 @@ class KappaGenerator(object):
     #            parent_name = ''
     #        else:
     #            parent_name = c.parent.name
-    #        self.__content += ("  %s  %d  %f  %s\n") % (c.name, c.dimension, c.size, parent_name)
-    #    self.__content += "end compartments\n\n"        
+    #        self.__content += ("  %s  %d  %f  %s\n") % \
+    #                          (c.name, c.dimension, c.size, parent_name)
+    #    self.__content += "end compartments\n\n"
 
     def generate_molecule_types(self):
         for m in self.model.monomers:
@@ -61,65 +62,77 @@ class KappaGenerator(object):
         self.__content += "\n"
 
     def generate_reaction_rules(self):
-        #self.__content += "begin reaction rules\n"
-        #max_length = max(len(r.name) for r in self.model.rules) + 1  # +1 for the colon
+        # +1 for the colon
+        #max_length = max(len(r.name) for r in self.model.rules) + 1
         for r in self.model.rules:
             label = '\'' + r.name + '\''
             reactants_code = format_reactionpattern(r.reactant_pattern)
             products_code  = format_reactionpattern(r.product_pattern)
             arrow = '->'
-            
-            if isinstance(r.rate_forward,pysb.core.Expression) and self.dialect == 'complx':
-              raise InvalidExpressionException
-            f_rate_code = ("\'" + r.rate_forward.name + "\'" if self.dialect == 'kasim' 
-                else float(r.rate_forward.value))
+
+            if isinstance(r.rate_forward,pysb.core.Expression) and \
+               self.dialect == 'complx':
+                raise KappaException("Expressions are not supported by complx.")
+            # Get the rate code depending on the dialect
+            if self.dialect == 'kasim':
+                f_rate_code = "\'" + r.rate_forward.name + "\'"
+            else:
+                f_rate_code = float(r.rate_forward.value)
+
             self.__content += ("%s %s %s %s @ %s") % \
                 (label, reactants_code, arrow, products_code, f_rate_code)
             self.__content += "\n"
 
+            # Add the reverse reaction
             if r.is_reversible:
-              if isinstance(r.rate_reverse,pysb.core.Expression) and self.dialect == 'complx':
-                  raise InvalidExpressionException
-              r_rate_code = ("\'" + r.rate_reverse.name + "\'" if self.dialect == 'kasim' 
-                  else float(r.rate_reverse.value))
-              label = '\'' + r.name + '_rev' + '\''
-              self.__content += ("%s %s %s %s @ %s") % \
-                (label, products_code, arrow, reactants_code, r_rate_code)
-              self.__content += "\n"
+                if isinstance(r.rate_reverse,pysb.core.Expression) and \
+                   self.dialect == 'complx':
+                    raise KappaException("Expressions are not supported by "
+                                         "complx.")
+                # Get the rate code depending on the dialect
+                if self.dialect == 'kasim':
+                    r_rate_code = "\'" + r.rate_reverse.name + "\'"
+                else:
+                    r_rate_code = float(r.rate_reverse.value)
+
+                label = '\'' + r.name + '_rev' + '\''
+                self.__content += ("%s %s %s %s @ %s") % \
+                      (label, products_code, arrow, reactants_code, r_rate_code)
+                self.__content += "\n"
 
         self.__content += "\n"
 
     def generate_observables(self):
         if not self.model.observables:
             return
-        #self.__content += "begin observables\n"
         for obs in self.model.observables:
             name = '\'' + obs.name + '\''
             observable_code = format_reactionpattern(obs.reaction_pattern)
             self.__content += ("%%obs: %s %s\n") % (name, observable_code)
         self.__content += "\n"
-        #self.__content += "end observables\n\n"
 
     def generate_species(self):
         if not self.model.initial_conditions:
-            raise Exception("Kappa generator requires initial conditions.")
-        species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
+            raise KappaException("Kappa generator requires initial conditions.")
+        species_codes = [format_complexpattern(cp)
+                         for cp, param in self.model.initial_conditions]
         #max_length = max(len(code) for code in species_codes)
-        #self.__content += "begin species\n"
         for i, code in enumerate(species_codes):
             param = self.model.initial_conditions[i][1]
-            #self.__content += ("%%init:  %-" + str(max_length) + "s   %s\n") % (code, param.name)
+            #self.__content += ("%%init:  %-" + str(max_length) + \
+            #                  "s   %s\n") % (code, param.name)
             if (self.dialect == 'kasim'):
-                # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
-                # for large integers
+                # Switched from %g (float) to %d (int) because kappa didn't
+                # like scientific notation for large integers
                 self.__content += ("%%init: \'%s\' %s\n") % (param.name, code)
                 #self.__content += ("%%init: %10g %s\n") % (param.value, code)
             else:
                 if isinstance(param,pysb.core.Expression):
-                  raise InvalidExpressionException
-                # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
-                # for large integers
-                self.__content += ("%%init: %10d * %s\n") % (float(param.value), code)
+                    raise KappaException("complx does not support Expressions.")
+                # Switched from %g (float) to %d (int) because kappa didn't
+                # like scientific notation for large integers
+                self.__content += ("%%init: %10d * %s\n") % \
+                                  (float(param.value), code)
                 #self.__content += ("%%init: %10g * %s\n") % (param.value, code)
 
         self.__content += "\n"
@@ -145,39 +158,60 @@ def format_monomerpattern(mp):
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))
-    site_pattern_code = ','.join([format_site_condition(site, state) for (site, state) in site_conditions])
+    site_pattern_code = ','.join([format_site_condition(site, state)
+                                  for (site, state) in site_conditions])
     ret = '%s(%s)' % (mp.monomer.name, site_pattern_code)
     if mp.compartment is not None:
         ret = '%s@%s' % (ret, mp.compartment.name)
     return ret
 
 def format_site_condition(site, state):
+    # If the state/bond is unspecified
     if state == None:
         state_code = ''
+    # If there is a bond number
     elif type(state) == int:
         state_code = '!' + str(state)
+    # If there is a lists of bonds to the site (not supported by Kappa)
     elif type(state) == list:
-        raise Exception("Kappa generator does not support multiple bonds to a single site.")
+        raise KappaException("Kappa generator does not support multiple bonds "
+                              "to a single site.")
+    # Site with state
     elif type(state) == str:
         state_code = '~' + state
+    # Site with state and a bond
     elif type(state) == tuple:
-        if state[1] == pysb.core.ANY:
-            state = (state[0], '_')
-        state_code = '~%s!%s' % state if state[1] != pysb.WILD else '~%s?' % state[0]
+        # If the bond is ANY
+        if state[1] == pysb.ANY:
+            state_code = '~%s!_' % state[0]
+        # If the bond is WILD
+        elif state[1] == pysb.WILD:
+            state_code = '~%s?' % state[0]
+        # If the bond is a number
+        elif type(state[1]) == int:
+            state_code = '~%s!%s' % state
+        # If it's something else, raise an Exception
+        else:
+            raise KappaException("Kappa generator has encountered an unknown "
+                                 "element in a site state/bond tuple: (%s, %s)"
+                                 % state)
+    # Site bound to ANY
     elif state == pysb.ANY:
         state_code = '!_'
+    # Something else
     else:
-        raise Exception("Kappa generator has encountered an unknown element in a rule pattern site condition.")
+        raise KappaException("Kappa generator has encountered an unknown "
+                        "element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
 
 def sympy_to_muparser(expr):
     code = sympy.fcode(expr)
     code = code.replace('\n @', '')
     code = code.replace('**', '^')
-    # kasim syntax cannot handle Fortran scientific notation (must use 'e' instead of 'd')
+    # kasim syntax cannot handle Fortran scientific notation (must use 'e'
+    # instead of 'd')
     code = sub('(?<=[0-9])d','e',code)
     return code
 
-class InvalidExpressionException(Exception):
-    """complx syntax does not allow Expressions"""
+class KappaException(Exception):
     pass
