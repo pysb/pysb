@@ -61,7 +61,7 @@ def test_contact_map_kasa():
     Monomer('B', ['b'])
     Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=1),
          Parameter('k_A_binds_B', 1))
-    ok_(run_kasa(model, contact_map=True, cleanup=True, base_filename='test1'))
+    ok_(contact_map(model, cleanup=True, base_filename='test1'))
     subprocess.call('rm influence.dot', shell=True)
 
 @with_model
@@ -78,6 +78,5 @@ def test_influence_map_kasa():
     Rule('B_activates_C',
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
-    ok_(run_kasa(model, influence_map=True, cleanup=True,
-                 base_filename='test2'))
+    ok_(influence_map(model, cleanup=True, base_filename='test2'))
     subprocess.call('rm contact.dot', shell=True)
