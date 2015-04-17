@@ -204,6 +204,9 @@ def format_site_condition(site, state):
     # Site bound to ANY
     elif state == pysb.ANY:
         state_code = '!_'
+    # Site bound to WILD
+    elif state == pysb.WILD:
+        state_code = '?'
     # Something else
     else:
         raise KappaException("Kappa generator has encountered an unknown "
