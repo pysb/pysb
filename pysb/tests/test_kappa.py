@@ -54,3 +54,30 @@ Observable('total_A_patterns',A(site=('u',WILD)))"""
     # tests kappa WILD pattern and kappa syntax generation
     ok_(subprocess.check_call(commands, shell=True) == 0)
     subprocess.call('rm test.ka; rm test.py*', shell=True)
+
+@with_model
+def test_contact_map_kasa():
+    Monomer('A', ['b'])
+    Monomer('B', ['b'])
+    Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=1),
+         Parameter('k_A_binds_B', 1))
+    ok_(run_kasa(model, contact_map=True, cleanup=True, base_filename='test1'))
+    subprocess.call('rm influence.dot', shell=True)
+
+@with_model
+def test_influence_map_kasa():
+    Monomer('A', [])
+    Monomer('B', ['active'], {'active': ['y', 'n']})
+    Monomer('C', ['active'], {'active': ['y', 'n']})
+    Initial(A(), Parameter('A_0', 100))
+    Initial(B(active='n'), Parameter('B_0', 100))
+    Initial(C(active='n'), Parameter('C_0', 100))
+    Rule('A_activates_B',
+         A() + B(active='n') >> A() + B(active='y'),
+         Parameter('k_A_activates_B', 1))
+    Rule('B_activates_C',
+         B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
+         Parameter('k_B_activates_C', 1))
+    ok_(run_kasa(model, influence_map=True, cleanup=True,
+                 base_filename='test2'))
+    subprocess.call('rm contact.dot', shell=True)

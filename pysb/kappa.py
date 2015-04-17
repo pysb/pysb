@@ -146,6 +146,9 @@ def contact_map(model, output_dir='.', base_filename=None, do_open=False,
 def run_complx(gen, kappa_filename, args):
     """Generalized method for passing arguments to the complx executable.
 
+    *DEPRECATED* because complx itself is deprecated. Switching over to using
+    KaSa for static analysis.
+
     Parameters
     ----------
     gen : :py:class:`pysb.generator.KappaGenerator`
@@ -286,6 +289,101 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
                     os.unlink(filename)
 
     output_dict = {'out':out_filename, 'im':im_filename, 'fm':'flux.dot'}
+    return output_dict
+
+
+def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
+             cleanup=False, base_filename=None):
+    """Run KaSa (static analyzer) on the given model.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model to simulate/analyze using KaSa.
+    influence_map : boolean
+        Whether to compute the influence map.
+    contact_map : boolean
+        Whether to compute the contact map.
+    output_dir : string
+        The subdirectory in which to generate the Kappa (.ka) file for the
+        model and all output files produced by KaSim. Default value is '.'
+        Note that only relative paths can be specified; paths are relative
+        to the directory where the current Python instance is running.
+        If the specified directory does not exist, an Exception is thrown.
+    cleanup : boolean
+        Specifies whether output files produced by KaSim should be deleted
+        after execution is completed. Default value is False.
+    base_filename : The base filename to be used for generation of the Kappa
+        (.ka) file and all output files produced by KaSim. Defaults to a
+        string of the form::
+
+            '%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
+
+        The influence map filename appends '_im.dot' to this base filename; the
+        contact map filename appends '_cm.dot'.
+
+    Returns
+    -------
+    A dict with two entries giving the filenames for the files produced
+
+        * output_dict['im'] gives the influence map filename, or None if not
+          produced
+        * output_dict['cm'] gives the contact map filename, or None if not
+          produced
+    """
+
+    gen = KappaGenerator(model)
+
+    if not base_filename:
+        base_filename = '%s/%s_%d_%d_temp' % (output_dir,
+                        model.name, os.getpid(), random.randint(0, 10000))
+
+    kappa_filename = base_filename + '.ka'
+    im_filename = base_filename + '_im.dot'
+    cm_filename = base_filename + '_cm.dot'
+
+    # Contact map args
+    if contact_map:
+        cm_args = ['--compute-contact-map', '--output-contact-map',
+                   cm_filename]
+    else:
+        cm_args = ['--no-compute-contact-map']
+    # Influence map args
+    if influence_map:
+        im_args = ['--compute-influence-map', '--output-influence-map',
+                   im_filename]
+    else:
+        im_args = ['--no-compute-influence-map']
+    # Full arg list
+    args = [kappa_filename, '--output-directory', output_dir] \
+            + cm_args + im_args
+
+    try:
+        kappa_file = open(kappa_filename, 'w')
+
+        # Generate the Kappa model code from the PySB model and write it to
+        # the Kappa file:
+        kappa_file.write(gen.get_content())
+        kappa_file.close()
+
+        print "Running KaSa"
+        p = subprocess.Popen(['KaSa'] + args)
+                           #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        p.communicate()
+
+        if p.returncode:
+            raise Exception(p.stdout.read())
+
+    except Exception as e:
+        raise Exception("Problem running KaSa: " + str(e))
+
+    finally:
+        if cleanup:
+            for filename in [kappa_filename, im_filename, cm_filename]:
+                if os.access(filename, os.F_OK):
+                    os.unlink(filename)
+
+    output_dict = {'im':im_filename, 'cm':cm_filename}
     return output_dict
 
 
