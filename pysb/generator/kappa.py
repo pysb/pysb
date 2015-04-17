@@ -1,6 +1,7 @@
 import pysb
 import sympy
 from re import sub
+import warnings
 
 class KappaGenerator(object):
 
@@ -119,7 +120,8 @@ class KappaGenerator(object):
 
     def generate_species(self):
         if not self.model.initial_conditions:
-            raise KappaException("Kappa generator requires initial conditions.")
+            warnings.warn("Warning: No initial conditions.")
+
         species_codes = [format_complexpattern(cp)
                          for cp, param in self.model.initial_conditions]
         #max_length = max(len(code) for code in species_codes)
