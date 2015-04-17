@@ -102,7 +102,7 @@ class KappaGenerator(object):
 
     def generate_species(self):
         if not self.model.initial_conditions:
-            raise Exception("BNG generator requires initial conditions.")
+            raise Exception("Kappa generator requires initial conditions.")
         species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
         #max_length = max(len(code) for code in species_codes)
         #self.__content += "begin species\n"
