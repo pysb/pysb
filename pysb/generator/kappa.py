@@ -109,12 +109,16 @@ class KappaGenerator(object):
         for obs in self.model.observables:
             name = '\'' + obs.name + '\''
             observable_code = format_reactionpattern(obs.reaction_pattern)
-            # In the newer KaSim syntax, observables are simply variables
-            # defined to match Kappa expressions
-            if self.dialect == 'kasim':
-                self.__content += ("%%obs: %s |%s|\n") % (name, observable_code)
-            else:
-                self.__content += ("%%obs: %s %s\n") % (name, observable_code)
+            # In the near future (KaSim 4.0), the observable syntax will
+            # require pipe characters around the expression. However, for the
+            # time being we'll stick with the old syntax for backwards
+            # compatibility
+            #if self.dialect == 'kasim':
+            #    self.__content += ("%%obs: %s |%s|\n") % \
+            #                      (name, observable_code)
+            #else:
+            #    self.__content += ("%%obs: %s %s\n") % (name, observable_code)
+            self.__content += ("%%obs: %s %s\n") % (name, observable_code)
 
         self.__content += "\n"
 
