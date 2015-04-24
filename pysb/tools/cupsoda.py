@@ -205,7 +205,7 @@ class CupSODASolver(Simulator):
             Output directory.
         prefix : string, optional (default: model.name)
             Output files will be named "prefix_i", for i=[0,N_SIMS).
-        integrator_options : See CupSODASimulator constructor.
+        integrator_options : See CupSODASolver constructor.
         
         Notes
         -----
@@ -472,7 +472,7 @@ class CupSODASolver(Simulator):
 
 def run_cupSODA(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
 
-    sim = CupSODASimulator(model, verbose=verbose, **integrator_options)
+    sim = CupSODASolver(model, verbose=verbose, **integrator_options)
     sim.run(param_values, y0, tspan, outdir, prefix)
     yfull = sim.get_yfull()
     return sim.tout, yfull
