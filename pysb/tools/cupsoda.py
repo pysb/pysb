@@ -474,6 +474,6 @@ def run_cupSODA(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None,
 
     sim = CupSODASolver(model, verbose=verbose, **integrator_options)
     sim.run(param_values, y0, tspan, outdir, prefix)
-    if self.options.get('load_ydata'):
+    if sim.options.get('load_ydata'):
         yfull = sim.get_yfull()
         return sim.tout, yfull
