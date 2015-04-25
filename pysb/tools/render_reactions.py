@@ -87,30 +87,35 @@ def run(model):
         if len([s for s in ic_species if s.is_equivalent_to(cp)]):
             color = "#aaffff"
         graph.add_node(species_node,
-                       label=species_node,
+                       label=slabel,
                        shape="Mrecord",
                        fillcolor=color, style="filled", color="transparent",
                        fontsize="12",
                        margin="0.06,0")
-    for i, reaction in enumerate(model.reactions):       
+    for i, reaction in enumerate(model.reactions_bidirectional):
+        reaction_node = 'r%d' % i
+        graph.add_node(reaction_node,
+                       label=reaction_node,
+                       shape="circle",
+                       fillcolor="lightgray", style="filled", color="transparent",
+                       fontsize="12",
+                       width=".3", height=".3", margin="0.06,0")
         reactants = set(reaction['reactants'])
         products = set(reaction['products'])
-#        modifiers = reactants & products
-#        reactants = reactants - modifiers
-#        products = products - modifiers
-        attr_reversible = {}
+        modifiers = reactants & products
+        reactants = reactants - modifiers
+        products = products - modifiers
+        attr_reversible = {'dir': 'both', 'arrowtail': 'empty'} if reaction['reversible'] else {}
         for s in reactants:
-            for p in products:
-                r_link(graph, s, p, **attr_reversible)
-               
-#        for s in products:
-#            r_link(graph, s, i, _flip=True, **attr_reversible)
-#        for s in modifiers:
-#            r_link(graph, s, i, arrowhead="odiamond")
+            r_link(graph, s, i, **attr_reversible)
+        for s in products:
+            r_link(graph, s, i, _flip=True, **attr_reversible)
+        for s in modifiers:
+            r_link(graph, s, i, arrowhead="odiamond")
     return graph.string()
 
 def r_link(graph, s, r, **attrs):
-    nodes = ('s%d' % s, 's%d' % r)
+    nodes = ('s%d' % s, 'r%d' % r)
     if attrs.get('_flip'):
         del attrs['_flip']
         nodes = reversed(nodes)
