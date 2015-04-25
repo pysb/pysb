@@ -28,7 +28,7 @@ class BNGSSASimulator(Simulator):
             raise Exception("'tspan' must be defined.")
         
         trajectories = bng_simulate(self.model, tspan=self.tspan, param_values=param_values, initial_changes=initial_changes,\
-                                    output_dir=output_dir, n_runs=n_runs, **additional_args)
+                                    output_dir=output_dir,verbose=self.verbose, n_runs=n_runs, **additional_args)
     
         self.tout = np.array(trajectories)[:,:,0] + self.tspan[0]
         # species
@@ -45,13 +45,13 @@ class BNGSSASimulator(Simulator):
 def run_bng(model, tspan, param_values=None,initial_changes=None,  output_dir=os.getcwd(), output_file_basename=None,\
              cleanup=True, verbose=False, n_runs=2,**additional_args):
 
-    sim = BNGSSASimulator(model, verbose=verbose)
+    sim = BNGSSASimulator(model,tspan, verbose=verbose)
     sim.run( tspan, param_values, initial_changes,  output_dir, output_file_basename, cleanup, n_runs,**additional_args)
     yfull = sim.get_yfull()
     return sim.tout, yfull
 
 
-def bng_simulate(model, tspan, param_values=None,initial_changes=None, output_dir=os.getcwd(), output_file_basename=None, \
+def bng_simulate(model,tspan, param_values=None,initial_changes=None, output_dir=os.getcwd(), output_file_basename=None, \
                  cleanup=True, verbose=False, n_runs=2,**additional_args):
 
     random_number = np.random.uniform(0,10000)
