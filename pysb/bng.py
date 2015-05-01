@@ -8,7 +8,7 @@ import itertools
 import sympy
 import numpy
 from StringIO import StringIO
-
+from pkg_resources import parse_version
 
 # Cached value of BNG path
 _bng_path = None
@@ -272,6 +272,13 @@ def generate_equations(model):
         return
     lines = iter(generate_network(model).split('\n'))
     try:
+        global new_reverse_convention
+        (bng_version, bng_codename) = re.match(r'# Created by BioNetGen (\d+\.\d+\.\d+)(?:-(\w+))?$', lines.next()).groups()
+        if parse_version(bng_version) > parse_version("2.2.6") or parse_version(bng_version) == parse_version("2.2.6") and bng_codename == "stable":
+            new_reverse_convention = True
+        else:
+            new_reverse_convention = False
+
         while 'begin species' not in lines.next():
             pass
         model.species = []
@@ -389,6 +396,51 @@ def _parse_species(model, line):
     model.species.append(cp)
 
 
+def _parse_reaction(model, line):
+    """Parse a 'reaction' line from a BNGL net file."""
+    (number, reactants, products, rate, rule) = line.strip().split(' ', 4)
+    # the -1 is to switch from one-based to zero-based indexing
+    reactants = tuple(int(r) - 1 for r in reactants.split(','))
+    products = tuple(int(p) - 1 for p in products.split(','))
+    rate = rate.rsplit('*')
+    if new_reverse_convention: # BNG 2.2.6-stable or greater
+        (is_reverse, rule_name, unit_conversion) = re.match(
+                    r'#(_reverse_)?(\w+)(?: unit_conversion=(.*))?\s*$', rule).groups()
+    else:
+        (rule_name, is_reverse, unit_conversion) = re.match(
+                    r'#(\w+)(?:\((reverse)\))?(?: unit_conversion=(.*))?\s*$', rule).groups()
+    is_reverse = bool(is_reverse)
+#     r_names = ['s%d' % r for r in reactants]
+    r_names = ['__s%d' % r for r in reactants]
+    combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
+    rule = model.rules[rule_name]
+    reaction = {
+        'reactants': reactants,
+        'products': products,
+        'rate': combined_rate,
+        'rule': rule_name,
+        'reverse': is_reverse,
+        }
+    model.reactions.append(reaction)
+    key = (rule_name, reactants, products)
+    key_reverse = (rule_name, products, reactants)
+    reaction_bd = reaction_cache.get(key_reverse)
+    if reaction_bd is None:
+        # make a copy of the reaction dict
+        reaction_bd = dict(reaction)
+        # default to false until we find a matching reverse reaction
+        reaction_bd['reversible'] = False
+        reaction_cache[key] = reaction_bd
+        model.reactions_bidirectional.append(reaction_bd)
+    else:
+        reaction_bd['reversible'] = True
+        reaction_bd['rate'] -= combined_rate
+    for p in products:
+        model.odes[p] += combined_rate
+    for r in reactants:
+        model.odes[r] -= combined_rate
+            
+            
 def _parse_group(model, line):
     """Parse a 'group' line from a BNGL net file."""
     # values are number (which we ignore), name, and species list
