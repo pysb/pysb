@@ -8,7 +8,7 @@ import itertools
 import sympy
 import numpy
 from StringIO import StringIO
-
+from pkg_resources import parse_version
 
 # Cached value of BNG path
 _bng_path = None
@@ -349,6 +349,13 @@ def generate_equations(model, cleanup=True, verbose=False):
 def _parse_netfile(model, lines):
     """Parse 'species', 'reactions', and 'groups' blocks from a BNGL net file."""
     try:
+        global new_reverse_convention
+        (bng_version, bng_codename) = re.match(r'# Created by BioNetGen (\d+\.\d+\.\d+)(?:-(\w+))?$', lines.next()).groups()
+        if parse_version(bng_version) > parse_version("2.2.6") or parse_version(bng_version) == parse_version("2.2.6") and bng_codename == "stable":
+            new_reverse_convention = True
+        else:
+            new_reverse_convention = False
+
         while 'begin species' not in lines.next():
             pass
         model.species = []
@@ -438,10 +445,14 @@ def _parse_reaction(model, line):
     reactants = tuple(int(r) - 1 for r in reactants.split(','))
     products = tuple(int(p) - 1 for p in products.split(','))
     rate = rate.rsplit('*')
-    (rule_name, is_reverse, unit_conversion) = re.match(
-                r'#(\w+)(?:\((reverse)\))?(?: unit_conversion=(.*))?', rule).groups()
+    if new_reverse_convention: # BNG 2.2.6-stable or greater
+        (is_reverse, rule_name, unit_conversion) = re.match(
+                    r'#(_reverse_)?(\w+)(?: unit_conversion=(.*))?\s*$', rule).groups()
+    else:
+        (rule_name, is_reverse, unit_conversion) = re.match(
+                    r'#(\w+)(?:\((reverse)\))?(?: unit_conversion=(.*))?\s*$', rule).groups()
     is_reverse = bool(is_reverse)
-#             r_names = ['s%d' % r for r in reactants]
+#     r_names = ['s%d' % r for r in reactants]
     r_names = ['__s%d' % r for r in reactants]
     combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
     rule = model.rules[rule_name]
