@@ -13,6 +13,7 @@ from pysb.simulate import Simulator
 from pysb.bng import generate_equations
 import numpy as np
 import pysb.generator.bng
+import multiprocessing
 class BNGSSASimulator(Simulator):
         
     def __init__(self, model, tspan=None, cleanup=True, verbose=False):
@@ -28,7 +29,8 @@ class BNGSSASimulator(Simulator):
             raise Exception("'tspan' must be defined.")
         
         trajectories = bng_simulate(self.model, tspan=self.tspan, param_values=param_values, initial_changes=initial_changes,\
-                                    output_dir=output_dir,verbose=self.verbose, n_runs=n_runs, **additional_args)
+                                    output_dir=output_dir,output_file_basename=output_file_basename,verbose=self.verbose,\
+                                    n_runs=n_runs, **additional_args)
     
         self.tout = np.array(trajectories)[:,:,0] + self.tspan[0]
         # species
@@ -43,7 +45,7 @@ class BNGSSASimulator(Simulator):
         return super(BNGSSASimulator, self).get_yfull()
 
 def run_bng(model, tspan, param_values=None,initial_changes=None,  output_dir=os.getcwd(), output_file_basename=None,\
-             cleanup=True, verbose=False, n_runs=2,**additional_args):
+             cleanup=True, verbose=False, n_runs=1,**additional_args):
 
     sim = BNGSSASimulator(model,tspan, verbose=verbose)
     sim.run( tspan, param_values, initial_changes,  output_dir, output_file_basename, cleanup, n_runs,**additional_args)
@@ -52,13 +54,15 @@ def run_bng(model, tspan, param_values=None,initial_changes=None,  output_dir=os
 
 
 def bng_simulate(model,tspan, param_values=None,initial_changes=None, output_dir=os.getcwd(), output_file_basename=None, \
-                 cleanup=True, verbose=False, n_runs=2,**additional_args):
+                 cleanup=True, verbose=False, n_runs=1,**additional_args):
 
-    random_number = np.random.uniform(0,10000)
+    
     
     if output_file_basename is None:
-        output_file_basename = '%s_%s_runfile' % (model.name,str(random_number))
-        output_file_basename1 = '%s_runfile' % model.name
+        process_id = multiprocessing.current_process()
+        process_id = str(process_id.pid)
+        output_file_basename = '%s_%s_runfile' % (model.name,process_id)
+    output_file_basename1 = '%s_runfile' % model.name
     
     bng_run = output_file_basename1.rstrip('_runfile')+'_temp.net'
     
@@ -92,7 +96,7 @@ def bng_simulate(model,tspan, param_values=None,initial_changes=None, output_dir
     gen = generate_parameters(model)
     run_ssa_code += gen
     if n_runs == 1: 
-        print 'For single ssa runs use pysb.bng.run_ssa please...'
+        run_ssa_code += "simulate({method=>\"ssa\",%s, %s })\n" % (ssa_args, "prefix=>\""+output_file_basename+str(n)+"\"")
     else:
         for n in range(n_runs):
             run_ssa_code += "simulate({method=>\"ssa\",%s, %s })\n" % (ssa_args, "prefix=>\""+output_file_basename+str(n)+"\"")
@@ -123,9 +127,6 @@ def bng_simulate(model,tspan, param_values=None,initial_changes=None, output_dir
 
     # Clean up
     if cleanup:
-        for filename in [bng_filename,  net_filename]:
-            if os.access(filename, os.F_OK):
-                os.unlink(filename)
         for i in xrange(n_runs):
             if os.path.exists(os.path.join(output_dir, output_file_basename+str(i)+'.net')):
                 os.unlink(os.path.join(output_dir,output_file_basename+ str(i)+'.net'))
