@@ -6,10 +6,9 @@ import numpy
 import sympy.parsing.sympy_parser
 import itertools
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+import pysb
 from pysb.integrate import odesolve
-from collections    import Mapping 
-from matplotlib.backends.backend_pdf import PdfPages
+
 
 
 def Heaviside_num(x):
@@ -18,7 +17,6 @@ def Heaviside_num(x):
 class Tropical:
     def __init__(self, model):
         self.model            = model
-        self.t                = numpy.linspace(0, 20000, 20001)          # timerange used
         self.y                = None                                     # odes solution, numpy array
         self.slaves           = None
         self.graph            = None
@@ -35,9 +33,9 @@ class Tropical:
              len(self.cycles),
              id(self))
 
-    def tropicalize(self, ignore=1, epsilon=2, rho=3, verbose=True):
+    def tropicalize(self,t, ignore=1, epsilon=2, rho=3, verbose=True):
         if verbose: print "Solving Simulation"
-        self.y = odesolve(self.model, self.t)
+        self.y = odesolve(self.model, t)
         
         # Only concrete species are considered, and the names must be made to match
         names           = [n for n in filter(lambda n: n.startswith('__'), self.y.dtype.names)]
@@ -201,7 +199,6 @@ class Tropical:
         solve_for = copy.deepcopy(self.slaves)
         eqs       = copy.deepcopy(self.pruned)
         eqs_l = []
-        sol_dict = {}
         for i in eqs.keys():
             eqs_l.append(eqs[i])
             
@@ -283,17 +280,17 @@ class Tropical:
                       pass
                    else: vertical.append(x_concentration[ij])
                mols_time = mols_time + f1(*arg_f1)
-               x_points = [self.t[x] for x in x_concentration] 
+               x_points = [t[x] for x in x_concentration] 
                prueba_y = numpy.repeat(count, len(x_points))
                plt.scatter(x_points, prueba_y, color = next(colors) )
-               plt.xlim(0, self.t[len(self.t)-1])
+               plt.xlim(0, t[len(t)-1])
                plt.ylim(0, len(yuju)+1)
                plt.title('Tropicalization' + ' ' + str(self.model.species[i]) )               
            plt.yticks(y_pos, monomials)
            
            plt.subplot(312)
            
-           plt.plot(self.t[1:], mols_time, '*-')
+           plt.plot(t[1:], mols_time, '*-')
            for i in vertical:
                plt.axvline(x=i, color = 'r')     
                                 
@@ -306,21 +303,21 @@ class Tropical:
                f_test = sympy.lambdify(var_test, test, 'numpy')
                for v in var_test:
                    arg_test.append(y[:][str(v)])
-               plt.plot(self.t[1:], f_test(*arg_test))               
-           plt.xlabel('time')
-           plt.ylabel('molecules/second')
+               plt.plot(t[1:], f_test(*arg_test))               
+           plt.xlabel('t') #time
+           plt.ylabel('ms/s') #molecules/second
 
            
            plt.subplot(313)
            all_variables_ready = list(set([item for sublist in all_variables for item in sublist]))
            for w in all_variables_ready:
-               plt.plot(self.t[1:],y[:][str(w)], label=str(w) + '=' + str(model.species[int(re.findall(r'[0-9]', str(w))[0])]) )
-               plt.xlim(0, self.t[len(self.t)-1])
-               plt.xlabel('time')
-               plt.ylabel('Number of molecules')
+               plt.plot(t[1:],y[:][str(w)], label=str(w) + '=' + str(model.species[int(re.findall(r'[0-9]', str(w))[0])]) )
+               plt.xlim(0, t[len(t)-1])
+               plt.xlabel('t') #time
+               plt.ylabel('ms') #Number of molecules
                for i in vertical:
                    plt.axvline(x=i, color = 'r')
-               lgd = plt.legend(bbox_to_anchor=(0.5,-0.5), loc='lower center', ncol=3)
+                   lgd = plt.legend(bbox_to_anchor=(0.5,-0.5), loc='lower center', ncol=3)
            plt.show()
 #           plt.savefig('s%d'%i, bbox_extra_artists=(lgd,), bbox_inches='tight', dpi=800)      
            plt.clf()
@@ -336,9 +333,10 @@ class Tropical:
 
 
 #from pysb.examples.tyson_oscillator import model
-#from earm.lopez_embedded import model
-#tro = Tropical(model)
-#tro.tropicalize()
+from earm.lopez_embedded import model
+t= numpy.linspace(0, 20000, 20001)          # timerange used
+tro = Tropical(model)
+tro.tropicalize(t)
 #tro.final_tropicalization() 
 
 ######################################################################## Change of parameters
