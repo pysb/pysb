@@ -262,7 +262,7 @@ def range_dominating_monomials(model, t):
            prueba_y = numpy.repeat(count, len(x_points))
            plt.scatter(x_points, prueba_y, color = next(colors) )
            plt.xlim(0, t[len(t)-1])
-           plt.ylim(0, len(yuju)+1)
+           plt.ylim(0, len(yuju)+1) 
            plt.title('Tropicalization' + ' ' + str(model.species[i]) )               
        plt.yticks(y_pos, monomials) 
 
