@@ -229,20 +229,20 @@ def range_dominating_monomials(model, t):
     y = y_ready(model,t)
     tropical_system = final_tropicalization(model,t)
     colors = itertools.cycle(["b", "g", "c", "m", "y", "k" ])
-    plt.figure()
-    monomials = []
+    
+    
     for i in tropical_system.keys():                            # i = Name of species tropicalized
        all_variables = [] 
        count = 0
-       
+       monomials = []
        vertical = []
        mols_time = numpy.zeros(len(t)-1)
-#       plt.subplot(311)
+       plt.figure(1)
+       plt.subplot(311)
        yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
        for q, j in enumerate(yuju):                            #j is a monomial of tropical_system[i]
            monomials.append(str(j).partition('*Heaviside')[0])
            y_pos = numpy.arange(1,len(monomials)+2)
-           print y_pos
            count = len(monomials)
            arg_f1 = []
            for par in model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
@@ -264,9 +264,8 @@ def range_dominating_monomials(model, t):
            plt.xlim(0, t[len(t)-1])
            plt.ylim(0, len(yuju)+1)
            plt.title('Tropicalization' + ' ' + str(model.species[i]) )               
-       plt.yticks(y_pos, monomials)
-    plt.show()
-    quit
+       plt.yticks(y_pos, monomials) 
+
        plt.subplot(312)
        
        plt.plot(t[1:], mols_time, '*-')
@@ -290,7 +289,7 @@ def range_dominating_monomials(model, t):
        plt.subplot(313)
        all_variables_ready = list(set([item for sublist in all_variables for item in sublist]))
        for w in all_variables_ready:
-           plt.plot(t[1:],y[:][str(w)], label=str(w) + '=' + str(spe_name[str(w)]) )
+           plt.plot(t[1:],y[str(w)], label=str(w) + '=' + str(spe_name[str(w)]) )
            plt.xlim(0, t[len(t)-1])
            plt.xlabel('t') #time
            plt.ylabel('ms') #Number of molecules
@@ -311,9 +310,9 @@ def range_dominating_monomials(model, t):
              
 
 
-from pysb.examples.tyson_oscillator import model
-# from earm.lopez_embedded import model
-t= numpy.linspace(0, 100, 101)          # timerange used
+# from pysb.examples.tyson_oscillator import model
+from earm.lopez_embedded import model
+t= numpy.linspace(0, 10000, 10001)          # timerange used
 
 
 ######################################################################## Change of parameters
