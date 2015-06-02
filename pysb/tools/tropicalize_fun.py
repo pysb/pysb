@@ -282,7 +282,7 @@ def range_dominating_monomials(model, t, only_observables = True):
            plt.ylim(0, len(yuju)+1) 
            plt.title('Tropicalization' + ' ' + str(model.species[i]) )               
        plt.yticks(y_pos, monomials) 
-
+ 
        plt.subplot(312)
        
        plt.plot(t[1:], mols_time, '*-')
