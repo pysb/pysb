@@ -8,7 +8,7 @@ import itertools
 import matplotlib.pyplot as plt
 import pysb
 from pysb.integrate import odesolve
-from matplotlib.markers import CARETUP, CARETDOWN, TICKUP, TICKDOWN
+
 
 
 def Heaviside_num(x):
@@ -256,14 +256,13 @@ def range_dominating_monomials(model, t, only_observables = True):
        mols_time = numpy.zeros(len(t)-1)
        plt.figure(1)
        plt.subplot(311)
-       yuju = tropical_var[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
-       sign_monomial = tropical_var[i].as_coefficients_dict().values()
-       for j, q in zip(yuju,sign_monomial):                            #j is a monomial of tropical_system[i]
-           for par in model.parameters: j = j.subs(par.name, par.value)
+       yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
+       for q, j in enumerate(yuju):                            #j is a monomial of tropical_system[i]
            monomials.append(str(j).partition('*Heaviside')[0])
            y_pos = numpy.arange(1,len(monomials)+2)
            count = len(monomials)
            arg_f1 = []
+           for par in model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
            var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))] #Variables of monomial 
            all_variables.append(var_to_study)
            f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=Heaviside_num, log=numpy.log, Abs=numpy.abs)) 
@@ -278,12 +277,10 @@ def range_dominating_monomials(model, t, only_observables = True):
            mols_time = mols_time + f1(*arg_f1)
            x_points = [t[x] for x in x_concentration] 
            prueba_y = numpy.repeat(count, len(x_points))
-           if q==1 : plt.scatter(x_points[::120], prueba_y[::120], color = next(colors), marker=r'$\uparrow$', s=500)
-           if q==-1 : plt.scatter(x_points[::120], prueba_y[::120], color = next(colors), marker=r'$\downarrow$', s=500)
+           plt.scatter(x_points, prueba_y, color = next(colors) )
            plt.xlim(0, t[len(t)-1])
            plt.ylim(0, len(yuju)+1) 
-           plt.title('Tropicalization' + ' ' + str(model.species[i]) )  
-       print monomials             
+           plt.title('Tropicalization' + ' ' + str(model.species[i]) )               
        plt.yticks(y_pos, monomials) 
 
        plt.subplot(312)
@@ -297,6 +294,7 @@ def range_dominating_monomials(model, t, only_observables = True):
            test = sympy.sympify(ii)
            for par in model.parameters: test = sympy.simplify(test.subs(par.name, par.value))
            var_test = [atom for atom in test.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
+           print test, var_test
            f_test = sympy.lambdify(var_test, test, 'numpy')
            for v in var_test:
                arg_test.append(y[:][str(v)])
@@ -308,6 +306,7 @@ def range_dominating_monomials(model, t, only_observables = True):
        plt.subplot(313)
        all_variables_ready = list(set([item for sublist in all_variables for item in sublist]))
        for w in all_variables_ready:
+           print w
            plt.plot(t[1:],y[str(w)], label=str(w) + '=' + str(spe_name[str(w)]) )
            plt.xlim(0, t[len(t)-1])
            plt.xlabel('t') #time
@@ -332,7 +331,7 @@ def range_dominating_monomials(model, t, only_observables = True):
 # from pysb.examples.tyson_oscillator import model
 from earm.lopez_embedded import model
 t= numpy.linspace(0, 10000, 10001)          # timerange used
-range_dominating_monomials(model, t)
+# range_dominating_monomials(model, t)
 
 ######################################################################## Change of parameters
 """
