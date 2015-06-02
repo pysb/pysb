@@ -220,18 +220,35 @@ def final_tropicalization(model,t):
     return tropicalized
 
 
-def range_dominating_monomials(model, t): 
+def range_dominating_monomials(model, t, only_observables = True): 
+    pysb.bng.generate_equations(model)
+    y = y_ready(model,t)
     
     spe_name = {}
     for i, j in enumerate(model.species):
         spe_name['s%d'%i] = j
     
-    y = y_ready(model,t)
     tropical_system = final_tropicalization(model,t)
+    
+    tropical_var = {}
+    
+    obs_spe = []
+    tropical_obs = {}
+    for i in model.observables:
+        for j in i.species:
+            obs_spe.append(j)
+    obs_in_trop = list(set(tropical_system)&set(obs_spe))
+    
+    for i in obs_in_trop:
+        tropical_obs[i]=tropical_system[i]
+    
+    if only_observables == True : tropical_var = tropical_obs
+    else: tropical_var = tropical_system
+    
     colors = itertools.cycle(["b", "g", "c", "m", "y", "k" ])
     
     
-    for i in tropical_system.keys():                            # i = Name of species tropicalized
+    for i in tropical_var.keys():                            # i = Name of species tropicalized
        all_variables = [] 
        count = 0
        monomials = []
@@ -289,6 +306,7 @@ def range_dominating_monomials(model, t):
        plt.subplot(313)
        all_variables_ready = list(set([item for sublist in all_variables for item in sublist]))
        for w in all_variables_ready:
+           print w
            plt.plot(t[1:],y[str(w)], label=str(w) + '=' + str(spe_name[str(w)]) )
            plt.xlim(0, t[len(t)-1])
            plt.xlabel('t') #time
@@ -313,7 +331,7 @@ def range_dominating_monomials(model, t):
 # from pysb.examples.tyson_oscillator import model
 from earm.lopez_embedded import model
 t= numpy.linspace(0, 10000, 10001)          # timerange used
-
+# range_dominating_monomials(model, t)
 
 ######################################################################## Change of parameters
 """
