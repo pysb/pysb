@@ -332,7 +332,7 @@ def range_dominating_monomials(model, t, only_observables = True):
 # from pysb.examples.tyson_oscillator import model
 from earm.lopez_embedded import model
 t= numpy.linspace(0, 10000, 10001)          # timerange used
-range_dominating_monomials(model, t)
+range_dominating_monomials(model, t) 
 
 ######################################################################## Change of parameters
 """
