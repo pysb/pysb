@@ -8,7 +8,7 @@ import itertools
 import matplotlib.pyplot as plt
 import pysb
 from pysb.integrate import odesolve
-
+from matplotlib.markers import CARETUP, CARETDOWN, TICKUP, TICKDOWN
 
 
 def Heaviside_num(x):
@@ -220,18 +220,35 @@ def final_tropicalization(model,t):
     return tropicalized
 
 
-def range_dominating_monomials(model, t): 
+def range_dominating_monomials(model, t, only_observables = True): 
+    pysb.bng.generate_equations(model)
+    y = y_ready(model,t)
     
     spe_name = {}
     for i, j in enumerate(model.species):
         spe_name['s%d'%i] = j
     
-    y = y_ready(model,t)
     tropical_system = final_tropicalization(model,t)
+    
+    tropical_var = {}
+    
+    obs_spe = []
+    tropical_obs = {}
+    for i in model.observables:
+        for j in i.species:
+            obs_spe.append(j)
+    obs_in_trop = list(set(tropical_system)&set(obs_spe))
+    
+    for i in obs_in_trop:
+        tropical_obs[i]=tropical_system[i]
+    
+    if only_observables == True : tropical_var = tropical_obs
+    else: tropical_var = tropical_system
+    
     colors = itertools.cycle(["b", "g", "c", "m", "y", "k" ])
     
     
-    for i in tropical_system.keys():                            # i = Name of species tropicalized
+    for i in tropical_var.keys():                            # i = Name of species tropicalized
        all_variables = [] 
        count = 0
        monomials = []
@@ -239,13 +256,14 @@ def range_dominating_monomials(model, t):
        mols_time = numpy.zeros(len(t)-1)
        plt.figure(1)
        plt.subplot(311)
-       yuju = tropical_system[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
-       for q, j in enumerate(yuju):                            #j is a monomial of tropical_system[i]
+       yuju = tropical_var[i].as_coefficients_dict().keys() # List of monomials of tropical equation tropical_system[i]
+       sign_monomial = tropical_var[i].as_coefficients_dict().values()
+       for j, q in zip(yuju,sign_monomial):                            #j is a monomial of tropical_system[i]
+           for par in model.parameters: j = j.subs(par.name, par.value)
            monomials.append(str(j).partition('*Heaviside')[0])
            y_pos = numpy.arange(1,len(monomials)+2)
            count = len(monomials)
            arg_f1 = []
-           for par in model.parameters: j = sympy.simplify(j.subs(par.name, par.value))
            var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))] #Variables of monomial 
            all_variables.append(var_to_study)
            f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=Heaviside_num, log=numpy.log, Abs=numpy.abs)) 
@@ -260,10 +278,12 @@ def range_dominating_monomials(model, t):
            mols_time = mols_time + f1(*arg_f1)
            x_points = [t[x] for x in x_concentration] 
            prueba_y = numpy.repeat(count, len(x_points))
-           plt.scatter(x_points, prueba_y, color = next(colors) )
+           if q==1 : plt.scatter(x_points[::120], prueba_y[::120], color = next(colors), marker=r'$\uparrow$', s=500)
+           if q==-1 : plt.scatter(x_points[::120], prueba_y[::120], color = next(colors), marker=r'$\downarrow$', s=500)
            plt.xlim(0, t[len(t)-1])
            plt.ylim(0, len(yuju)+1) 
-           plt.title('Tropicalization' + ' ' + str(model.species[i]) )               
+           plt.title('Tropicalization' + ' ' + str(model.species[i]) )  
+       print monomials             
        plt.yticks(y_pos, monomials) 
 
        plt.subplot(312)
@@ -277,7 +297,6 @@ def range_dominating_monomials(model, t):
            test = sympy.sympify(ii)
            for par in model.parameters: test = sympy.simplify(test.subs(par.name, par.value))
            var_test = [atom for atom in test.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
-           print test, var_test
            f_test = sympy.lambdify(var_test, test, 'numpy')
            for v in var_test:
                arg_test.append(y[:][str(v)])
@@ -313,7 +332,7 @@ def range_dominating_monomials(model, t):
 # from pysb.examples.tyson_oscillator import model
 from earm.lopez_embedded import model
 t= numpy.linspace(0, 10000, 10001)          # timerange used
-
+range_dominating_monomials(model, t)
 
 ######################################################################## Change of parameters
 """
