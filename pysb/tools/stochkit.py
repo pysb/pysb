@@ -5,6 +5,7 @@ import re
 import sympy
 import numpy as np
 import itertools
+import pysb
 
 def _translate_parameters(model, param_values=None):
     # Error check
@@ -58,26 +59,44 @@ def _translate_reactions(model):
                 products[p] += 1
             else:
                 products[p] = 1
-        rate = sympy.ccode(rxn["rate"])
-        # expand expressions
-        for e in model.expressions:
-            rate = re.sub(r'\b%s\b' % e.name, '('+sympy.ccode(e.expand_expr(model))+')', rate)
-        # replace observables w/ sums of species
-        for obs in model.observables:
-            obs_string = ''
-            for i in range(len(obs.coefficients)):
-                if i > 0: obs_string += "+"
-                if obs.coefficients[i] > 1: 
-                    obs_string += str(obs.coefficients[i])+"*"
-                obs_string += "__s"+str(obs.species[i])
-            if len(obs.coefficients) > 1: 
-                obs_string = '(' + obs_string + ')'
-            rate = re.sub(r'%s' % obs.name, obs_string, rate)
-        # create reaction
-        rxn_list[n] = gillespy.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
+        # determining if mass action or not
+        if type(model.rules[rxn["rule"]].rate_forward) == pysb.core.Parameter:
+            if rxn["reverse"] == True:
+                rate = gillespy.Parameter(name=model.rules[rxn["rule"]].rate_reverse.name, expression=model.rules[rxn["rule"]].rate_reverse.value)
+            else:
+                rate = gillespy.Parameter(name=model.rules[rxn["rule"]].rate_forward.name, expression=model.rules[rxn["rule"]].rate_forward.value)
+            rxn_list[n] = gillespy.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
                                         reactants = reactants,\
                                         products = products,\
-                                        propensity_function = rate) 
+                                        rate = rate,\
+                                        massaction = True)
+        else:
+            print type(model.rules[rxn["rule"]].rate_forward)
+            rate = sympy.ccode(rxn["rate"]) 
+            for m in matches:
+                repl = m[0]
+                for i in range(1,int(m[1])):
+                    repl += "*(%s - %s)" % (m[0],str(int(m[1])-1))
+                rate = re.sub('__s\d+\*\*\d+', repl, rate, count=1)
+            # expand expressions
+            for e in model.expressions:
+                rate = re.sub(r'\b%s\b' % e.name, '('+sympy.ccode(e.expand_expr(model))+')', rate)
+            # replace observables w/ sums of species
+            for obs in model.observables:
+                obs_string = ''
+                for i in range(len(obs.coefficients)):
+                    if i > 0: obs_string += "+"
+                    if obs.coefficients[i] > 1: 
+                        obs_string += str(obs.coefficients[i])+"*"
+                    obs_string += "__s"+str(obs.species[i])
+                if len(obs.coefficients) > 1: 
+                    obs_string = '(' + obs_string + ')'
+                rate = re.sub(r'%s' % obs.name, obs_string, rate)
+            # create reaction
+            rxn_list[n] = gillespy.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
+                                        reactants = reactants,\
+                                        products = products,\
+                                        propensity_function = rate)
     return rxn_list
     
 def _translate(model, param_values=None, y0=None):
