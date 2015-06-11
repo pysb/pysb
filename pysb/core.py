@@ -756,7 +756,10 @@ class Parameter(Component, sympy.Symbol):
     def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
         self.value = float(value)
-
+    
+    def get_value(self):
+        return self.value
+    
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
     @property
@@ -1052,6 +1055,9 @@ class Expression(Component, sympy.Symbol):
         return all(str(a) in [p.name for p in model.parameters] or
                    isinstance(a, sympy.Number)
                    for a in self.expand_expr(model).atoms())
+        
+    def get_value(self):
+        return self.expr.evalf()
 
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
