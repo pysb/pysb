@@ -86,16 +86,28 @@ class Solver(object):
 
         pysb.bng.generate_equations(model)
 
+        def eqn_substitutions(eqns):
+            """String substitutions on the sympy C code for the ODE RHS and
+            Jacobian functions to use appropriate terms for variables and
+            parameters."""
+            # Substitute 'y[i]' for 'si'
+            eqns = re.sub(r's(\d+)',
+                          lambda m: 'y[%s]' % (int(m.group(1))), eqns)
+            # Substitute expanded parameter formulas for any named expressions
+            for e in model.expressions:
+                eqns = re.sub(r'\b(%s)\b' % e.name,
+                              sympy.ccode(e.expand_expr()), eqns)
+            # Substitute 'p[i]' for any named parameters
+            for i, p in enumerate(model.parameters):
+                eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
+            return eqns
+
+        # ODE RHS -----------------------------------------------
+        # Prepare the string representations of the RHS equations
         code_eqs = '\n'.join(['ydot[%d] = %s;' %
                               (i, sympy.ccode(model.odes[i]))
                               for i in range(len(model.odes))])
-        code_eqs = re.sub(r's(\d+)',
-                          lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
-        for e in model.expressions:
-            code_eqs = re.sub(r'\b(%s)\b' % e.name,
-                              sympy.ccode(e.expand_expr()), code_eqs)
-        for i, p in enumerate(model.parameters):
-            code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
+        code_eqs = eqn_substitutions(code_eqs)
 
         Solver._test_inline()
         # If we can't use weave.inline to run the C code, compile it as Python
