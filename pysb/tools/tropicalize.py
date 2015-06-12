@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pysb
 from pysb.integrate import odesolve
 
-
+# TODO: Change 'masters' to 'drivers' and 'slaves' to 'passengers'.
 
 def Heaviside_num(x):
     return 0.5*(numpy.sign(x)+1)
@@ -17,7 +17,7 @@ def Heaviside_num(x):
 class Tropical:
     def __init__(self, model):
         self.model            = model
-        self.y                = None                                     # odes solution, numpy array
+        self.y                = None  # ode solution, numpy array
         self.slaves           = None
         self.graph            = None
         self.cycles           = []
