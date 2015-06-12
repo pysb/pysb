@@ -6,7 +6,7 @@ virtualenv:
 before_install:
   - sudo apt-get install python-numpy python-scipy python-matplotlib
 install:
-  - pip install sympy networkx ghalton pygraphviz
+  - pip install sympy networkx pygraphviz
   - wget http://mmbios.org/index.php/bionetgen-2-2-5-stable/bionetgen-2-2-5-stable-zip?format=raw -O BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
   - sudo ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen

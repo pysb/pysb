@@ -332,11 +332,11 @@ class Tropical:
              
 
 
-#from pysb.examples.tyson_oscillator import model
-from pysb.examples.earm_2_0.lopez_embedded import model
-t= numpy.linspace(0, 20000, 20001)          # timerange used
-tro = Tropical(model)
-tro.tropicalize(t)
+# from pysb.examples.tyson_oscillator import model
+# # from earm.lopez_embedded import model
+# t= numpy.linspace(0, 20000, 20001)          # timerange used
+# tro = Tropical(model)
+# tro.tropicalize(t)
 #tro.final_tropicalization() 
 
 ######################################################################## Change of parameters
