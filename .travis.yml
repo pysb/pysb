@@ -11,7 +11,7 @@ install:
   - unzip BioNetGen-2.2.5-stable.zip
   - sudo ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
   - wget http://downloads.sourceforge.net/project/stochkit/StochKit2/StochKit2.0.11/StochKit2.0.11.tgz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fstochkit%2Ffiles%2F&ts=1434079825&use_mirror=iweb
-  - tar xzf StochKit2.0.11.tgz
+  - curl --silent -L "http://downloads.sourceforge.net/project/stochkit/StochKit2/StochKit2.0.11/StochKit2.0.11.tgz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fstochkit%2Ffiles%2F&ts=1434079825&use_mirror=iweb" | tar xz
   - StochKit2.0.11/install.sh
   - git clone https://github.com/JohnAbel/gillespy.git
   - sudo STOCHKIT_HOME=$HOME/StochKit2.0.11/ python setup.py install
