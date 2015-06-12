@@ -11,3 +11,5 @@ install:
   - unzip BioNetGen-2.2.5-stable.zip
   - sudo ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
 script: nosetests
+notifications:
+  slack: lopezlab:6RrEQYyVeSjYJKLWTovcqiM1
