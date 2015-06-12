@@ -9,14 +9,14 @@ import pysb
 
 def _translate_parameters(model, param_values=None):
     # Error check
-    if param_values != None and len(param_values) != len(model.parameters):
+    if param_values is not None and len(param_values) != len(model.parameters):
         raise Exception("len(param_values) must equal len(model.parameters)")
     unused = model.parameters_unused()
     param_list = (len(model.parameters)-len(unused)) * [None]
     count = 0
     for i,p in enumerate(model.parameters):
         if p not in unused:
-            if param_values != None:
+            if param_values is not None:
                 val=param_values[i]
             else:
                 val=p.value
@@ -59,31 +59,15 @@ def _translate_reactions(model):
                 products[p] += 1
             else:
                 products[p] = 1
-        # determining if mass action or not
-#         if type(model.rules[rxn["rule"]].rate_forward) == pysb.core.Parameter:
-#             if rxn["reverse"] == True:
-#                 rate = gillespy.Parameter(name=model.rules[rxn["rule"]].rate_reverse.name, expression=model.rules[rxn["rule"]].rate_reverse.value)
-#             else:
-#                 rate = gillespy.Parameter(name=model.rules[rxn["rule"]].rate_forward.name, expression=model.rules[rxn["rule"]].rate_forward.value)
-#             rxn_list[n] = gillespy.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
-#                                         reactants = reactants,\
-#                                         products = products,\
-#                                         rate = rate,\
-#                                         massaction = True)
-#         else:
-        rate = sympy.fcode(rxn["rate"])
-        matches = re.findall('(__s\d+)\*\*(\d+)', rate)
+        # replace terms like __s**2 with __s*(__s-1)
+        rate = str(rxn["rate"])
+        pattern = "(__s\d+)\*\*(\d+)"
+        matches = re.findall(pattern, rate)
         for m in matches:
             repl = m[0]
             for i in range(1,int(m[1])):
-                repl += "*(%s - %s)" % (m[0],str(int(m[1])-1))
-            rate = re.sub('__s\d+\*\*\d+', repl, rate, count=1)
-        
-        for m in matches:
-            repl = m[0]
-            for i in range(1,int(m[1])):
-                repl += "*(%s - %s)" % (m[0],str(int(m[1])-1))
-            rate = re.sub('__s\d+\*\*\d+', repl, rate, count=1)
+                repl += "*(%s-%d)" % (m[0],i)
+            rate = re.sub(pattern, repl, rate)
         # expand expressions
         for e in model.expressions:
             rate = re.sub(r'\b%s\b' % e.name, '('+sympy.ccode(e.expand_expr(model))+')', rate)
