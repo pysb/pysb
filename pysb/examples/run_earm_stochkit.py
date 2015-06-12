@@ -17,7 +17,7 @@ def plot_mean_min_max(name, title=None):
     plt.ylabel('Population of %s' %name)
     plt.savefig('%s.png'%name)
 tspan = np.linspace(0, 20000, 100)
-tout, trajectories = run_stochkit(model, tspan, n_runs=5, seed=None, verbose=True)
+tout, trajectories = run_stochkit(model, tspan, n_runs=20, seed=None, algorithm="ssa", verbose=True)
 
 plot_mean_min_max('Bid_unbound')
 plot_mean_min_max('PARP_unbound')
