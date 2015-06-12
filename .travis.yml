@@ -24,7 +24,7 @@ install:
       StochKit2.0.11/install.sh;
     fi
   - git clone https://github.com/JohnAbel/gillespy.git
-  - cd gillespy && sudo STOCHKIT_HOME=$HOME/StochKit2.0.11/ python setup.py install && cd ..
+  - cd gillespy && STOCHKIT_HOME=$HOME/StochKit2.0.11/ python setup.py install && cd ..
 script: nosetests
 notifications:
   slack: lopezlab:6RrEQYyVeSjYJKLWTovcqiM1
