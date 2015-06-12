@@ -5,6 +5,9 @@ virtualenv:
   system_site_packages: true
 before_install:
   - sudo apt-get install python-numpy python-scipy python-matplotlib
+cache:
+  directories:
+    - $HOME/StochKit2.0.11
 install:
   - pip install sympy networkx pygraphviz
   - wget http://mmbios.org/index.php/bionetgen-2-2-5-stable/bionetgen-2-2-5-stable-zip?format=raw -O BioNetGen-2.2.5-stable.zip
