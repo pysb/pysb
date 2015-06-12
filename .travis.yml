@@ -6,10 +6,15 @@ virtualenv:
 before_install:
   - sudo apt-get install python-numpy python-scipy python-matplotlib
 install:
-  - pip install sympy
+  - pip install sympy networkx ghalton pygraphviz
   - wget http://bionetgen.googlecode.com/files/BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
   - sudo ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
+  - wget http://downloads.sourceforge.net/project/stochkit/StochKit2/StochKit2.0.11/StochKit2.1.11.tgz
+  - tar xzf StochKit2.1.11.tgz
+  - StochKit2.1.11/install.sh
+  - git clone https://github.com/JohnAbel/gillespy.git
+  - sudo STOCHKIT_HOME=$HOME/StochKit2.1.11/ python setup.py install
 script: nosetests
 notifications:
   slack: lopezlab:6RrEQYyVeSjYJKLWTovcqiM1
