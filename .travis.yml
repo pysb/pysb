@@ -5,7 +5,7 @@ python:
 virtualenv:
   system_site_packages: true
 env:
-  - BNGPATH=$HOME/BioNetGen-2.2.5-stable
+  - BNGPATH=~/BioNetGen-2.2.5-stable
 addons:
   apt:
     packages:
