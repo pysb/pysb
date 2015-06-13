@@ -4,8 +4,6 @@ python:
   - "2.7"
 virtualenv:
   system_site_packages: true
-env:
-  - BNGPATH=~/BioNetGen-2.2.5-stable
 addons:
   apt:
     packages:
@@ -19,6 +17,7 @@ install:
   - pip install sympy networkx pygraphviz matplotlib
   - wget http://mmbios.org/index.php/bionetgen-2-2-5-stable/bionetgen-2-2-5-stable-zip?format=raw -O BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
+  - export BNGPATH=`pwd`/BioNetGen-2.2.5-stable
   - if [ ! -d "StochKit2.0.11" ] ; then
       curl --silent -L "http://downloads.sourceforge.net/project/stochkit/StochKit2/StochKit2.0.11/StochKit2.0.11.tgz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fstochkit%2Ffiles%2F&ts=1434079825&use_mirror=iweb" | tar xz;
       StochKit2.0.11/install.sh;
