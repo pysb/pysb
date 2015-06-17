@@ -17,7 +17,7 @@ def plot_mean_min_max(name, title=None):
     plt.ylabel('Population')
 
 tspan = np.linspace(0, 50, 5001)
-tout, trajectories = run_stochkit(model, tspan, n_runs=10, seed=None, verbose=True)
+tout, trajectories = run_stochkit(model, tspan, n_runs=5, seed=None, algorithm="ssa", verbose=True)
 
 plot_mean_min_max('__s0', str(model.species[0]))
 plot_mean_min_max('YT')

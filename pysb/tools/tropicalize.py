@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pysb
 from pysb.integrate import odesolve
 
-
+# TODO: Change 'masters' to 'drivers' and 'slaves' to 'passengers'.
 
 def Heaviside_num(x):
     return 0.5*(numpy.sign(x)+1)
@@ -17,7 +17,7 @@ def Heaviside_num(x):
 class Tropical:
     def __init__(self, model):
         self.model            = model
-        self.y                = None                                     # odes solution, numpy array
+        self.y                = None  # ode solution, numpy array
         self.slaves           = None
         self.graph            = None
         self.cycles           = []
@@ -332,11 +332,11 @@ class Tropical:
              
 
 
-#from pysb.examples.tyson_oscillator import model
-from earm.lopez_embedded import model
-t= numpy.linspace(0, 20000, 20001)          # timerange used
-tro = Tropical(model)
-tro.tropicalize(t)
+# from pysb.examples.tyson_oscillator import model
+# # from earm.lopez_embedded import model
+# t= numpy.linspace(0, 20000, 20001)          # timerange used
+# tro = Tropical(model)
+# tro.tropicalize(t)
 #tro.final_tropicalization() 
 
 ######################################################################## Change of parameters
