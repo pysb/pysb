@@ -44,7 +44,7 @@ class BNGSSASimulator(Simulator):
     def get_yfull(self):
         return super(BNGSSASimulator, self).get_yfull()
 
-def run_bng(model, tspan, param_values=None,initial_changes=None,  output_dir=os.getcwd(), output_file_basename=None,\
+def run_ssa(model, tspan, param_values=None,initial_changes=None,  output_dir=os.getcwd(), output_file_basename=None,\
              cleanup=True, verbose=False, n_runs=1,**additional_args):
 
     sim = BNGSSASimulator(model,tspan, verbose=verbose)
