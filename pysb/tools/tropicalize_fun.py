@@ -283,7 +283,7 @@ def range_dominating_monomials(model, t, p6=None, nam=None):
             sign_monomial = obs[i].as_coefficients_dict().values()
             mols_time = numpy.zeros(len(t)-1)
             for j,q in zip(mons,sign_monomial):
-                jj = copy.deepcopy(j)
+                jj = copy.deepcopy(j) 
                 for par in model.parameters: j=j.subs(par.name,par.value)
                 arg_f1 = []
                 var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))] #Variables of monomial 
@@ -336,19 +336,21 @@ def range_dominating_monomials(model, t, p6=None, nam=None):
         plt.title('Tropicalization' + ' ' + str(model.observables[ii].reaction_pattern) )
         plt.ylabel('Molecules')
         plt.ylim(0,20000)
-        plt.show()
-#         plt.savefig('/home/carlos/Desktop/test_parameters_embedded/'+nam+'__s%d'%i, bbox_inches='tight', dpi=800, format='pdf')    
+#         plt.show()
+        plt.savefig('/home/carlos/Desktop/test_parameters_embedded/'+nam+'__s%d'%i, bbox_inches='tight', dpi=800, format='pdf')    
         plt.close(plt.figure(1))
     return
                      
 
-from earm.lopez_embedded import model
-t= numpy.linspace(0, 20000, 20001)          # timerange used
+
 # from pysb.examples.tyson_oscillator import model
 # t= numpy.linspace(0, 100, 100) 
 
-f = open('/home/carlos/Desktop/pars_embedded.txt') 
-data = csv.reader(f)
-params = []
-for i in data:params.append(float(i[1]))
-range_dominating_monomials(model, t,p6=params,nam='')
+# from earm.lopez_embedded import model
+# t= numpy.linspace(0, 20000, 20001)          # timerange used
+# 
+# f = open('/home/carlos/Desktop/pars_embedded.txt') 
+# data = csv.reader(f)
+# params = []
+# for i in data:params.append(float(i[1]))
+# range_dominating_monomials(model, t,p6=params,nam='')
