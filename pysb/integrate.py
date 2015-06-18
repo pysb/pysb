@@ -164,6 +164,9 @@ class Solver(object):
         jac_eqs_list = []
         for i, row in enumerate(jac_matrix):
             for j, entry in enumerate(row):
+                # Skip zero entries in the Jacobian
+                if entry == 0:
+                    continue
                 jac_eq_str = 'jac[%d, %d] = %s;' % (i, j, sympy.ccode(entry))
                 jac_eqs_list.append(jac_eq_str)
         jac_eqs = eqn_substitutions('\n'.join(jac_eqs_list))
@@ -204,7 +207,7 @@ class Solver(object):
         self.y = numpy.ndarray((len(tspan), len(model.species)))
         self.ydot = numpy.ndarray(len(model.species))
         # Initialization of matrix for storing the Jacobian
-        self.jac = numpy.ndarray((len(model.odes), len(model.species)))
+        self.jac = numpy.zeros((len(model.odes), len(model.species)))
         if len(model.observables):
             self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
                                                       itertools.repeat(float)))
