@@ -8,6 +8,7 @@ addons:
   apt:
     packages:
     - python-numpy
+    - liblapack-dev
 cache:
   directories:
     - $TRAVIS_BUILD_DIR/StochKit2.0.11
