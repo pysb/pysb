@@ -10,4 +10,4 @@ t = linspace(0, 100, 10001)
 
 
 def test_slaves():
-    assert_equal(tropicalize_fun.find_slaves(model, t, epsilon=2, p=None), ['0','1','4'])
+    assert_equal(tropicalize_fun.find_slaves(model, t, epsilon=2, p=None), [0,1,4])
