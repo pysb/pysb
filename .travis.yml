@@ -8,12 +8,11 @@ addons:
   apt:
     packages:
     - python-numpy
-    - python-scipy
 cache:
   directories:
     - $TRAVIS_BUILD_DIR/StochKit2.0.11
 install:
-  - pip install sympy networkx matplotlib pygraphviz
+  - pip install sympy networkx matplotlib pygraphviz scipy
   - wget http://mmbios.org/index.php/bionetgen-2-2-5-stable/bionetgen-2-2-5-stable-zip?format=raw -O BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
   - export BNGPATH=`pwd`/BioNetGen-2.2.5-stable
