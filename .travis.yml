@@ -9,6 +9,7 @@ addons:
     packages:
     - python-numpy
     - liblapack-dev
+    - gfortran
 cache:
   directories:
     - $TRAVIS_BUILD_DIR/StochKit2.0.11
