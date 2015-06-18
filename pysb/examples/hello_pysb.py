@@ -4,8 +4,6 @@
 """
 
 from pysb import *
-from pysb.integrate import odesolve
-from pylab import linspace, plot, xlabel, ylabel, show
 
 Model()
 
@@ -30,6 +28,8 @@ Rule('L_binds_R', L(s=None) + R(s=None) <> L(s=1) % R(s=1), kf, kr)
 Observable('LR', L(s=1) % R(s=1))
 
 if __name__ == '__main__':
+    from pylab import linspace, plot, xlabel, ylabel, show
+    from pysb.integrate import odesolve
     print __doc__
     # Simulate the model through 40 seconds
     time = linspace(0, 40, 100)

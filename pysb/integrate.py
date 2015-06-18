@@ -315,10 +315,10 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     >>> print yfull.dtype   #doctest: +NORMALIZE_WHITESPACE
     [('__s0', '<f8'), ('__s1', '<f8'), ('__s2', '<f8'), ('A_total', '<f8'),
     ('B_total', '<f8'), ('C_total', '<f8')]
-    >>> print yfull[0:4, 1:3]
+    >>> print yfull[0:4, 1:3]   #doctest: +ELLIPSIS
     Traceback (most recent call last):
       ...
-    IndexError: too many indices
+    IndexError: too many indices...
     >>> yarray = yfull.view(float).reshape(len(yfull), -1)
     >>> print yarray.shape
     (10, 6)
