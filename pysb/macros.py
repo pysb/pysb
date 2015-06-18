@@ -213,11 +213,14 @@ def _verify_sites(m, *site_list):
 
     """
 
-    for site in site_list:
-        if site not in m().monomer.sites:
-            raise ValueError("Monomer '%s' must contain the site '%s'" %
-                            (m().monomer.name, site))
-    return True
+    if isinstance(m, ComplexPattern):
+        return _verify_sites_complex(m, *site_list)
+    else:
+        for site in site_list:
+            if site not in m().monomer.sites:
+                raise ValueError("Monomer '%s' must contain the site '%s'" %
+                                (m().monomer.name, site))
+        return True
 
 def _verify_sites_complex(c, *site_list):
   
@@ -363,10 +366,9 @@ def bind(s1, site1, s2, site2, klist):
 
     _verify_sites(s1, site1)
     _verify_sites(s2, site2)
-
     return _macro_rule('bind',
-                       s1({site1: None}) + s2({site2: None}) <>
-                       s1({site1: 1}) % s2({site2: 1}),
+                       s1(**{site1: None}) + s2(**{site2: None}) <>
+                       s1(**{site1: 1}) % s2(**{site2: 1}),
                        klist, ['kf', 'kr'], name_func=bind_name_func)
 
 def bind_name_func(rule_expression):

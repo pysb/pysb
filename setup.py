@@ -6,27 +6,8 @@ import sys, os, subprocess, traceback, re
 
 def main():
 
-    rv_filename = 'RELEASE-VERSION'
-    try:
-        version = get_version()
-        version_file = open(rv_filename, 'w')
-        version_file.write(version)
-        version_file.close() # ensure sdist build process sees new contents
-    except Exception:
-        try:
-            version_file = open(rv_filename, 'r')
-            version = version_file.read()
-        except IOError as e:
-            if e.errno == 2 and e.filename == rv_filename:
-                sys.stderr.write(
-"""This does not appear to be a git repository, and the file %s is not
-present. In order to build or install PySB, please either download a
-distribution from http://pypi.python.org/pypi/pysb or clone the git repository
-at https://github.com/pysb/pysb.git\n""" % rv_filename)
-                sys.exit(1)
-
     setup(name='pysb',
-          version=version,
+          version=get_version(),
           description='Python Systems Biology modeling framework',
           long_description='PySB (pronounced "Pie Ess Bee") is a framework ' + \
               'for building rule-based mathematical models of biochemical ' + \
@@ -37,7 +18,7 @@ at https://github.com/pysb/pysb.git\n""" % rv_filename)
           author_email='jmuhlich@bitflood.org',
           url='http://pysb.org/',
           packages=['pysb', 'pysb.generator', 'pysb.tools', 'pysb.examples',
-                    'pysb.export', 'pysb.testing'],
+                    'pysb.export', 'pysb.testing', 'pysb.tests'],
           scripts=['scripts/pysb_export'],
           requires=['numpy', 'scipy', 'sympy'],
           keywords=['systems', 'biology', 'model', 'rules'],
@@ -54,10 +35,33 @@ at https://github.com/pysb/pysb.git\n""" % rv_filename)
             ],
           )
 
+def get_version():
+    rv_filename = 'RELEASE-VERSION'
+    base_path = os.path.dirname(__file__)
+    rv_path = os.path.join(base_path, rv_filename)
+    try:
+        version = get_git_version()
+        version_file = open(rv_path, 'w')
+        version_file.write(version)
+        version_file.close() # ensure sdist build process sees new contents
+    except Exception:
+        try:
+            version_file = open(rv_path, 'r')
+            version = version_file.read()
+        except IOError as e:
+            if e.errno == 2 and e.filename == rv_path:
+                sys.stderr.write(
+"""This does not appear to be a git repository, and the file %s is not
+present. In order to build or install PySB, please either download a
+distribution from http://pypi.python.org/pypi/pysb or clone the git repository
+at https://github.com/pysb/pysb.git\n""" % rv_filename)
+                sys.exit(1)
+    return version
+
 class GitError(Exception):
     pass
 
-def get_version():
+def get_git_version():
     """Get a nice version number from git-describe"""
 
     # ensure that we are working in a pysb git repo
@@ -68,7 +72,7 @@ def get_version():
     os.chdir(setup_path)
 
     # run git describe
-    gitcmd = ['git', 'describe', '--always', '--abbrev=4']
+    gitcmd = ['git', 'describe', '--always']
     try:
         gitproc = subprocess.Popen(gitcmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         retcode = gitproc.wait()

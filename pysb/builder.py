@@ -142,7 +142,7 @@ class Builder(object):
         p = Parameter(name, param_val, _export=False)
         self.model.add_component(p)
 
-        if estimate:
+        if prior is not None:
             self.estimate_params.append(p)
             self.priors.append(prior)
 
