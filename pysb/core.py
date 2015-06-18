@@ -1030,31 +1030,18 @@ class Expression(Component, sympy.Symbol):
         Component.__init__(self, name, _export)
         self.expr = expr
 
-#     def expand_expr(self):
-#         """Return expr rewritten in terms of terminal symbols only."""
-#         subs = ((a, a.expand_expr()) for a in self.expr.atoms()
-#                 if isinstance(a, Expression))
-#         return self.expr.subs(subs)
-    
-    def expand_expr(self, model):
+    def expand_expr(self):
         """Return expr rewritten in terms of terminal symbols only."""
-        subs = [ (a, model.expressions[str(a)].expand_expr(model)) 
-                 for a in self.expr.atoms()
-                 if str(a) in [e.name for e in model.expressions] ]
+        subs = ((a, a.expand_expr()) for a in self.expr.atoms()
+                if isinstance(a, Expression))
         return self.expr.subs(subs)
 
-#     def is_constant_expression(self):
-#         """Return True if all terminal symbols are Parameters or numbers."""
-#         return all(isinstance(a, Parameter) or
-#                    (isinstance(a, Expression) and a.is_constant_expression()) or
-#                    isinstance(a, sympy.Number)
-#                    for a in self.expr.atoms())
-
-    def is_constant_expression(self, model):
-        """Return True if all terminal symbols are Parameters or numbers."""        
-        return all(str(a) in [p.name for p in model.parameters] or
+    def is_constant_expression(self):
+        """Return True if all terminal symbols are Parameters or numbers."""
+        return all(isinstance(a, Parameter) or
+                   (isinstance(a, Expression) and a.is_constant_expression()) or
                    isinstance(a, sympy.Number)
-                   for a in self.expand_expr(model).atoms())
+                   for a in self.expr.atoms())
         
     def get_value(self):
         return self.expr.evalf()
@@ -1253,7 +1240,7 @@ class Model(object):
     def expressions_constant(self):
         """Return a ComponentSet of constant expressions."""
         cset = ComponentSet(e for e in self.expressions
-                            if e.is_constant_expression(self))
+                            if e.is_constant_expression())
         return cset
 
     def expressions_dynamic(self):
