@@ -2,6 +2,10 @@ language: python
 sudo: false
 python:
   - "2.7"
+addons:
+  apt:
+    sources:
+    - graphviz
 cache:
   directories:
     - $TRAVIS_BUILD_DIR/StochKit2.0.11
