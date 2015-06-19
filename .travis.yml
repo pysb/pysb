@@ -12,7 +12,8 @@ before_install:
   - export PATH=/home/travis/miniconda/bin:$PATH
   - conda update --yes conda
 install:
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib sympy networkx pygraphviz nose
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib sympy networkx nose
+  - conda install --yes -c andreas-wilm pygraphviz
   - wget http://mmbios.org/index.php/bionetgen-2-2-5-stable/bionetgen-2-2-5-stable-zip?format=raw -O BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
   - export BNGPATH=`pwd`/BioNetGen-2.2.5-stable
