@@ -6,15 +6,15 @@ from pysb.integrate import Solver
 from pysb.examples import robertson, earm_1_0
 import numpy as np
 
-def check_runtime(model, tspan, iterations, use_inline, use_jacobian):
+def check_runtime(model, tspan, iterations, use_inline, use_analytic_jacobian):
     Solver._use_inline = use_inline
-    sol = Solver(model, tspan, use_jacobian=use_jacobian)
+    sol = Solver(model, tspan, use_analytic_jacobian=use_analytic_jacobian)
     start_time = timeit.default_timer()
     for i in range(iterations):
         sol.run()
     elapsed = timeit.default_timer() - start_time
-    print "use_inline=%s, use_jacobian=%s, %d iterations" % \
-          (use_inline, use_jacobian, iterations)
+    print "use_inline=%s, use_analytic_jacobian=%s, %d iterations" % \
+          (use_inline, use_analytic_jacobian, iterations)
     print "Time: %f sec\n" % elapsed
 
 if __name__ == '__main__':

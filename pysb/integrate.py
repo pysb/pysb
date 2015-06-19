@@ -37,9 +37,9 @@ class Solver(object):
         Time values over which to integrate. The first and last values define
         the time range, and the returned trajectories will be sampled at every
         value.
-    use_jacobian : boolean, optional
+    use_analytic_jacobian : boolean, optional
         Whether to provide the solver a Jacobian matrix derived analytically
-        from the model ODEs. Defaults to True. If False, the integrator may
+        from the model ODEs. Defaults to False. If False, the integrator may
         approximate the Jacobian by finite-differences calculations when
         necessary (depending on the integrator and settings).
     integrator : string, optional
@@ -87,11 +87,11 @@ class Solver(object):
                     distutils.errors.CompileError, ImportError):
                 pass
 
-    def __init__(self, model, tspan, use_jacobian=True, integrator='vode',
-                 **integrator_options):
+    def __init__(self, model, tspan, use_analytic_jacobian=False,
+                 integrator='vode', **integrator_options):
 
         # We'll need to know if we're using the Jacobian when we get to run()
-        self._use_jacobian = use_jacobian
+        self._use_analytic_jacobian = use_analytic_jacobian
         # Generate the equations for the model
         pysb.bng.generate_equations(model)
 
@@ -202,33 +202,34 @@ class Solver(object):
             pass
         options.update(integrator_options)
 
+        # Initialize variables
         self.model = model
         self.tspan = tspan
         self.y = numpy.ndarray((len(tspan), len(model.species)))
         self.ydot = numpy.ndarray(len(model.species))
         # Initialization of matrix for storing the Jacobian
         self.jac = numpy.zeros((len(model.odes), len(model.species)))
+        # Initialize record array for observable timecourses
         if len(model.observables):
             self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
                                                       itertools.repeat(float)))
         else:
             self.yobs = numpy.ndarray((len(tspan), 0))
+        # Initialize view of observables record array
+        self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
+        # Initialize array for expression timecourses
         exprs = model.expressions_dynamic()
         if len(exprs):
             self.yexpr = numpy.ndarray(len(tspan), zip(exprs.keys(),
                                                        itertools.repeat(float)))
         else:
             self.yexpr = numpy.ndarray((len(tspan), 0))
-        self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
-        # Initialize an instance of scipy.integrate.ode
-        if self._use_jacobian:
-            # Use the analytic Jacobian
-            self.integrator = ode(rhs, jac=jacobian).set_integrator(
-                                                        integrator, **options)
-        else:
-            # Don't use the analytic Jacobian
-            self.integrator = ode(rhs).set_integrator(integrator, **options)
 
+        # Initialize the jacobian argument to None if we're not going to use it
+        jac = jacobian if self._use_analytic_jacobian else None
+        # Initialize an instance of scipy.integrate.ode
+        self.integrator = ode(rhs, jac=jac).set_integrator(
+                                                    integrator, **options)
 
     def run(self, param_values=None, y0=None):
         """Perform an integration.
@@ -247,7 +248,6 @@ class Solver(object):
             determined by the order of model.species. If not specified, initial
             conditions will be taken from model.initial_conditions (with initial
             condition parameter values taken from `param_values` if specified).
-
         """
 
         if param_values is not None:
@@ -288,7 +288,7 @@ class Solver(object):
         self.integrator.set_initial_value(y0, self.tspan[0])
         # Set parameter vectors for RHS func and Jacobian
         self.integrator.set_f_params(param_values)
-        if self._use_jacobian:
+        if self._use_analytic_jacobian:
             self.integrator.set_jac_params(param_values)
         self.y[0] = y0
         i = 1
