@@ -2,19 +2,20 @@ language: python
 sudo: false
 python:
   - "2.7"
-virtualenv:
-  system_site_packages: true
-addons:
-  apt:
-    packages:
-    - liblapack-dev
-    - gfortran
 cache:
   directories:
     - $TRAVIS_BUILD_DIR/StochKit2.0.11
+before_install:
+  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - chmod +x miniconda.sh
+  - ./miniconda.sh -b
+  - export PATH=/home/travis/miniconda/bin:$PATH
+  - conda update --yes conda
+  # The next couple lines fix a crash with multiprocessing on Travis and are not specific to using Miniconda
+  - sudo rm -rf /dev/shm
+  - sudo ln -s /run/shm /dev/shm
 install:
-  - pip install sympy networkx matplotlib pygraphviz numpy
-  - pip install -q scipy
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib sympy networkx pygraphviz nose
   - wget http://mmbios.org/index.php/bionetgen-2-2-5-stable/bionetgen-2-2-5-stable-zip?format=raw -O BioNetGen-2.2.5-stable.zip
   - unzip BioNetGen-2.2.5-stable.zip
   - export BNGPATH=`pwd`/BioNetGen-2.2.5-stable
