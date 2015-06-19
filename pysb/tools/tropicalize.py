@@ -289,7 +289,7 @@ class Tropical:
                 test[0]=f1(*arg_f1)
                 test[1]=q
                 mons_data[str(jj).partition('*Heaviside')[0]] = test
-            trop_data[_parse_name(self.model.species[i])] = mons_data
+            trop_data[str(self.model.species[i])] = mons_data
         self.tro_species = trop_data
         return trop_data 
     
@@ -298,6 +298,10 @@ class Tropical:
             raise Exception("driver_specie is not driver")
         elif driver_specie in self.tro_species.keys():
             spec_ready = driver_specie
+            
+        spe_index = {}
+        for i, j in enumerate(self.model.species):
+            spe_index[str(j)] = '__s%d'%i
         
         monomials_dic = self.tro_species[spec_ready]
         colors = itertools.cycle(["b", "g", "c", "m", "y", "k" ])
@@ -305,6 +309,7 @@ class Tropical:
         si_flux = 0
         no_flux = 0
         f = plt.figure(1)
+        plt.subplot(211)
         monomials = []
         for c, mon in enumerate(monomials_dic):
             x_concentration = numpy.nonzero(monomials_dic[mon][0])[0]
@@ -318,10 +323,14 @@ class Tropical:
             else: no_flux+=1
         y_pos = numpy.arange(2,2*si_flux+4,2)    
         plt.yticks(y_pos, monomials, size = 'x-small') 
-        plt.xlabel('Time (s)')
         plt.ylabel('Monomials')
-        plt.title('Tropicalization' + '' + spec_ready)
         plt.xlim(0, self.tspan[-1])
+        plt.subplot(210)
+        print len(self.tspan[1:]),len(self.y[spe_index[spec_ready]])
+        plt.plot(self.tspan[1:],self.y[spe_index[spec_ready]][1:])
+        plt.ylabel('Molecules')
+        plt.xlabel('Time (s)')
+        plt.suptitle('Tropicalization' + ' ' + spec_ready)
 #         plt.ylim(0, len(monomials)+1) 
         return f  
 
