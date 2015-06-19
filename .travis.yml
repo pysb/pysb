@@ -5,7 +5,7 @@ python:
 addons:
   apt:
     sources:
-    - graphviz
+    - libgraphviz-dev
 cache:
   directories:
     - $TRAVIS_BUILD_DIR/StochKit2.0.11
