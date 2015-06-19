@@ -470,7 +470,7 @@ class CupSODASolver(Simulator):
     def get_yfull(self):
         return super(CupSODASolver, self).get_yfull()
 
-def run_cupSODA(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
+def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
 
     sim = CupSODASolver(model, verbose=verbose, **integrator_options)
     sim.run(param_values, y0, tspan, outdir, prefix)
