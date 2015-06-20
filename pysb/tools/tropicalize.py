@@ -293,48 +293,62 @@ class Tropical:
         self.tro_species = trop_data
         return trop_data 
     
-    def visualization(self, driver_specie=None):
-        if driver_specie not in self.tro_species.keys():
-            raise Exception("driver_specie is not driver")
-        elif driver_specie in self.tro_species.keys():
-            spec_ready = driver_specie
+    def visualization(self, driver_species=None):
+        if driver_species is not None:
+            species_ready = []
+            for i in driver_species:
+                if i in self.tro_species.keys(): species_ready.append(i)
+                else: print 'specie' + ' ' + str(i) + ' ' + 'is not a driver'
+            species_ready = [i for i in driver_species if i in self.tro_species.keys()]
+        elif driver_species is None:
+            raise Exception('list of driver species must be defined')
+        
+        if species_ready == []:
+            raise Exception('None of the input species is a driver')
+             
             
         spe_index = {}
         for i, j in enumerate(self.model.species):
             spe_index[str(j)] = '__s%d'%i
         
-        monomials_dic = self.tro_species[spec_ready]
+        
+        
         colors = itertools.cycle(["b", "g", "c", "m", "y", "k" ])
         
-        si_flux = 0
-        no_flux = 0
-        f = plt.figure(1)
-        plt.subplot(211)
-        monomials = []
-        for c, mon in enumerate(monomials_dic):
-            x_concentration = numpy.nonzero(monomials_dic[mon][0])[0]
-            if len(x_concentration) > 0:   
-                monomials.append(mon)            
-                si_flux+=1
-                x_points = [self.tspan[x] for x in x_concentration] 
-                prueba_y = numpy.repeat(2*si_flux, len(x_concentration))
-                if monomials_dic[mon][1]==1 : plt.scatter(x_points[::int(len(self.tspan)/100)], prueba_y[::int(len(self.tspan)/100)], color = next(colors), marker=r'$\uparrow$', s=numpy.array([monomials_dic[mon][0][k] for k in x_concentration])[::int(len(self.tspan)/100)]*2)
-                if monomials_dic[mon][1]==-1 : plt.scatter(x_points[::int(len(self.tspan)/100)], prueba_y[::int(len(self.tspan)/100)], color = next(colors), marker=r'$\downarrow$', s=numpy.array([monomials_dic[mon][0][k] for k in x_concentration])[::int(len(self.tspan)/100)]*2)
-            else: no_flux+=1
-        y_pos = numpy.arange(2,2*si_flux+4,2)    
-        plt.yticks(y_pos, monomials, size = 'x-small') 
-        plt.ylabel('Monomials')
-        plt.xlim(0, self.tspan[-1])
-        plt.subplot(210)
-        print len(self.tspan[1:]),len(self.y[spe_index[spec_ready]])
-        plt.plot(self.tspan[1:],self.y[spe_index[spec_ready]][1:])
-        plt.ylabel('Molecules')
-        plt.xlabel('Time (s)')
-        plt.suptitle('Tropicalization' + ' ' + spec_ready)
-#         plt.ylim(0, len(monomials)+1) 
+        for sp in species_ready:
+            si_flux = 0
+            no_flux = 0
+            monomials_dic = self.tro_species[str(sp)]
+            f = plt.figure()
+            plt.subplot(211)
+            monomials = []
+            for c, mon in enumerate(monomials_dic):
+                x_concentration = numpy.nonzero(monomials_dic[mon][0])[0]
+                if len(x_concentration) > 0:   
+                    monomials.append(mon)            
+                    si_flux+=1
+                    x_points = [self.tspan[x] for x in x_concentration] 
+                    prueba_y = numpy.repeat(2*si_flux, len(x_concentration))
+                    if monomials_dic[mon][1]==1 : plt.scatter(x_points[::int(len(self.tspan)/100)], prueba_y[::int(len(self.tspan)/100)], color = next(colors), marker=r'$\uparrow$', s=numpy.array([monomials_dic[mon][0][k] for k in x_concentration])[::int(len(self.tspan)/100)]*2)
+                    if monomials_dic[mon][1]==-1 : plt.scatter(x_points[::int(len(self.tspan)/100)], prueba_y[::int(len(self.tspan)/100)], color = next(colors), marker=r'$\downarrow$', s=numpy.array([monomials_dic[mon][0][k] for k in x_concentration])[::int(len(self.tspan)/100)]*2)
+                else: no_flux+=1
+            y_pos = numpy.arange(2,2*si_flux+4,2)    
+            plt.yticks(y_pos, monomials, size = 'x-small') 
+            plt.ylabel('Monomials')
+            plt.xlim(0, self.tspan[-1])
+            plt.subplot(210)
+            plt.plot(self.tspan[1:],self.y[spe_index[sp]][1:])
+            plt.ylabel('Molecules')
+            plt.xlabel('Time (s)')
+            plt.suptitle('Tropicalization' + ' ' + sp)
         return f  
 
     def get_trop_data(self):
         return self.tro_species
 
- 
+def run_tropical(model, tspan, parameters = None, sp_visualize = None):
+    tr = Tropical(model)
+    tr.tropicalize(tspan, parameters)
+    if sp_visualize is not None:
+        tr.visualization(driver_species=sp_visualize)
+    return tr.get_trop_data()
