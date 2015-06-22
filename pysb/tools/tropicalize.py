@@ -345,6 +345,10 @@ class Tropical:
 
     def get_trop_data(self):
         return self.tro_species
+    def get_passengers(self):
+        return self.passengers
+    def get_drivers(self):
+        return self.tro_species.keys()
 
 def run_tropical(model, tspan, parameters = None, sp_visualize = None):
     tr = Tropical(model)
