@@ -341,6 +341,7 @@ class Tropical:
             plt.ylabel('Molecules')
             plt.xlabel('Time (s)')
             plt.suptitle('Tropicalization' + ' ' + sp)
+            plt.show()
         return f  
 
     def get_trop_data(self):
