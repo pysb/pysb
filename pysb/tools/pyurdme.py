@@ -129,7 +129,7 @@ class PyurdmeSimulator(Simulator):
         super(PyurdmeSimulator, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
     
-    def run(self, tspan=None, param_values=None, dif0=None, y0=None, initial_dist, n_runs=1, seed=None, solver = 'nsm', mesh_pyurdme = None):
+    def run(self, tspan=None, param_values=None, dif0=None, y0=None, initial_dist=None, n_runs=1, seed=None, solver = 'nsm', mesh_pyurdme = None):
         
         if mesh is None:
             raise Exception("Mesh must be defined.")        
