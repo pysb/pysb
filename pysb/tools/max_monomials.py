@@ -65,7 +65,7 @@ class Tropical:
         self.drivers_max(self.y[ignore:], verbose)
         return 
 
-    def find_passengers(self, y, verbose=False, epsilon=None):
+    def find_passengers(self, y, ptge_similar = 0.9, verbose=False, epsilon=None):
         self.passengers = []
         a = []               # list of solved polynomial equations
         b = []               # b is the list of differential equations   
@@ -86,11 +86,11 @@ class Tropical:
                 args.append(y[:][str(l)])
             hey = abs(f(*args) - y[:]['__s%d'%b[k]])
             s_points = sum(w < epsilon for w in hey)
-            if s_points > 0.9*len(hey) : self.passengers.append(b[k])
+            if s_points > ptge_similar*len(hey) : self.passengers.append(b[k])
                 
         return self.passengers
     
-    def drivers_max(self,y, verbose=False):
+    def drivers_max(self,y, verbose=False, ptge_max=0.8):
         drivers = list(set(range(len(self.model.species)))-set(self.passengers))
         drivers_data= {}
         drivers_monomials = {}
@@ -111,7 +111,7 @@ class Tropical:
                        arg_f1.append(y[str(va)])    
                     tmp[q]=f1(*arg_f1)
                 for col in range(len(self.tspan[1:])):
-                    mon_value = [(m,v) for m,v in enumerate(tmp[:,col]) if v >= 0.8*max(tmp[:,col])]
+                    mon_value = [(m,v) for m,v in enumerate(tmp[:,col]) if v >= ptge_max*max(tmp[:,col])]
                     for va in mon_value:
                         monomials_eval[:,col][va[0]] = va[1]
                 drivers_data[i] = monomials_eval
@@ -161,15 +161,19 @@ class Tropical:
             plt.yticks(y_pos, monomials, size = 'x-small') 
             plt.ylabel('Monomials')
             plt.xlim(0, self.tspan[-1])
+            plt.ylim(0,max(y_pos))
             plt.subplot(210)
             plt.plot(self.tspan[1:],self.y['__s%d'%sp][1:])
             plt.ylabel('Molecules')
             plt.xlabel('Time (s)')
             plt.suptitle('Tropicalization' + ' ' + str(self.model.species[sp]))
+            plt.show()
         return f 
        
     def get_driver_data(self):
         return self.tro_species
+    def get_drivers(self):
+        return self.tro_species.keys()
 
 def run_tropical(model, tspan, parameters = None, sp_visualize = None):
     tr = Tropical(model)
