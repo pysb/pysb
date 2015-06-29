@@ -101,7 +101,7 @@ class Solver(object):
         code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
         
         for e in model.expressions:
-            code_eqs = re.sub(r'\b(%s)\b' % e.name, '('+sympy.ccode(e.expand_expr(model))+')', code_eqs)
+            code_eqs = re.sub(r'\b(%s)\b' % e.name, '('+sympy.ccode(e.expand_expr())+')', code_eqs)
 
         for obs in model.observables:
             obs_string = ''
