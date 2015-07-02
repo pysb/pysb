@@ -3,31 +3,32 @@ from pysb.core import *
 from pysb.macros import *
 from pysb.integrate import odesolve
 from pylab import linspace, plot, xlabel, ylabel, show
+from sympy import sympify
 
 @with_model
 def test_integrate_with_expression():
-    #Declaring the monomers
+
     Monomer('s1')
+    Monomer('s9')
     Monomer('s16')
     Monomer('s20')
 
-    #Declaring parameters
-    Parameter('ka',2e-05)
-    Parameter('ka20', 10^5)
-
-    #Declaring expression
-    Expression('keff', ka*ka20/(ka20+10000))
-
-    #Declaring rules
-    Rule('None_s16', None >> s16(), ka)
-    Rule('None_s20', None >> s20(), ka)
-    Rule('s16_and_s20', s16() + s20() >> s16() + s1(), keff)
-
-    #Declaring observables
+    Parameter('ka',2e-5)
+    Parameter('ka20', 1e5)
+    
+    Initial(s9(), Parameter('s9_0', 10000))
+    
     Observable('s1_obs', s1())
+    Observable('s9_obs', s9())
     Observable('s16_obs', s16())
     Observable('s20_obs', s20())
+    
+    Expression('keff', sympify("ka*ka20/(ka20+s9_obs)"))
 
+    Rule('R1', None >> s16(), ka)
+    Rule('R2', None >> s20(), ka)
+    Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
     time = linspace(0, 40, 100)
     x = odesolve(model, time, verbose=True)
+    
