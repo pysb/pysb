@@ -215,5 +215,5 @@ def sympy_to_muparser(expr):
 #     code = sympy.ccode(expr)
     code = str(expr)
     code = code.replace('\n     @', '')
-#     code = code.replace('**', '^')
+    code = code.replace('**', '^')
     return code
