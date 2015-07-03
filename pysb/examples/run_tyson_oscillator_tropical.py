@@ -5,5 +5,6 @@ import matplotlib.pyplot as plt
 
 
 tspan = np.linspace(0, 100, 100)
-run_tropical(model, tspan, sp_visualize=[3,5])
+run_tropical(model, tspan, sp_visualize=[3,5], stoch=True)
+run_tropical(model, tspan, sp_visualize=[3,5], stoch=False)
 

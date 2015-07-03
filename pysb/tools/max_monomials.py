@@ -1,3 +1,4 @@
+from __future__ import division
 import networkx
 import sympy
 import re
@@ -7,6 +8,8 @@ import sympy.parsing.sympy_parser
 import itertools
 import matplotlib.pyplot as plt
 import pysb
+import math
+from pysb.tools.stochkit import run_stochkit
 from pysb.integrate import odesolve
 
 
@@ -44,20 +47,21 @@ class Tropical:
              len(self.cycles),
              id(self))
 
-    def tropicalize(self,tspan=None, param_values=None, ignore=1, epsilon=2, rho=3, verbose=True):
+    def tropicalize(self,tspan=None, param_values=None, ignore=1, epsilon=2, rho=3, verbose=True, stoch=False):
         if verbose: print "Solving Simulation"
         
         if tspan is not None:
+            self.t = tspan
+        elif self.t is None:
+            raise Exception("'time t' must be defined.")
+        if stoch:
+            tout, tmpy=run_stochkit(self.model,self.t, n_runs=20, param_values=param_values, seed=None, algorithm="ssa", verbose=True)
+            self.y=tmpy[0]
+            self.tspan = tout[0]
+        else: 
             self.tspan = tspan
-        elif self.tspan is None:
-            raise Exception("'tspan' must be defined.")
-        
-        self.y = odesolve(self.model, self.tspan, param_values)
-        
-        # Only concrete species are considered, and the names must be made to match
-#         names           = [n for n in filter(lambda n: n.startswith('__'), self.y.dtype.names)]
-#         self.y          = self.y[names]
-#         self.y.dtype    = [(n,'<f8') for n in names]    
+            self.y = odesolve(self.model, self.tspan, param_values)
+            
           
         if verbose: print "Getting Passenger species"
         self.find_passengers(self.y[ignore:], verbose, epsilon)
@@ -83,14 +87,14 @@ class Tropical:
             variables = [atom for atom in a[k].atoms(sympy.Symbol) if not re.match(r'\d',str(atom))]
             f = sympy.lambdify(variables, a[k], modules = dict(sqrt=numpy.lib.scimath.sqrt) )
             for u,l in enumerate(variables):
-                args.append(y[:][str(l)])
-            hey = abs(f(*args) - y[:]['__s%d'%b[k]])
+                args.append(y[str(l)])
+            hey = abs(f(*args) - y['__s%d'%b[k]])
             s_points = sum(w < epsilon for w in hey)
             if s_points > ptge_similar*len(hey) : self.passengers.append(b[k])
                 
         return self.passengers
     
-    def drivers_max(self,y, verbose=False, ptge_max=0.8):
+    def drivers_max(self,y, verbose=False, ptge_max=0.5):
         drivers = list(set(range(len(self.model.species)))-set(self.passengers))
         drivers_data= {}
         drivers_monomials = {}
@@ -98,7 +102,6 @@ class Tropical:
             spe_monomials = self.model.odes[i].as_coefficients_dict()
             if spe_monomials.keys() == [1]: print "equation" + ' ' + str(i) + ' ' + 'does not have monomials, it is a constant'
             else:
-                sign_monomials = self.model.odes[i].as_coefficients_dict().values()
                 monomials_eval = numpy.zeros((len(spe_monomials), len(self.tspan[1:])),dtype=float)
                 drivers_monomials[i] = spe_monomials
                 tmp = numpy.zeros((len(spe_monomials), len(self.tspan[1:])), dtype=float)
@@ -149,14 +152,15 @@ class Tropical:
             monomials_inf = self.mon_names[sp]
             for m_value, name in zip(monomials_dic,monomials_inf.keys()):
                 x_concentration = numpy.nonzero(m_value)[0]
-                if len(x_concentration) > 0:   
-                    monomials.append(name)            
-                    si_flux+=1
-                    x_points = [self.tspan[x] for x in x_concentration] 
-                    prueba_y = numpy.repeat(2*si_flux, len(x_concentration))
-                    if monomials_inf[name]== 1 : plt.scatter(x_points[::int(len(self.tspan)/100)], prueba_y[::int(len(self.tspan)/100)], color = next(colors), marker=r'$\uparrow$', s=numpy.array([m_value[k] for k in x_concentration])[::int(len(self.tspan)/100)]*2)
-                    if monomials_inf[name]==-1 : plt.scatter(x_points[::int(len(self.tspan)/100)], prueba_y[::int(len(self.tspan)/100)], color = next(colors), marker=r'$\downarrow$', s=numpy.array([m_value[k] for k in x_concentration])[::int(len(self.tspan)/100)]*2)
-                else: no_flux+=1
+                monomials.append(name)            
+                si_flux+=1
+                x_points = [self.tspan[x] for x in x_concentration] 
+                prueba_y = numpy.repeat(2*si_flux, len(x_concentration))
+                if monomials_inf[name]== 1 : plt.scatter(x_points[::int(math.ceil(len(self.tspan)/100))], prueba_y[::int(math.ceil(len(self.tspan)/100))],\
+                                            color = next(colors), marker=r'$\uparrow$', s=numpy.array([m_value[k] for k in x_concentration])[::int(math.ceil(len(self.tspan)/100))])
+                if monomials_inf[name]==-1 : plt.scatter(x_points[::int(math.ceil(len(self.tspan)/100))], prueba_y[::int(math.ceil(len(self.tspan)/100))], \
+                                            color = next(colors), marker=r'$\downarrow$', s=numpy.array([m_value[k] for k in x_concentration])[::int(math.ceil(len(self.tspan)/100))])
+ 
             y_pos = numpy.arange(2,2*si_flux+4,2)    
             plt.yticks(y_pos, monomials, size = 'x-small') 
             plt.ylabel('Monomials')
@@ -167,6 +171,7 @@ class Tropical:
             plt.ylabel('Molecules')
             plt.xlabel('Time (s)')
             plt.suptitle('Tropicalization' + ' ' + str(self.model.species[sp]))
+            plt.savefig('/home/carlos/'+'s%d'%sp, format='pdf', bbox_inches='tight', dpi=800)
             plt.show()
         return f 
        
@@ -175,9 +180,9 @@ class Tropical:
     def get_drivers(self):
         return self.tro_species.keys()
 
-def run_tropical(model, tspan, parameters = None, sp_visualize = None):
+def run_tropical(model, tspan, parameters = None, sp_visualize = None, stoch=False):
     tr = Tropical(model)
-    tr.tropicalize(tspan, parameters)
+    tr.tropicalize(tspan, parameters, stoch=stoch)
     if sp_visualize is not None:
         tr.visualization(drivers_v=sp_visualize)
     return tr.get_driver_data()
