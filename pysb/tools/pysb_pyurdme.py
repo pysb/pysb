@@ -29,13 +29,11 @@ def _translate_parameters(model, param_values=None):
             count += 1
     return param_list
 
-def _translate_species(model, dif0=None, y0=None, initial_dist=None):
+def _translate_species(model, initial_dist, dif0=None, y0=None):
     # Error check
     
-    if initial_dist is None:
-        raise Exception("Initial distribution of the species must be defined")
-    
-    if len(y0) and len(dif0) != len(model.species):
+   
+    if y0 and len(y0) != len(model.species):
         raise Exception("len(dif0) and len(y0) must equal len(model.species)")            
     species_list = len(model.species) * [None]
     for i,sp in enumerate(model.species):
@@ -43,12 +41,12 @@ def _translate_species(model, dif0=None, y0=None, initial_dist=None):
         if dif0:
             val=dif0[i]
         else:
-            for ic in model.diffusivities:
-                if str(ic[0]) == str(sp):
-                    val=ic[1].value
+            for id in model.diffusivities:
+                if str(id[0]) == str(sp):
+                    val=id[1]
         species_list[i] = pyurdme.Species(name="__s%d" % i, diffusion_constant=val)
 
-    ditribution_list = len(initial_dist.keys()) * [None]
+    distribution_list = len(initial_dist.keys()) * [None]
     for i,sp in enumerate(model.species):
         if str(sp) in initial_dist.keys():
             val = 0.
@@ -107,72 +105,85 @@ def _translate_reactions(model):
                 obs_string = '(' + obs_string + ')'
             rate = re.sub(r'%s' % obs.name, obs_string, rate)
         # create reaction
-        rxn_list[n] = pyurdme.Reaction(name = 'Rxn%d (rule:%s)' % (n, str(rxn["rule"])),\
+        rxn_list[n] = pyurdme.Reaction(name = 'rule%s' %  str(rxn["rule"]),\
                                     reactants = reactants,\
                                     products = products,\
                                     propensity_function = rate)
     return rxn_list
     
-def _translate(model, param_values=None, dif0=None, y0=None, initial_dist=None):
-
-    urdme_model = pyurdme.URDMEModel(model.name)
-    urdme_model.add_parameter(_translate_parameters(model, param_values))
-    urdme_model.add_species(_translate_species(model, dif0, y0, initial_dist)[0])
-    urdme_model.add_reaction(_translate_reactions(model))
+def _translate(model, mesh, initial_dist, param_values=None, dif0=None, y0=None):
     
-    initial_d_info = _translate_species(model, dif0, y0, initial_dist)[1]
+    
+    urdme_model = pyurdme.URDMEModel(model.name)
+    urdme_model.add_species(_translate_species(model, initial_dist, dif0, y0)[0])
+    urdme_model.mesh = mesh
+    urdme_model.add_parameter(_translate_parameters(model, param_values))
+    urdme_model.add_reaction(_translate_reactions(model))
+    initial_d_info = _translate_species(model, initial_dist, dif0, y0)[1]
     for id in initial_d_info:
-        geattr(urdme_model, id[0][0])(id[1], id[0][1])
+        getattr(urdme_model, id[0][0])({urdme_model.get_species(id[1].keys()[0]):id[1].values()[0]}, id[0][1])
        
     return urdme_model
 
 class PyurdmeSimulator(Simulator):
         
-    def __init__(self, model, tspan=None, mesh=None, cleanup=True, verbose=False):
+    def __init__(self, model, tspan=None, mesh=None, initial_dist=None, cleanup=True, verbose=False):
         super(PyurdmeSimulator, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
     
-    def run(self, tspan=None, mesh = None, param_values=None, dif0=None, y0=None, initial_dist=None, solver = 'nsm'):
-        
-        if mesh is None:
-            raise Exception("Mesh must be defined.")        
-        
+    def run(self, tspan=None, mesh = None, initial_dist=None, param_values=None, dif0=None, y0=None, solver = 'nsm'):
+
+
         if tspan is not None:
             self.tspan = tspan
         elif self.tspan is None:
             raise Exception("'tspan' must be defined.")
         
-        urdme_model = _translate(self.model, param_values, dif0, y0, initial_dist)
-        urdme_model.timespan(tspan)
-        urdme_model.mesh = mesh
-        result = pyurdme.run(number_of_trajectories = n_runs, solver = solver, seed = seed )
+        if mesh is not None:
+            self.mesh = mesh
+        elif self.mesh is None:
+            raise Exception("Mesh must be defined.")
+        
+        if initial_dist is not None:
+            self.initial_dist = initial_dist
+        elif self.initial_dist is None:
+            raise Exception("Initial distribution of proteins must be defiened")        
+        
+        
+        urdme_model = _translate(self.model, self.mesh, self.initial_dist, param_values, dif0, y0)
+        urdme_model.timespan(self.tspan)
+        
+        result = urdme_model.run(report_level=1)
     
-        # output time points (in case they aren't the same tspan, which is possible in BNG)
-        self.tout = result.get_timespan()
         # species
         
-        trajectories = np.zeros(len(result['sol'].keys()),len(result.get_timespan))
+        trajectories = np.zeros((len(result['sol'].keys()),len(result.get_timespan())))
         for i, sp in enumerate(result['sol'].keys()):
-            trajectories[i] = np.sum(reult.get_species(sp),axis=1)
+            trajectories[i] = np.sum(result.get_species(sp),axis=1)
         trajectories = trajectories.T
         
         self.y = trajectories
+        
+        # output time points (in case they aren't the same tspan, which is possible in BNG)
+        time = result.get_timespan()
+        self.tout = np.tile(time,(len(self.y),1))
+
         # observables and expressions
         self._calc_yobs_yexpr(param_values)
         
         self.simulation = result
         
     def _calc_yobs_yexpr(self, param_values=None):
-        super(StochKitSimulator, self)._calc_yobs_yexpr()
+        super(PyurdmeSimulator, self)._calc_yobs_yexpr()
         
     def get_yfull(self):
-        return super(StochKitSimulator, self).get_yfull()        
+        return super(PyurdmeSimulator, self).get_yfull()        
 
 
-def run_pyurdme(model, tspan, mesh, param_values=None, dif0=None, y0=None, initial_dist=None, verbose=True):
+def run_pyurdme(model, tspan, mesh, initial_dist, param_values=None, dif0=None, y0=None, verbose=True):
     """Runs pyurdme using PySB
        the initial distribution should be a dict:
        initial_dist={DISC(bf=None):['set_initial_condition_scatter', *arguments, i.e point=[0.5,0.5]]}"""
     sim = PyurdmeSimulator(model, verbose=verbose)
-    sim.run(tspan, mesh, param_values , dif0, y0, initial_dist)
+    sim.run(tspan, mesh, initial_dist, param_values , dif0, y0)
     return sim.simulation
