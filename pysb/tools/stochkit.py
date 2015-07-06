@@ -1,7 +1,8 @@
 try:
     import gillespy
 except:
-    warning("Package 'gillespy' cannot be found and is required for StochKit simulations. See XXX for further details.")
+    import warnings
+    warnings.warn("Package 'gillespy' cannot be found and is required for StochKit simulations. See XXX for further details.")
 from pysb.simulate import Simulator
 from pysb.bng import generate_equations
 import re
