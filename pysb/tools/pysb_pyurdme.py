@@ -11,8 +11,6 @@ import numpy as np
 import itertools
 import pysb
 
-pyurdme.URDMEModel
-
 def _translate_parameters(model, param_values=None):
     # Error check
     if param_values is not None and len(param_values) != len(model.parameters):
