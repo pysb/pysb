@@ -17,7 +17,7 @@ before_install:
   - conda update --yes conda
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib sympy networkx nose h5py conda-build
-  - conda build --yes boost eigen3 petsc petsc4py instant ufl fiat ffc dolfin fenics --python 27
+  - conda build boost eigen3 petsc petsc4py instant ufl fiat ffc dolfin fenics --python 27
   - conda install --yes fenics mkl --use-local
   - python -c "import fenics"
   - pip install -i https://pypi.binstar.org/pypi/simple pygraphviz pyurdme
