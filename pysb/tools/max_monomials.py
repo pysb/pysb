@@ -55,7 +55,7 @@ class Tropical:
         elif self.t is None:
             raise Exception("'time t' must be defined.")
         if stoch:
-            tout, tmpy=run_stochkit(self.model,self.t, n_runs=20, param_values=param_values, seed=None, algorithm="ssa", verbose=True)
+            tout, tmpy=run_stochkit(self.model,self.t, n_runs=1, param_values=param_values, seed=None, algorithm="ssa", verbose=True)
             self.y=tmpy[0]
             self.tspan = tout[0]
         else: 
@@ -77,8 +77,8 @@ class Tropical:
         # Loop through all equations (i is equation number)
         for i, eq in enumerate(self.model.odes):
             eq        = eq.subs('__s%d' % i, '__s%dstar' % i)
-            sol       = sympy.solve(eq, sympy.Symbol('__s%dstar' % i))        # Find equation of imposed trace
-            for j in range(len(sol)):        # j is solution j for equation i (mostly likely never greater than 2)
+            sol       = sympy.solve(eq, sympy.Symbol('__s%dstar' % i))          # Find equation of imposed trace
+            for j in range(len(sol)):                                           # j is solution j for equation i (mostly likely never greater than 2)
                 for p in self.model.parameters: sol[j] = sol[j].subs(p.name, p.value)    # Substitute parameters
                 a.append(sol[j])
                 b.append(i)
@@ -109,7 +109,7 @@ class Tropical:
                     for par in self.model.parameters: j=j.subs(par.name,par.value)
                     arg_f1 = []
                     var_to_study = [atom for atom in j.atoms(sympy.Symbol) if not re.match(r'\d',str(atom))] #Variables of monomial 
-                    f1 = sympy.lambdify(var_to_study, j, modules = dict(Heaviside=_Heaviside_num, log=numpy.log, Abs=numpy.abs)) 
+                    f1 = sympy.lambdify(var_to_study, j) 
                     for va in var_to_study:
                        arg_f1.append(y[str(va)])    
                     tmp[q]=f1(*arg_f1)
