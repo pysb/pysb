@@ -1,5 +1,4 @@
 from __future__ import division
-import networkx
 import sympy
 import re
 import copy
