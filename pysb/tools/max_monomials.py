@@ -27,6 +27,13 @@ def _parse_name(spec):
             lis_m.append(''.join([tmp_1[0],tmp_2[0]]))
     return '_'.join(lis_m)
 
+def _round_list(list):
+    tmp = numpy.zeros(len(list))
+    for i,j in enumerate(list):
+        tmp[i] = round(j,5)
+    return tmp
+
+
 class Tropical:
     def __init__(self, model):
         self.model              = model
@@ -112,7 +119,7 @@ class Tropical:
                     f1 = sympy.lambdify(var_to_study, j) 
                     for va in var_to_study:
                        arg_f1.append(y[str(va)])    
-                    tmp[q]=f1(*arg_f1)
+                    tmp[q]=_round_list(f1(*arg_f1))
                 for col in range(len(self.tspan[1:])):
                     mon_value = [(m,v) for m,v in enumerate(tmp[:,col]) if v >= ptge_max*max(tmp[:,col])]
                     for va in mon_value:
@@ -132,13 +139,7 @@ class Tropical:
         
         if species_ready == []:
             raise Exception('None of the input species is a driver')
-             
-            
-        spe_index = {}
-        for i, j in enumerate(self.model.species):
-            spe_index[i] = '__s%d'%i
-        
-        
+                     
         
         colors = itertools.cycle(["b", "g", "c", "m", "y", "k" ])
         
@@ -185,5 +186,5 @@ def run_tropical(model, tspan, parameters = None, sp_visualize = None, stoch=Fal
     tr.tropicalize(tspan, parameters, stoch=stoch)
     if sp_visualize is not None:
         tr.visualization(drivers_v=sp_visualize)
-    return tr.get_driver_data()
+    return tr.tro_species, tr.mon_names
 
