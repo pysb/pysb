@@ -96,7 +96,7 @@ class Solver(object):
             Solver._use_inline = False
             try:
                 if weave_inline is not None:
-                    weave_inline('int i;', force=1)
+                    weave_inline('int i=0; i=i;', force=1)
                     Solver._use_inline = True
             except (scipy.weave.build_tools.CompileError,
                     distutils.errors.CompileError, ImportError):
