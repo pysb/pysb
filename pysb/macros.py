@@ -789,9 +789,9 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
          Parameter('bind_R1_R2_kf', 1000.0),
          Parameter('bind_R1_R2_kr', 0.1),
          ])
-        >>> bind_table_complex([[                     C1(y=1) % C2(y=1), C2],\
-                                [R1,                  (1e-4, 1e-1),      (2e-4, 2e-1)],\
-                                [R1(c1=1) % R2(x=1),  (3e-4, 3e-1),      None]], 'x', 'c2', m1=R1, m2=C2)
+        >>> bind_table_complex([[                     C1(y=1) % C2(y=1), C2],
+        ...                     [R1,                  (1e-4, 1e-1),      (2e-4, 2e-1)],
+        ...                     [R1(c1=1) % R2(x=1),  (3e-4, 3e-1),      None]], 'x', 'c2', m1=R1, m2=C2)
         ComponentSet([
          Rule('bind_C2C1_R1', C2(y=1, c2=None) % C1(y=2) + R1(x=None) <> C2(y=1, c2=50) % C1(y=2) % R1(x=50), bind_C2C1_R1_kf, bind_C2C1_R1_kr),
          Parameter('bind_C2C1_R1_kf', 0.0001),
