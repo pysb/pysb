@@ -1,5 +1,5 @@
 FROM ipython/scipyserver
-MAINTAINER Alex Lubbock <alex.lubbock@ed.ac.uk>
+MAINTAINER Alex Lubbock <code@alexlubbock.com>
 
 RUN apt-get install -y wget unzip
 
@@ -9,5 +9,7 @@ RUN ln -s /BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
 
 RUN git clone https://github.com/pysb/pysb.git /pysb
 RUN cd /pysb && python setup.py install
+
+RUN git clone https://github.com/lolab-vu/pysb-tutorials.git /notebooks/examples
 
 RUN sed -i.bak 's/ipython notebook/ipython2 notebook/g' /notebook.sh
