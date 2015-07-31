@@ -80,6 +80,7 @@ class Solver(object):
     single Solver object and then call its ``run`` method as needed.
 
     """
+
     @staticmethod
     def _test_inline():
         """Detect whether scipy.weave.inline is functional."""
@@ -92,7 +93,6 @@ class Solver(object):
                     distutils.errors.CompileError, ImportError):
                 pass
 
-<<<<<<< HEAD
     def __init__(self, model, tspan, integrator='vode', cleanup=True, verbose=False, **integrator_options):
         
         self.verbose = verbose
@@ -114,18 +114,6 @@ class Solver(object):
 
         code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
 
-=======
-    def __init__(self, model, tspan, integrator='vode', verbose=False, **integrator_options):
-        
-        self.verbose = verbose
-        pysb.bng.generate_equations(model,self.verbose)
-        
-        code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
-#         code_eqs = re.sub(r's(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
-        code_eqs = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
-        for e in model.expressions:
-            code_eqs = re.sub(r'\b(%s)\b' % e.name, sympy.ccode(e.expand_expr()), code_eqs)
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
         for i, p in enumerate(model.parameters):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
         
@@ -162,7 +150,6 @@ class Solver(object):
         options.update(integrator_options) # overwrite defaults
         self.model = model
         self.tspan = tspan
-<<<<<<< HEAD
         self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
         self.ydot = numpy.ndarray(len(self.model.species))
         
@@ -176,56 +163,25 @@ class Solver(object):
         
         # expressions
         exprs = self.model.expressions_dynamic()
-=======
-        self.y = numpy.ndarray((len(tspan), len(model.species))) # species concentrations
-        self.ydot = numpy.ndarray(len(model.species))
-        
-        if len(model.observables):
-            self.yobs = numpy.ndarray(len(tspan), zip(model.observables.keys(),
-                                                      itertools.repeat(float)))
-        else:
-            self.yobs = numpy.ndarray((len(tspan), 0))
-        exprs = model.expressions_dynamic()
-        
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
         if len(exprs):
             self.yexpr = numpy.ndarray(len(self.tspan), zip(exprs.keys(),
                                                        itertools.repeat(float)))
         else:
-<<<<<<< HEAD
             self.yexpr = numpy.ndarray((len(self.tspan), 0))
         self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
         
         # Integrator
         if scipy.integrate._ode.find_integrator(integrator):
-=======
-            self.yexpr = numpy.ndarray((len(tspan), 0))
-        self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
-        
-        # Integrator
-        if (scipy.integrate._ode.find_integrator(integrator)):
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
             self.integrator = ode(rhs).set_integrator(integrator, **options)
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
         
-<<<<<<< HEAD
 #         help(self.integrator)
 #         for (key, val) in self.integrator.__dict__['_integrator'].__dict__.items():
 #             print key, ": ", val
 #         quit()
 
     def run(self, param_values=None, y0=None,initial_changes=None):
-=======
-#         print type(self.integrator)
-# #        help(self.integrator)
-#         for i in range(len(self.integrator.__dict__['_integrator'].__dict__.keys())):
-#             print self.integrator.__dict__['_integrator'].__dict__.items()[i][0], ": ", self.integrator.__dict__['_integrator'].__dict__.items()[i][1]
-#         print "YUP" if scipy.integrate._ode.find_integrator("lsoda") else "NOPE"
-#         quit()
-
-    def run(self, param_values=None, y0=None):
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
         """Perform an integration.
 
         Returns nothing; access the Solver object's ``y``, ``yobs``, or
@@ -317,18 +273,11 @@ class Solver(object):
         if self.integrator.t < self.tspan[-1]:
             self.y[i:, :] = 'nan'
 
-<<<<<<< HEAD
         # calculate observables
         for i, obs in enumerate(self.model.observables): 
             self.yobs_view[:, i] = (self.y[:, obs.species] * obs.coefficients).sum(1)
         
         # calculate expressions
-=======
-        for i, obs in enumerate(self.model.observables): # calculate observables
-            self.yobs_view[:, i] = \
-                (self.y[:, obs.species] * obs.coefficients).sum(1)
-        
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
         for expr in self.model.expressions_dynamic():
@@ -336,11 +285,7 @@ class Solver(object):
             func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
-<<<<<<< HEAD
 def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', cleanup=True, verbose=False,
-=======
-def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbose=False,
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
              **integrator_options):
     """Integrate a model's ODEs over a given timespan.
 
@@ -447,11 +392,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', verbos
 
     """
 
-<<<<<<< HEAD
     solver = Solver(model, tspan, integrator, cleanup, verbose, **integrator_options)
-=======
-    solver = Solver(model, tspan, integrator, verbose, **integrator_options)
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
     solver.run(param_values, y0)
 
     species_names = ['__s%d' % i for i in range(solver.y.shape[1])]

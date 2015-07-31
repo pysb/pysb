@@ -324,11 +324,7 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     return output.getvalue()
 
 
-<<<<<<< HEAD
 def generate_equations(model, cleanup=True, verbose=False):
-=======
-def generate_equations(model, verbose=False):
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
     """
     Generate math expressions for reaction rates and species in a model.
 
@@ -346,11 +342,7 @@ def generate_equations(model, verbose=False):
     #   or, use a separate "math model" object to contain ODEs
     if model.odes:
         return
-<<<<<<< HEAD
     lines = iter(generate_network(model,cleanup,verbose=verbose).split('\n'))
-=======
-    lines = iter(generate_network(model, verbose=verbose).split('\n'))
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
     _parse_netfile(model, lines)
 
 
@@ -398,6 +390,7 @@ def _parse_netfile(model, lines):
 
     except StopIteration as e:
         pass
+
 
 def _parse_species(model, line):
     """Parse a 'species' line from a BNGL net file."""
@@ -488,13 +481,8 @@ def _parse_reaction(model, line):
         model.odes[p] += combined_rate
     for r in reactants:
         model.odes[r] -= combined_rate
-<<<<<<< HEAD
             
             
-=======
-
-
->>>>>>> 2e9a183e282f27dc3ebbd7116e81681911de2642
 def _parse_group(model, line):
     """Parse a 'group' line from a BNGL net file."""
     # values are number (which we ignore), name, and species list
