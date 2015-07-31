@@ -181,7 +181,7 @@ class Solver(object):
 #             print key, ": ", val
 #         quit()
 
-    def run(self, param_values=None, y0=None,initial_changes=None):
+    def run(self, param_values=None, y0=None):
         """Perform an integration.
 
         Returns nothing; access the Solver object's ``y``, ``yobs``, or
@@ -193,11 +193,15 @@ class Solver(object):
             Values to use for every parameter in the model. Ordering is
             determined by the order of model.parameters. If not specified,
             parameter values will be taken directly from model.parameters.
-        y0 : vector-like, optional
+        y0 : vector-like or dictionary, optional
             Values to use for the initial condition of all species. Ordering is
-            determined by the order of model.species. If not specified, initial
-            conditions will be taken from model.initial_conditions (with initial
-            condition parameter values taken from `param_values` if specified).
+            determined by the order of model.species. 
+            If passed a dictionary, keys must be model.initial_conditions.name .
+            It fills in y0 from those values otherwise takes them from
+            model.initial_conditions or from param_values.
+            If not specified, initial conditions will be taken from 
+            model.initial_conditions (with initial condition parameter values 
+            taken from `param_values` if specified).
 
         """
 
@@ -214,43 +218,32 @@ class Solver(object):
 #         subs = dict((p, param_values[i]) for i, p in enumerate(self.model.parameters))
         subs = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
         
-        if y0 is not None:
+        if y0 is not None and not isinstance(y0, dict):
             # accept vector of species amounts as an argument
             if len(y0) != self.y.shape[1]:
                 raise Exception("y0 must be the same length as model.species")
             if not isinstance(y0, numpy.ndarray):
                 y0 = numpy.array(y0)
-        elif initial_changes is not None:
-            y0 = numpy.zeros((self.y.shape[1],))
-            for cp, value_obj in self.model.initial_conditions:
-                if value_obj.name in initial_changes:
-                    value = initial_changes[value_obj.name]
-                elif value_obj in self.model.parameters:
-                    pi = self.model.parameters.index(value_obj)
-                    value = param_values[pi]
-                elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr(self.model).evalf(subs=subs)
-                else:
-                    raise ValueError("Unexpected initial condition value type")
-                si = self.model.get_species_index(cp)
-                if si is None:
-                    raise Exception("Species not found in model: %s" % repr(cp))
-                y0[si] = value
         else:
+            # to minimize repeating this code above and allow a dictionary we copy y0 to y0_dict
+            # y0 gets create as an empty array. Should we recode all y0 or do this?
+            y0_dict = y0
             y0 = numpy.zeros((self.y.shape[1],))
             for cp, value_obj in self.model.initial_conditions:
-                if value_obj in self.model.parameters:
-                    pi = self.model.parameters.index(value_obj)
-                    value = param_values[pi]
-                elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr(self.model).evalf(subs=subs)
-                else:
-                    raise ValueError("Unexpected initial condition value type")
+                if isinstance(y0_dict, dict):
+                    if value_obj.name in y0_dict:
+                        value = y0_dict[value_obj.name]
+                    elif value_obj in self.model.parameters:
+                        pi = self.model.parameters.index(value_obj)
+                        value = param_values[pi]
+                    elif value_obj in self.model.expressions:
+                        value = value_obj.expand_expr(self.model).evalf(subs=subs)
+                    else:
+                        raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)
                 if si is None:
                     raise Exception("Species not found in model: %s" % repr(cp))
                 y0[si] = value
-
         # perform the actual integration
         self.integrator.set_initial_value(y0, self.tspan[0])
         self.integrator.set_f_params(param_values)
