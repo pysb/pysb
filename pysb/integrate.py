@@ -196,7 +196,7 @@ class Solver(object):
         y0 : vector-like or dictionary, optional
             Values to use for the initial condition of all species. Ordering is
             determined by the order of model.species. 
-            If passed a dictionary, keys must be model.initial_conditions.name .
+            If passed as a dictionary, keys must be model.initial_conditions.name.
             It fills in y0 from those values otherwise takes them from
             model.initial_conditions or from param_values.
             If not specified, initial conditions will be taken from 
@@ -215,7 +215,6 @@ class Solver(object):
             # create parameter vector from the values in the model
             param_values = numpy.array([p.value for p in self.model.parameters])
 
-#         subs = dict((p, param_values[i]) for i, p in enumerate(self.model.parameters))
         subs = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
         
         if y0 is not None and not isinstance(y0, dict):
@@ -225,14 +224,25 @@ class Solver(object):
             if not isinstance(y0, numpy.ndarray):
                 y0 = numpy.array(y0)
         else:
-            # to minimize repeating this code above and allow a dictionary we copy y0 to y0_dict
-            # y0 gets create as an empty array. Should we recode all y0 or do this?
-            y0_dict = y0
+            y0_dict = y0 if isinstance(y0, dict) else {}
             y0 = numpy.zeros((self.y.shape[1],))
+
+            for key in y0_dict.keys():
+                if not isinstance(key, pysb.core.ComplexPattern) and not isinstance(key, pysb.core.MonomerPattern):
+                    raise Exception("y0 keys must be MonomerPatterns or ComplexPatterns")
+                if isinstance(key, pysb.core.MonomerPattern): # convert all MonomerPatterns to ComplexPatterns
+                    val = y0_dict.pop(key) # remove the MonomerPattern key and store the value
+                    key = pysb.core.ComplexPattern([key], None) # redefine key as ComplexPattern
+                    y0_dict[key] = val # add it back to the dictionary
+                # get species index and set value
+                si = self.model.get_species_index(key)
+                if si is None:
+                    raise Exception("Species not found in model: %s" % repr(key))
+                y0[si] = y0_dict[key]
+
             for cp, value_obj in self.model.initial_conditions:
-                if isinstance(y0_dict, dict):
-                    if value_obj.name in y0_dict:
-                        value = y0_dict[value_obj.name]
+                if any(cp.is_equivalent_to(key) for key in y0_dict.keys()):
+                    continue
                 elif value_obj in self.model.parameters:
                     pi = self.model.parameters.index(value_obj)
                     value = param_values[pi]
