@@ -194,14 +194,14 @@ class Solver(object):
             determined by the order of model.parameters. If not specified,
             parameter values will be taken directly from model.parameters.
         y0 : vector-like or dictionary, optional
-            Values to use for the initial condition of all species. Ordering is
-            determined by the order of model.species. 
-            If passed as a dictionary, keys must be model.initial_conditions.name.
-            It fills in y0 from those values otherwise takes them from
-            model.initial_conditions or from param_values.
-            If not specified, initial conditions will be taken from 
-            model.initial_conditions (with initial condition parameter values 
-            taken from `param_values` if specified).
+            Values to use for the initial condition of all species. If passed
+            as a list, ordering is determined by the order of model.species. 
+            If passed as a dictionary, keys must be `MonomerPattern` or 
+            `ComplexPattern` objects. If not specified, initial conditions are 
+            taken from model.initial_conditions (with initial condition parameter 
+            values taken from `param_values` if specified). Note that values
+            passed in `y0` always take precedence over initial condition parameters,
+            even if passed in `param_values`.
 
         """
 
