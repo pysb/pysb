@@ -233,13 +233,13 @@ class Solver(object):
                 if isinstance(y0_dict, dict):
                     if value_obj.name in y0_dict:
                         value = y0_dict[value_obj.name]
-                    elif value_obj in self.model.parameters:
-                        pi = self.model.parameters.index(value_obj)
-                        value = param_values[pi]
-                    elif value_obj in self.model.expressions:
-                        value = value_obj.expand_expr(self.model).evalf(subs=subs)
-                    else:
-                        raise ValueError("Unexpected initial condition value type")
+                elif value_obj in self.model.parameters:
+                    pi = self.model.parameters.index(value_obj)
+                    value = param_values[pi]
+                elif value_obj in self.model.expressions:
+                    value = value_obj.expand_expr(self.model).evalf(subs=subs)
+                else:
+                    raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)
                 if si is None:
                     raise Exception("Species not found in model: %s" % repr(cp))
