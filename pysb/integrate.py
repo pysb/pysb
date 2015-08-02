@@ -217,12 +217,9 @@ class Solver(object):
             # create parameter vector from the values in the model
             param_values_dict = param_values if isinstance(param_values, dict) else {}
             param_values = numpy.array([p.value for p in self.model.parameters])
-            print param_values
             for key in param_values_dict.keys():
                 pi = self.model.parameters.index(self.model.parameters[key])
-                #pi = self.model.parameters.index(key)
                 param_values[pi] = param_values_dict[key]
-            print param_values
         subs = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
         
         if y0 is not None and not isinstance(y0, dict):
