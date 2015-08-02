@@ -11,6 +11,7 @@ from pysb.bng import run_ssa
 from pysb.macros import synthesize
 import matplotlib.pyplot as plt
 import numpy as np
+from unittest import TestCase
 
 @with_model
 def test_integrate_with_expression():
@@ -38,59 +39,71 @@ def test_integrate_with_expression():
 
     time = linspace(0, 40, 100)
     x = odesolve(model, time, verbose=True)
-    
-@with_model
-def test_y0_as_dict():
 
-    Monomer('A', ['a'])
-    Monomer('B', ['b'])
-    
-    Parameter('ksynthA', 100)
-    Parameter('ksynthB', 100)
-    Parameter('kbindAB', 100)
-    
-    Parameter('A_init', 0)
-    Parameter('B_init', 0)
-    
-    Initial(A(a=None), A_init)
-    Initial(B(b=None), B_init)
-    
-    Observable("A_free", A(a=None))
-    Observable("B_free", B(b=None))
-    Observable("AB_complex", A(a=1) % B(b=1))
-    
-    synthesize(A(a=None), ksynthA)
-    synthesize(B(b=None), ksynthB)
-    Rule('AB_bind', A(a=None) + B(b=None) >> A(a=1) % B(b=1), kbindAB)
-    
-    time = np.linspace(0, 0.005, 101)
-    solver = Solver(model, time, verbose=True)
-    solver.run(y0={"A(a=None)":100, "B(b=1) % A(a=1)":100, "B(b=None)":50})
 
-@with_model
-def test_param_values_as_dict():
+class SolverTests(TestCase):
+    @with_model
+    def setUp(self):
+        """ Setup for Solver() tests """
 
-    Monomer('A', ['a'])
-    Monomer('B', ['b'])
-    
-    Parameter('ksynthA', 100)
-    Parameter('ksynthB', 100)
-    Parameter('kbindAB', 100)
-    
-    Parameter('A_init', 0)
-    Parameter('B_init', 0)
-    
-    Initial(A(a=None), A_init)
-    Initial(B(b=None), B_init)
-    
-    Observable("A_free", A(a=None))
-    Observable("B_free", B(b=None))
-    Observable("AB_complex", A(a=1) % B(b=1))
-    
-    synthesize(A(a=None), ksynthA)
-    synthesize(B(b=None), ksynthB)
-    Rule('AB_bind', A(a=None) + B(b=None) >> A(a=1) % B(b=1), kbindAB)
-    
-    time = np.linspace(0, 0.005, 101)
-    solver = Solver(model, time, verbose=True)
-    solver.run(param_values={'ksynthA':150})
+        Monomer('A', ['a'])
+        Monomer('B', ['b'])
+
+        Parameter('ksynthA', 100)
+        Parameter('ksynthB', 100)
+        Parameter('kbindAB', 100)
+
+        Parameter('A_init', 0)
+        Parameter('B_init', 0)
+
+        Initial(A(a=None), A_init)
+        Initial(B(b=None), B_init)
+
+        Observable("A_free", A(a=None))
+        Observable("B_free", B(b=None))
+        Observable("AB_complex", A(a=1) % B(b=1))
+
+        synthesize(A(a=None), ksynthA)
+        synthesize(B(b=None), ksynthB)
+        Rule('AB_bind', A(a=None) + B(b=None) >> A(a=1) % B(b=1), kbindAB)
+
+        time = np.linspace(0, 0.005, 101)
+        self.solver = Solver(model, time, verbose=True)
+
+    def test_solver_run(self):
+        """ Test solver.run() with no arguments """
+        self.solver.run()
+
+    def test_y0_as_dictionary(self):
+        """ Test solver.run() with y0 as a dictionary """
+        self.solver.run(y0={"A(a=None)": 0, "B(b=1) % A(a=1)": 0,
+                        "B(b=None)": 0})
+        assert all(self.solver.yobs_view[-1, :] < 1e-8)
+
+    @raises(IndexError)
+    def test_y0_invalid_dictionary_key(self):
+        """ Test solver.run() using y0 dictionary with invalid monomer name """
+        self.solver.run(y0={"C(c=None)": 1})
+
+    @raises(ValueError, TypeError)
+    def test_y0_non_numeric_value(self):
+        """ Test solver.run() using y0 dictionary with a non-numeric value """
+        self.solver.run(y0={"A(a=None)": 'eggs'})
+
+    def test_param_values_as_dictionary(self):
+        """ Test solver.run() with param_values as a dictionary """
+        self.solver.run(param_values={'kbindAB': 0})
+        # kbindAB=0 should ensure no AB_complex is produced
+        assert all(self.solver.yobs["AB_complex"] < 1e-8)
+
+    @raises(IndexError)
+    def test_param_values_invalid_dictionary_key(self):
+        """ Test solver.run() using param_values dictionary with invalid
+               monomer name """
+        self.solver.run(param_values={'spam': 150})
+
+    @raises(ValueError, TypeError)
+    def test_param_values_non_numeric_value(self):
+        """ Test solver.run() using param_values dict with a non-numeric
+               value """
+        self.solver.run(param_values={'ksynthA': 'eggs'})

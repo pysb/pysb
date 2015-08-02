@@ -94,12 +94,12 @@ class Solver(object):
                 pass
 
     def __init__(self, model, tspan, integrator='vode', cleanup=True, verbose=False, **integrator_options):
-        
+
         self.verbose = verbose
         pysb.bng.generate_equations(model,cleanup,self.verbose)
-        
+
         code_eqs = '\n'.join(['ydot[%d] = %s;' % (i, sympy.ccode(model.odes[i])) for i in range(len(model.odes))])
-        
+
         for e in model.expressions:
             code_eqs = re.sub(r'\b(%s)\b' % e.name, '('+sympy.ccode(e.expand_expr())+')', code_eqs)
 
@@ -116,9 +116,9 @@ class Solver(object):
 
         for i, p in enumerate(model.parameters):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
-        
+
         Solver._test_inline()
-        
+
         # If we can't use weave.inline to run the C code, compile it as Python code instead for use with
         # exec. Note: C code with array indexing, basic math operations, and pow() just happens to also
         # be valid Python.  If the equations ever have more complex things in them, this might fail.
@@ -128,7 +128,7 @@ class Solver(object):
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
                 code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,'%s(\\1)' % macro, code_eqs)
-        
+
         def rhs(t, y, p):
             ydot = self.ydot
             # note that the evaluated code sets ydot as a side effect
@@ -146,13 +146,13 @@ class Solver(object):
 #             options.update(default_integrator_options[integrator])
 #         except KeyError as e:
 #             pass
-        
+
         options.update(integrator_options) # overwrite defaults
         self.model = model
         self.tspan = tspan
         self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
         self.ydot = numpy.ndarray(len(self.model.species))
-        
+
         # observables
         if len(self.model.observables):
             self.yobs = numpy.ndarray(len(self.tspan), zip(self.model.observables.keys(),
@@ -160,7 +160,7 @@ class Solver(object):
         else:
             self.yobs = numpy.ndarray((len(self.tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
-        
+
         # expressions
         exprs = self.model.expressions_dynamic()
         if len(exprs):
@@ -169,13 +169,13 @@ class Solver(object):
         else:
             self.yexpr = numpy.ndarray((len(self.tspan), 0))
         self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
-        
+
         # Integrator
         if scipy.integrate._ode.find_integrator(integrator):
             self.integrator = ode(rhs).set_integrator(integrator, **options)
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
-        
+
 #         help(self.integrator)
 #         for (key, val) in self.integrator.__dict__['_integrator'].__dict__.items():
 #             print key, ": ", val
@@ -210,7 +210,8 @@ class Solver(object):
         if param_values is not None and not isinstance(param_values, dict):
             # accept vector of parameter values as an argument
             if len(param_values) != len(self.model.parameters):
-                raise Exception("param_values must be the same length as model.parameters")
+                raise ValueError("param_values must be the same length as "
+                                 "model.parameters")
             if not isinstance(param_values, numpy.ndarray):
                 param_values = numpy.array(param_values)
         else:
@@ -218,14 +219,19 @@ class Solver(object):
             param_values_dict = param_values if isinstance(param_values, dict) else {}
             param_values = numpy.array([p.value for p in self.model.parameters])
             for key in param_values_dict.keys():
-                pi = self.model.parameters.index(self.model.parameters[key])
+                try:
+                    pi = self.model.parameters.index(self.model.parameters[key])
+                except KeyError:
+                    raise IndexError("param_values dictionary has invalid "
+                                     "species")
                 param_values[pi] = param_values_dict[key]
-        subs = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
-        
+        subs = dict((p.name, param_values[i]) for i, p in
+                    enumerate(self.model.parameters))
+
         if y0 is not None and not isinstance(y0, dict):
             # accept vector of species amounts as an argument
             if len(y0) != self.y.shape[1]:
-                raise Exception("y0 must be the same length as model.species")
+                raise ValueError("y0 must be the same length as model.species")
             if not isinstance(y0, numpy.ndarray):
                 y0 = numpy.array(y0)
         else:
@@ -242,11 +248,13 @@ class Solver(object):
                     raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)
                 if si is None:
-                    raise Exception("Species not found in model: %s" % repr(cp))
+                    raise IndexError("Species not found in model: %s" %
+                                     repr(cp))
                 y0[si] = value
             for i in y0_dict:
                 if not isinstance(i, str):
-                    raise Exception("Must pass dictionary of species as strings")
+                    raise TypeError("Must pass dictionary of species as "
+                                   "strings")
                 tmp_list = [j for j in i.replace(" ","")]
                 tmp_list.sort()
                 comparison_dict[i] = tmp_list
@@ -259,14 +267,14 @@ class Solver(object):
                             y0[si] = y0_dict[each]
                             y0_dict.pop(each)
             if len(y0_dict) != 0:
-                raise Exception("y0 dictionary has invalid species")
+                raise IndexError("y0 dictionary has invalid species")
 
         # perform the actual integration
         self.integrator.set_initial_value(y0, self.tspan[0])
         self.integrator.set_f_params(param_values)
         self.y[0] = y0
         i = 1
-        if self.verbose: 
+        if self.verbose:
             print "Integrating..."
             print "\t"+"Time"
             print "\t"+"----"
@@ -284,9 +292,9 @@ class Solver(object):
             self.y[i:, :] = 'nan'
 
         # calculate observables
-        for i, obs in enumerate(self.model.observables): 
+        for i, obs in enumerate(self.model.observables):
             self.yobs_view[:, i] = (self.y[:, obs.species] * obs.coefficients).sum(1)
-        
+
         # calculate expressions
         obs_names = self.model.observables.keys()
         obs_dict = dict((k, self.yobs[k]) for k in obs_names)
