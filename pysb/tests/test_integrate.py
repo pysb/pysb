@@ -65,7 +65,7 @@ def test_y0_as_dict():
     
     time = np.linspace(0, 0.005, 101)
     solver = Solver(model, time, verbose=True)
-    solver.run(y0={A(a=None):100, B(b=1) % A(a=1):100, B(b=None):50})
+    solver.run(y0={"A(a=None)":100, "B(b=1) % A(a=1)":100, "B(b=None)":50})
 
 @with_model
 def test_param_values_as_dict():
