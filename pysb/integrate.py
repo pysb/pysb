@@ -189,10 +189,12 @@ class Solver(object):
 
         Parameters
         ----------
-        param_values : vector-like, optional
+        param_values : vector-like or dictionary, optional
             Values to use for every parameter in the model. Ordering is
-            determined by the order of model.parameters. If not specified,
-            parameter values will be taken directly from model.parameters.
+            determined by the order of model.parameters. 
+            If passed as a dictionary, keys must be parameter names.
+            If not specified, parameter values will be taken directly from
+            model.parameters.
         y0 : vector-like or dictionary, optional
             Values to use for the initial condition of all species. If passed
             as a list, ordering is determined by the order of model.species. 
@@ -205,7 +207,7 @@ class Solver(object):
 
         """
 
-        if param_values is not None:
+        if param_values is not None and not isinstance(param_values, dict):
             # accept vector of parameter values as an argument
             if len(param_values) != len(self.model.parameters):
                 raise Exception("param_values must be the same length as model.parameters")
@@ -213,8 +215,14 @@ class Solver(object):
                 param_values = numpy.array(param_values)
         else:
             # create parameter vector from the values in the model
+            param_values_dict = param_values if isinstance(param_values, dict) else {}
             param_values = numpy.array([p.value for p in self.model.parameters])
-
+            print param_values
+            for key in param_values_dict.keys():
+                pi = self.model.parameters.index(self.model.parameters[key])
+                #pi = self.model.parameters.index(key)
+                param_values[pi] = param_values_dict[key]
+            print param_values
         subs = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
         
         if y0 is not None and not isinstance(y0, dict):
