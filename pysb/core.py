@@ -509,8 +509,10 @@ class ComplexPattern(object):
         """
         return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
-    def __call__(self, **kwargs):
+    def __call__(self, conditions=None, **kwargs):
         """Build a new ComplexPattern with updated site conditions."""
+
+        kwargs = extract_site_conditions(conditions, **kwargs)
 
         # Ensure we don't have more than one of any Monomer in our patterns.
         mp_monomer = lambda mp: mp.monomer
@@ -1593,16 +1595,25 @@ class ComponentDuplicateNameError(ValueError):
 
 
 def extract_site_conditions(conditions=None, **kwargs):
-    """Parse MonomerPattern site conditions."""
+    """Parse MonomerPattern/ComplexPattern site conditions."""
     # enforce site conditions as kwargs or a dict but not both
     if conditions and kwargs:
-        raise Exception("Site conditions may be specified as EITHER keyword arguments OR a single dict")
+        raise RedundantSiteConditionsError()
     # handle normal cases
     elif conditions:
         site_conditions = conditions.copy()
     else:
         site_conditions = kwargs
     return site_conditions
+
+
+class RedundantSiteConditionsError(ValueError):
+    """Both conditions dict and kwargs both passed to create pattern."""
+    def __init__(self):
+        ValueError.__init__(
+            self,
+            ("Site conditions may be specified as EITHER keyword arguments "
+             "OR a single dict"))
 
 
 # Some light infrastructure for defining symbols that act like "keywords", i.e.
