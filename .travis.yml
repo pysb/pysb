@@ -23,11 +23,6 @@ install:
   -O BioNetGen-2.2.5-stable.zip
 - unzip BioNetGen-2.2.5-stable.zip
 - export BNGPATH=`pwd`/BioNetGen-2.2.5-stable
-- if [ ! -d "StochKit2.0.11" ] ; then curl --silent -L "http://downloads.sourceforge.net/project/stochkit/StochKit2/StochKit2.0.11/StochKit2.0.11.tgz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fstochkit%2Ffiles%2F&ts=1434079825&use_mirror=iweb"
-  | tar xz; StochKit2.0.11/install.sh; fi
-- git clone https://github.com/JohnAbel/gillespy.git
-- cd gillespy && STOCHKIT_HOME=$HOME/StochKit2.0.11/ python setup.py install && cd
-  ..
 script: nosetests
 notifications:
   slack:
