@@ -222,9 +222,10 @@ class Solver(object):
                 try:
                     pi = self.model.parameters.index(self.model.parameters[key])
                 except KeyError:
-                    raise IndexError("param_values dictionary has invalid "
-                                     "species")
+                    raise IndexError("param_values dictionary has unknown "
+                                     "parameter name (%s)" % key)
                 param_values[pi] = param_values_dict[key]
+                
         subs = dict((p.name, param_values[i]) for i, p in
                     enumerate(self.model.parameters))
 
