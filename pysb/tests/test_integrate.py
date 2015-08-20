@@ -68,17 +68,24 @@ class SolverTests(TestCase):
         Rule('AB_bind', A(a=None) + B(b=None) >> A(a=1) % B(b=1), kbindAB)
 
         time = np.linspace(0, 0.005, 101)
-        self.solver = Solver(model, time, verbose=True)
+        self.solver = Solver(model, time, verbose=False)
 
     def test_solver_run(self):
         """ Test solver.run() with no arguments """
         self.solver.run()
 
-    def test_y0_as_dictionary(self):
+    def test_y0_as_dictionary_defined_species(self):
         """ Test solver.run() with y0 as a dictionary """
-        self.solver.run(y0={"A(a=None)": 0, "B(b=1) % A(a=1)": 0,
+        self.solver.run(y0={"A(a=None)": 10, "B(b=1) % A(a=1)": 0,
                         "B(b=None)": 0})
-        assert all(self.solver.yobs_view[-1, :] < 1e-8)
+        assert np.abs(self.solver.y[0,0] == 10)
+    
+    def test_y0_as_dictionary_with_undefined_species(self):
+        """ Test solver.run() with y0 as a dictionary """
+        self.solver.run(y0={"A(a=None)": 0, "B(b=1) % A(a=1)": 100,
+                        "B(b=None)": 0})
+        assert np.abs(self.solver.y[0, 3] == 100)
+        
 
     @raises(IndexError)
     def test_y0_invalid_dictionary_key(self):

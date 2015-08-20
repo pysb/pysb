@@ -237,6 +237,7 @@ class Solver(object):
         else:
             y0_dict = y0 if isinstance(y0, dict) else {}
             y0 = numpy.zeros((self.y.shape[1],))
+
             comparison_dict = {}
             for cp, value_obj in self.model.initial_conditions:
                 if value_obj in self.model.parameters:
@@ -251,6 +252,7 @@ class Solver(object):
                     raise IndexError("Species not found in model: %s" %
                                      repr(cp))
                 y0[si] = value
+
             for i in y0_dict:
                 if not isinstance(i, str):
                     raise TypeError("Must pass dictionary of species as "
@@ -258,14 +260,17 @@ class Solver(object):
                 tmp_list = [j for j in i.replace(" ","")]
                 tmp_list.sort()
                 comparison_dict[i] = tmp_list
+
             for sp in self.model.species:
                 tmp_list = [j for j in str(sp).replace(" ","")]
                 tmp_list.sort()
                 if any(tmp_list == key for key in comparison_dict.values()):
                     for each in comparison_dict:
                         if tmp_list == comparison_dict[each]:
+                            si = self.model.get_species_index(sp)
                             y0[si] = y0_dict[each]
                             y0_dict.pop(each)
+
             if len(y0_dict) != 0:
                 raise IndexError("y0 dictionary has invalid species")
 
