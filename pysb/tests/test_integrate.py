@@ -74,17 +74,19 @@ class SolverTests(TestCase):
         """ Test solver.run() with no arguments """
         self.solver.run()
 
-    def test_y0_as_dictionary_defined_species(self):
-        """ Test solver.run() with y0 as a dictionary """
+    def test_y0_as_dictionary_monomer_species(self):
+        """ Test solver.run() with y0 as a dictionary containing monomers 
+            defined within model """
         self.solver.run(y0={"A(a=None)": 10, "B(b=1) % A(a=1)": 0,
                         "B(b=None)": 0})
-        assert np.abs(self.solver.y[0,0] == 10)
+        assert np.abs(self.solver.y[0,0] - 10) < 1e-8
     
-    def test_y0_as_dictionary_with_undefined_species(self):
-        """ Test solver.run() with y0 as a dictionary """
+    def test_y0_as_dictionary_with_bound_species(self):
+        """ Test solver.run() with y0 as a dictionary containing a complex
+        that is generated with BioNetGen """
         self.solver.run(y0={"A(a=None)": 0, "B(b=1) % A(a=1)": 100,
                         "B(b=None)": 0})
-        assert np.abs(self.solver.y[0, 3] == 100)
+        assert np.abs(self.solver.y[0, 3] - 100) < 1e-8
         
 
     @raises(IndexError)
