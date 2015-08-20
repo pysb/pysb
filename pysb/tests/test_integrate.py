@@ -106,7 +106,7 @@ class SolverTests(TestCase):
     @raises(IndexError)
     def test_param_values_invalid_dictionary_key(self):
         """ Test solver.run() using param_values dictionary with invalid
-               monomer name """
+               parameter name """
         self.solver.run(param_values={'spam': 150})
 
     @raises(ValueError, TypeError)
