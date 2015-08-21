@@ -74,27 +74,28 @@ class SolverTests(TestCase):
         """ Test solver.run() with no arguments """
         self.solver.run()
 
+    @raises(NotImplementedError)
     def test_y0_as_dictionary_monomer_species(self):
-        """ Test solver.run() with y0 as a dictionary containing monomers 
+        """ Test solver.run() with y0 as a dictionary containing monomers
             defined within model """
         self.solver.run(y0={"A(a=None)": 10, "B(b=1) % A(a=1)": 0,
                         "B(b=None)": 0})
         assert np.abs(self.solver.y[0,0] - 10) < 1e-8
-    
+
+    @raises(NotImplementedError)
     def test_y0_as_dictionary_with_bound_species(self):
         """ Test solver.run() with y0 as a dictionary containing a complex
         that is generated with BioNetGen """
         self.solver.run(y0={"A(a=None)": 0, "B(b=1) % A(a=1)": 100,
                         "B(b=None)": 0})
         assert np.abs(self.solver.y[0, 3] - 100) < 1e-8
-        
 
-    @raises(IndexError)
+    @raises(NotImplementedError)
     def test_y0_invalid_dictionary_key(self):
         """ Test solver.run() using y0 dictionary with invalid monomer name """
         self.solver.run(y0={"C(c=None)": 1})
 
-    @raises(ValueError, TypeError)
+    @raises(NotImplementedError)
     def test_y0_non_numeric_value(self):
         """ Test solver.run() using y0 dictionary with a non-numeric value """
         self.solver.run(y0={"A(a=None)": 'eggs'})
