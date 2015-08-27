@@ -1,8 +1,18 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
-import distutils.cmd
-import sys, os, subprocess, traceback, re
+import sys, os, subprocess, re
+
+extra = {}
+if sys.version_info >= (3,):
+    from distutils.command.build_py import build_py_2to3
+    class build_py(build_py_2to3):
+        # http://marc.info/?l=python-distutils-sig&m=127205216610290&w=2
+        fixer_names = ['lib2to3.fixes.fix_ne']
+
+    extra['use_2to3'] = True
+    extra['cmdclass'] = {'build_py': build_py}
+    # extra['convert_2to3_doctests'] = ['src/your/module/README.txt']
 
 def main():
 
@@ -29,10 +39,12 @@ def main():
             'License :: OSI Approved :: BSD License',
             'Operating System :: OS Independent',
             'Programming Language :: Python :: 2',
+            'Programming Language :: Python :: 3',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
             'Topic :: Scientific/Engineering :: Chemistry',
             'Topic :: Scientific/Engineering :: Mathematics',
             ],
+          **extra
           )
 
 def get_version():

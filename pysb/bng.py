@@ -1,3 +1,4 @@
+from __future__ import print_function as _
 import pysb.core
 from pysb.generator.bng import BngGenerator
 import os
@@ -7,8 +8,14 @@ import re
 import itertools
 import sympy
 import numpy
-from StringIO import StringIO
-
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
+try:
+    from future_builtins import zip
+except ImportError:
+    pass
 
 # Cached value of BNG path
 _bng_path = None
@@ -109,7 +116,7 @@ def _parse_bng_outfile(out_filename):
         column_names = [raw_name for raw_name in raw_names if not raw_name == '']
 
         # Create the dtype argument for the numpy record array
-        dt = zip(column_names, ('float',)*len(column_names))
+        dt = list(zip(column_names, ('float',)*len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
         arr = numpy.loadtxt(out_filename, dtype=dt, skiprows=1)
@@ -159,7 +166,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp',
                                 os.getpid(), random.randint(0, 100000))
 
     if os.path.exists(output_file_basename + '.bngl'):
-        print "WARNING! File %s already exists!" % (output_file_basename + '.bngl')
+        print("WARNING! File %s.bngl already exists!" % output_file_basename)
         output_file_basename += '_1'
 
     bng_filename = output_file_basename + '.bngl'
@@ -181,7 +188,7 @@ def run_ssa(model, t_end=10, n_steps=100, output_dir='/tmp',
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip("at line")+"\n"+p_err.rstrip())
-        print "Wrote " + gdat_filename # FIXME
+        print("Wrote " + gdat_filename) # FIXME
         output_arr = _parse_bng_outfile(gdat_filename)
         #ssa_file = open(ssa_filename, 'r')
         #output.write(ssa_file.read())
@@ -234,7 +241,8 @@ def generate_network(model, cleanup=True, append_stdout=False):
         bng_file.write(_generate_network_code)
         bng_file.close()
         p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             universal_newlines=True)
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
@@ -272,20 +280,20 @@ def generate_equations(model):
         return
     lines = iter(generate_network(model).split('\n'))
     try:
-        while 'begin species' not in lines.next():
+        while 'begin species' not in next(lines):
             pass
         model.species = []
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end species' in line: break
             _parse_species(model, line)
 
-        while 'begin reactions' not in lines.next():
+        while 'begin reactions' not in next(lines):
             pass
         model.odes = [sympy.numbers.Zero()] * len(model.species)
         reaction_cache = {}
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end reactions' in line: break
             (number, reactants, products, rate, rule) = line.strip().split(' ', 4)
             # the -1 is to switch from one-based to zero-based indexing
@@ -332,10 +340,10 @@ def generate_equations(model):
             # now the 'reverse' value is no longer needed
             del r['reverse']
 
-        while 'begin groups' not in lines.next():
+        while 'begin groups' not in next(lines):
             pass
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end groups' in line: break
             _parse_group(model, line)
 

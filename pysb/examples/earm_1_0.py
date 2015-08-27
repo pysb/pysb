@@ -7,6 +7,7 @@ Cell Death. PLoS Biol 6(12): e299. doi:10.1371/journal.pbio.0060299
 http://www.plosbiology.org/article/info:doi/10.1371/journal.pbio.0060299
 """
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -294,8 +295,8 @@ for m in model.monomers:
 
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid. Please see\n" \
-        "run_earm_1_0.py for example usage."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid. Please see run_earm_1_0.py for example usage.""")

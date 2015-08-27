@@ -65,7 +65,10 @@ import sympy
 import re
 import sys
 import os
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 from pysb.export import Exporter
 
 class PottersWheelExporter(Exporter):

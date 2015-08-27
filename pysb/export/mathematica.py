@@ -104,7 +104,10 @@ import pysb
 import pysb.bng
 import sympy
 import re
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 from math import floor, log
 from pysb.export import Exporter
 

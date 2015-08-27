@@ -1,6 +1,7 @@
 """Example of how to write a model without using SelfExporter.
 """
 
+from __future__ import print_function
 from pysb import *
 import pysb.core
 
@@ -27,7 +28,8 @@ model.initial(L(r=None), L_0)
 model.initial(R(l=None), R_0)
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid.""")

@@ -250,7 +250,7 @@ def _verify_sites_complex(c, *site_list):
         allsitesdict[mon] = mon.monomer.sites
     for site in site_list:
         specsitesdict = {}
-        for monomer, li in allsitesdict.iteritems():
+        for monomer, li in allsitesdict.items():
             for s in li:
                 if site in li:
                     specsitesdict[monomer] = site
@@ -512,13 +512,14 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
     else:
         _verify_sites_complex(s1, site1)
         _verify_sites_complex(s2, site2)
-        #Retrieve a dictionary specifiying the MonomerPattern within the complex that contains the given binding site.
-        specsitesdict1 = _verify_sites_complex(s1, site1)
-        specsitesdict2 = _verify_sites_complex(s2, site2)
+        #Retrieve a dictionary specifiying the MonomerPattern within
+        #the complex that contains the given binding site. Convert to list.
+        specsites1 = list(_verify_sites_complex(s1, site1))
+        specsites2 = list(_verify_sites_complex(s2, site2))
         #Return error if binding site exists on multiple monomers and a monomer for binding (m1/m2) hasn't been specified.
-        if len(specsitesdict1) > 1 and m1==None:
+        if len(specsites1) > 1 and m1==None:
             raise ValueError("Binding site '%s' present in more than one monomer in complex '%s'.  Specify variable m1, the monomer used for binding within the complex." % (site1, s1))
-        if len(specsitesdict2) > 1 and m2==None:
+        if len(specsites2) > 1 and m2==None:
             raise ValueError("Binding site '%s' present in more than one monomer in complex '%s'.  Specify variable m2, the monomer used for binding within the complex." % (site2, s2))
         if not s1.is_concrete:
             raise ValueError("Complex '%s' must be concrete." % (s1))
@@ -527,7 +528,7 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         #To avoid creating rules with multiple bonds to the same site when combining the two complexes, check for the maximum bond integer in s1 and add to all s2 bond integers.
         maxint = 0
         for monomer in s1.monomer_patterns:
-            for stateint in monomer.site_conditions.itervalues():
+            for stateint in monomer.site_conditions.values():
                 if isinstance(stateint, int):
                     if stateint > maxint:
                         maxint = stateint
@@ -538,10 +539,10 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         #If the given binding site is only present in one monomer in the complex:
         if m1==None:
           #Build up ComplexPattern for use in rule (with state of given binding site specified).
-            s1complexpatub = specsitesdict1.keys()[0]({site1:None})
-            s1complexpatb = specsitesdict1.keys()[0]({site1:50})
+            s1complexpatub = specsites1[0]({site1:None})
+            s1complexpatb = specsites1[0]({site1:50})
             for monomer in s1.monomer_patterns:
-                if monomer not in specsitesdict1.keys():
+                if monomer not in specsites1:
                     s1complexpatub %= monomer
                     s1complexpatb %= monomer
         else:
@@ -557,10 +558,10 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
                     s1complexpatb %= mon
         if m2==None:
           #Build up ComplexPattern for use in rule (with state of given binding site specified).
-            s2complexpatub = specsitesdict2.keys()[0]({site2:None})
-            s2complexpatb = specsitesdict2.keys()[0]({site2:50})
+            s2complexpatub = specsites2[0]({site2:None})
+            s2complexpatb = specsites2[0]({site2:50})
             for monomer in s2.monomer_patterns:
-                if monomer not in specsitesdict2.keys():
+                if monomer not in specsites2:
                     s2complexpatub %= monomer
                     s2complexpatb %= monomer
         #If the binding site is present on more than one monomer in the complex, the monomer must be specified by the user.  Use specified m2 to build ComplexPattern.
@@ -788,9 +789,9 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
          Parameter('bind_R1_R2_kf', 1000.0),
          Parameter('bind_R1_R2_kr', 0.1),
          ])
-        >>> bind_table_complex([[                     C1(y=1) % C2(y=1), C2],\
-                                [R1,                  (1e-4, 1e-1),      (2e-4, 2e-1)],\
-                                [R1(c1=1) % R2(x=1),  (3e-4, 3e-1),      None]], 'x', 'c2', m1=R1, m2=C2)
+        >>> bind_table_complex([[                     C1(y=1) % C2(y=1), C2],
+        ...                     [R1,                  (1e-4, 1e-1),      (2e-4, 2e-1)],
+        ...                     [R1(c1=1) % R2(x=1),  (3e-4, 3e-1),      None]], 'x', 'c2', m1=R1, m2=C2)
         ComponentSet([
          Rule('bind_C2C1_R1', C2(y=1, c2=None) % C1(y=2) + R1(x=None) <> C2(y=1, c2=50) % C1(y=2) % R1(x=50), bind_C2C1_R1_kf, bind_C2C1_R1_kr),
          Parameter('bind_C2C1_R1_kf', 0.0001),

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import pysb.bng
 import numpy 
 import sympy 
@@ -93,7 +94,7 @@ def annlinit(model, abstol=1.0e-3, reltol=1.0e-3, nsteps = 1000, itermaxstep = N
     yout = numpy.zeros([nsteps, odesize])
 
     #initialize the arrays
-    #print "Initial parameter values:", y
+    #print("Initial parameter values:", y)
     xout[0] = 0.0 #CHANGE IF NEEDED
     #first step in yout
     for i in range(0, odesize):
@@ -158,15 +159,15 @@ def annlodesolve(model, tfinal, envlist, params, tinit = 0.0, ic=True):
     t = cvode.realtype(tinit)
     tout = tinit + tadd
     
-    #print "Beginning integration"
-    #print "TINIT:", tinit, "TFINAL:", tfinal, "TADD:", tadd, "ODESIZE:", odesize
-    #print "Integrating Parameters:\n", params
-    #print "y0:", yzero
+    #print("Beginning integration")
+    #print("TINIT:", tinit, "TFINAL:", tfinal, "TADD:", tadd, "ODESIZE:", odesize)
+    #print("Integrating Parameters:\n", params)
+    #print("y0:", yzero)
 
     for step in range(1, nsteps):
         ret = cvode.CVode(cvode_mem, tout, y, ctypes.byref(t), cvode.CV_NORMAL)
         if ret !=0:
-            print "CVODE ERROR %i"%(ret)
+            print("CVODE ERROR %i"%(ret))
             break
 
         xout[step]= tout
@@ -175,7 +176,7 @@ def annlodesolve(model, tfinal, envlist, params, tinit = 0.0, ic=True):
 
         # increase the time counter
         tout += tadd
-    #print "Integration finished"
+    #print("Integration finished")
 
     #now deal with observables
     yobs = numpy.zeros([len(model.observables), nsteps])
@@ -214,7 +215,7 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
     #rngmax = min(xparray[0].max(), simarray[0].max())
     #rngmin = round(rngmin, -1)
     #rngmax = round(rngmax, -1)
-    #print "Time overlap range:", rngmin,"to", rngmax
+    #print("Time overlap range:", rngmin,"to", rngmax)
     
     ipsimarray = numpy.zeros(xparray.shape[1])
     objout = 0
@@ -223,9 +224,9 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         # create a b-spline of the sim data and fit it to desired range
         
         #some error checking
-        #print "xspairlist length:", len(xspairlist[i])
-        #print "xspairlist element type:", type(xspairlist[i])
-        #print "xspairlist[i] elements:", xspairlist[i][0], xspairlist[i][1]
+        #print("xspairlist length:", len(xspairlist[i]))
+        #print("xspairlist element type:", type(xspairlist[i]))
+        #print("xspairlist[i] elements:", xspairlist[i][0], xspairlist[i][1])
         assert type(xspairlist[i]) is tuple
         assert len(xspairlist[i]) == 2
         
@@ -245,7 +246,7 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         diffsqarray = diffarray * diffarray
 
         if vardata is True:
-            #print "using XP VAR",xparrayaxis+1
+            #print("using XP VAR",xparrayaxis+1)
             xparrayvar = xparray[xparrayaxis+1] # variance data provided in xparray in next column
         else:
         # assume a default variance
@@ -263,14 +264,14 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         # check for inf in objarray, they creep up when there are near zero or zero values in xparrayvar
         for i in range(len(objarray)):
             if numpy.isinf(objarray[i]) or numpy.isnan(objarray[i]):
-                #print "CORRECTING NAN OR INF. IN ARRAY"
-                # print objarray
+                #print("CORRECTING NAN OR INF. IN ARRAY")
+                #print(objarray)
                 objarray[i] = 1e-100 #zero enough
 
         objout += objarray.sum()
-        #print "OBJOUT(%d,%d):%f  |\t\tOBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout)
+        #print("OBJOUT(%d,%d):%f  |\t\tOBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout))
 
-    print "OBJOUT(total):", objout
+    print("OBJOUT(total):", objout)
     return objout
 
 def logparambounds(params, omag=1, useparams=[], usemag=None, initparams=[], initmag=None):
@@ -382,7 +383,7 @@ def tenninetycomp(outlistnorm, arglist, xpsamples=1.0):
     obj = ((1./varTdxp) * (Tdsim - Tdxp)**2.) + ((1./varTsxp) * (Tssim - Tsxp)**2.)
     #obj *= xpsamples
     
-    print "OBJOUT-10-90:(%g,%g):%g"%(Tdsim, Tssim, obj)
+    print("OBJOUT-10-90:(%g,%g):%g"%(Tdsim, Tssim, obj))
 
     return obj    
 
@@ -408,17 +409,17 @@ def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, tn = [
     paramarr = mapprms(zoparams, lb, ub, scaletype="log")
 
     #debug
-    #print "ZOPARAMS:\n", zoparams,"\n"
-    #print paramarr
+    #print("ZOPARAMS:\n", zoparams,"\n")
+    #print(paramarr)
 
     # eliminate values outside the boundaries, i.e. those outside [0,1)
     if numpy.greater_equal(paramarr, lb).all() and numpy.less_equal(paramarr, ub).all():
-        print "integrating... "
+        print("integrating... ")
         outlist = annlodesolve(model, time, envlist, paramarr)
 
         # normalized data needs a bit more tweaking before objfxn calculation
         if norm is True:
-            print "Normalizing data"
+            print("Normalizing data")
             datamax = numpy.max(outlist[0], axis = 1)
             datamin = numpy.min(outlist[0], axis = 1)
             outlistnorm = ((outlist[0].T - datamin)/(datamax-datamin)).T
@@ -429,18 +430,18 @@ def annealfxn(zoparams, time, model, envlist, xpdata, xspairlist, lb, ub, tn = [
             if tn:
                 tn = tenninetycomp(outlistnorm, tn, len(xpdata[0]))
                 objout += tn 
-            print "NORM objout TOT:", objout
+            print("NORM objout TOT:", objout)
         else:
             objout = compare_data(xpdata, outlist[0], xspairlist, vardata)
             if tn:
                 tn = tenninetycomp(outlist[0], tn)
                 objout += tn 
-            print "objout TOT:", objout
+            print("objout TOT:", objout)
     else:
-        print "======> VALUE OUT OF BOUNDS NOTED"
+        print("======> VALUE OUT OF BOUNDS NOTED")
         temp = numpy.where((numpy.logical_and(numpy.greater_equal(paramarr, lb), numpy.less_equal(paramarr, ub)) * 1) == 0)
         for i in temp:
-            print "======>",i,"\n======", paramarr[i],"\n", zoparams[i],"\n"
+            print("======>",i,"\n======", paramarr[i],"\n", zoparams[i],"\n")
         objout = 1.0e300 # the largest FP in python is 1.0e308, otherwise it is just Inf
 
     # save the params and temps for analysis

@@ -13,9 +13,9 @@ def check_runtime(model, tspan, iterations, use_inline, use_analytic_jacobian):
     for i in range(iterations):
         sol.run()
     elapsed = timeit.default_timer() - start_time
-    print "use_inline=%s, use_analytic_jacobian=%s, %d iterations" % \
-          (use_inline, use_analytic_jacobian, iterations)
-    print "Time: %f sec\n" % elapsed
+    print("use_inline=%s, use_analytic_jacobian=%s, %d iterations" %
+          (use_inline, use_analytic_jacobian, iterations))
+    print("Time: %f sec\n" % elapsed)
 
 if __name__ == '__main__':
     arg_list = [(0, 0), (0, 1), (1, 0), (1, 1)]

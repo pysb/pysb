@@ -131,7 +131,7 @@ class JacobianGenerator(object):
 
     def make_groups(self, elements, size):
         groups = []
-        offsets = range(0, len(elements), size) + [None]
+        offsets = list(range(0, len(elements), size)) + [None]
         for i in range(0, len(offsets) - 1):
             groups.append(elements[offsets[i]:offsets[i+1]])
         return groups
