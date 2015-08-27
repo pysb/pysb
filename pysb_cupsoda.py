@@ -232,10 +232,10 @@ class CupSODASolver(Simulator):
         # Error checks on 'param_values' and 'y0'
         if len(param_values) != len(y0):
             raise Exception("Lengths of 'param_values' (len=" + str(len(param_values)) +") and 'y0' (len=" + str(len(y0)) + ") must be equal.")
-        if len(param_values.shape) != 2 or param_values.shape[1] != len(self.model.reactions):
-            raise Exception("'param_values' must be a 2D array with dimensions N_SIMS x N_RXNS: param_values.shape=" + str(self.param_values.shape))
+        if len(param_values.shape) != 2 or param_values.shape[1] != len(self.model.parameters_rules()):
+            raise Exception("'param_values' must be a 2D array with dimensions N_SIMS x len(model.parameters_rules()): param_values.shape=" + str(self.param_values.shape))
         if len(y0.shape) != 2 or y0.shape[1] != len(self.model.species):
-            raise Exception("'y0' must be a 2D array with dimensions N_SIMS x N_SPECIES: y0.shape=" + str(y0.shape))
+            raise Exception("'y0' must be a 2D array with dimensions N_SIMS x len(model.species): y0.shape=" + str(y0.shape))
         
         # Create outdir if it doesn't exist
         self.outdir = outdir
@@ -271,8 +271,28 @@ class CupSODASolver(Simulator):
             n_sims = param_values.shape[0]
             n_blocks = int(np.ceil(1.*n_sims/threads_per_block))
         
+        # Create c_matrix
+        c_matrix = np.zeros((len(param_values), len(self.model.reactions)))
+        par_names = [p.name for p in self.model.parameters_rules()]
+        rate_args = []
+        for rxn in self.model.reactions:
+            rate_args.append([arg for arg in rxn['rate'].args if not re.match("_*s",str(arg))])
+        output = 0.01*len(param_values)
+        output = int(output) if output > 1 else 1
+        for i in range(len(param_values)):
+            if self.verbose and i % output == 0: print str(int(round(100.*i/len(param_values))))+"%"
+            for j in range(len(self.model.reactions)):
+                rate = 1.0
+                for r in rate_args[j]:
+                    x = str(r)
+                    if x in par_names:
+                        rate *= self.model.parameters_rules()[x].value
+                    else: # FIXME: need to detect non-numbers and throw an error
+                        rate *= float(x)
+                c_matrix[i][j] = rate
+        
         # Create cupSODA input files
-        self._create_input_files(cupsoda_files, param_values, y0)
+        self._create_input_files(cupsoda_files, c_matrix, y0)
             
         # Build command
         # ./cupSODA input_model_folder blocks output_folder simulation_file_prefix gpu_number fitness_calculation memory_use dump        
@@ -376,6 +396,18 @@ class CupSODASolver(Simulator):
             MX_0.write(line)
             if i < n_sims-1: MX_0.write("\n")
         MX_0.close()
+        
+        # M_feed
+        M_feed = open(os.path.join(cupsoda_files,"M_feed"), 'wb')
+        line = ""
+        for j,sp in enumerate(self.model.species):
+            if j > 0: line += "\t"
+            if str(sp) == '__source()':
+                line += str(y0[0,j])
+            else:
+                line += '0'
+        M_feed.write(line)
+        M_feed.close()
         
         # right_side
         right_side = open(os.path.join(cupsoda_files,"right_side"), 'wb')
