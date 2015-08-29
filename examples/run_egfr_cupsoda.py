@@ -3,6 +3,7 @@ from pysb_cupsoda import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+observables = ['obsAKTPP', 'obsErbB1_P_CE', 'obsERKPP']
 colors = ['b', 'g', 'r']
 
 expdata = np.load('/Users/lopezlab/git/egfr/chen_sorger_2009_egfr_simplified/experimental_data/experimental_data_A431_highEGF_unnorm.npy')
@@ -20,7 +21,6 @@ for p in model.parameters:
 
 #####
 # from pysb.integrate import odesolve
-# observables = ['obsAKTPP', 'obsErbB1_P_CE', 'obsERKPP']
 # x = odesolve(model, tspan, verbose=True)
 # for i in range(len(observables)):
 #     plt.plot(tspan, x[observables[i]], lw=3, label=observables[i], color=colors[i])
