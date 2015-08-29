@@ -15,7 +15,7 @@ _cupsoda_path = None
 # Obviously, the only integrator currently supported is "cupSODA" (case insensitive).
 default_integrator_options = {
     'cupsoda': {
-        'max_steps': 20000,          # max no. of internal iterations (LSODA's MXSTEP)
+        'max_steps': 20000,         # max no. of internal iterations (LSODA's MXSTEP)
         'atol': 1e-8,               # absolute tolerance
         'rtol': 1e-8,               # relative tolerance
         'n_blocks': None,           # number of GPU blocks
@@ -30,7 +30,7 @@ default_integrator_options = {
         },
     }
 
-def set_cupSODA_path(dir):
+def set_cupsoda_path(dir):
     global _cupsoda_path
     _cupsoda_path = os.path.join(dir,'cupSODA')
     # Make sure file exists and that it is not a directory
@@ -40,12 +40,12 @@ def set_cupSODA_path(dir):
     elif not os.access(_cupsoda_path, os.X_OK):
         raise Exception("cupSODA binary in " + os.path.abspath(dir) + " does not have executable permissions.")
 
-def _get_cupSODA_path():
+def _get_cupsoda_path():
     """
     Return the path to the cupSODA executable.
 
     Looks for the cupSODA executable in a few hard-coded standard locations
-    or in a user-defined location set via ``set_cupSODA_path``.
+    or in a user-defined location set via ``set_cupsoda_path``.
 
     """
     global _cupsoda_path
@@ -74,13 +74,13 @@ def _get_cupSODA_path():
         else:
             raise Exception('Could not find cupSODA installed in one of the following locations:' + 
                             ''.join('\n    ' + x for x in bin_dirs) + '\nPlease put the executable ' +
-                            '(or a link to it) in one of these locations or set the path using set_cupSODA_path().')
+                            '(or a link to it) in one of these locations or set the path using set_cupsoda_path().')
             
     # Cache path for future use
     _cupsoda_path = bin_path
     return bin_path
 
-class CupSODASolver(Simulator):
+class CupsodaSolver(Simulator):
     """An interface for running cupSODA, a CUDA implementation of LSODA.
     Parameters
     ----------
@@ -171,7 +171,7 @@ class CupSODASolver(Simulator):
     """
     
     def __init__(self, model, tspan=None, cleanup=True, verbose=False, integrator='cupsoda', **integrator_options):
-        super(CupSODASolver, self).__init__(model, tspan, verbose)
+        super(CupsodaSolver, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
 
         # Set integrator options to defaults
@@ -205,7 +205,7 @@ class CupSODASolver(Simulator):
             Output directory.
         prefix : string, optional (default: model.name)
             Output files will be named "prefix_i", for i=[0,N_SIMS).
-        integrator_options : See CupSODASolver constructor.
+        integrator_options : See CupsodaSolver constructor.
         
         Notes
         -----
@@ -247,7 +247,7 @@ class CupSODASolver(Simulator):
             prefix = self.model.name
         
         # Path to cupSODA executable
-        bin_path = _get_cupSODA_path() 
+        bin_path = _get_cupsoda_path() 
     
         # Put the cupSODA input files in a directory within the output directory
         cupsoda_files = os.path.join(self.outdir,"__CUPSODA_FILES")
@@ -280,7 +280,8 @@ class CupSODASolver(Simulator):
         output = 0.01*len(param_values)
         output = int(output) if output > 1 else 1
         for i in range(len(param_values)):
-            if self.verbose and i % output == 0: print str(int(round(100.*i/len(param_values))))+"%"
+            if self.verbose and i % output == 0: 
+                print str(int(round(100.*i/len(param_values))))+"%"
             for j in range(len(self.model.reactions)):
                 rate = 1.0
                 for r in rate_args[j]:
@@ -290,6 +291,8 @@ class CupSODASolver(Simulator):
                     else: # FIXME: need to detect non-numbers and throw an error
                         rate *= float(x)
                 c_matrix[i][j] = rate
+        if self.verbose:
+            print "100%"
         
         # Create cupSODA input files
         self._create_input_files(cupsoda_files, c_matrix, y0)
@@ -497,14 +500,14 @@ class CupSODASolver(Simulator):
         self.y = np.array(self.y)
         
     def _calc_yobs_yexpr(self, param_values=None):
-        super(CupSODASolver, self)._calc_yobs_yexpr()
+        super(CupsodaSolver, self)._calc_yobs_yexpr()
         
     def get_yfull(self):
-        return super(CupSODASolver, self).get_yfull()
+        return super(CupsodaSolver, self).get_yfull()
 
 def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
 
-    sim = CupSODASolver(model, verbose=verbose, **integrator_options)
+    sim = CupsodaSolver(model, verbose=verbose, **integrator_options)
     sim.run(param_values, y0, tspan, outdir, prefix)
     if sim.options.get('load_ydata'):
         yfull = sim.get_yfull()
