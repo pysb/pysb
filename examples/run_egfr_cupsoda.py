@@ -19,17 +19,17 @@ for p in model.parameters:
         p.value = fittedparams[p.name]
 
 #####
-from pysb.integrate import odesolve
-observables = ['obsAKTPP', 'obsErbB1_P_CE', 'obsERKPP']
-x = odesolve(model, tspan, verbose=True)
-for i in range(len(observables)):
-    plt.plot(tspan, x[observables[i]], lw=3, label=observables[i], color=colors[i])
-#     plt.plot(exptimepts, expdata[:,i], '*', lw=0, ms=12, mew=0, mfc=colors[i])
-plt.legend(loc=0)
-plt.ylim(ymin=1)
-plt.ylabel('molecules')
-plt.xlabel('time')
-plt.show()
+# from pysb.integrate import odesolve
+# observables = ['obsAKTPP', 'obsErbB1_P_CE', 'obsERKPP']
+# x = odesolve(model, tspan, verbose=True)
+# for i in range(len(observables)):
+#     plt.plot(tspan, x[observables[i]], lw=3, label=observables[i], color=colors[i])
+# #     plt.plot(exptimepts, expdata[:,i], '*', lw=0, ms=12, mew=0, mfc=colors[i])
+# plt.legend(loc=0)
+# plt.ylim(ymin=1)
+# plt.ylabel('molecules')
+# plt.xlabel('time')
+# plt.show()
 # quit()
 #####
 
