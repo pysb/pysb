@@ -1,9 +1,10 @@
 from pysb.testing import *
 from pysb.core import *
 from pysb.macros import *
-from pysb.integrate import odesolve
+from pysb.integrate import odesolve, Solver
 from pylab import linspace, plot, xlabel, ylabel, show
 from sympy import sympify
+import numpy as np
 
 from pysb import *
 from pysb.integrate import *
@@ -13,32 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from unittest import TestCase
 
-@with_model
-def test_integrate_with_expression():
-
-    Monomer('s1')
-    Monomer('s9')
-    Monomer('s16')
-    Monomer('s20')
-
-    Parameter('ka',2e-5)
-    Parameter('ka20', 1e5)
-    
-    Initial(s9(), Parameter('s9_0', 10000))
-    
-    Observable('s1_obs', s1())
-    Observable('s9_obs', s9())
-    Observable('s16_obs', s16())
-    Observable('s20_obs', s20())
-    
-    Expression('keff', sympify("ka*ka20/(ka20+s9_obs)"))
-
-    Rule('R1', None >> s16(), ka)
-    Rule('R2', None >> s20(), ka)
-    Rule('R3', s16() + s20() >> s16() + s1(), keff)
-
-    time = linspace(0, 40, 100)
-    x = odesolve(model, time, verbose=True)
+from pysb.examples import robertson, earm_1_0
 
 
 class SolverTests(TestCase):
@@ -117,3 +93,60 @@ class SolverTests(TestCase):
         """ Test solver.run() using param_values dict with a non-numeric
                value """
         self.solver.run(param_values={'ksynthA': 'eggs'})
+
+
+@with_model
+def test_integrate_with_expression():
+
+    Monomer('s1')
+    Monomer('s9')
+    Monomer('s16')
+    Monomer('s20')
+
+    Parameter('ka',2e-5)
+    Parameter('ka20', 1e5)
+
+    Initial(s9(), Parameter('s9_0', 10000))
+
+    Observable('s1_obs', s1())
+    Observable('s9_obs', s9())
+    Observable('s16_obs', s16())
+    Observable('s20_obs', s20())
+
+    Expression('keff', sympify("ka*ka20/(ka20+s9_obs)"))
+
+    Rule('R1', None >> s16(), ka)
+    Rule('R2', None >> s20(), ka)
+    Rule('R3', s16() + s20() >> s16() + s1(), keff)
+
+    time = linspace(0, 40, 100)
+    x = odesolve(model, time, verbose=True)
+
+
+def test_robertson_integration():
+    t = np.linspace(0, 100)
+    # Run with or without inline
+    sol = Solver(robertson.model, t, use_analytic_jacobian=True)
+    sol.run()
+    assert sol.y.shape[0] == t.shape[0]
+
+    if Solver._use_inline:
+        # Also run without inline
+        Solver._use_inline = False
+        sol = Solver(robertson.model, t, use_analytic_jacobian=True)
+        sol.run()
+        assert sol.y.shape[0] == t.shape[0]
+        Solver._use_inline = True
+
+
+def test_earm_integration():
+    t = np.linspace(0, 1e3, 1000)
+    # Run with or without inline
+    sol = Solver(earm_1_0.model, t, use_analytic_jacobian=True)
+    sol.run()
+    if Solver._use_inline:
+        # Also run without inline
+        Solver._use_inline = False
+        sol = Solver(earm_1_0.model, t, use_analytic_jacobian=True)
+        sol.run()
+        Solver._use_inline = True

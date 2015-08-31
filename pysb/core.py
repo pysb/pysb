@@ -9,7 +9,16 @@ import weakref
 import copy
 import itertools
 import sympy
-
+try:
+    reload
+except NameError:
+    from imp import reload
+try:
+    basestring
+except NameError:
+    # Under Python 3, do not pretend that bytes are a valid string
+    basestring = str
+    long = int
 
 def Initial(*args):
     """Declare an initial condition (see Model.initial)."""
@@ -101,7 +110,7 @@ class SelfExporter(object):
             SelfExporter.default_model.add_component(obj)
 
         # load obj into target namespace under obj.name
-        if SelfExporter.target_globals.has_key(export_name):
+        if export_name in SelfExporter.target_globals:
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
 
@@ -240,12 +249,12 @@ class Monomer(Component):
         for site in sites:
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
-        sites_dup = [site for site in sites_seen.keys() if sites_seen[site] > 1]
+        sites_dup = [site for site, count in sites_seen.items() if count > 1]
         if sites_dup:
             raise Exception("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
-        unknown_sites = [site for site in site_states.keys() if not site in sites_seen]
+        unknown_sites = [site for site in site_states if not site in sites_seen]
         if unknown_sites:
             raise Exception("Unknown sites in site_states: " + str(unknown_sites))
         # ensure site_states values are all strings
@@ -322,7 +331,7 @@ class MonomerPattern(object):
 
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
-        unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites]
+        unknown_sites = [site for site in site_conditions if site not in monomer.sites]
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
@@ -429,7 +438,7 @@ class MonomerPattern(object):
         value += ', '.join([
                 k + '=' + repr(self.site_conditions[k])
                 for k in self.monomer.sites
-                if self.site_conditions.has_key(k)
+                if k in self.site_conditions
                 ])
         value += ')'
         if self.compartment is not None:
@@ -495,10 +504,11 @@ class ComplexPattern(object):
         #   so some sort of canonicalization of that numbering is necessary.
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
-        return \
-            self.compartment == other.compartment and \
-            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in self.monomer_patterns) == \
-            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in other.monomer_patterns)
+        return (self.compartment == other.compartment and
+                sorted((repr(mp.monomer), mp.site_conditions, mp.compartment)
+                       for mp in self.monomer_patterns) ==
+                sorted((repr(mp.monomer), mp.site_conditions, mp.compartment)
+                       for mp in other.monomer_patterns))
 
     def copy(self):
         """
@@ -509,8 +519,10 @@ class ComplexPattern(object):
         """
         return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
-    def __call__(self, **kwargs):
+    def __call__(self, conditions=None, **kwargs):
         """Build a new ComplexPattern with updated site conditions."""
+
+        kwargs = extract_site_conditions(conditions, **kwargs)
 
         # Ensure we don't have more than one of any Monomer in our patterns.
         mp_monomer = lambda mp: mp.monomer
@@ -1405,7 +1417,7 @@ class Model(object):
         """
         # FIXME I don't even want to think about the inefficiency of this, but at least it works
         try:
-            return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
+            return next((i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)))
         except StopIteration:
             return None
 
@@ -1624,16 +1636,25 @@ class ComponentDuplicateNameError(ValueError):
 
 
 def extract_site_conditions(conditions=None, **kwargs):
-    """Parse MonomerPattern site conditions."""
+    """Parse MonomerPattern/ComplexPattern site conditions."""
     # enforce site conditions as kwargs or a dict but not both
     if conditions and kwargs:
-        raise Exception("Site conditions may be specified as EITHER keyword arguments OR a single dict")
+        raise RedundantSiteConditionsError()
     # handle normal cases
     elif conditions:
         site_conditions = conditions.copy()
     else:
         site_conditions = kwargs
     return site_conditions
+
+
+class RedundantSiteConditionsError(ValueError):
+    """Both conditions dict and kwargs both passed to create pattern."""
+    def __init__(self):
+        ValueError.__init__(
+            self,
+            ("Site conditions may be specified as EITHER keyword arguments "
+             "OR a single dict"))
 
 
 # Some light infrastructure for defining symbols that act like "keywords", i.e.

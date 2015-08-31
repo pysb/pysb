@@ -72,7 +72,10 @@ import pysb.bng
 import sympy
 import textwrap
 from pysb.export import Exporter, pad
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 import re
 
 class PythonExporter(Exporter):

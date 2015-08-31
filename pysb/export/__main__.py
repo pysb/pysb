@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import re
@@ -10,7 +11,7 @@ def validate_argv(argv):
 
 def main(argv):
     if not validate_argv(argv):
-        print pysb.export.__doc__,
+        print(pysb.export.__doc__, end=' ')
         return 1
 
     model_filename = argv[1]
@@ -34,8 +35,8 @@ def main(argv):
         # which we use, there will be trouble (use the imp package and import
         # as some safe name?)
         model_module = __import__(model_name)
-    except StandardError as e:
-        print "Error in model script:\n"
+    except Exception as e:
+        print("Error in model script:\n")
         raise
     # grab the 'model' variable from the module
     try:
@@ -44,7 +45,7 @@ def main(argv):
         raise Exception("File '%s' isn't a model file" % model_filename)
 
     # Export the model
-    print pysb.export.export(model, format, model_module.__doc__)
+    print(pysb.export.export(model, format, model_module.__doc__))
 
     return 0
 

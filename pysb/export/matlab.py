@@ -163,7 +163,10 @@ import pysb
 import pysb.bng
 import sympy
 import re
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 from pysb.export import Exporter, pad
 
 class MatlabExporter(Exporter):

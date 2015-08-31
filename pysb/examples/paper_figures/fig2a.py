@@ -1,5 +1,6 @@
 """Elements for Figure 2A from the PySB publication"""
 
+from __future__ import print_function
 from pysb import *
 from pysb.bng import generate_network, generate_equations
 import re
@@ -42,18 +43,18 @@ generate_equations(model)
 num_rules = len(model.rules)
 num_odes = len(model.odes)
 
-print "BNGL Rules"
-print "=========="
+print("BNGL Rules")
+print("==========")
 for line in bng_code.split("\n"):
     for rule in model.rules:
         match = re.match(r'^\s*%s:\s*(.*)' % rule.name, line)
         if match:
-            print match.group(1)
-print
-print "ODEs"
-print "===="
+            print(match.group(1))
+print()
+print("ODEs")
+print("====")
 for species, ode in zip(model.species, model.odes):
-    print "%s: %s" % (species, ode)
+    print("%s: %s" % (species, ode))
 
 def test_fig2a():
     assert num_rules == 2, "number of rules not as expected"

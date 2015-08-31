@@ -1,4 +1,5 @@
-from ply import lex, yacc;
+from __future__ import print_function
+from ply import lex, yacc
 
 
 reserved_list = [
@@ -10,7 +11,7 @@ reserved_list = [
     'reaction_rules',
     'observables',
     ]
-reserved = dict([r, r.upper()] for r in reserved_list)
+reserved = dict((r, r.upper()) for r in reserved_list)
 
 tokens = [
     'ID',
@@ -29,7 +30,7 @@ tokens = [
     'LPAREN',
     'RPAREN',
     'NEWLINE',
-    ] + reserved.values()
+    ] + list(reserved.values())
 
 t_COMMA       = r','
 t_PLUS        = r'\+'
@@ -53,7 +54,7 @@ def t_FLOAT(t):
     try:
         t.value = float(t.value)    
     except ValueError:
-        print "Line %d: Number '%s' has some kind of problem (ValueError)!" % (t.lineno,t.value)
+        print("Line %d: Number '%s' has some kind of problem (ValueError)!" % (t.lineno,t.value))
         t.value = float("nan")
     return t
 
@@ -62,7 +63,7 @@ def t_INTEGER(t):
     try:
         t.value = int(t.value)    
     except ValueError:
-        print "Line %d: Number '%s' has some kind of problem (ValueError)!" % (t.lineno,t.value)
+        print("Line %d: Number '%s' has some kind of problem (ValueError)!" % (t.lineno,t.value))
         t.value = 0
     return t
 
@@ -80,7 +81,7 @@ t_ignore  = ' \t'
 
 # Error handling rule
 def t_error(t):
-    print "Illegal character '%s' on line %d" % (t.value[0], t.lineno)
+    print("Illegal character '%s' on line %d" % (t.value[0], t.lineno))
     t.lexer.skip(1)
 
 
@@ -101,7 +102,7 @@ def list_helper(p):
 def p_model(p):
     'model : block_list'
     p[0] = p[1]
-    print "model:", p[0]
+    print("model:", p[0])
 
 def p_block_list(p):
     '''block_list : block_list block
@@ -122,27 +123,27 @@ def p_block_empty(p):
 def p_parameter_block(p):
     'parameter_block : BEGIN PARAMETERS NEWLINE parameter_st_list END PARAMETERS NEWLINE'
     p[0] = p[4]
-    print "block:", p[2]
+    print("block:", p[2])
 
 def p_molecule_type_block(p):
     'molecule_type_block : BEGIN MOLECULE_TYPES NEWLINE END MOLECULE_TYPES NEWLINE'
     p[0] = p[2]
-    print "block:", p[2]
+    print("block:", p[2])
 
 def p_species_block(p):
     'species_block : BEGIN SPECIES NEWLINE END SPECIES NEWLINE'
     p[0] = p[2]
-    print "block:", p[2]
+    print("block:", p[2])
 
 def p_reaction_rules_block(p):
     'reaction_rules_block : BEGIN REACTION_RULES NEWLINE END REACTION_RULES NEWLINE'
     p[0] = p[2]
-    print "block:", p[2]
+    print("block:", p[2])
 
 def p_observables_block(p):
     'observables_block : BEGIN OBSERVABLES NEWLINE END OBSERVABLES NEWLINE'
     p[0] = p[2]
-    print "block:", p[2]
+    print("block:", p[2])
 
 def p_parameter_st_list(p):
     '''parameter_st_list : parameter_st_list parameter_st
@@ -164,52 +165,52 @@ def p_number(p):
 # def p_statement_list(p):
 #     '''statement_list : statement_list statement'''
 #     p[0] = p[1] + [p[2]]
-#     #print "statement_list:", p[0]
+#     #print("statement_list:", p[0])
 
 # def p_statement_list_trivial(p):
 #     '''statement_list : statement'''
 #     p[0] = [p[1]]
-#     #print "statement_list_trivial:", p[0]
+#     #print("statement_list_trivial:", p[0])
 
 # def p_statement_empty(p):
 #     'statement : NEWLINE'
-#     #print "statement_empty:", p[0]
+#     #print("statement_empty:", p[0])
 
 # def p_statement(p):
 #     'statement : rule NEWLINE'
 #     p[0] = p[1]
-#     #print "statement:", p[0]
+#     #print("statement:", p[0])
 
 # def p_rule(p):
 #     '''rule : irr_rule
 #             | rev_rule'''
 #     p[0] = p[1]
-#     #print "rule:", p[0]
+#     #print("rule:", p[0])
 
 # def p_irr_rule(p):
 #     'irr_rule : expression IRRARROW expression LPAREN FLOAT RPAREN'
-#     #print "irr_rule"
+#     #print("irr_rule")
 #     p[0] = RuleIrreversible(reactants=p[1], products=p[3], rate=p[5])
 
 # def p_rev_rule(p):
 #     'rev_rule : expression REVARROW expression LPAREN FLOAT COMMA FLOAT RPAREN'
-#     #print "rev_rule"
+#     #print("rev_rule")
 #     p[0] = RuleReversible(reactants=p[1], products=p[3], rates=[p[5], p[7]])
 
 # def p_expression_plus(p):
 #     'expression : expression PLUS expression'
 #     p[0] = p[1] + p[3]
-#     #print "expression_plus:", p[0]
+#     #print("expression_plus:", p[0])
 
 # def p_expression_species(p):
 #     'expression : SPECIES'
-#     #print "expression_species:", p[1]
+#     #print("expression_species:", p[1])
 #     p[0] = [Species(name=p[1])]
 
 # Error rule for syntax errors
 def p_error(p):
-    print "Syntax error in input:"
-    print p
+    print("Syntax error in input:")
+    print(p)
 
 precedence = (
     ('left', 'PLUS'),

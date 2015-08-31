@@ -1,3 +1,4 @@
+from __future__ import print_function as _
 import pysb.core
 from pysb.generator.bng import BngGenerator
 import os
@@ -7,8 +8,16 @@ import re
 import itertools
 import sympy
 import numpy
-from StringIO import StringIO
+from warnings import warn
 from pkg_resources import parse_version
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
+try:
+    from future_builtins import zip
+except ImportError:
+    pass
 
 # Cached value of BNG path
 _bng_path = None
@@ -87,50 +96,11 @@ begin actions
 generate_network({overwrite=>1})
 end actions
 """
-#generate_network({overwrite=>1, verbose=>1})
-
-def _parse_bng_outfile(out_filename):
-    """
-    Load and return data from a BNG .gdat or .cdat output file.
-
-    The format of the output files is an initial line of the form::
-
-        #   time   obs1    obs2    obs3  ...
-
-    The column headers are separated by a differing number of spaces (not tabs).
-    This function parses out the column names and then uses the numpy.loadtxt
-    method to load the output file into a numpy record array.
-
-    Parameters
-    ----------
-    out_filename : string
-        Path of file to load.
-
-    """
-
-    try:
-        out_file = open(out_filename, 'r')
-
-        line = out_file.readline().strip() # Get the first line
-        out_file.close()
-        line = line[2:]  # strip off opening '# '
-        raw_names = re.split('\s*', line)
-        column_names = [raw_name for raw_name in raw_names if not raw_name == '']
-
-        # Create the dtype argument for the numpy record array
-        dt = zip(column_names, ('float',)*len(column_names))
-
-        # Load the output file as a numpy record array, skip the name row
-        arr = numpy.loadtxt(out_filename, dtype=dt, skiprows=1)
-    
-    except Exception as e:
-        # FIXME special Exception/Error?
-        raise Exception("problem parsing BNG outfile: " + str(e)) 
-    
-    return arr
 
 
-def run_ssa(model, tspan, param_values=None, output_dir=os.getcwd(), output_file_basename=None, cleanup=True, verbose=False, n_runs=1, **additional_args):
+def run_ssa(model, tspan, param_values=None, output_dir=os.getcwd(),
+            output_file_basename=None, cleanup=True, verbose=False,
+            **additional_args):
     """
     Simulate a model with BNG's SSA simulator and return the trajectories.
 
@@ -168,21 +138,6 @@ begin actions
     simulate_ssa({%s})
 end actions
 """ % (ssa_args)
-
-    #####
-    '''
-    run_ssa_code =  "begin actions\n"
-    run_ssa_code += "\tgenerate_network({overwrite=>1})\n"
-    if n_runs == 1: 
-        run_ssa_code += "\tsimulate_ssa({%s})\n" % (ssa_args)
-    else:
-        for n in range(n_runs):
-            print n
-            run_ssa_code += "\tsimulate_ssa({%s, %s})\n" % (ssa_args, "suffix=>\""+str(n)+"\"")
-            run_ssa_code += "\tresetConcentrations()\n"
-    run_ssa_code += "end actions\n"
-    '''
-    #####
     
     if param_values is not None:
         if len(param_values) != len(model.parameters):
@@ -196,7 +151,7 @@ end actions
                                 os.getpid(), random.randint(0, 100000))
 
     if os.path.exists(output_file_basename + '.bngl'):
-        print "WARNING! File %s already exists!" % (output_file_basename + '.bngl')
+        warn("WARNING! File %s.bngl already exists!" % output_file_basename)
         output_file_basename += '_1'
 
     bng_filename = output_file_basename + '.bngl'
@@ -217,7 +172,7 @@ end actions
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if verbose:
             for line in iter(p.stdout.readline, b''):
-                print line,
+                print(line, end="")
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip("at line")+"\n"+p_err.rstrip())
@@ -238,12 +193,6 @@ end actions
         yfull_view[:, :len(names)] = cdat_arr 
         yfull_view[:, len(names):] = gdat_arr
 
-        #ssa_file = open(ssa_filename, 'r')
-        #output.write(ssa_file.read())
-        #net_file.close()
-        #if append_stdout:
-        #    output.write("#\n# BioNetGen execution log follows\n# ==========")
-        #    output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
     finally:
         # Parse NET file if it hasn't already been done
         if not model.species: 
@@ -262,6 +211,7 @@ end actions
         os.chdir(working_dir)
 
     return yfull
+
 
 def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     """
@@ -298,10 +248,11 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         bng_file.write(_generate_network_code)
         bng_file.close()
         p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              universal_newlines=True)
         if verbose:
             for line in iter(p.stdout.readline, b''):
-                print line,
+                print(line, end="")
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
@@ -356,21 +307,21 @@ def _parse_netfile(model, lines):
         else:
             new_reverse_convention = False
 
-        while 'begin species' not in lines.next():
+        while 'begin species' not in next(lines):
             pass
         model.species = []
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end species' in line: break
             _parse_species(model, line)
 
-        while 'begin reactions' not in lines.next():
+        while 'begin reactions' not in next(lines):
             pass
         model.odes = [sympy.numbers.Zero()] * len(model.species)
         global reaction_cache
         reaction_cache = {}
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end reactions' in line: break
             _parse_reaction(model, line)
         # fix up reactions whose reverse version we saw first
@@ -381,10 +332,10 @@ def _parse_netfile(model, lines):
             # now the 'reverse' value is no longer needed
             del r['reverse']
 
-        while 'begin groups' not in lines.next():
+        while 'begin groups' not in next(lines):
             pass
         while True:
-            line = lines.next()
+            line = next(lines)
             if 'end groups' in line: break
             _parse_group(model, line)
 
@@ -452,7 +403,6 @@ def _parse_reaction(model, line):
         (rule_name, is_reverse, unit_conversion) = re.match(
                     r'#(\w+)(?:\((reverse)\))?(?: unit_conversion=(.*))?\s*$', rule).groups()
     is_reverse = bool(is_reverse)
-#     r_names = ['s%d' % r for r in reactants]
     r_names = ['__s%d' % r for r in reactants]
     combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
     rule = model.rules[rule_name]

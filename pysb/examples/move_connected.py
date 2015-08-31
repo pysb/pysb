@@ -1,6 +1,7 @@
 """Demonstration of the move_connected keyword for Rules
 """
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -35,7 +36,8 @@ Parameter('ABx_0', 1)
 Initial(A(b=1)**X % B(a=1)**X, ABx_0)
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid.""")
