@@ -5,13 +5,10 @@ from pysb.integrate import odesolve, Solver
 from pylab import linspace, plot, xlabel, ylabel, show
 from sympy import sympify
 import numpy as np
-
 from pysb import *
-from pysb.integrate import *
 from pysb.bng import run_ssa
 from pysb.macros import synthesize
 import matplotlib.pyplot as plt
-import numpy as np
 from unittest import TestCase
 
 from pysb.examples import robertson, earm_1_0
@@ -44,12 +41,27 @@ class SolverTests(TestCase):
         Rule('AB_bind', A(a=None) + B(b=None) >> A(a=1) % B(b=1), kbindAB)
 
         time = np.linspace(0, 0.005, 101)
-        self.solver = Solver(model, time, verbose=False)
+        self.solver = Solver(model, time,verbose=False)
+        
+        self.solver_lsoda = Solver(model, time,integrator='lsoda',
+                                   verbose=False)
+        
+        self.solver_lsoda_jac = Solver(model, time,integrator='lsoda',
+                                       use_analytic_jacobian=True,
+                                       verbose=False)
 
     def test_solver_run(self):
         """ Test solver.run() with no arguments """
         self.solver.run()
-
+        
+    def test_lsoda_solver_run(self):
+        """ Test solver.run() with no arguments """
+        self.solver_lsoda.run()
+    
+    def test_lsoda_jac_solver_run(self):
+        """ Test solver.run() with no arguments """
+        self.solver_lsoda_jac.run()
+        
     @raises(NotImplementedError)
     def test_y0_as_dictionary_monomer_species(self):
         """ Test solver.run() with y0 as a dictionary containing monomers

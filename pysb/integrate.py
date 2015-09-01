@@ -2,6 +2,7 @@ import pysb.core
 import pysb.bng
 import numpy
 from scipy.integrate import ode
+import code
 try:
     from scipy.weave import inline as weave_inline
 except ImportError:
@@ -121,6 +122,7 @@ class Solver(object):
         self.verbose = verbose
         self.model = model
         self.tspan = tspan
+        self.integrator = integrator
         # We'll need to know if we're using the Jacobian when we get to run()
         self._use_analytic_jacobian = use_analytic_jacobian        
         # Generate the equations for the model
@@ -176,7 +178,10 @@ class Solver(object):
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
                 code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,'%s(\\1)' % macro, code_eqs)
-
+        
+        def wrap_rhs(t,y,p):
+            return rhs(y,t,p)
+        
         def rhs(t, y, p):
             ydot = self.ydot
             # note that the evaluated code sets ydot as a side effect
@@ -185,12 +190,13 @@ class Solver(object):
             else:
                 _exec(code_eqs_py, locals())
             return ydot
-
+        
         # JACOBIAN -----------------------------------------------
         # We'll keep the code for putting together the matrix in Sympy
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
         jac_fn = None
+        self.wrap_jacobian = jac_fn
         if self._use_analytic_jacobian:
             species_names = ['__s%d' % i for i in range(len(self.model.species))]
             jac_matrix = []
@@ -230,7 +236,9 @@ class Solver(object):
                     macro = arr_name.upper() + '1'
                     jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                       '%s(\\1)' % macro, jac_eqs)
-    
+            def wrap_jacobian(t,y,p):
+                return jacobian(y,t,p)
+            
             def jacobian(t, y, p):
                 jac = self.jac
                 # note that the evaluated code sets jac as a side effect
@@ -245,6 +253,7 @@ class Solver(object):
             # Initialization of matrix for storing the Jacobian
             self.jac = numpy.zeros((len(self.model.odes), len(self.model.species)))
             jac_fn = jacobian
+            self.wrap_jacobian = wrap_jacobian
 
         # build integrator options list from our defaults and any kwargs passed to this function
         options = {}
@@ -252,6 +261,7 @@ class Solver(object):
             options.update(default_integrator_options[integrator]) # default options
 
         options.update(integrator_options) # overwrite defaults
+        self.opts = options
         self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
         self.ydot = numpy.ndarray(len(self.model.species))
 
@@ -275,11 +285,16 @@ class Solver(object):
         self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
 
         # Integrator
-        if scipy.integrate._ode.find_integrator(integrator):
-            self.integrator = ode(rhs, jac=jac_fn).set_integrator(integrator,
-                                                          **options)
+        if integrator == 'lsoda':
+            
+            self.func = wrap_rhs
+            self.jac_fn = self.wrap_jacobian
         else:
-            raise Exception("Integrator type '" + integrator + "' not recognized.")
+            if scipy.integrate._ode.find_integrator(integrator):
+                self.integrator = ode(rhs, jac=jac_fn).set_integrator(integrator,
+                                                          **options)
+            else:
+                raise Exception("Integrator type '" + integrator + "' not recognized.")
 
 
     def run(self, param_values=None, y0=None):
@@ -350,31 +365,36 @@ class Solver(object):
                     raise IndexError("Species not found in model: %s" %
                                      repr(cp))
                 y0[si] = value
-
-        # perform the actual integration
-        self.integrator.set_initial_value(y0, self.tspan[0])
-        # Set parameter vectors for RHS func and Jacobian
-        self.integrator.set_f_params(param_values)
-        if self._use_analytic_jacobian:
-            self.integrator.set_jac_params(param_values)
-        self.y[0] = y0
-        i = 1
-        if self.verbose:
-            print "Integrating..."
-            print "\t"+"Time"
-            print "\t"+"----"
-            print "\t", self.integrator.t
-        while self.integrator.successful() and self.integrator.t < self.tspan[-1]:
-            self.y[i] = self.integrator.integrate(self.tspan[i]) # integration
-            i += 1
-            ######
-#             self.integrator.integrate(self.tspan[i],step=True)
-#             if self.integrator.t >= self.tspan[i]: i += 1
-            ######
-            if self.verbose: print "\t", self.integrator.t
-        if self.verbose: print "...Done."
-        if self.integrator.t < self.tspan[-1]:
-            self.y[i:, :] = 'nan'
+        if self.integrator == 'lsoda':
+            self.y = scipy.integrate.odeint(self.func,y0 ,self.tspan,
+                                            Dfun=self.jac_fn,
+                                            args=(param_values,),**self.opts)
+        else:
+  
+            # perform the actual integration
+            self.integrator.set_initial_value(y0, self.tspan[0])
+            # Set parameter vectors for RHS func and Jacobian
+            self.integrator.set_f_params(param_values)
+            if self._use_analytic_jacobian:
+                self.integrator.set_jac_params(param_values)
+            self.y[0] = y0
+            i = 1
+            if self.verbose:
+                print "Integrating..."
+                print "\t"+"Time"
+                print "\t"+"----"
+                print "\t", self.integrator.t
+            while self.integrator.successful() and self.integrator.t < self.tspan[-1]:
+                self.y[i] = self.integrator.integrate(self.tspan[i]) # integration
+                i += 1
+                ######
+    #             self.integrator.integrate(self.tspan[i],step=True)
+    #             if self.integrator.t >= self.tspan[i]: i += 1
+                ######
+                if self.verbose: print "\t", self.integrator.t
+            if self.verbose: print "...Done."
+            if self.integrator.t < self.tspan[-1]:
+                self.y[i:, :] = 'nan'
 
         # calculate observables
         for i, obs in enumerate(self.model.observables):
