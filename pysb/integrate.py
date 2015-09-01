@@ -122,7 +122,6 @@ class Solver(object):
         self.verbose = verbose
         self.model = model
         self.tspan = tspan
-        self.integrator = integrator
         # We'll need to know if we're using the Jacobian when we get to run()
         self._use_analytic_jacobian = use_analytic_jacobian        
         # Generate the equations for the model
@@ -286,7 +285,7 @@ class Solver(object):
 
         # Integrator
         if integrator == 'lsoda':
-            
+            self.integrator = integrator
             self.func = wrap_rhs
             self.jac_fn = self.wrap_jacobian
         else:
@@ -365,12 +364,12 @@ class Solver(object):
                     raise IndexError("Species not found in model: %s" %
                                      repr(cp))
                 y0[si] = value
+        
         if self.integrator == 'lsoda':
-            self.y = scipy.integrate.odeint(self.func,y0 ,self.tspan,
+            self.y = scipy.integrate.odeint(self.func, y0, self.tspan,
                                             Dfun=self.jac_fn,
-                                            args=(param_values,),**self.opts)
+                                            args=(param_values,), **self.opts)
         else:
-  
             # perform the actual integration
             self.integrator.set_initial_value(y0, self.tspan[0])
             # Set parameter vectors for RHS func and Jacobian
