@@ -396,16 +396,14 @@ def _parse_reaction(model, line):
     reactants = tuple(int(r) - 1 for r in reactants.split(','))
     products = tuple(int(p) - 1 for p in products.split(','))
     rate = rate.rsplit('*')
-    if new_reverse_convention: # BNG 2.2.6-stable or greater
-        (is_reverse, rule_name, unit_conversion) = re.match(
-                    r'#(_reverse_)?(\w+)(?: unit_conversion=(.*))?\s*$', rule).groups()
-    else:
-        (rule_name, is_reverse, unit_conversion) = re.match(
-                    r'#(\w+)(?:\((reverse)\))?(?: unit_conversion=(.*))?\s*$', rule).groups()
-    is_reverse = bool(is_reverse)
+    (rule_list, unit_conversion) = re.match(
+                    r'#([\w,\(\)]+)(?: unit_conversion=(.*))?\s*$', rule).groups()
+    rule_list = rule_list.split(',') # BNG lists all rules that generate a rxn
+    # Support new (BNG 2.2.6-stable or greater) and old BNG naming convention for reverse rules
+    rule_name, is_reverse = zip(*[re.subn('^_reverse_|\(reverse\)$', '', r) for r in rule_list])
+    is_reverse = tuple(bool(i) for i in is_reverse)
     r_names = ['__s%d' % r for r in reactants]
     combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
-    rule = model.rules[rule_name]
     reaction = {
         'reactants': reactants,
         'products': products,
@@ -414,8 +412,9 @@ def _parse_reaction(model, line):
         'reverse': is_reverse,
         }
     model.reactions.append(reaction)
-    key = (rule_name, reactants, products)
-    key_reverse = (rule_name, products, reactants)
+    # bidirectional reactions
+    key = (reactants, products)
+    key_reverse = (products, reactants)
     reaction_bd = reaction_cache.get(key_reverse)
     if reaction_bd is None:
         # make a copy of the reaction dict
@@ -427,6 +426,8 @@ def _parse_reaction(model, line):
     else:
         reaction_bd['reversible'] = True
         reaction_bd['rate'] -= combined_rate
+        reaction_bd['rule'] += tuple(r for r in rule_name if r not in reaction_bd['rule'])
+    # odes
     for p in products:
         model.odes[p] += combined_rate
     for r in reactants:
