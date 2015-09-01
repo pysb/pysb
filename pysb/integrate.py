@@ -119,23 +119,25 @@ class Solver(object):
                  verbose=False, **integrator_options):
 
         self.verbose = verbose
+        self.model = model
+        self.tspan = tspan
         # We'll need to know if we're using the Jacobian when we get to run()
-        self._use_analytic_jacobian = use_analytic_jacobian
+        self._use_analytic_jacobian = use_analytic_jacobian        
         # Generate the equations for the model
-        pysb.bng.generate_equations(model, cleanup, self.verbose)
+        pysb.bng.generate_equations(self.model, cleanup, self.verbose)
 
         def eqn_substitutions(eqns):
             """String substitutions on the sympy C code for the ODE RHS and
             Jacobian functions to use appropriate terms for variables and
             parameters."""
             # Substitute expanded parameter formulas for any named expressions
-            for e in model.expressions:
+            for e in self.model.expressions:
                 eqns = re.sub(r'\b(%s)\b' % e.name, '('+sympy.ccode(
                     e.expand_expr())+')', eqns)
 
             # Substitute sums of observable species that could've been added
             # by expressions
-            for obs in model.observables:
+            for obs in self.model.observables:
                 obs_string = ''
                 for i in range(len(obs.coefficients)):
                     if i > 0:
@@ -152,24 +154,24 @@ class Solver(object):
                        eqns)
 
             # Substitute 'p[i]' for any named parameters
-            for i, p in enumerate(model.parameters):
+            for i, p in enumerate(self.model.parameters):
                 eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
             return eqns
 
         # ODE RHS -----------------------------------------------
         # Prepare the string representations of the RHS equations
         code_eqs = '\n'.join(['ydot[%d] = %s;' %
-                              (i, sympy.ccode(model.odes[i]))
-                              for i in range(len(model.odes))])
+                              (i, sympy.ccode(self.model.odes[i]))
+                              for i in range(len(self.model.odes))])
         code_eqs = eqn_substitutions(code_eqs)
-
+        
         Solver._test_inline()
 
         # If we can't use weave.inline to run the C code, compile it as Python code instead for use with
         # exec. Note: C code with array indexing, basic math operations, and pow() just happens to also
         # be valid Python.  If the equations ever have more complex things in them, this might fail.
         if not Solver._use_inline:
-            code_eqs_py = compile(code_eqs, '<%s odes>' % model.name, 'exec')
+            code_eqs_py = compile(code_eqs, '<%s odes>' % self.model.name, 'exec')
         else:
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
@@ -188,53 +190,61 @@ class Solver(object):
         # We'll keep the code for putting together the matrix in Sympy
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
-        species_names = ['s%d' % i for i in range(len(model.species))]
-        jac_matrix = []
-        # Rows of jac_matrix are by equation f_i:
-        # [[df1/x1, df1/x2, ..., df1/xn],
-        #  [   ...                     ],
-        #  [dfn/x1, dfn/x2, ..., dfn/xn],
-        for eqn in model.odes:
-            # Derivatives for f_i...
-            jac_row = []
-            for species_name in species_names:
-                # ... with respect to s_j
-                d = sympy.diff(eqn, species_name)
-                jac_row.append(d)
-            jac_matrix.append(jac_row)
-
-        # Next, prepare the stringified Jacobian equations
-        jac_eqs_list = []
-        for i, row in enumerate(jac_matrix):
-            for j, entry in enumerate(row):
-                # Skip zero entries in the Jacobian
-                if entry == 0:
-                    continue
-                jac_eq_str = 'jac[%d, %d] = %s;' % (i, j, sympy.ccode(entry))
-                jac_eqs_list.append(jac_eq_str)
-        jac_eqs = eqn_substitutions('\n'.join(jac_eqs_list))
-
-        # Try to inline the Jacobian if possible (as above for RHS)
-        if not Solver._use_inline:
-            jac_eqs_py = compile(jac_eqs, '<%s jacobian>' % model.name, 'exec')
-        else:
-            # Substitute array refs with calls to the JAC1 macro for inline
-            jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
-                             r'JAC2(\1, \2)', jac_eqs)
-            # Substitute calls to the Y1 and P1 macros
-            for arr_name in ('y', 'p'):
-                macro = arr_name.upper() + '1'
-                jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
-                                  '%s(\\1)' % macro, jac_eqs)
-
-        def jacobian(t, y, p):
-            jac = self.jac
-            # note that the evaluated code sets jac as a side effect
-            if Solver._use_inline:
-                weave_inline(jac_eqs, ['jac', 't', 'y', 'p']);
+        jac_fn = None
+        if self._use_analytic_jacobian:
+            species_names = ['__s%d' % i for i in range(len(self.model.species))]
+            jac_matrix = []
+            # Rows of jac_matrix are by equation f_i:
+            # [[df1/x1, df1/x2, ..., df1/xn],
+            #  [   ...                     ],
+            #  [dfn/x1, dfn/x2, ..., dfn/xn],
+            for eqn in self.model.odes:
+                # Derivatives for f_i...
+                jac_row = []
+                for species_name in species_names:
+                    # ... with respect to s_j
+                    d = sympy.diff(eqn, species_name)
+                    jac_row.append(d)
+                jac_matrix.append(jac_row)
+    
+            # Next, prepare the stringified Jacobian equations
+            jac_eqs_list = []
+            for i, row in enumerate(jac_matrix):
+                for j, entry in enumerate(row):
+                    # Skip zero entries in the Jacobian
+                    if entry == 0:
+                        continue
+                    jac_eq_str = 'jac[%d, %d] = %s;' % (i, j, sympy.ccode(entry))
+                    jac_eqs_list.append(jac_eq_str)
+            jac_eqs = eqn_substitutions('\n'.join(jac_eqs_list))
+            
+            # Try to inline the Jacobian if possible (as above for RHS)
+            if not Solver._use_inline:
+                jac_eqs_py = compile(jac_eqs, '<%s jacobian>' % self.model.name, 'exec')
             else:
-                _exec(jac_eqs_py, locals())
-            return jac
+                # Substitute array refs with calls to the JAC1 macro for inline
+                jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
+                                 r'JAC2(\1, \2)', jac_eqs)
+                # Substitute calls to the Y1 and P1 macros
+                for arr_name in ('y', 'p'):
+                    macro = arr_name.upper() + '1'
+                    jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
+                                      '%s(\\1)' % macro, jac_eqs)
+    
+            def jacobian(t, y, p):
+                jac = self.jac
+                # note that the evaluated code sets jac as a side effect
+                if Solver._use_inline:
+                    weave_inline(jac_eqs, ['jac', 't', 'y', 'p']);
+                else:
+                    _exec(jac_eqs_py, locals())
+                return jac
+            
+            # Initialize the jacobian argument to None if we're not going to use it
+            # jac = self.jac as defined in jacobian() earlier
+            # Initialization of matrix for storing the Jacobian
+            self.jac = numpy.zeros((len(self.model.odes), len(self.model.species)))
+            jac_fn = jacobian
 
         # build integrator options list from our defaults and any kwargs passed to this function
         options = {}
@@ -242,12 +252,9 @@ class Solver(object):
             options.update(default_integrator_options[integrator]) # default options
 
         options.update(integrator_options) # overwrite defaults
-        self.model = model
-        self.tspan = tspan
         self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
         self.ydot = numpy.ndarray(len(self.model.species))
-        # Initialization of matrix for storing the Jacobian
-        self.jac = numpy.zeros((len(self.model.odes), len(self.model.species)))
+
         # Initialize record array for observable timecourses
         if len(self.model.observables):
             self.yobs = numpy.ndarray(len(self.tspan),
@@ -267,12 +274,9 @@ class Solver(object):
             self.yexpr = numpy.ndarray((len(self.tspan), 0))
         self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
 
-        # Initialize the jacobian argument to None if we're not going to use it
-        # jac = self.jac as defined in jacobian() earlier
-        jac = jacobian if self._use_analytic_jacobian else None
         # Integrator
         if scipy.integrate._ode.find_integrator(integrator):
-            self.integrator = ode(rhs, jac=jac).set_integrator(integrator,
+            self.integrator = ode(rhs, jac=jac_fn).set_integrator(integrator,
                                                           **options)
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
