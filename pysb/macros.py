@@ -43,7 +43,7 @@ import itertools
 
 __all__ = ['equilibrate',
            'bind', 'bind_table',
-           'catalyze', 'catalyze_state',
+           'catalyze', 'catalyze_state', 'catalyze_complex',
            'catalyze_one_step', 'catalyze_one_step_reversible',
            'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport', 'pore_bind', 'assemble_chain_sequential_base',
@@ -377,16 +377,16 @@ def bind_name_func(rule_expression):
     # Build the label components
     return '_'.join(_complex_pattern_label(cp) for cp in react_cps)
 
+
 def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
     """
     Generate the reversible binding reaction S1 + S2 <> S1:S2, with optional complexes attached to either
     S1 (C1:S1 + S2 <> C1:S1:S2), S2 (S1 + C2:S2 <> C2:S2:S1), or both (C1:S1 + C2:S2 <> C1:S1:S2:C2).
-
     Parameters
     ----------
     s1, s2 : Monomer, MonomerPattern, or ComplexPattern
         Monomers or complexes participating in the binding reaction.
-    site1, site2 : string 
+    site1, site2 : string
         The names of the sites on s1 and s2 used for binding.
     klist : list of 2 Parameters or list of 2 numbers
         Forward and reverse rate constants (in that order). If Parameters are
@@ -395,28 +395,23 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         names based on the names and states of S1 and S2 and these parameters
         will be included at the end of the returned component list.
     m1, m2 : Monomer or MonomerPattern
-        If either binding site is present in multiple monomers
+        If s1 or s2 binding site is present in multiple monomers
         within a complex, the specific monomer desired for binding must be specified.
-
     Returns
     -------
     components : ComponentSet
         The generated components. Contains the bidirectional binding Rule
         and optionally two Parameters if klist was given as numbers.
-
     Examples
     --------
     Binding between A:B and C:D::
-
         Model()
         Monomer('A', ['a', 'b'])
         Monomer('B', ['c', 'd'])
         Monomer('C', ['e', 'f'])
         Monomer('D', ['g', 'h'])
         bind_complex(A(a=1) % B(c=1), 'b', C(e=2) % D(g=2), 'h', [1e-4, 1e-1])
-
     Execution::
-
         >>> Model() # doctest:+ELLIPSIS
         <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
         >>> Monomer('A', ['a', 'b'])
@@ -427,75 +422,98 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         Monomer('C', ['e', 'f'])
         >>> Monomer('D', ['g', 'h'])
         Monomer('D', ['g', 'h'])
-        >>> bind(A, 'a', B, 'c', [1e4, 1e-1])
+        >>> bind(A, 'a', B, 'c', [1e4, 1e-1]) #doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('bind_A_B', A(a=None) + B(c=None) <> A(a=1) % B(c=1), bind_A_B_kf, bind_A_B_kr),
-         Parameter('bind_A_B_kf', 10000.0),
-         Parameter('bind_A_B_kr', 0.1),
-         ])
-        >>> bind(C, 'e', D, 'g', [1e4, 1e-1])
+        Rule('bind_A_B',
+        A(a=None) + B(c=None) <> A(a=1) % B(c=1),
+        bind_A_B_kf, bind_A_B_kr),
+        Parameter('bind_A_B_kf', 10000.0),
+        Parameter('bind_A_B_kr', 0.1),
+        ])
+        >>> bind(C, 'e', D, 'g', [1e4, 1e-1]) #doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('bind_C_D', C(e=None) + D(g=None) <> C(e=1) % D(g=1), bind_C_D_kf, bind_C_D_kr),
-         Parameter('bind_C_D_kf', 10000.0),
-         Parameter('bind_C_D_kr', 0.1),
-         ])
-        >>> bind_complex(A(a=1) % B(c=1), 'b', C(e=2) % D(g=2), 'h', [1e-4, 1e-1])
+        Rule('bind_C_D',
+        C(e=None) + D(g=None) <> C(e=1) % D(g=1),
+        bind_C_D_kf, bind_C_D_kr),
+        Parameter('bind_C_D_kf', 10000.0),
+        Parameter('bind_C_D_kr', 0.1),
+        ])
+        >>> bind_complex(A(a=1) % B(c=1), 'b', C(e=2) % D(g=2), 'h', [1e-4, 1e-1]) #doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('bind_AB_DC', A(a=1, b=None) % B(c=1) + D(g=3, h=None) % C(e=3) <> A(a=1, b=50) % B(c=1) % D(g=3, h=50) % C(e=3), bind_AB_DC_kf, bind_AB_DC_kr),
-         Parameter('bind_AB_DC_kf', 0.0001),
-         Parameter('bind_AB_DC_kr', 0.1),
-         ])
+        Rule('bind_AB_DC',
+        A(a=1, b=None) % B(c=1) + D(g=3, h=None) % C(e=3) <> A(a=1, b=50) % B(c=1) % D(g=3, h=50) % C(e=3),
+        bind_AB_DC_kf, bind_AB_DC_kr),
+        Parameter('bind_AB_DC_kf', 0.0001),
+        Parameter('bind_AB_DC_kr', 0.1),
+        ])
     """
     if isinstance(m1, Monomer):
         m1 = m1()
     if isinstance(m2, Monomer):
         m2 = m2()
-    #Define some functions for checking complex sites, building complexes up from monomers, and creating rules.    
+    #Define some functions for checking complex sites, building complexes up from monomers, and creating rules.
     def comp_mono_func(s1, site1, s2, site2, m1):
         _verify_sites(s2, site2)
-        _verify_sites_complex(s1, site1)
-        #Retrieve a dictionary specifiying the MonomerPattern within the complex that contains the given binding site.
-        specsitesdict = _verify_sites_complex(s1, site1)
-        
-        def check_sites_comp_build(s1, site1, m1, specsitesdict):
-            #Return error if binding site exists on multiple monomers and a monomer for binding (m1) hasn't been specified.
-            if len(specsitesdict) > 1 and m1==None:
-                raise ValueError("Binding site '%s' present in more than one monomer in complex '%s'.  Specify variable m1 or m2, the monomer used for binding within the complex." % (site1, s1))
-            if not s1.is_concrete:
-                raise ValueError("Complex '%s' must be concrete." % (s1))
-            #If the given binding site is only present in one monomer in the complex:
-            if m1==None:
-                #Build up ComplexPattern for use in rule (with state of given binding site specified).
-                s1complexpatub = specsitesdict.keys()[0]({site1:None})
-                s1complexpatb = specsitesdict.keys()[0]({site1:50})
-                for monomer in s1.monomer_patterns:
-                    if monomer not in specsitesdict.keys():
-                        s1complexpatub %= monomer
-                        s1complexpatb %= monomer
-            
-            #If the binding site is present on more than one monomer in the complex, the monomer must be specified by the user.  Use specified m1 to build ComplexPattern.
-            else:
-                #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
-                for mon in s1.monomer_patterns:
-                    if mon.monomer.name == m1.monomer.name:
+        #Retrieve a dictionary specifying the MonomerPattern within the complex that contains the given binding site.
+        specsites = list(_verify_sites_complex(s1, site1))
+        s1complexpatub, s1complexpatb = check_sites_comp_build(s1, site1, m1, specsites)
+        return create_rule(s1complexpatub, s1complexpatb, s2({site2:None}), s2({site2: 50}))
+
+    def check_sites_comp_build(s1, site1, m1, specsites):
+        #Return error if binding site exists on multiple monomers and a monomer for binding (m1) hasn't been specified.
+        if len(specsites) > 1 and m1==None:
+            raise ValueError("Binding site '%s' present in more than one monomer in complex '%s'.  Specify variable m1, the monomer used for binding within the complex." % (site1, s1))
+        if not s1.is_concrete:
+            raise ValueError("Complex '%s' must be concrete." % (s1))
+        #If the given binding site is only present in one monomer in the complex:
+        if m1==None:
+            #Build up ComplexPattern for use in rule (with state of given binding site specified).
+            s1complexpatub = specsites[0]({site1:None})
+            s1complexpatb = specsites[0]({site1:50})
+            for monomer in s1.monomer_patterns:
+                if monomer not in specsites:
+                    s1complexpatub %= monomer
+                    s1complexpatb %= monomer
+
+        #If the binding site is present on more than one monomer in the complex, the monomer must be specified by the user.  Use specified m1 to build ComplexPattern.
+        else:
+            #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
+            i = 0
+            identical_monomers = []
+            other_monomers = []
+            for mon in s1.monomer_patterns:
+                #Only change the binding site for the first monomer that matches.  Keep any others unchanged to add to final complex that is returned.
+                if mon.monomer.name == m1.monomer.name and mon.site_conditions==m1.site_conditions:
+                    i += 1
+                    if i == 1:
                         s1complexpatub = mon({site1:None})
                         s1complexpatb = mon({site1:50})
-                #Build up ComplexPattern for use in rule (with state of given binding site on m1 specified).
-                for mon in s1.monomer_patterns:
-                    if mon.monomer.name != m1.monomer.name:
-                        s1complexpatub %= mon
-                        s1complexpatb %= mon
-            return (s1complexpatub, s1complexpatb)
-        #Create rule.
-        def create_rule(s1ub, s1b, s2ub, s2b):
-            return _macro_rule('bind',
-                                s1ub + s2ub <>
-                                s1b % s2b,
-                                klist, ['kf', 'kr'], name_func=bind_name_func)
-        
-        (s1complexpatub, s1complexpatb) = check_sites_comp_build(s1, site1, m1, specsitesdict)
-        return create_rule(s1complexpatub, s1complexpatb, s2({site2:None}), s2({site2: 50})) 
-        
+                    else:
+                        identical_monomers.append(mon)
+                else:
+                    other_monomers.append(mon)
+
+            #Throw an error if no monomer pattern in the complex matched the pattern given for m1
+            if i == 0:
+                raise ValueError("No monomer pattern in complex '%s' matches the pattern given for m1, '%s'." % (s1, m1))
+
+            #Build up ComplexPattern for use in rule (with state of given binding site on m1 specified).
+            for mon in other_monomers:
+                    s1complexpatub %= mon
+                    s1complexpatb %= mon
+            if identical_monomers:
+                for i in range(len(identical_monomers)):
+                    s1complexpatub %= identical_monomers[i]
+                    s1complexpatb %= identical_monomers[i]
+
+        return s1complexpatub, s1complexpatb
+    #Create rules.
+    def create_rule(s1ub, s1b, s2ub, s2b):
+        return _macro_rule('bind',
+                            s1ub + s2ub <>
+                            s1b % s2b,
+                            klist, ['kf', 'kr'], name_func=bind_name_func)
+
     #If no complexes given, revert to normal bind macro.
     if (isinstance(s1, MonomerPattern) or isinstance(s1, Monomer)) and (isinstance(s2, MonomerPattern) or isinstance(s2, Monomer)):
         _verify_sites(s1, site1)
@@ -507,11 +525,9 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
         return comp_mono_func(s1, site1, s2, site2, m1)
     elif (isinstance(s1, MonomerPattern) or isinstance(s1, Monomer)) and isinstance(s2, ComplexPattern):
         return comp_mono_func(s2, site2, s1, site1, m2)
-     
-    #Create a rule if both complexes are present.
+
+    #Create rule when both s1 and s2 are complexes.
     else:
-        _verify_sites_complex(s1, site1)
-        _verify_sites_complex(s2, site2)
         #Retrieve a dictionary specifiying the MonomerPattern within
         #the complex that contains the given binding site. Convert to list.
         specsites1 = list(_verify_sites_complex(s1, site1))
@@ -532,54 +548,23 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
                 if isinstance(stateint, int):
                     if stateint > maxint:
                         maxint = stateint
+        match = 'N'
         for monomer in s2.monomer_patterns:
+            if m2 != None:
+                if m2.site_conditions == monomer.site_conditions and m2.monomer.name == monomer.monomer.name:
+                    match = 'Y'
             for site, stateint in monomer.site_conditions.items():
                 if isinstance(stateint, int):
                     monomer.site_conditions[site] += maxint
-        #If the given binding site is only present in one monomer in the complex:
-        if m1==None:
-          #Build up ComplexPattern for use in rule (with state of given binding site specified).
-            s1complexpatub = specsites1[0]({site1:None})
-            s1complexpatb = specsites1[0]({site1:50})
-            for monomer in s1.monomer_patterns:
-                if monomer not in specsites1:
-                    s1complexpatub %= monomer
-                    s1complexpatb %= monomer
-        else:
-            #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
-            for mon in s1.monomer_patterns:
-                if mon.monomer.name == m1.monomer.name:
-                    s1complexpatub = mon({site1:None})
-                    s1complexpatb = mon({site1:50})
-            #Build up ComplexPattern for use in rule (with state of given binding site on m1 specified).
-            for mon in s1.monomer_patterns:
-                if mon.monomer.name != m1.monomer.name:
-                    s1complexpatub %= mon
-                    s1complexpatb %= mon
-        if m2==None:
-          #Build up ComplexPattern for use in rule (with state of given binding site specified).
-            s2complexpatub = specsites2[0]({site2:None})
-            s2complexpatb = specsites2[0]({site2:50})
-            for monomer in s2.monomer_patterns:
-                if monomer not in specsites2:
-                    s2complexpatub %= monomer
-                    s2complexpatb %= monomer
-        #If the binding site is present on more than one monomer in the complex, the monomer must be specified by the user.  Use specified m2 to build ComplexPattern.
-        else:
-            #Make sure binding states of MonomerPattern m2 match those of the monomer within the ComplexPattern s2 (ComplexPattern monomer takes precedence if not).
-            for mon in s2.monomer_patterns:
-                if mon.monomer.name == m2.monomer.name:
-                    s2complexpatub = mon({site2:None})
-                    s2complexpatb = mon({site2:50})
-            #Build up ComplexPattern for use in rule (with state of given binding site on m2 specified).
-            for mon in s2.monomer_patterns:
-                if mon.monomer.name != m2.monomer.name:
-                    s2complexpatub %= mon
-                    s2complexpatb %= mon
-        return _macro_rule('bind',
-                           s1complexpatub + s2complexpatub <>
-                           s1complexpatb % s2complexpatb,
-                           klist, ['kf', 'kr'], name_func=bind_name_func)
+            if match == 'Y':
+                m2.site_conditions = monomer.site_conditions
+            match = 'N'
+
+        #Actually create rules
+        s1complexpatub, s1complexpatb = check_sites_comp_build(s1, site1, m1, specsites1)
+        s2complexpatub, s2complexpatb = check_sites_comp_build(s2, site2, m2, specsites2)
+        return create_rule(s1complexpatub, s1complexpatb, s2complexpatub, s2complexpatb)
+
 
 def bind_table(bindtable, row_site, col_site, kf=None):
     """
@@ -699,12 +684,13 @@ def bind_table(bindtable, row_site, col_site, kf=None):
 
     return components
 
+
 def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None):
     """
     Generate a table of reversible binding reactions when either the row or column species (or both) have a complex bound to them.
 
-    Given two lists of species R and C (each with an optional attached complex),
-    calls the `bind` macro on each pairwise
+    Given two lists of species R and C (which can be complexes or monomers),
+    calls the `bind_complex` macro on each pairwise
     combination (R[i], C[j]). The species lists and the parameter values are
     passed as a list of lists (i.e. a table) with elements of R passed as the
     "row headers", elements of C as the "column headers", and forward / reverse
@@ -737,9 +723,12 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
     row_site, col_site : string 
         The names of the sites on the elements of R and C, respectively, used
         for binding.
-    m1, m2 : Monomer or MonomerPattern
-        If either binding site is present in multiple monomers
-        within a complex, the specific monomer desired for binding must be specified.
+    m1 : Monomer or MonomerPattern, optional
+        Monomer in row complex for binding.  Must be specified if there are multiple monomers 
+        that have the row_site within a complex.
+    m2 : Monomer or MonomerPattern, optional
+        Monomer in column complex for binding.  Must be specified if there are multiple monomers 
+        that have the col_site within a complex.
     kf : Parameter or number, optional
         If the "cells" in bindtable are given as single kd values, this is the
         shared kf used to calculate the kr values.
@@ -752,18 +741,19 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
 
     Examples
     --------
-    Binding table for two species types (R and C, each with an attached complex), each with two members::
+    Binding table for two species types (R and C, which can be complexes or monomers)::
 
         Model()
         Monomer('R1', ['x', 'c1'])
         Monomer('R2', ['x', 'c1'])
         Monomer('C1', ['y', 'c2'])
         Monomer('C2', ['y', 'c2'])
-        bind(C1, 'y', C2, 'y', [1e4, 1e-1])
-        bind(R1, 'c1', R2, 'x', [1e3, 1e-1])
-        bind_table_complex([[C1(y=1) % C2(y=1),           C2],
-                           [R1,  (1e-4, 1e-1),  (2e-4, 2e-1)],
-                           [R1(c1=1) % R2(x=1),  (3e-4, 3e-1), None]], 'x', 'c2', m1=R1, m2=C2)
+        bind(C1(y=None), 'c2', C1(y=None), 'c2', (1e-3, 1e-2))
+        bind(R1(x=None), 'c1', R2(x=None), 'c1', (1e-3, 1e-2))
+        bind_table_complex([[              C1(c2=1, y=None)%C1(c2=1),            C2],
+                           [R1()%R2(),  (1e-4, 1e-1),  (2e-4, 2e-1)],
+                           [R2,     (3e-4, 3e-1),         None]],
+                           'x', 'y', m1=R1(), m2=C1(y=None, c2=1))
 
     Execution:: 
 
@@ -777,31 +767,32 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
         Monomer('C1', ['y', 'c2'])
         >>> Monomer('C2', ['y', 'c2'])
         Monomer('C2', ['y', 'c2'])
-        >>> bind(C1, 'y', C2, 'y', [1e4, 1e-1])
+        >>> bind(C1(y=None), 'c2', C1(y=None), 'c2', (1e-3, 1e-2)) #doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('bind_C1_C2', C1(y=None) + C2(y=None) <> C1(y=1) % C2(y=1), bind_C1_C2_kf, bind_C1_C2_kr),
-         Parameter('bind_C1_C2_kf', 10000.0),
-         Parameter('bind_C1_C2_kr', 0.1),
+         Rule('bind_C1_C1', C1(y=None, c2=None) + C1(y=None, c2=None) <> C1(y=None, c2=1) % C1(y=None, c2=1), bind_C1_C1_kf, bind_C1_C1_kr),
+         Parameter('bind_C1_C1_kf', 0.001),
+         Parameter('bind_C1_C1_kr', 0.01),
          ])
-        >>> bind(R1, 'c1', R2, 'x', [1e3, 1e-1])
+        >>> bind(R1(x=None), 'c1', R2(x=None), 'c1', (1e-3, 1e-2)) #doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('bind_R1_R2', R1(c1=None) + R2(x=None) <> R1(c1=1) % R2(x=1), bind_R1_R2_kf, bind_R1_R2_kr),
-         Parameter('bind_R1_R2_kf', 1000.0),
-         Parameter('bind_R1_R2_kr', 0.1),
+         Rule('bind_R1_R2', R1(x=None, c1=None) + R2(x=None, c1=None) <> R1(x=None, c1=1) % R2(x=None, c1=1), bind_R1_R2_kf, bind_R1_R2_kr),
+         Parameter('bind_R1_R2_kf', 0.001),
+         Parameter('bind_R1_R2_kr', 0.01),
          ])
-        >>> bind_table_complex([[                     C1(y=1) % C2(y=1), C2],
-        ...                     [R1,                  (1e-4, 1e-1),      (2e-4, 2e-1)],
-        ...                     [R1(c1=1) % R2(x=1),  (3e-4, 3e-1),      None]], 'x', 'c2', m1=R1, m2=C2)
+        >>> bind_table_complex([[               C1(c2=1, y=None)%C1(c2=1),           C2],
+        ...                      [R1()%R2(),      (1e-4, 1e-1),                        (2e-4, 2e-1)],
+        ...                       [R2,             (3e-4, 3e-1),                        None]],
+        ...                       'x', 'y', m1=R1(), m2=C1(y=None, c2=1)) #doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('bind_C2C1_R1', C2(y=1, c2=None) % C1(y=2) + R1(x=None) <> C2(y=1, c2=50) % C1(y=2) % R1(x=50), bind_C2C1_R1_kf, bind_C2C1_R1_kr),
-         Parameter('bind_C2C1_R1_kf', 0.0001),
-         Parameter('bind_C2C1_R1_kr', 0.1),
-         Rule('bind_R1_C2', R1(x=None) + C2(c2=None) <> R1(x=1) % C2(c2=1), bind_R1_C2_kf, bind_R1_C2_kr),
-         Parameter('bind_R1_C2_kf', 0.0002),
-         Parameter('bind_R1_C2_kr', 0.2),
-         Rule('bind_R1R2_C2C1', R1(x=None, c1=1) % R2(x=1) + C2(y=2, c2=None) % C1(y=2) <> R1(x=50, c1=1) % R2(x=1) % C2(y=2, c2=50) % C1(y=2), bind_R1R2_C2C1_kf, bind_R1R2_C2C1_kr),
-         Parameter('bind_R1R2_C2C1_kf', 0.0003),
-         Parameter('bind_R1R2_C2C1_kr', 0.3),
+        Rule('bind_R1R2_C1C1', R1(x=None) % R2() + C1(y=None, c2=1) % C1(c2=1) <> R1(x=50) % R2() % C1(y=50, c2=1) % C1(c2=1), bind_R1R2_C1C1_kf, bind_R1R2_C1C1_kr),
+        Parameter('bind_R1R2_C1C1_kf', 0.0001),
+        Parameter('bind_R1R2_C1C1_kr', 0.1),
+        Rule('bind_R1R2_C2', R1(x=None) % R2() + C2(y=None) <> R1(x=50) % R2() % C2(y=50), bind_R1R2_C2_kf, bind_R1R2_C2_kr),
+        Parameter('bind_R1R2_C2_kf', 0.0002),
+        Parameter('bind_R1R2_C2_kr', 0.2),
+        Rule('bind_C1C1_R2', C1(y=None, c2=1) % C1(c2=1) + R2(x=None) <> C1(y=50, c2=1) % C1(c2=1) % R2(x=50), bind_C1C1_R2_kf, bind_C1C1_R2_kr),
+        Parameter('bind_C1C1_R2_kf', 0.0003),
+        Parameter('bind_C1C1_R2_kr', 0.3),
          ])
 
     """
@@ -825,7 +816,7 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
                 if isinstance(klist, numbers.Real):
                     kd = klist
                     klist = (kf, kd*kf)
-                components |= bind_complex(s_row, row_site, s_col, col_site, klist, m1=m1, m2=m2)
+                components |= bind_complex(s_row, row_site, s_col, col_site, klist, m1, m2)
     return components
 
 # Catalysis
@@ -953,6 +944,129 @@ def catalyze(enzyme, e_site, substrate, s_site, product, klist):
                               es_complex >> enzyme_free + product,
                               [klist[2]], ['kc'])
 
+    return components
+
+def catalyze_complex(enzyme, e_site, substrate, s_site, product, klist, m1=None, m2=None):
+    """ Generate the two-step catalytic reaction E + S <> E:S >> E + P, while allowing complexes to serve as enzyme, substrate and/or product.
+        
+        E:S1 + S:S2 <> E:S1:S:S2 >> E:S1 + P:S2
+        
+        Parameters
+        ----------
+        enzyme, substrate, product : Monomer, MonomerPattern, or ComplexPattern
+        Monomers or complexes participating in the binding reaction.
+        
+        e_site, s_site : string
+        The names of the sites on `enzyme` and `substrate` (respectively) where
+        they bind each other to form the E:S complex.
+        
+        klist : list of 3 Parameters or list of 3 numbers
+        Forward, reverse and catalytic rate constants (in that order). If
+        Parameters are passed, they will be used directly in the generated
+        Rules. If numbers are passed, Parameters will be created with
+        automatically generated names based on the names and states of enzyme,
+        substrate and product and these parameters will be included at the end
+        of the returned component list.
+        
+        m1, m2 : Monomer or MonomerPattern
+        If enzyme or substrate binding site is present in multiple monomers
+        within a complex, the specific monomer desired for binding must be specified.
+        
+        Returns
+        -------
+        components : ComponentSet
+        The generated components. Contains the bidirectional binding Rule
+        and optionally three Parameters if klist was given as numbers.
+        """
+    if isinstance(m1, Monomer):
+        m1 = m1()
+    if isinstance(m2, Monomer):
+        m2 = m2()
+        
+    def build_complex(s1, site1, m1):
+        _verify_sites_complex(s1, site1)
+        #Retrieve a dictionary specifying the MonomerPattern within the complex that contains the given binding site.
+        specsitesdict = _verify_sites_complex(s1, site1)
+        s1complexpatub, s1complexpatb = check_sites_comp_build(s1, site1, m1, specsitesdict)
+        return s1complexpatb, s1complexpatub
+
+    def check_sites_comp_build(s1, site1, m1, specsitesdict):
+        #Return error if binding site exists on multiple monomers and a monomer for binding (m1) hasn't been specified.
+        if len(specsitesdict) > 1 and m1==None:
+            raise ValueError("Binding site '%s' present in more than one monomer in complex '%s'.  Specify variable m1, the monomer used for binding within the complex." % (site1, s1))
+        if not s1.is_concrete:
+            raise ValueError("Complex '%s' must be concrete." % (s1))
+            #If the given binding site is only present in one monomer in the complex:
+        if m1==None:
+            #Build up ComplexPattern for use in rule (with state of given binding site specified).
+            s1complexpatub = specsitesdict.keys()[0]({site1:None})
+            s1complexpatb = specsitesdict.keys()[0]({site1:50})
+            for monomer in s1.monomer_patterns:
+                if monomer not in specsitesdict.keys():
+                    s1complexpatub %= monomer
+                    s1complexpatb %= monomer
+    
+        #If the binding site is present on more than one monomer in the complex, the monomer must be specified by the user.  Use specified m1 to build ComplexPattern.
+        else:
+            #Make sure binding states of MonomerPattern m1 match those of the monomer within the ComplexPattern s1 (ComplexPattern monomer takes precedence if not).
+            i = 0
+            identical_monomers = []
+            for mon in s1.monomer_patterns:
+                #Only change the binding site for the first monomer that matches.  Keep any others unchanged to add to final complex that is returned.
+                if mon.monomer.name == m1.monomer.name:
+                    i += 1
+                    if i == 1:
+                        s1complexpatub = m1({site1:None})
+                        s1complexpatb = m1({site1:50})
+                    else:
+                        identical_monomers.append(mon)
+            #Build up ComplexPattern for use in rule (with state of given binding site  on m1 specified).
+            for mon in s1.monomer_patterns:
+                if mon.monomer.name != m1.monomer.name:
+                    s1complexpatub %= mon
+                    s1complexpatb %= mon
+            if identical_monomers:
+                for i in range(len(identical_monomers)):
+                    s1complexpatub %= identical_monomers[i]
+                    s1complexpatb %= identical_monomers[i]
+    
+        return s1complexpatub, s1complexpatb
+
+    #If no complexes exist in the reaction, revert to catalyze().
+    if (isinstance(enzyme, MonomerPattern) or isinstance(enzyme, Monomer)) and (isinstance(substrate, MonomerPattern) or isinstance(substrate, Monomer)):
+        _verify_sites(enzyme, e_site)
+        _verify_sites(substrate, s_site)
+        return catalyze(enzyme, e_site, substrate, s_site, product, klist,)
+    
+    # Build E:S
+    if isinstance(enzyme, ComplexPattern):
+        enzymepatb, enzyme_free = build_complex(enzyme, e_site, m1)
+    else:
+        enzymepatb, enzyme_free = enzyme({e_site: 1}), enzyme({e_site: None})
+            
+    if isinstance(substrate, ComplexPattern):
+        substratepatb, substratepatub = build_complex(substrate, s_site, m2)
+    else:
+        substratepatb = substrate({s_site: 50})
+        
+        """if s_site in substrate.site_conditions:
+            substrate_free = substrate()
+            s_state = (substrate.site_conditions[s_site], 1)
+        else:
+            substrate_free = substrate({s_site: None})
+            s_state = 1
+        substratepatb = substrate({s_site: s_state})
+        """
+
+            
+    es_complex = enzymepatb % substratepatb
+            
+    # Use bind complex to binding rule.
+
+    components = bind_complex(enzyme, e_site, substrate, s_site, klist[0:2], m1, m2)
+    components |= _macro_rule('catalyze',
+                              es_complex >> enzyme_free + product,
+                              [klist[2]], ['kc'])
     return components
 
 def catalyze_state(enzyme, e_site, substrate, s_site, mod_site,

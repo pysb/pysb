@@ -134,7 +134,7 @@ class BngGenerator(object):
         for i, code in enumerate(species_codes):
             param = self.model.initial_conditions[i][1]
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code, param.name)
-        self.__content += "end species\n"
+        self.__content += "end species\n\n"
 
 def format_monomer_site(monomer, site):
     ret = site
@@ -211,7 +211,9 @@ def warn_caller(message):
     warnings.warn(message, stacklevel=stacklevel)
 
 def sympy_to_muparser(expr):
-    code = sympy.fcode(expr)
+#     code = sympy.fcode(expr)
+#     code = sympy.ccode(expr)
+    code = str(expr)
     code = code.replace('\n     @', '')
     code = code.replace('**', '^')
     return code
