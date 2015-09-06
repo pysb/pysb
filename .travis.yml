@@ -21,8 +21,8 @@ install:
 - pip install -i https://pypi.binstar.org/pypi/simple pygraphviz
 - pip install python-coveralls
 - wget "http://www.csb.pitt.edu/Faculty/Faeder/?smd_process_download=1&download_id=142"
-  -O BioNetGen-2.2.6-stable.zip
-- unzip BioNetGen-2.2.6-stable.zip
+  -O BioNetGen-2.2.6-stable.tar.gz
+- tar xzf BioNetGen-2.2.6-stable.tar.gz
 - export BNGPATH=`pwd`/BioNetGen-2.2.6-stable
 script:
   nosetests --with-coverage --cover-package=pysb
