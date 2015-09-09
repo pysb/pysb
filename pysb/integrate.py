@@ -177,10 +177,7 @@ class Solver(object):
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
                 code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,'%s(\\1)' % macro, code_eqs)
-        
-        def wrap_rhs(t,y,p):
-            return rhs(y,t,p)
-        
+
         def rhs(t, y, p):
             ydot = self.ydot
             # note that the evaluated code sets ydot as a side effect
@@ -195,7 +192,6 @@ class Solver(object):
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
         jac_fn = None
-        self.wrap_jacobian = jac_fn
         if self._use_analytic_jacobian:
             species_names = ['__s%d' % i for i in range(len(self.model.species))]
             jac_matrix = []
@@ -235,9 +231,7 @@ class Solver(object):
                     macro = arr_name.upper() + '1'
                     jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                       '%s(\\1)' % macro, jac_eqs)
-            def wrap_jacobian(t,y,p):
-                return jacobian(y,t,p)
-            
+
             def jacobian(t, y, p):
                 jac = self.jac
                 # note that the evaluated code sets jac as a side effect
@@ -252,7 +246,6 @@ class Solver(object):
             # Initialization of matrix for storing the Jacobian
             self.jac = numpy.zeros((len(self.model.odes), len(self.model.species)))
             jac_fn = jacobian
-            self.wrap_jacobian = wrap_jacobian
 
         # build integrator options list from our defaults and any kwargs passed to this function
         options = {}
@@ -286,8 +279,9 @@ class Solver(object):
         # Integrator
         if integrator == 'lsoda':
             self.integrator = integrator
-            self.func = wrap_rhs
-            self.jac_fn = self.wrap_jacobian
+            # lsoda's arguments are in a different order to other integrators
+            self.func = lambda t, y, p: rhs(y, t, p)
+            self.jac_fn = lambda t, y, p: jacobian(y, t, p)
         else:
             if scipy.integrate._ode.find_integrator(integrator):
                 self.integrator = ode(rhs, jac=jac_fn).set_integrator(integrator,
