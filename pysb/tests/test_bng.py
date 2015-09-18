@@ -52,3 +52,13 @@ def test_expressions_with_one_parameter():
     Initial(A(), k1)
     generate_equations(model)
 
+@with_model
+def test_expressions_with_one_observable():
+    Monomer('A')
+    Parameter('k1', 1)
+    Observable('o1', A())
+    Expression('e1', o1)
+    Rule('A_deg', A() >> None, k1)
+    Initial(A(), k1)
+    generate_equations(model)
+
