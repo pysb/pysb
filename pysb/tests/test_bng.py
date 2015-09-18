@@ -42,3 +42,13 @@ def test_bidirectional_rules():
     ok_(len(model.reactions_bidirectional[0]['rule'])==3)
     ok_(model.reactions_bidirectional[0]['reversible'])
     #TODO Check that 'rate' has 4 terms
+
+@with_model
+def test_expressions_with_one_parameter():
+    Monomer('A')
+    Parameter('k1', 1)
+    Expression('e1', k1)
+    Rule('A_deg', A() >> None, k1)
+    Initial(A(), k1)
+    generate_equations(model)
+
