@@ -39,7 +39,7 @@ class BngGenerator(object):
                                (p.name, p.value))
         for e in exprs:
             self.__content += (("  %-" + str(max_length) + "s   %s\n") %
-                               (e.name, sympy_to_muparser(e.expr)))
+                               (e.name, sympy_to_muparser(e)))
         self.__content += "end parameters\n\n"
 
     def generate_compartments(self):
@@ -121,7 +121,7 @@ class BngGenerator(object):
         for i, e in enumerate(exprs):
             signature = e.name + '()'
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % \
-                (signature, sympy_to_muparser(e.expr))
+                (signature, sympy_to_muparser(e))
         self.__content += "end functions\n\n"
 
     def generate_species(self):
@@ -211,9 +211,7 @@ def warn_caller(message):
     warnings.warn(message, stacklevel=stacklevel)
 
 def sympy_to_muparser(expr):
-#     code = sympy.fcode(expr)
-#     code = sympy.ccode(expr)
-    code = str(expr)
+    code = expr.formula_to_str()
     code = code.replace('\n     @', '')
     code = code.replace('**', '^')
     return code
