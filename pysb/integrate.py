@@ -335,8 +335,9 @@ class Solver(object):
                     raise IndexError("param_values dictionary has unknown "
                                      "parameter name (%s)" % key)
                 param_values[pi] = param_values_dict[key]
-                
-        subs = dict((p.name, param_values[i]) for i, p in
+
+        # The substitution dict must have Symbols as keys, not strings
+        subs = dict((p, param_values[i]) for i, p in
                     enumerate(self.model.parameters))
 
         if y0 is not None:
