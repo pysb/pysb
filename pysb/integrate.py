@@ -356,7 +356,7 @@ class Solver(object):
                     pi = self.model.parameters.index(value_obj)
                     value = param_values[pi]
                 elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr(self.model).evalf(subs=subs)
+                    value = value_obj.expand_expr().evalf(subs=subs)
                 else:
                     raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)
