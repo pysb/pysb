@@ -1078,25 +1078,6 @@ class Expression(Component, sympy.Symbol):
     def __str__(self):
         return repr(self)
 
-    def formula_to_str(self):
-        """Get the formula for the expression as a string.
-
-        For the case where the Expression's expression (i.e., self.expr) is
-        simply a Parameter (or an Observable) and not an algebraic expression,
-        we need to explicitly call the repr of sympy.Symbol, because otherwise
-        we will get the repr of the Parameter or Observable object, which is
-        not what we want in the string representation for the formula and which
-        causes errors for the BNG generator downstream (see issue 151).
-        """
-
-        if isinstance(self.expr, sympy.Symbol):
-            expr_repr = super(sympy.Symbol, self.expr).__repr__()
-        # If the expression is not a sympy.Symbol then it's presumably some
-        # other kind of sympy formula so calling repr directly will work.
-        else:
-            expr_repr = repr(self.expr)
-        return expr_repr
-
 
 class Model(object):
 
