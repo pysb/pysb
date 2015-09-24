@@ -335,8 +335,9 @@ class Solver(object):
                     raise IndexError("param_values dictionary has unknown "
                                      "parameter name (%s)" % key)
                 param_values[pi] = param_values_dict[key]
-                
-        subs = dict((p.name, param_values[i]) for i, p in
+
+        # The substitution dict must have Symbols as keys, not strings
+        subs = dict((p, param_values[i]) for i, p in
                     enumerate(self.model.parameters))
 
         if y0 is not None:
@@ -356,7 +357,7 @@ class Solver(object):
                     pi = self.model.parameters.index(value_obj)
                     value = param_values[pi]
                 elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr(self.model).evalf(subs=subs)
+                    value = value_obj.expand_expr().evalf(subs=subs)
                 else:
                     raise ValueError("Unexpected initial condition value type")
                 si = self.model.get_species_index(cp)

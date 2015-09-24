@@ -42,3 +42,4 @@ def test_bidirectional_rules():
     ok_(len(model.reactions_bidirectional[0]['rule'])==3)
     ok_(model.reactions_bidirectional[0]['reversible'])
     #TODO Check that 'rate' has 4 terms
+

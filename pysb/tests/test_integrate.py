@@ -125,7 +125,7 @@ def test_integrate_with_expression():
     Observable('s16_obs', s16())
     Observable('s20_obs', s20())
 
-    Expression('keff', sympify("ka*ka20/(ka20+s9_obs)"))
+    Expression('keff', (ka*ka20)/(ka20+s9_obs))
 
     Rule('R1', None >> s16(), ka)
     Rule('R2', None >> s20(), ka)
