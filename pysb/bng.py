@@ -301,7 +301,7 @@ def _parse_netfile(model, lines):
     """Parse 'species', 'reactions', and 'groups' blocks from a BNGL net file."""
     try:
         global new_reverse_convention
-        (bng_version, bng_codename) = re.match(r'# Created by BioNetGen (\d+\.\d+\.\d+)(?:-(\w+))?$', lines.next()).groups()
+        (bng_version, bng_codename) = re.match(r'# Created by BioNetGen (\d+\.\d+\.\d+)(?:-(\w+))?$', next(lines)).groups()
         if parse_version(bng_version) > parse_version("2.2.6") or parse_version(bng_version) == parse_version("2.2.6") and bng_codename == "stable":
             new_reverse_convention = True
         else:
