@@ -213,7 +213,7 @@ def warn_caller(message):
 def expression_to_muparser(expression):
     """Render the Expression as a muparser-compatible string."""
 
-    # sympy.printing.sstr is the preferred way to render an Expressions as a
+    # sympy.printing.sstr is the preferred way to render an Expression as a
     # string (rather than, e.g., str(Expression.expr) or repr(Expression.expr).
     # Note: "For large expressions where speed is a concern, use the setting
     # order='none'"
