@@ -786,9 +786,9 @@ class Parameter(Component, sympy.Symbol):
 
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
-    
+
     def __str__(self):
-        return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
+        return  repr(self)
 
 
 
@@ -842,7 +842,6 @@ class Compartment(Component):
     def __repr__(self):
         return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
             (self.__class__.__name__, repr(self.name), repr(self.parent), repr(self.dimension), repr(self.size))
-
 
 
 class Rule(Component):
@@ -1010,15 +1009,9 @@ class Observable(Component, sympy.Symbol):
             ret += ', match=%s' % repr(self.match)
         ret += ')'
         return ret
-    
-    def __str__(self):
-        ret = '%s(%s, %s' % (self.__class__.__name__, repr(self.name),
-                              repr(self.reaction_pattern))
-        if self.match != 'molecules':
-            ret += ', match=%s' % repr(self.match)
-        ret += ')'
-        return ret
 
+    def __str__(self):
+        return repr(self)
 
 
 class Expression(Component, sympy.Symbol):
