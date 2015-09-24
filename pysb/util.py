@@ -7,6 +7,7 @@ import io
 
 __all__ = ['alias_model_components', 'rules_using_parameter']
 
+
 def alias_model_components(model=None):
     """Make all model components visible as symbols in the caller's global namespace"""
     if model is None:
@@ -15,8 +16,12 @@ def alias_model_components(model=None):
     components = dict((c.name, c) for c in model.all_components())
     caller_globals.update(components)
 
+
 def rules_using_parameter(model, parameter):
     """Return a ComponentSet of rules in the model which make use of the given parameter"""
+    if not isinstance(parameter, pysb.core.Parameter):
+        # Try getting the parameter by name
+        parameter = model.parameters.get(parameter)
     cset = ComponentSet()
     for rule in model.rules:
         if rule.rate_forward is parameter or rule.rate_reverse is parameter:
@@ -41,6 +46,7 @@ def synthetic_data(model, tspan, obs_list=None, sigma=0.1):
     solver.yobs_view *= ((numpy.random.randn(*solver.yobs_view.shape) * sigma) + 1)
     return solver.yobs
 
+
 def get_param_num(model, name):
     for i in range(len(model.parameters)):
         if model.parameters[i].name == name:
@@ -63,6 +69,7 @@ def write_params(model,paramarr, name=None):
     if name is None:
         return fobj.getvalue()
 
+
 def update_param_vals(model, newvals):
     """update the values of model parameters with the values from a dict. 
     the keys in the dict must match the parameter names
@@ -76,6 +83,7 @@ def update_param_vals(model, newvals):
         else:
             noupdate.append(i.name)
     return update, noupdate
+
 
 def load_params(fname):
     """load the parameter values from a csv file, return them as dict.
