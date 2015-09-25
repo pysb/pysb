@@ -1,6 +1,6 @@
-from pysb.core import *
-from pysb.util import *
-from pysb.examples import earm_1_0
+from pysb.core import Initial, Model, Monomer, Parameter, Rule
+from pysb.testing import with_model
+from pysb.util import alias_model_components, rules_using_parameter
 
 
 def test_alias_model_components():
@@ -8,34 +8,37 @@ def test_alias_model_components():
     Tests that alias_model_components() exports to the global namespace
     """
     m = Model(_export=False)
-    m.add_component(Monomer('temp_monomer_A', _export=False))
-    try:
-        temp_monomer_A
-        raise NameError('Monomer A should not be defined in global namespace')
-    except NameError:
-        # We expect this exception due to _export=False
-        pass
+    m.add_component(Monomer('A', _export=False))
+    assert 'A' not in globals()
     alias_model_components(m)
 
-    # Use global version of temp_monomer_A (needed to delete it)
-    global temp_monomer_A
-
     # A should now be defined in the namespace - try deleting it
-    assert isinstance(temp_monomer_A, Monomer)
+    assert isinstance(globals()['A'], Monomer)
 
     # Delete the monomer to cleanup the global namespace
-    del temp_monomer_A
+    del globals()['A']
 
 
+@with_model
 def test_rules_using_parameter():
     """
     Tests for rules_using_parameter() in pysb.util
     """
-    # Get rules matching parameter name
-    r = rules_using_parameter(earm_1_0.model, 'kc1')
-    assert isinstance(r.get('produce_DISC'), Rule)
+    Monomer('m1')
+    Monomer('m2')
+    Monomer('m3')
+
+    ka1 = Parameter('ka1', 2e-5)
+    keff = Parameter('keff', 1e5)
+
+    Initial(m2(), Parameter('m2_0', 10000))
+
+    Rule('R1', None >> m1(), ka1)
+    Rule('R2', m1() + m2() >> m1() + m3(), keff)
+
+    components = rules_using_parameter(model, 'keff')
+    assert isinstance(components['R2'], Rule)
 
     # Get rules by supplying Parameter object directly
-    r = rules_using_parameter(earm_1_0.model,
-                              earm_1_0.model.parameters.get('kc1'))
-    assert isinstance(r.get('produce_DISC'), Rule)
+    components = rules_using_parameter(model, keff)
+    assert isinstance(components['R2'], Rule)
