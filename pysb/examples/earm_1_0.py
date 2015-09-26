@@ -11,9 +11,9 @@ from __future__ import print_function
 from pysb import *
 
 Model()
-Annotation(model, 'is', 'http://identifiers.org/biomodels.db/BIOMD0000000220')
-Annotation(model, 'isDescribedBy',
-           'http://identifiers.org/doi/10.1371/journal.pbio.0060299')
+Annotation(model, 'http://identifiers.org/biomodels.db/BIOMD0000000220', 'is')
+Annotation(model, 'http://identifiers.org/doi/10.1371/journal.pbio.0060299',
+           'isDescribedBy')
 
 transloc = .01; # rate of translocation between the cytosolic and mitochondrial compartments
 
