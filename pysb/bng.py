@@ -8,6 +8,8 @@ import re
 import itertools
 import sympy
 import numpy
+import pexpect
+import tempfile
 from warnings import warn
 from pkg_resources import parse_version
 try:
@@ -91,13 +93,85 @@ class GenerateNetworkError(RuntimeError):
     """BNG reported an error when trying to generate a network for a model."""
     pass
 
-_generate_network_code = """
-begin actions
-generate_network({overwrite=>1})
-end actions
-"""
+
+class BngConsole:
+    """ Interact with BioNetGen through BNG Console """
+    def __init__(self, model, logfile=None, timeout=30, verbose=False):
+        self.verbose = verbose
+        self.generator = BngGenerator(model)
+        self._check_model()
+
+        try:
+            # Generate BNGL file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.bngl',
+                                             delete=False) as bng_file:
+                self.bng_filename = bng_file.name
+                bng_file.write(self.generator.get_content())
+
+            # Start BNG Console and load BNGL
+            self.console = pexpect.spawn('perl %s --console' % _get_bng_path(),
+                                         cwd=os.path.dirname(
+                                             self.bng_filename),
+                                         logfile=logfile, timeout=timeout)
+            self._console_wait()
+            self.console.sendline('load %s' % bng_file.name)
+            self._console_wait()
+        finally:
+            if self.bng_filename:
+                try:
+                    os.unlink(self.bng_filename)
+                except OSError:
+                    pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.console.sendline('done')
+        self.console.close()
+
+    def _check_model(self):
+        if not self.model.initial_conditions:
+            raise NoInitialConditionsError()
+        if not self.model.rules:
+            raise NoRulesError()
+
+    def _console_wait(self):
+        self.console.expect('BNG>')
+        if self.verbose:
+            print(self.console.before)
+        return self.console.before
+
+    def action(self, action, **kwargs):
+        if kwargs:
+            action_args = '{' + ','.join('%s=>%s' % (k, v) for k, v in
+                                         kwargs.iteritems()) + '}'
+        else:
+            action_args = ''
+        self.console.sendline('action %s(%s)' % (action, action_args))
+        return self._console_wait()
+
+    def generate_network(self, overwrite=False, cleanup=True):
+        try:
+            net_filename = os.path.splitext(self.bng_filename)[0] + '.net'
+            self.action('generate_network', overwrite=int(overwrite))
+            with open(net_filename, 'r') as net_file:
+                bng_network = net_file.read()
+        finally:
+            if cleanup:
+                try:
+                    os.unlink(net_filename)
+                except OSError:
+                    # File may have been deleted already, or be open elsewhere
+                    pass
+        return bng_network
+
+    @property
+    def model(self):
+        return self.generator.model
 
 
+# TODO: Properly support output_dir, output_file_basename, cleanup arguments
 def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcwd(),
             output_file_basename=None, cleanup=True, verbose=False,
             **additional_args):
@@ -132,54 +206,25 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
         Additional arguments to pass to BioNetGen
 
     """
-    ssa_args = "t_end=>%s,n_steps=>%s" % (t_end, n_steps)
-    for key,val in additional_args.items(): ssa_args += ", %s=>%s" % (key,"\""+str(val)+"\"" if isinstance(val,str) else str(val))
-    if verbose: ssa_args += ", verbose=>1"
-        
-    run_ssa_code = """
-begin actions
-    generate_network({overwrite=>1})
-    simulate_ssa({%s})
-end actions
-""" % (ssa_args)
-    
+    additional_args['t_end'] = t_end
+    additional_args['n_steps'] = n_steps
+
     if param_values is not None:
         if len(param_values) != len(model.parameters):
             raise Exception("param_values must be the same length as model.parameters")
         for i in range(len(param_values)):
             model.parameters[i].value = param_values[i]
-    
-    gen = BngGenerator(model)
-    if output_file_basename is None:
-        output_file_basename = '%s_%d_%d_temp' % (model.name,
-                                os.getpid(), random.randint(0, 100000))
-
-    if os.path.exists(output_file_basename + '.bngl'):
-        warn("WARNING! File %s.bngl already exists!" % output_file_basename)
-        output_file_basename += '_1'
-
-    bng_filename = output_file_basename + '.bngl'
-    gdat_filename = output_file_basename + '.gdat'
-    cdat_filename = output_file_basename + '.cdat'
-    net_filename = output_file_basename + '.net'
-
-    output = StringIO()
 
     try:
-        working_dir = os.getcwd()
-        os.chdir(output_dir)
-        bng_file = open(bng_filename, 'w')
-        bng_file.write(gen.get_content())
-        bng_file.write(run_ssa_code)
-        bng_file.close()
-        p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if verbose:
-            for line in iter(p.stdout.readline, b''):
-                print(line, end="")
-        (p_out, p_err) = p.communicate()
-        if p.returncode:
-            raise GenerateNetworkError(p_out.rstrip("at line")+"\n"+p_err.rstrip())
+        with BngConsole(model, verbose=verbose) as con:
+            bngl_filename = con.bng_filename
+            output_file_basename = os.path.splitext(bngl_filename)[0]
+            gdat_filename = output_file_basename + '.gdat'
+            cdat_filename = output_file_basename + '.cdat'
+            net_filename = output_file_basename + '.net'
+
+            output = con.generate_network(overwrite=True)
+            con.action('simulate_ssa', **additional_args)
 
         cdat_arr = numpy.loadtxt(cdat_filename, skiprows=1) # keep first column (time)
         if len(model.observables):
@@ -200,24 +245,21 @@ end actions
 
     finally:
         # Parse NET file if it hasn't already been done
-        if not model.species: 
-            net_file = open(net_filename, 'r')
-            output.write(net_file.read())
-            net_file.close()
-            lines = iter(output.getvalue().split('\n'))
-            _parse_netfile(model, lines)
+        if not model.species:
+            _parse_netfile(model, iter(output.split('\n')))
         # Clean up
         if cleanup:
-            for filename in [bng_filename, gdat_filename,
+            for filename in [gdat_filename,
                              cdat_filename, net_filename]:
-                if os.access(filename, os.F_OK):
+                try:
                     os.unlink(filename)
-        # Move to working directory  
-        os.chdir(working_dir)
+                except OSError:
+                    pass
 
     return yfull
 
 
+# TODO: Support append_stdout argument
 def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     """
     Return the output from BNG's generate_network function given a model.
@@ -239,45 +281,9 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         appended to the net file contents. If False (default), do not append it.
 
     """
-    gen = BngGenerator(model)
-    if not model.initial_conditions:
-        raise NoInitialConditionsError()
-    if not model.rules:
-        raise NoRulesError()
-    bng_filename = '%s_%d_%d_temp.bngl' % (model.name, os.getpid(), random.randint(0, 10000))
-    net_filename = bng_filename.replace('.bngl', '.net')
-    output = StringIO()
-    try:
-        bng_file = open(bng_filename, 'w')
-        bng_file.write(gen.get_content())
-        bng_file.write(_generate_network_code)
-        bng_file.close()
-        p = subprocess.Popen(['perl', _get_bng_path(), bng_filename],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              universal_newlines=True)
-        if verbose:
-            for line in iter(p.stdout.readline, b''):
-                print(line, end="")
-        (p_out, p_err) = p.communicate()
-        if p.returncode:
-            raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
-        ######
-#         p = subprocess.call(['perl', _get_bng_path(), bng_filename])
-#         if p:
-#             raise GenerateNetworkError(p_out.rstrip()+"\n"+p_err.rstrip())
-        ######
-        net_file = open(net_filename, 'r')
-        output.write(net_file.read())
-        net_file.close()
-        if append_stdout:
-            output.write("#\n# BioNetGen execution log follows\n# ==========")
-            output.write(re.sub(r'(^|\n)', r'\n# ', p_out))
-    finally:
-        if cleanup:
-            for filename in [bng_filename, net_filename]:
-                if os.access(filename, os.F_OK):
-                    os.unlink(filename)
-    return output.getvalue()
+    with BngConsole(model, verbose=verbose) as con:
+        output = con.generate_network(overwrite=True)
+    return output
 
 
 def generate_equations(model, cleanup=True, verbose=False):
