@@ -37,8 +37,8 @@ def test_rules_using_parameter():
     Rule('R2', m1() + m2() >> m1() + m3(), keff)
 
     components = rules_using_parameter(model, 'keff')
-    assert isinstance(components['R2'], Rule)
+    assert R2 in components
 
     # Get rules by supplying Parameter object directly
     components = rules_using_parameter(model, keff)
-    assert isinstance(components['R2'], Rule)
+    assert R2 in components
