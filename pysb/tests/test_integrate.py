@@ -162,3 +162,10 @@ def test_earm_integration():
         sol = Solver(earm_1_0.model, t, use_analytic_jacobian=True)
         sol.run()
         Solver._use_inline = True
+
+
+def test_run_ssa():
+    """
+    Rudimentary test, mainly to ensure API compatibility
+    """
+    run_ssa(robertson.model, t_end=20000, n_steps=100, verbose=False)
