@@ -145,7 +145,7 @@ class BngConsole:
     def action(self, action, **kwargs):
         if kwargs:
             action_args = '{' + ','.join('%s=>%s' % (k, v) for k, v in
-                                         kwargs.iteritems()) + '}'
+                                         kwargs.items()) + '}'
         else:
             action_args = ''
         self.console.sendline('action %s(%s)' % (action, action_args))
