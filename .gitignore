@@ -8,7 +8,6 @@ build/*
 dist/*
 doc/_build
 MANIFEST
-RELEASE-VERSION
 .idea
 *#
 *.#*

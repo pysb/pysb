@@ -13,3 +13,7 @@ except (ImportError, AttributeError) as e:
 else:
     import pysb.reinteract_integration
     pysb.reinteract_integration.apply_mixins()
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
