@@ -377,7 +377,7 @@ class Solver(object):
                 print("Integrating...")
                 print("\tTime")
                 print("\t----")
-                print("\t", self.integrator.t)
+                print("\t%g" % self.integrator.t)
             while self.integrator.successful() and self.integrator.t < self.tspan[-1]:
                 self.y[i] = self.integrator.integrate(self.tspan[i]) # integration
                 i += 1
@@ -385,7 +385,7 @@ class Solver(object):
     #             self.integrator.integrate(self.tspan[i],step=True)
     #             if self.integrator.t >= self.tspan[i]: i += 1
                 ######
-                if self.verbose: print("\t", self.integrator.t)
+                if self.verbose: print("\t%g" % self.integrator.t)
             if self.verbose: print("...Done.")
             if self.integrator.t < self.tspan[-1]:
                 self.y[i:, :] = 'nan'
