@@ -94,7 +94,7 @@ class GenerateNetworkError(RuntimeError):
     pass
 
 
-class BngConsole:
+class BngConsole(object):
     """ Interact with BioNetGen through BNG Console """
     def __init__(self, model, logfile=None, timeout=30, verbose=False):
         self.verbose = verbose
@@ -142,10 +142,25 @@ class BngConsole:
             print(self.console.before)
         return self.console.before
 
+    @classmethod
+    def _bng_param(cls, param):
+        """
+        Ensures a BNG console parameter is in the correct format
+
+        Strings are double quoted and booleans are mapped to [0,1]. Other
+        types are currently used verbatim.
+        """
+        if isinstance(param, str):
+            return '"%s"' % param
+        if isinstance(param, bool):
+            return 1 if param else 0
+        return param
+
     def action(self, action, **kwargs):
         if kwargs:
-            action_args = '{' + ','.join('%s=>%s' % (k, v) for k, v in
-                                         kwargs.items()) + '}'
+            action_args = '{' + ','.join('%s=>%s' % (k,
+                                                     BngConsole._bng_param(v))
+                                         for k, v in kwargs.items()) + '}'
         else:
             action_args = ''
         self.console.sendline('action %s(%s)' % (action, action_args))
@@ -154,7 +169,7 @@ class BngConsole:
     def generate_network(self, overwrite=False, cleanup=True):
         try:
             net_filename = os.path.splitext(self.bng_filename)[0] + '.net'
-            self.action('generate_network', overwrite=int(overwrite))
+            self.action('generate_network', overwrite=overwrite)
             with open(net_filename, 'r') as net_file:
                 bng_network = net_file.read()
         finally:
@@ -207,10 +222,10 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
         Additional arguments to pass to BioNetGen
 
     """
-    additional_args['method'] = '"ssa"'
+    additional_args['method'] = 'ssa'
     additional_args['t_end'] = t_end
     additional_args['n_steps'] = n_steps
-    additional_args['verbose'] = 1 if verbose==True else 0
+    additional_args['verbose'] = verbose
 
     if param_values is not None:
         if len(param_values) != len(model.parameters):
@@ -228,6 +243,10 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
 
             output = con.generate_network(overwrite=True)
             con.action('simulate', **additional_args)
+
+        # Parse netfile (in case this hasn't already been done)
+        if not model.species:
+            _parse_netfile(model, iter(output.split('\n')))
 
         cdat_arr = numpy.loadtxt(cdat_filename, skiprows=1) # keep first column (time)
         if len(model.observables):
@@ -247,10 +266,6 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
         yfull_view[:, len(names):] = gdat_arr
 
     finally:
-        # Parse NET file if it hasn't already been done
-        if not model.species:
-            _parse_netfile(model, iter(output.split('\n')))
-        # Clean up
         if cleanup:
             for filename in [gdat_filename,
                              cdat_filename, net_filename]:
