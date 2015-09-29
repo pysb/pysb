@@ -3,9 +3,6 @@ sudo: false
 python:
 - '2.7'
 - '3.4'
-cache:
-  directories:
-  - "$TRAVIS_BUILD_DIR/StochKit2.0.11"
 before_install:
 - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
 - chmod +x miniconda.sh
@@ -25,6 +22,3 @@ script:
   nosetests --with-coverage --cover-package=pysb
 after_success:
   coveralls
-notifications:
-  slack:
-    secure: No8IBa40/eRJX2ma0EQl3zc0Y8OpWCnh390mMEqlurYGKhdMRL9O+asG4OsYthWA2wrkl7GqZc+1YDTfsz8ADvX93c3L8fdpe9CUOFiBK+SmJuDkJ982sstFl6Ckz0qjEgK/hhPvtqVLBRlZaItWp15uN37NrcoDz0WRxvwajA7KqbDdV5DPgCQiIYVLDAHx1TygnuqVkwcPznnssa9jcaf9jIolyzT1ecs+Awa/VJrmelAdQJUI1Q38i3+qNjJcRDkZ95bVhY8NKVNucjFIG0SRE2XQwRqg7pKmO2tZukqfmfHX/hKl24j4YFG/PjjT0QMwNvmWy9HYMhK+R4vUzpAV/XoHyyoV31YixFI0OPDNCcN4cmXqvhcnK78eulJJj2IoelYUzV717mibsDf/ox0agDw0OfKvdu+tabP1kWQgish54xUMRvvo3gSdYZXrpQsdezekEzTeKOfD42WoCe45pSjqcKO0ArgKSkiPEjJDBTE5kvWcKg/+7frxwpgXVTarMl4CJGsYNpN6P2kCAg8mAcRbt1rqDCsp/wwVe2n5TI6sZsYWgBpC1d/bH97CS3fvUDe7PW+75/9dSa5SL7N4bJ6bKtZHNRymu0eqZxDCVGh6UcZluVdHz6OJ68UBzrHFBg7DRRuq4xGhnDNGe+uTJTdqtTZnoSZpvuJpZRg=
