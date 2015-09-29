@@ -1,20 +1,18 @@
-#!/usr/bin/env python
+from ez_setup import use_setuptools
+use_setuptools()
+from setuptools import setup
+import setuptools.command.build_py
 
-from distutils.core import setup
 import sys, os, subprocess, re
 
-extra = {}
-if sys.version_info >= (3,):
-    from distutils.command.build_py import build_py_2to3
-    class build_py(build_py_2to3):
-        # http://marc.info/?l=python-distutils-sig&m=127205216610290&w=2
-        fixer_names = ['lib2to3.fixes.fix_ne']
-
-    extra['use_2to3'] = True
-    extra['cmdclass'] = {'build_py': build_py}
-    # extra['convert_2to3_doctests'] = ['src/your/module/README.txt']
+class build_py(setuptools.command.build_py.build_py):
+    # Simplest way to use a specific list of fixers. Note use_2to3_fixers will
+    # be ignored.
+    fixer_names = ['lib2to3.fixes.fix_ne']
 
 def main():
+
+    cmdclass = {'build_py': build_py}
 
     setup(name='pysb',
           version=get_version(),
@@ -30,7 +28,12 @@ def main():
           packages=['pysb', 'pysb.generator', 'pysb.tools', 'pysb.examples',
                     'pysb.export', 'pysb.testing', 'pysb.tests'],
           scripts=['scripts/pysb_export'],
-          requires=['numpy', 'scipy', 'sympy'],
+          # We should really specify some minimum versions here.
+          install_requires=['numpy', 'scipy', 'sympy'],
+          setup_requires=['nose'],
+          tests_require=['coverage', 'pygraphviz', 'matplotlib'],
+          cmdclass=cmdclass,
+          use_2to3=True,
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
             'Development Status :: 4 - Beta',
@@ -44,7 +47,6 @@ def main():
             'Topic :: Scientific/Engineering :: Chemistry',
             'Topic :: Scientific/Engineering :: Mathematics',
             ],
-          **extra
           )
 
 def get_version():

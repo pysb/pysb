@@ -15,3 +15,7 @@ RELEASE-VERSION
 *.dylib
 *.so.*
 .coverage
+setuptools*.egg
+setuptools*.zip
+*.egg-info
+.eggs
