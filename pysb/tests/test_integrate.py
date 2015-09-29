@@ -41,14 +41,10 @@ class SolverTests(TestCase):
         Rule('AB_bind', A(a=None) + B(b=None) >> A(a=1) % B(b=1), kbindAB)
 
         time = np.linspace(0, 0.005, 101)
-        self.solver = Solver(model, time,verbose=False)
-        
-        self.solver_lsoda = Solver(model, time,integrator='lsoda',
-                                   verbose=False)
-        
-        self.solver_lsoda_jac = Solver(model, time,integrator='lsoda',
-                                       use_analytic_jacobian=True,
-                                       verbose=False)
+        self.solver = Solver(model, time)
+        self.solver_lsoda = Solver(model, time, integrator='lsoda')
+        self.solver_lsoda_jac = Solver(model, time, integrator='lsoda',
+                                       use_analytic_jacobian=True)
 
     def test_solver_run(self):
         """ Test solver.run() with no arguments """
@@ -132,7 +128,7 @@ def test_integrate_with_expression():
     Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
     time = linspace(0, 40, 100)
-    x = odesolve(model, time, verbose=True)
+    x = odesolve(model, time)
 
 
 def test_robertson_integration():
