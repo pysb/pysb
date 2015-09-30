@@ -165,3 +165,8 @@ def test_run_ssa():
     Rudimentary test, mainly to ensure API compatibility
     """
     run_ssa(robertson.model, t_end=20000, n_steps=100, verbose=False)
+
+
+@raises(UserWarning)
+def test_nonexistent_integrator():
+    Solver(robertson.model, np.linspace(0, 1, 2), integrator='does_not_exist')

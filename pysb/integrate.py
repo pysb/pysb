@@ -14,6 +14,7 @@ import distutils.errors
 import sympy
 import re
 import itertools
+import warnings
 try:
     from future_builtins import zip
 except ImportError:
@@ -284,11 +285,9 @@ class Solver(object):
             self.jac_fn = lambda t, y, p: jacobian(y, t, p)
         else:
             self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
-            self.integrator.set_integrator(integrator, **options)
-            # set_integrator only warns if the integrator is unknown, so digging
-            # into its internals is the only way to determine this.
-            if not hasattr(self.integrator, '_integrator'):
-                raise Exception("Integrator type '" + integrator + "' not recognized.")
+            with warnings.catch_warnings():
+                warnings.filterwarnings('error', 'No integrator name match')
+                self.integrator.set_integrator(integrator, **options)
 
 
     def run(self, param_values=None, y0=None):
