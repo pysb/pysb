@@ -1,19 +1,20 @@
 import pysb.core
 import pysb.bng
 import numpy
-from scipy.integrate import ode
+import scipy.integrate
 import code
 try:
+    # weave is not available under Python 3.
     from scipy.weave import inline as weave_inline
+    import scipy.weave.build_tools
 except ImportError:
     weave_inline = None
-else:
-    import scipy.weave.build_tools
 
 import distutils.errors
 import sympy
 import re
 import itertools
+import warnings
 try:
     from future_builtins import zip
 except ImportError:
@@ -283,11 +284,10 @@ class Solver(object):
             self.func = lambda t, y, p: rhs(y, t, p)
             self.jac_fn = lambda t, y, p: jacobian(y, t, p)
         else:
-            if scipy.integrate._ode.find_integrator(integrator):
-                self.integrator = ode(rhs, jac=jac_fn).set_integrator(integrator,
-                                                          **options)
-            else:
-                raise Exception("Integrator type '" + integrator + "' not recognized.")
+            self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
+            with warnings.catch_warnings():
+                warnings.filterwarnings('error', 'No integrator name match')
+                self.integrator.set_integrator(integrator, **options)
 
 
     def run(self, param_values=None, y0=None):

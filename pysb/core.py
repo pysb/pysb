@@ -525,7 +525,7 @@ class ComplexPattern(object):
         kwargs = extract_site_conditions(conditions, **kwargs)
 
         # Ensure we don't have more than one of any Monomer in our patterns.
-        mp_monomer = lambda mp: mp.monomer
+        mp_monomer = lambda mp: id(mp.monomer)
         patterns_sorted = sorted(self.monomer_patterns, key=mp_monomer)
         pgroups = itertools.groupby(patterns_sorted, mp_monomer)
         pcounts = [(monomer, sum(1 for mp in mps)) for monomer, mps in pgroups]

@@ -8,10 +8,13 @@ build/*
 dist/*
 doc/_build
 MANIFEST
-RELEASE-VERSION
 .idea
 *#
 *.#*
 *.dylib
 *.so.*
 .coverage
+setuptools*.egg
+setuptools*.zip
+*.egg-info
+.eggs
