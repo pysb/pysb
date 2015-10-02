@@ -430,7 +430,7 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
 
     finally:
         if cleanup:
-            for filename in [net_filename, gdat_filename,
+            for filename in [gdat_filename,
                              cdat_filename, net_filename]:
                 try:
                     os.unlink(filename)
