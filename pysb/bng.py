@@ -3,15 +3,14 @@ import pysb.core
 from pysb.generator.bng import BngGenerator
 import os
 import subprocess
-import random
 import re
 import itertools
 import sympy
 import numpy
-import pexpect
 import tempfile
-from warnings import warn
 from pkg_resources import parse_version
+import abc
+
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -94,16 +93,110 @@ class GenerateNetworkError(RuntimeError):
     pass
 
 
-class BngConsole(object):
-    """ Interact with BioNetGen through BNG Console """
-    def __init__(self, model, logfile=None, timeout=30, verbose=False):
+class BngBaseInterface(object):
+    """ Abstract base class for interfacing with BNG """
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, model, verbose=False, cleanup=False,
+                 output_prefix=None):
         self.verbose = verbose
+        self.cleanup = cleanup
+        self.output_prefix = 'tmpBNG' if output_prefix is None else \
+            output_prefix
         self.generator = BngGenerator(model)
         self._check_model()
+
+    def __enter__(self):
+        return self
+
+    @abc.abstractmethod
+    def __exit__(self):
+        return
+
+    def _check_model(self):
+        """
+        Checks a model has at least one initial condition and rule, raising
+        an exception if not
+        """
+        if not self.model.initial_conditions:
+            raise NoInitialConditionsError()
+        if not self.model.rules:
+            raise NoRulesError()
+
+    @classmethod
+    def _bng_param(cls, param):
+        """
+        Ensures a BNG console parameter is in the correct format
+
+        Strings are double quoted and booleans are mapped to [0,1]. Other
+        types are currently used verbatim.
+
+        Parameters
+        ----------
+        param :
+            An argument to a BNG action call
+        """
+        if isinstance(param, str):
+            return '"%s"' % param
+        if isinstance(param, bool):
+            return 1 if param else 0
+        return param
+
+    @abc.abstractmethod
+    def action(self, action, **kwargs):
+        """
+        Generates code to execute a BNG action command
+
+        Parameters
+        ----------
+        action: string
+            The name of the BNG action function
+        kwargs: kwargs, optional
+            Arguments and values to supply to BNG
+        """
+        if kwargs:
+            action_args = ','.join('%s=>%s' % (k, BngConsole._bng_param(v))
+                                   for k, v in kwargs.items())
+        else:
+            action_args = ''
+        return action_args
+
+    @property
+    def model(self):
+        """
+        Convenience method to get the PySB model itself
+
+        :return: PySB model used in BNG interface constructor
+        """
+        return self.generator.model
+
+    @property
+    def base_filename(self):
+        """
+        Returns the base filename (without extension) for BNG output files
+        """
+        return os.path.splitext(self.bng_filename)[0]
+
+
+class BngConsole(BngBaseInterface):
+    """ Interact with BioNetGen through BNG Console """
+    def __init__(self, model, verbose=False, cleanup=True,
+                 output_dir=None, output_prefix=None, timeout=30):
+        super(BngConsole, self).__init__(model, verbose, cleanup,
+                                         output_prefix)
+
+        try:
+            import pexpect
+        except ImportError:
+            raise ImportError("Library 'pexpect' is required to use "
+                              "BNGConsole, please install it to continue.\n"
+                              "It is not currently available on Windows.")
 
         try:
             # Generate BNGL file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.bngl',
+                                             prefix=self.output_prefix,
+                                             dir=output_dir,
                                              delete=False) as bng_file:
                 self.bng_filename = bng_file.name
                 bng_file.write(self.generator.get_content())
@@ -112,7 +205,7 @@ class BngConsole(object):
             self.console = pexpect.spawn('perl %s --console' % _get_bng_path(),
                                          cwd=os.path.dirname(
                                              self.bng_filename),
-                                         logfile=logfile, timeout=timeout)
+                                         timeout=timeout)
             self._console_wait()
             self.console.sendline('load %s' % bng_file.name)
             self._console_wait()
@@ -123,57 +216,41 @@ class BngConsole(object):
                 except OSError:
                     pass
 
-    def __enter__(self):
-        return self
-
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        In console mode, commands have already been executed, so we simply
+        close down the console when down.
+        """
         self.console.sendline('done')
         self.console.close()
 
-    def _check_model(self):
-        if not self.model.initial_conditions:
-            raise NoInitialConditionsError()
-        if not self.model.rules:
-            raise NoRulesError()
-
     def _console_wait(self):
+        """
+        Wait for BNG console to process the command, and return the output
+        :return: BNG console output from the previous command
+        """
         self.console.expect('BNG>')
         if self.verbose:
             print(self.console.before)
         return self.console.before
 
-    @classmethod
-    def _bng_param(cls, param):
+    def generate_network(self, overwrite=False):
         """
-        Ensures a BNG console parameter is in the correct format
+        Generates a network in BNG and returns the network file contents as
+        a string
 
-        Strings are double quoted and booleans are mapped to [0,1]. Other
-        types are currently used verbatim.
+        Parameters
+        ----------
+        overwrite: bool, optional
+            Overwrite existing network file, if any
         """
-        if isinstance(param, str):
-            return '"%s"' % param
-        if isinstance(param, bool):
-            return 1 if param else 0
-        return param
-
-    def action(self, action, **kwargs):
-        if kwargs:
-            action_args = '{' + ','.join('%s=>%s' % (k,
-                                                     BngConsole._bng_param(v))
-                                         for k, v in kwargs.items()) + '}'
-        else:
-            action_args = ''
-        self.console.sendline('action %s(%s)' % (action, action_args))
-        return self._console_wait()
-
-    def generate_network(self, overwrite=False, cleanup=True):
         try:
-            net_filename = os.path.splitext(self.bng_filename)[0] + '.net'
+            net_filename = self.base_filename + '.net'
             self.action('generate_network', overwrite=overwrite)
             with open(net_filename, 'r') as net_file:
                 bng_network = net_file.read()
         finally:
-            if cleanup:
+            if self.cleanup:
                 try:
                     os.unlink(net_filename)
                 except OSError:
@@ -181,13 +258,94 @@ class BngConsole(object):
                     pass
         return bng_network
 
-    @property
-    def model(self):
-        return self.generator.model
+    def action(self, action, **kwargs):
+        """
+        Generates a BNG action command and executes it through the console,
+        returning any console output
+
+        Parameters
+        ----------
+        action : string
+            The name of the BNG action function
+        kwargs : kwargs, optional
+            Arguments and values to supply to BNG
+        """
+        # Process BNG arguments into a string using supermethod
+        action_args = super(BngConsole, self).action(action, **kwargs)
+
+        # Execute the command via the console
+        self.console.sendline('action %s({%s})' % (action, action_args))
+
+        # Wait for the command to execute and return the result
+        return self._console_wait()
 
 
-# TODO: Properly support output_dir, output_file_basename, cleanup arguments
-def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcwd(),
+class BngFileInterface(BngBaseInterface):
+    def __init__(self, model, verbose=False, output_dir=None,
+                 output_prefix=None, cleanup=True):
+        super(BngFileInterface, self).__init__(model, verbose, cleanup,
+                                               output_prefix)
+        self.command_queue = StringIO()
+        self.command_queue.write('begin actions\n')
+
+        # Create the BNGL file now so we know where to find it
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.bngl',
+                                         prefix=self.output_prefix,
+                                         dir=output_dir,
+                                         delete=False) as bng_file:
+            self.bng_filename = bng_file.name
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        In file mode, we execute all the queued commands when leaving the
+        context manager (i.e. now) by adding them to the BNGL
+        """
+        self.command_queue.write('end actions\ndone\n')
+        try:
+            # Generate BNGL file
+            with open(self.bng_filename, 'w') as bng_file:
+                bng_file.write(self.generator.get_content())
+                bng_file.write(self.command_queue.getvalue())
+
+            p = subprocess.Popen(['perl', _get_bng_path(), self.bng_filename],
+                                 cwd=os.path.dirname(self.bng_filename),
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            if self.verbose:
+                for line in iter(p.stdout.readline, b''):
+                    print(line, end="")
+            (p_out, p_err) = p.communicate()
+            if p.returncode:
+                raise GenerateNetworkError(p_out.rstrip("at line") +
+                                           "\n" +
+                                           p_err.rstrip())
+        finally:
+            try:
+                os.unlink(self.bng_filename)
+            except OSError:
+                pass
+
+    def action(self, action, **kwargs):
+        """
+        Generates a BNG action command and adds it to the command queue
+
+        Parameters
+        ----------
+        action : string
+            The name of the BNG action function
+        kwargs : kwargs, optional
+            Arguments and values to supply to BNG
+        """
+        # Process BNG arguments into a string using supermethod
+        action_args = super(BngFileInterface, self).action(action, **kwargs)
+
+        # Add the command to the queue
+        self.command_queue.write('\t%s({%s})\n' % (action, action_args))
+
+        return
+
+
+def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
             output_file_basename=None, cleanup=True, verbose=False,
             **additional_args):
     """
@@ -207,11 +365,11 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
             If not specified, parameter values will be taken directly from
             model.parameters.
     output_dir : string, optional
-        Location for temporary files generated by BNG. Defaults to '/tmp'.
+        Location for temporary files generated by BNG. If None (the
+        default), uses a temporary directory provided by the system.
     output_file_basename : string, optional
         The basename for the .bngl, .gdat, .cdat, and .net files that are
-        generated by BNG. If None (the default), creates a basename from the
-        model name, process ID, and a random integer in the range (0, 100000).
+        generated by BNG. If None (the default), creates a random basename.
     cleanup : bool, optional
         If True (default), delete the temporary files after the simulation is
         finished. If False, leave them in place (in `output_dir`). Useful for
@@ -226,6 +384,7 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
     additional_args['t_end'] = t_end
     additional_args['n_steps'] = n_steps
     additional_args['verbose'] = verbose
+    additional_args['cleanup'] = cleanup
 
     if param_values is not None:
         if len(param_values) != len(model.parameters):
@@ -234,15 +393,19 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
             model.parameters[i].value = param_values[i]
 
     try:
-        with BngConsole(model, verbose=verbose) as con:
-            bngl_filename = con.bng_filename
-            output_file_basename = os.path.splitext(bngl_filename)[0]
+        with BngFileInterface(model, verbose=verbose, output_dir=output_dir,
+                              output_prefix=output_file_basename) as con:
+            output_file_basename = con.base_filename
             gdat_filename = output_file_basename + '.gdat'
             cdat_filename = output_file_basename + '.cdat'
             net_filename = output_file_basename + '.net'
 
-            output = con.generate_network(overwrite=True)
+            con.action('generate_network', overwrite=True)
             con.action('simulate', **additional_args)
+
+        # Read in the network file
+        with open(net_filename, 'r') as net_file:
+            output = net_file.read()
 
         # Parse netfile (in case this hasn't already been done)
         if not model.species:
@@ -267,7 +430,7 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
 
     finally:
         if cleanup:
-            for filename in [gdat_filename,
+            for filename in [net_filename, gdat_filename,
                              cdat_filename, net_filename]:
                 try:
                     os.unlink(filename)
@@ -277,7 +440,6 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=os.getcw
     return yfull
 
 
-# TODO: Support append_stdout argument
 def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     """
     Return the output from BNG's generate_network function given a model.
@@ -295,12 +457,18 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         finished. If False, leave them in place (in `output_dir`). Useful for
         debugging.
     append_stdout : bool, optional
-        If True, provide BNG2.pl's standard output stream as comment lines
-        appended to the net file contents. If False (default), do not append it.
-
+        This option is no longer supported and has been left here for API
+        compatibility reasons.
+    verbose : bool, optional
+        If True, print output from BNG to stdout.
     """
-    with BngConsole(model, verbose=verbose) as con:
-        output = con.generate_network(overwrite=True)
+    with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as con:
+        net_filename = con.base_filename + '.net'
+        con.action('generate_network', overwrite=True)
+
+    with open(net_filename, 'r') as net_file:
+            output = net_file.read()
+
     return output
 
 
