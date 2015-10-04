@@ -394,14 +394,14 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
     try:
         with BngFileInterface(model, verbose=verbose, output_dir=output_dir,
                               output_prefix=output_file_basename,
-                              cleanup=cleanup) as con:
-            output_file_basename = con.base_filename
+                              cleanup=cleanup) as bngfile:
+            output_file_basename = bngfile.base_filename
             gdat_filename = output_file_basename + '.gdat'
             cdat_filename = output_file_basename + '.cdat'
             net_filename = output_file_basename + '.net'
 
-            con.action('generate_network', overwrite=True, verbose=verbose)
-            con.action('simulate', **additional_args)
+            bngfile.action('generate_network', overwrite=True, verbose=verbose)
+            bngfile.action('simulate', **additional_args)
 
         # Read in the network file
         with open(net_filename, 'r') as net_file:
@@ -462,9 +462,9 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     verbose : bool, optional
         If True, print output from BNG to stdout.
     """
-    with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as con:
-        net_filename = con.base_filename + '.net'
-        con.action('generate_network', overwrite=True, verbose=verbose)
+    with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as bngfile:
+        net_filename = bngfile.base_filename + '.net'
+        bngfile.action('generate_network', overwrite=True, verbose=verbose)
 
     with open(net_filename, 'r') as net_file:
             output = net_file.read()
