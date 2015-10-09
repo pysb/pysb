@@ -331,7 +331,7 @@ def _parse_netfile(model, lines):
             _parse_reaction(model, line)
         # fix up reactions whose reverse version we saw first
         for r in model.reactions_bidirectional:
-            if r['reverse']:
+            if all(r['reverse']):
                 r['reactants'], r['products'] = r['products'], r['reactants']
                 r['rate'] *= -1
             # now the 'reverse' value is no longer needed
