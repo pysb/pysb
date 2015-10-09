@@ -419,19 +419,26 @@ def _parse_reaction(model, line):
     model.reactions.append(reaction)
     # bidirectional reactions
     key = (reactants, products)
-    key_reverse = (products, reactants)
-    reaction_bd = reaction_cache.get(key_reverse)
-    if reaction_bd is None:
-        # make a copy of the reaction dict
-        reaction_bd = dict(reaction)
-        # default to false until we find a matching reverse reaction
-        reaction_bd['reversible'] = False
-        reaction_cache[key] = reaction_bd
-        model.reactions_bidirectional.append(reaction_bd)
+    reaction_bd = reaction_cache.get(key)
+    if reaction_bd:
+        reaction_bd['rate'] += combined_rate
+        reaction_bd['rule'] += tuple(r for r in rule_name if r not in
+                                     reaction_bd['rule'])
     else:
-        reaction_bd['reversible'] = True
-        reaction_bd['rate'] -= combined_rate
-        reaction_bd['rule'] += tuple(r for r in rule_name if r not in reaction_bd['rule'])
+        key_reverse = (products, reactants)
+        reaction_bd_rev = reaction_cache.get(key_reverse)
+        if reaction_bd_rev:
+            reaction_bd_rev['reversible'] = True
+            reaction_bd_rev['rate'] -= combined_rate
+            reaction_bd_rev['rule'] += tuple(r for r in rule_name if r not in
+                                             reaction_bd_rev['rule'])
+        else:
+            # make a copy of the reaction dict
+            reaction_bd_rev = dict(reaction)
+            # default to false until we find a matching reverse reaction
+            reaction_bd_rev['reversible'] = False
+            reaction_cache[key] = reaction_bd_rev
+            model.reactions_bidirectional.append(reaction_bd_rev)
     # odes
     for p in products:
         model.odes[p] += combined_rate
