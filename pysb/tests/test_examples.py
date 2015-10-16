@@ -1,13 +1,15 @@
-from pysb.bng import generate_network, NoInitialConditionsError
+from pysb.bng import generate_network, NoInitialConditionsError, NoRulesError
 from pysb.core import SelfExporter
 import traceback
 import os
 import importlib
 
+
 def test_generate_network():
     """Run network generation on all example models"""
     for model in get_example_models():
         yield (check_generate_network, model)
+
 
 def get_example_models():
     """Generator that yields the model objects for all example models"""
@@ -25,9 +27,10 @@ def get_example_models():
             yield module.model
 
 expected_exceptions = {
-    'tutorial_b': NoInitialConditionsError,
-    'tutorial_c': NoInitialConditionsError,
+    'tutorial_b': (NoInitialConditionsError, NoRulesError),
+    'tutorial_c': (NoInitialConditionsError, NoRulesError),
     }
+
 
 def check_generate_network(model):
     """Tests that network generation runs without error for the given model"""
@@ -36,11 +39,11 @@ def check_generate_network(model):
         generate_network(model)
         success = True
     except Exception as e:
-        # Some example models are deliberately incomplete, so here we will treat
-        # any of these "expected" exceptions as a success.
+        # Some example models are deliberately incomplete, so here we will
+        # treat any of these "expected" exceptions as a success.
         model_base_name = model.name.rsplit('.', 1)[1]
-        exception_class = expected_exceptions.get(model_base_name)
-        if exception_class and isinstance(e, exception_class):
+        exception_classes = expected_exceptions.get(model_base_name)
+        if exception_classes and isinstance(e, exception_classes):
             success = True
     assert success, "Network generation failed on model %s:\n-----\n%s" % \
                 (model.name, traceback.format_exc())

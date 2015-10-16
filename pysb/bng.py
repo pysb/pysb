@@ -240,10 +240,11 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
 
     """
     gen = BngGenerator(model)
-    if not model.initial_conditions:
-        raise NoInitialConditionsError()
     if not model.rules:
         raise NoRulesError()
+    if not model.initial_conditions and not any(r.is_synth() for r in
+                                                model.rules):
+        raise NoInitialConditionsError()
     bng_filename = '%s_%d_%d_temp.bngl' % (model.name, os.getpid(), random.randint(0, 10000))
     net_filename = bng_filename.replace('.bngl', '.net')
     output = StringIO()
@@ -459,7 +460,9 @@ def _parse_group(model, line):
 class NoInitialConditionsError(RuntimeError):
     """Model initial_conditions is empty."""
     def __init__(self):
-        RuntimeError.__init__(self, "Model has no initial conditions")
+        RuntimeError.__init__(self, "Model has no initial conditions or "
+                                    "zero-order synthesis rules")
+
 
 class NoRulesError(RuntimeError):
     """Model rules is empty."""
