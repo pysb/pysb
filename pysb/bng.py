@@ -156,6 +156,18 @@ class BngBaseInterface(object):
         kwargs: kwargs, optional
             Arguments and values to supply to BNG
         """
+        return
+
+    @classmethod
+    def _format_action_args(cls, **kwargs):
+        """
+        Formats a set of arguments for BNG
+
+        Parameters
+        ----------
+        kwargs: kwargs, optional
+            Arguments and values to supply to BNG
+        """
         if kwargs:
             action_args = ','.join('%s=>%s' % (k, BngConsole._bng_param(v))
                                    for k, v in kwargs.items())
@@ -272,8 +284,8 @@ class BngConsole(BngBaseInterface):
         kwargs : kwargs, optional
             Arguments and values to supply to BNG
         """
-        # Process BNG arguments into a string using supermethod
-        action_args = super(BngConsole, self).action(action, **kwargs)
+        # Process BNG arguments into a string
+        action_args = self._format_action_args(**kwargs)
 
         # Execute the command via the console
         self.console.sendline('action %s({%s})' % (action, action_args))
@@ -338,8 +350,8 @@ class BngFileInterface(BngBaseInterface):
         kwargs : kwargs, optional
             Arguments and values to supply to BNG
         """
-        # Process BNG arguments into a string using supermethod
-        action_args = super(BngFileInterface, self).action(action, **kwargs)
+        # Process BNG arguments into a string
+        action_args = self._format_action_args(**kwargs)
 
         # Add the command to the queue
         self.command_queue.write('\t%s({%s})\n' % (action, action_args))
