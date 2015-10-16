@@ -6,7 +6,8 @@ from pysb.core import as_complex_pattern
 @with_model
 def test_generate_network():
     Monomer('A')
-    assert_raises(NoInitialConditionsError, generate_network, model)
+    assert_raises((NoInitialConditionsError, NoRulesError),
+                  generate_network, model)
     Parameter('A_0', 1)
     Initial(A(), A_0)
     assert_raises(NoRulesError, generate_network, model)
@@ -43,3 +44,11 @@ def test_bidirectional_rules():
     ok_(model.reactions_bidirectional[0]['reversible'])
     #TODO Check that 'rate' has 4 terms
 
+
+@with_model
+def test_zero_order_synth_no_initials():
+    Monomer('A')
+    Monomer('B')
+    Rule('Rule1', None >> A(), Parameter('ksynth', 100))
+    Rule('Rule2', A() <> B(), Parameter('kf', 20), Parameter('kr', 2))
+    generate_equations(model)
