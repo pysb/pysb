@@ -119,10 +119,11 @@ class BngBaseInterface(object):
         Checks a model has at least one initial condition and rule, raising
         an exception if not
         """
-        if not self.model.initial_conditions:
-            raise NoInitialConditionsError()
         if not self.model.rules:
             raise NoRulesError()
+        if not self.model.initial_conditions and not any(r.is_synth() for r
+                                                         in self.model.rules):
+            raise NoInitialConditionsError()
 
     @classmethod
     def _bng_param(cls, param):
@@ -652,7 +653,8 @@ def _parse_group(model, line):
 class NoInitialConditionsError(RuntimeError):
     """Model initial_conditions is empty."""
     def __init__(self):
-        RuntimeError.__init__(self, "Model has no initial conditions")
+        RuntimeError.__init__(self, "Model has no initial conditions or "
+                                    "zero-order synthesis rules")
 
 class NoRulesError(RuntimeError):
     """Model rules is empty."""

@@ -5,7 +5,8 @@ from pysb.bng import *
 @with_model
 def test_generate_network():
     Monomer('A')
-    assert_raises(NoInitialConditionsError, generate_network, model)
+    assert_raises((NoInitialConditionsError, NoRulesError),
+                  generate_network, model)
     Parameter('A_0', 1)
     Initial(A(), A_0)
     assert_raises(NoRulesError, generate_network, model)
@@ -52,3 +53,12 @@ def test_bidirectional_rules():
     ok_(len(model.reactions_bidirectional[0]['rule'])==3)
     ok_(model.reactions_bidirectional[0]['reversible'])
     #TODO Check that 'rate' has 4 terms
+
+
+@with_model
+def test_zero_order_synth_no_initials():
+    Monomer('A')
+    Monomer('B')
+    Rule('Rule1', None >> A(), Parameter('ksynth', 100))
+    Rule('Rule2', A() <> B(), Parameter('kf', 10), Parameter('kr', 1))
+    generate_equations(model)
