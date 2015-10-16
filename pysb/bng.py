@@ -97,6 +97,7 @@ class BngBaseInterface(object):
     """ Abstract base class for interfacing with BNG """
     __metaclass__ = abc.ABCMeta
 
+    @abc.abstractmethod
     def __init__(self, model, verbose=False, cleanup=False,
                  output_prefix=None):
         self.verbose = verbose
