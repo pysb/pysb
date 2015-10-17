@@ -21,7 +21,8 @@ def test_simulate_network_console():
     Initial(A(), A_0)
     Parameter('k', 1)
     Rule('degrade', A() >> None, k)
-    with BngConsole(model) as bng:
+    # Suppress network overwrite warning from simulate command
+    with BngConsole(model, suppress_warnings=True) as bng:
         bng.generate_network(overwrite=True)
         bng.action('simulate', method='ssa', t_end=20000, n_steps=100)
 

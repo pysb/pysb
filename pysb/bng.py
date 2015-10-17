@@ -89,8 +89,9 @@ def _get_bng_path():
     _bng_path = script_path
     return script_path
 
-class GenerateNetworkError(RuntimeError):
-    """BNG reported an error when trying to generate a network for a model."""
+
+class BngInterfaceError(RuntimeError):
+    """BNG reported an error"""
     pass
 
 
@@ -227,6 +228,8 @@ class BngConsole(BngBaseInterface):
             self._console_wait()
             self.console.sendline('load %s' % bng_file.name)
             self._console_wait()
+        except Exception as e:
+            raise BngInterfaceError(e)
         finally:
             if self.bng_filename:
                 try:
@@ -269,6 +272,8 @@ class BngConsole(BngBaseInterface):
             self.action('generate_network', overwrite=overwrite)
             with open(net_filename, 'r') as net_file:
                 bng_network = net_file.read()
+        except Exception as e:
+            raise BngInterfaceError(e)
         finally:
             if self.cleanup:
                 try:
@@ -336,9 +341,11 @@ class BngFileInterface(BngBaseInterface):
                     print(line, end="")
             (p_out, p_err) = p.communicate()
             if p.returncode:
-                raise GenerateNetworkError(p_out.rstrip("at line") +
+                raise BngInterfaceError(p_out.rstrip("at line") +
                                            "\n" +
                                            p_err.rstrip())
+        except Exception as e:
+            raise BngInterfaceError(e)
         finally:
             try:
                 os.unlink(self.bng_filename)
