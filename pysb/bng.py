@@ -10,6 +10,7 @@ import numpy
 import tempfile
 from pkg_resources import parse_version
 import abc
+from warnings import warn
 
 try:
     from cStringIO import StringIO
@@ -195,7 +196,8 @@ class BngBaseInterface(object):
 class BngConsole(BngBaseInterface):
     """ Interact with BioNetGen through BNG Console """
     def __init__(self, model, verbose=False, cleanup=True,
-                 output_dir=None, output_prefix=None, timeout=30):
+                 output_dir=None, output_prefix=None, timeout=30,
+                 suppress_warnings=False):
         super(BngConsole, self).__init__(model, verbose, cleanup,
                                          output_prefix)
 
@@ -205,6 +207,8 @@ class BngConsole(BngBaseInterface):
             raise ImportError("Library 'pexpect' is required to use "
                               "BNGConsole, please install it to continue.\n"
                               "It is not currently available on Windows.")
+
+        self.suppress_warnings = suppress_warnings
 
         try:
             # Generate BNGL file
@@ -246,6 +250,8 @@ class BngConsole(BngBaseInterface):
         self.console.expect('BNG>')
         if self.verbose:
             print(self.console.before)
+        elif not self.suppress_warnings and "WARNING:" in self.console.before:
+            warn(self.console.before)
         return self.console.before
 
     def generate_network(self, overwrite=False):
