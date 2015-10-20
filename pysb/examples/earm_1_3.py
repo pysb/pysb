@@ -12,6 +12,7 @@ http://www.ploscompbiol.org/article/info:doi/10.1371/journal.pcbi.1002482
 # duplicating the body of that model here, we'll start this model off as a copy
 # of that one then modify and add components as necessary.
 
+from __future__ import print_function
 import re
 from pysb import *
 import pysb.bng
@@ -20,8 +21,8 @@ import pysb.examples.earm_1_0
 # Start from EARM 1.0 as a base
 # ==========
 Model(base=pysb.examples.earm_1_0.model)
-Annotation(model, 'isDescribedBy',
-           'http://identifiers.org/doi/10.1371/journal.pcbi.1002482')
+Annotation(model, 'http://identifiers.org/doi/10.1371/journal.pcbi.1002482',
+           'isDescribedBy')
 
 # Rename all instances of Bcl2c to Mcl1, which was determined as a more accurate
 # description of that monomer based on its role in the model
@@ -145,9 +146,9 @@ for species in all_species:
 
 def show_species():
     """Print a table of species like Table S2"""
-    print '   | %-12s %8s %20s %10s' \
-        % ('species', 'initial', 'synth rate', 'deg rate')
-    print '-' * (5 + 12 + 1 + 8 + 1 + 20 + 1 + 10)
+    print('   | %-12s %8s %20s %10s' %
+          ('species', 'initial', 'synth rate', 'deg rate'))
+    print('-' * (5 + 12 + 1 + 8 + 1 + 20 + 1 + 10))
     for i, species in enumerate(all_species, 1):
         mp_names = [mp.monomer.name for mp in species.monomer_patterns]
         name = '_'.join(mp_names)
@@ -165,39 +166,43 @@ def show_species():
         else:
             ks_expr = '0'
         values = (i, display_name, ic_value, ks_expr, kdeg.value)
-        print '%2d | %-12s %8d %20s %10g' % values
+        print('%2d | %-12s %8d %20s %10g' % values)
 
 def show_rates():
     """Print a table of rate parameters like Table S4"""
     # FIXME kf14-kf21 need to be un-scaled by v to make the table look right
-    print ("%-20s        " * 3) % ('forward', 'reverse', 'catalytic')
-    print '-' * (9 + 11 + 7) * 3
-    for i in range(1,29) + [31]:
+    print(("%-20s        " * 3) % ('forward', 'reverse', 'catalytic'))
+    print('-' * (9 + 11 + 7) * 3)
+    for i in list(range(1,29)) + [31]:
         for t in ('f', 'r', 'c'):
             n = 'k%s%d' % (t,i)
             p = model.parameters.get(n)
             if p is not None:
-                print "%-9s%11g       " % (p.name, p.value),
-        print
+                print("%-9s%11g       " % (p.name, p.value), end=' ')
+        print()
 
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\n"
-    print "Initial species concentrations and synthesis/degradation rates\n" \
-        "==========\n" \
-        "(compare to supporting text S3, table S2 from Gaudet et al., " \
-        "however note that\nthe numbering and ordering is different)\n" 
+    print(__doc__, "\n", model)
+    print("""
+Initial species concentrations and synthesis/degradation rates
+==========
+(compare to supporting text S3, table S2 from Gaudet et al.,
+however note that the numbering and ordering is different.)""")
     show_species()
-    print "\n"
+    print("\n")
 
-    print "Kinetic rate parameters\n" \
-        "==========\n" \
-        "(compare to supporting text S3, table S4 from Gaudet et al., " \
-        "however note that\nkf14-kf21 are off by a factor of 'v' (%g) as " \
-        "this volume scaling factor has\nbeen moved from the ODEs to the " \
-        "rate values in this implementation)\n" % v
+    print("""
+Kinetic rate parameters
+==========
+(compare to supporting text S3, table S4 from Gaudet et al.,
+however note that kf14-kf21 are off by a factor of 'v' (%g) as
+this volume scaling factor has been moved from the ODEs to the
+rate values in this implementation)
+""" % v)
     show_rates()
-    print "\n\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid."
+    print("""
+
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid.""")

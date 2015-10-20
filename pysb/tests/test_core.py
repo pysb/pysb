@@ -114,3 +114,16 @@ def test_reaction_pattern_add_to_none():
     rp = cp + cp
     ok_(isinstance(rp + None, ReactionPattern),
         'ReactionPattern + None did not return a ReactionPattern.')
+
+@with_model
+def test_complex_pattern_call():
+    """Ensure ComplexPattern calling (refinement) works as expected."""
+    Monomer('A', ['w', 'x'], {'x': ('e', 'f')})
+    Monomer('B', ['y', 'z'], {'z': ('g', 'h')})
+    cp = A(w=1, x='e') % B(y=1, z='g')
+    r = {'x': 'f', 'z': 'h'} # refinement for complexpattern
+    ok_(cp(**r))
+    ok_(cp(**r).monomer_patterns[0].site_conditions['x'] == r['x'])
+    ok_(cp(r))
+    ok_(cp(r).monomer_patterns[0].site_conditions['x'] == r['x'])
+    assert_raises(RedundantSiteConditionsError, cp, {'x': 'f'}, z='h')

@@ -1,5 +1,6 @@
 """Produce contact map for Figure 5D from the PySB publication"""
 
+from __future__ import print_function
 from pysb import *
 from earm import lopez_modules
 from earm import albeck_modules
@@ -38,5 +39,5 @@ try:
     os.unlink('fig5d_cm.jpg')
 except OSError:
     pass
-print
-print "Generated fig5d_cm.dot in", output_dir
+print()
+print("Generated fig5d_cm.dot in", output_dir)

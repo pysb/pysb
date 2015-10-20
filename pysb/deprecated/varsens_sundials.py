@@ -1,3 +1,4 @@
+from __future__ import print_function
 import pysb.bng
 import numpy 
 import sympy 
@@ -13,7 +14,7 @@ from pysundials import cvode
 
 def spinner(i):
     spin = ("|", "/","-", "\\")
-    print "\r[%s] %d"%(spin[i%4],i),
+    print("\r[%s] %d"%(spin[i%4],i), end=' ')
     sys.stdout.flush()
 
 # reltol of 1.0e-3, relative error of ~1%. abstol of 1.0e-3, enough for values that oscillate in the hundreds to thousands
@@ -90,7 +91,7 @@ def odeinit(model, reltol=1.0e-3, abstol=1.0e-3, nsteps = 1000, itermaxstep = No
     yout = numpy.zeros([nsteps, odesize])
 
     #initialize the arrays
-    #print "Initial parameter values:", y
+    #print("Initial parameter values:", y)
     xout[0] = 0.0 #CHANGE IF NEEDED
     #first step in yout
     for i in range(0, odesize):
@@ -121,7 +122,7 @@ def odesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic=Tru
     else:
         #only a subset of parameters are used for annealing
         for i in range(len(useparams)):
-            #print "changing parameter", model.parameters[useparams[i]],"data.p", data.p[useparams[i]],"to", params[i]
+            #print("changing parameter", model.parameters[useparams[i]],"data.p", data.p[useparams[i]],"to", params[i])
             data.p[useparams[i]] = params[i]
 
     # FIXME:
@@ -148,15 +149,15 @@ def odesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic=Tru
     t = cvode.realtype(tinit)
     tout = tinit + tadd
     
-    #print "Beginning integration"
-    #print "TINIT:", tinit, "TFINAL:", tfinal, "TADD:", tadd, "ODESIZE:", odesize
-    #print "Integrating Parameters:\n", params
-    #print "y0:", yzero
+    #print("Beginning integration")
+    #print("TINIT:", tinit, "TFINAL:", tfinal, "TADD:", tadd, "ODESIZE:", odesize)
+    #print("Integrating Parameters:\n", params)
+    #print("y0:", yzero)
 
     for step in range(1, nsteps):
         ret = cvode.CVode(cvode_mem, tout, y, ctypes.byref(t), cvode.CV_NORMAL)
         if ret !=0:
-            print "CVODE ERROR %i"%(ret)
+            print("CVODE ERROR %i"%(ret))
             break
 
         xout[step]= tout
@@ -165,7 +166,7 @@ def odesolve(model, tfinal, envlist, params, useparams=None, tinit = 0.0, ic=Tru
 
         # increase the time counter
         tout += tadd
-    #print "Integration finished"
+    #print("Integration finished")
 
     #now deal with observables
     #obs_names = [name for name, rp in model.observable_patterns]
@@ -203,7 +204,7 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
     #rngmax = min(xparray[0].max(), simarray[0].max())
     #rngmin = round(rngmin, -1)
     #rngmax = round(rngmax, -1)
-    #print "Time overlap range:", rngmin,"to", rngmax
+    #print("Time overlap range:", rngmin,"to", rngmax)
     
     ipsimarray = numpy.zeros(xparray.shape[1])
     objout = []
@@ -214,9 +215,9 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         # code.interact(local=locals())
         
         #some error checking
-        #print "xspairlist length:", len(xspairlist[i])
-        #print "xspairlist element type:", type(xspairlist[i])
-        #print "xspairlist[i] elements:", xspairlist[i][0], xspairlist[i][1]
+        #print("xspairlist length:", len(xspairlist[i]))
+        #print("xspairlist element type:", type(xspairlist[i]))
+        #print("xspairlist[i] elements:", xspairlist[i][0], xspairlist[i][1])
         assert type(xspairlist[i]) is tuple
         assert len(xspairlist[i]) == 2
         
@@ -236,7 +237,7 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         diffsqarray = diffarray * diffarray
 
         if vardata is True:
-            #print "using XP VAR",xparrayaxis+1
+            #print("using XP VAR",xparrayaxis+1)
             xparrayvar = xparray[xparrayaxis+1] # variance data provided in xparray in next column
         else:
             # assume a default variance
@@ -251,16 +252,16 @@ def compare_data(xparray, simarray, xspairlist, vardata=False):
         # check for inf in objarray, they creep up when there are near zero or zero values in xparrayvar
         for i in range(len(objarray)):
             if numpy.isinf(objarray[i]) or numpy.isnan(objarray[i]):
-                #print "CORRECTING NAN OR INF. IN ARRAY"
-                # print objarray
+                #print("CORRECTING NAN OR INF. IN ARRAY")
+                #print(objarray)
                 objarray[i] = 1e-100 #zero enough
 
         #import code
         #code.interact(local=locals())
 
         objout.append(objarray.sum())
-        #print "OBJOUT(%d,%d):%f  OBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout)
-    #print "OBJOUT(total):", objout
+        #print("OBJOUT(%d,%d):%f  OBJOUT(CUM):%f"%(xparrayaxis, simarrayaxis, objarray.sum(), objout))
+    #print("OBJOUT(total):", objout)
     return numpy.asarray(objout)
 
 def getlog(sobolarr, params, omag=1, useparams=[], usemag=None):
@@ -320,7 +321,7 @@ def getlin(sobolarr, params, CV =.25, useparams=[], useCV=None):
         for i in range(sobprmarr.shape[0]):
             sobprmarr[i] = (sobolarr[i]*(ub-lb)) + lb
     else:
-        print "array shape not allowed... "
+        print("array shape not allowed... ")
         
 
     # sobprmarr is the N x len(params) array for sobol analysis
@@ -361,7 +362,7 @@ def parmeval(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist
     # specify that this is normalized data
     if norm is True:
         # First process the A and B matrices
-        print "processing matrix A, %d iterations:", sobmtxA.shape[0]
+        print("processing matrix A, %d iterations:", sobmtxA.shape[0])
         for i in range(sobmtxA.shape[0]):
             outlist = odesolve(model, time, envlist, sobmtxA[i], useparams, ic)
             datamax = numpy.max(outlist[0], axis = 1)
@@ -371,7 +372,7 @@ def parmeval(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist
             yA[i] = compare_data(xpdata, outlistnorm, xspairlist, vardata)
             spinner(i)
 
-        print "\nprocessing matrix B, %d iterations:", sobmtxB.shape[0]
+        print("\nprocessing matrix B, %d iterations:", sobmtxB.shape[0])
         for i in range(sobmtxB.shape[0]):
             outlist = odesolve(model, time, envlist, sobmtxB[i], useparams, ic)
             datamax = numpy.max(outlist[0], axis = 1)
@@ -383,9 +384,9 @@ def parmeval(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist
             spinner(i)
 
         # now the C matrix, a bit more complicated b/c it is of size params x samples
-        print "\nprocessing matrix C_n, %d parameters:"%(sobmtxC.shape[0])
+        print("\nprocessing matrix C_n, %d parameters:"%(sobmtxC.shape[0]))
         for i in range(sobmtxC.shape[0]):
-            print "\nprocessing processing parameter %d, %d iterations"%(i,sobmtxC.shape[1])
+            print("\nprocessing processing parameter %d, %d iterations"%(i,sobmtxC.shape[1]))
             for j in range(sobmtxC.shape[1]):
                 outlist = odesolve(model, time, envlist, sobmtxC[i][j], useparams, ic)
                 datamax = numpy.max(outlist[0], axis = 1)
@@ -397,21 +398,21 @@ def parmeval(model, sobmtxA, sobmtxB, sobmtxC, time, envlist, xpdata, xspairlist
                 spinner(j)
     else:
         # First process the A and B matrices
-        print "processing matrix A:"
+        print("processing matrix A:")
         for i in range(sobmtxA.shape[0]):
             outlist = odesolve(model, time, envlist, sobmtxA[i], useparams, ic)
             yA[i] = compare_data(xpdata, outlist[0], xspairlist, vardata)
             spinner(i)
 
-        print "processing matrix B:"
+        print("processing matrix B:")
         for i in range(sobmtxB.shape[0]):
             outlist = odesolve(model, time, envlist, sobmtxB[i], useparams, ic)
             yB[i] = compare_data(xpdata, outlistnorm, xspairlist, vardata)
             spinner(i)
 
-        print "processing matrix C_n"
+        print("processing matrix C_n")
         for i in range(sobmtxC.shape[0]):
-            print "processing processing parameter %d"%i
+            print("processing processing parameter %d"%i)
             for j in range(sobmtxC.shape[1]):
                 outlist = odesolve(model, time, envlist, sobmtxC[i][j], useparams, ic)
                 yC[i][j] = compare_data(xpdata, outlistnorm, xspairlist, vardata)

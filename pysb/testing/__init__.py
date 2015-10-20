@@ -5,11 +5,11 @@ import pickle
 def with_model(func):
     """Decorate a test to set up and tear down a Model."""
     def inner(*args, **kwargs):
-        model = Model(func.func_name, _export=False)
+        model = Model(func.__name__, _export=False)
         # manually set up SelfExporter, targeting func's globals
         SelfExporter.default_model = model
         SelfExporter.target_module = func.__module__
-        SelfExporter.target_globals = func.func_globals
+        SelfExporter.target_globals = func.__globals__
         SelfExporter.target_globals['model'] = model
         try:
             # call the actual test function
@@ -26,7 +26,7 @@ def serialize_component_list(model, filename):
     """
 
     f = open(filename, 'w')
-    pickle.dump(model.all_components().values(), f)
+    pickle.dump(list(model.all_components().values()), f)
     f.close()
 
 def check_model_against_component_list(model, component_list):
@@ -41,15 +41,16 @@ def check_model_against_component_list(model, component_list):
     To serialize the list of components to create a record of a
     validated state, see :py:func:`serialize_component_list`.
     """
-    assert len(model.all_components().values()) == len(component_list), \
+    assert len(model.all_components()) == len(component_list), \
            "Model %s does not have the same " \
            "number of components as the previously validated version. " \
            "The validated model has %d components, current model has " \
            "%d components." % \
-           (model.name, len(model.all_components().values()), len(component_list))
+           (model.name, len(model.all_components()), len(component_list))
 
+    model_components = list(model.all_components().values())
     for i, comp in enumerate(component_list):
-        model_comp_str = repr(model.all_components().values()[i])
+        model_comp_str = repr(model_components[i])
         comp_str = repr(comp) 
         assert comp_str == model_comp_str, \
                "Model %s does not match reference version: " \

@@ -3,6 +3,7 @@
 http://bionetgen.org/index.php/Simple
 """
 
+from __future__ import print_function
 from pysb import *
 
 Model()
@@ -40,7 +41,8 @@ Observable('Lbound', EGF(R=ANY))  # Molecules
 
 
 if __name__ == '__main__':
-    print __doc__, "\n", model
-    print "\nNOTE: This model code is designed to be imported and programatically " \
-        "manipulated,\nnot executed directly. The above output is merely a " \
-        "diagnostic aid."
+    print(__doc__, "\n", model)
+    print("""
+NOTE: This model code is designed to be imported and programatically
+manipulated, not executed directly. The above output is merely a
+diagnostic aid.""")

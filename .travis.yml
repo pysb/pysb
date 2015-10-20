@@ -1,19 +1,32 @@
 language: python
+sudo: false
 python:
-  - "2.7"
-virtualenv:
-  system_site_packages: true
+- '2.7'
+- '3.4'
 before_install:
-  - sudo apt-get install python-scipy
-  - sudo apt-get install ocaml-native-compilers
+- sudo apt-get install python-scipy
+- sudo apt-get install ocaml-native-compilers
+- wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+- chmod +x miniconda.sh
+- "./miniconda.sh -b"
+- export PATH=/home/travis/miniconda/bin:$PATH
+- conda update --yes conda
+- conda install --yes python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib sympy networkx
+  nose h5py
+- pip install -i https://pypi.binstar.org/pypi/simple pygraphviz==1.3rc1
+- pip install python-coveralls
+- wget "http://www.csb.pitt.edu/Faculty/Faeder/?smd_process_download=1&download_id=142"
+  -O BioNetGen-2.2.6-stable.tar.gz
+- tar xzf BioNetGen-2.2.6-stable.tar.gz
+- export BNGPATH=`pwd`/BioNetGen-2.2.6-stable
+- wget https://github.com/Kappa-Dev/KaSim/archive/KaSim3.zip
+- unzip KaSim3.zip
+- cd KaSim-KaSim3
+- make
+- export PATH=`pwd`/KaSim /usr/local/share/KaSim:$PATH
 install:
-  - pip install sympy
-  - wget http://bionetgen.googlecode.com/files/BioNetGen-2.2.5-stable.zip
-  - unzip BioNetGen-2.2.5-stable.zip
-  - sudo ln -s `pwd`/BioNetGen-2.2.5-stable /usr/local/share/BioNetGen
-  - wget https://github.com/Kappa-Dev/KaSim/archive/KaSim3.zip
-  - unzip KaSim3.zip
-  - cd KaSim-KaSim3
-  - make
-  - sudo ln -s `pwd`/KaSim /usr/local/share/KaSim
-script: nosetests
+  python setup.py build --build-lib=build/lib
+script:
+  nosetests build/lib/pysb --with-coverage --cover-inclusive --cover-package=build/lib/pysb
+after_success:
+  coveralls

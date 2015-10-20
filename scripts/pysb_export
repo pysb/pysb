@@ -1,5 +1,6 @@
 #!python
 
+from __future__ import print_function
 import os
 import sys
 from pysb.export.__main__ import main, validate_argv
@@ -16,7 +17,7 @@ Supported formats:
   %s""" % (script_name, format_list)
 
 if not validate_argv(sys.argv):
-   print usage
+   print(usage)
    sys.exit(1)
 sys.exit(main(sys.argv))
 

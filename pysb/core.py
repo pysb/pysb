@@ -9,7 +9,16 @@ import weakref
 import copy
 import itertools
 import sympy
-
+try:
+    reload
+except NameError:
+    from imp import reload
+try:
+    basestring
+except NameError:
+    # Under Python 3, do not pretend that bytes are a valid string
+    basestring = str
+    long = int
 
 def Initial(*args):
     """Declare an initial condition (see Model.initial)."""
@@ -101,7 +110,7 @@ class SelfExporter(object):
             SelfExporter.default_model.add_component(obj)
 
         # load obj into target namespace under obj.name
-        if SelfExporter.target_globals.has_key(export_name):
+        if export_name in SelfExporter.target_globals:
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
 
@@ -240,12 +249,12 @@ class Monomer(Component):
         for site in sites:
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
-        sites_dup = [site for site in sites_seen.keys() if sites_seen[site] > 1]
+        sites_dup = [site for site, count in sites_seen.items() if count > 1]
         if sites_dup:
             raise Exception("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
-        unknown_sites = [site for site in site_states.keys() if not site in sites_seen]
+        unknown_sites = [site for site in site_states if not site in sites_seen]
         if unknown_sites:
             raise Exception("Unknown sites in site_states: " + str(unknown_sites))
         # ensure site_states values are all strings
@@ -323,7 +332,7 @@ class MonomerPattern(object):
 
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
-        unknown_sites = [site for site in site_conditions.keys() if site not in monomer.sites]
+        unknown_sites = [site for site in site_conditions if site not in monomer.sites]
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
 
@@ -430,7 +439,7 @@ class MonomerPattern(object):
         value += ', '.join([
                 k + '=' + repr(self.site_conditions[k])
                 for k in self.monomer.sites
-                if self.site_conditions.has_key(k)
+                if k in self.site_conditions
                 ])
         value += ')'
         if self.compartment is not None:
@@ -496,10 +505,11 @@ class ComplexPattern(object):
         #   so some sort of canonicalization of that numbering is necessary.
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
-        return \
-            self.compartment == other.compartment and \
-            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in self.monomer_patterns) == \
-            sorted((mp.monomer, mp.site_conditions, mp.compartment) for mp in other.monomer_patterns)
+        return (self.compartment == other.compartment and
+                sorted((repr(mp.monomer), mp.site_conditions, mp.compartment)
+                       for mp in self.monomer_patterns) ==
+                sorted((repr(mp.monomer), mp.site_conditions, mp.compartment)
+                       for mp in other.monomer_patterns))
 
     def copy(self):
         """
@@ -510,11 +520,13 @@ class ComplexPattern(object):
         """
         return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
 
-    def __call__(self, **kwargs):
+    def __call__(self, conditions=None, **kwargs):
         """Build a new ComplexPattern with updated site conditions."""
 
+        kwargs = extract_site_conditions(conditions, **kwargs)
+
         # Ensure we don't have more than one of any Monomer in our patterns.
-        mp_monomer = lambda mp: mp.monomer
+        mp_monomer = lambda mp: id(mp.monomer)
         patterns_sorted = sorted(self.monomer_patterns, key=mp_monomer)
         pgroups = itertools.groupby(patterns_sorted, mp_monomer)
         pcounts = [(monomer, sum(1 for mp in mps)) for monomer, mps in pgroups]
@@ -763,7 +775,10 @@ class Parameter(Component, sympy.Symbol):
     def __init__(self, name, value=0.0, _export=True):
         Component.__init__(self, name, _export)
         self.value = float(value)
-
+    
+    def get_value(self):
+        return self.value
+    
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
     @property
@@ -772,6 +787,9 @@ class Parameter(Component, sympy.Symbol):
 
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
+
+    def __str__(self):
+        return  repr(self)
 
 
 
@@ -825,7 +843,6 @@ class Compartment(Component):
     def __repr__(self):
         return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
             (self.__class__.__name__, repr(self.name), repr(self.parent), repr(self.dimension), repr(self.size))
-
 
 
 class Rule(Component):
@@ -950,7 +967,7 @@ class Observable(Component, sympy.Symbol):
     species : list of integers
         List of species indexes for species matching the pattern.
     coefficients : list of integers
-        List of coefficients by which each species amount is to be multipled to
+        List of coefficients by which each species amount is to be multiplied to
         correct for multiple pattern matches within a species.
 
     Notes
@@ -994,6 +1011,8 @@ class Observable(Component, sympy.Symbol):
         ret += ')'
         return ret
 
+    def __str__(self):
+        return repr(self)
 
 
 class Expression(Component, sympy.Symbol):
@@ -1036,6 +1055,9 @@ class Expression(Component, sympy.Symbol):
                    isinstance(a, sympy.Number)
                    for a in self.expr.atoms())
 
+    def get_value(self):
+        return self.expr.evalf()
+
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
     @property
@@ -1047,6 +1069,8 @@ class Expression(Component, sympy.Symbol):
                               repr(self.expr))
         return ret
 
+    def __str__(self):
+        return repr(self)
 
 
 class Model(object):
@@ -1079,8 +1103,8 @@ class Model(object):
         Parameter defines the amount or concentration of the species.
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
-        the initial conditions and successively applying
-        the rules. Each ComplexPattern is concrete.
+        the initial conditions and successively applying the rules. Each 
+        ComplexPattern is concrete.
     odes : list of sympy.Expr
         Mathematical expressions describing the time derivative of the amount of
         each species, as generated by the rules.
@@ -1122,6 +1146,9 @@ class Model(object):
         self.reactions_bidirectional = []
         self.initial_conditions = []
         self.annotations = []
+        #####
+        self.diffusivities = []
+        #####
         if self._export:
             SelfExporter.export(self)
         if self.base is not None:
@@ -1212,11 +1239,17 @@ class Model(object):
         cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
         return self.parameters - cset_used
 
+#     def expressions_constant(self):
+#         """Return a ComponentSet of constant expressions."""
+#         cset = ComponentSet(e for e in self.expressions
+#                             if all(isinstance(a, (Parameter, sympy.Number))
+#                                    for a in e.expand_expr().atoms()))
+#         return cset
+    
     def expressions_constant(self):
         """Return a ComponentSet of constant expressions."""
         cset = ComponentSet(e for e in self.expressions
-                            if all(isinstance(a, (Parameter, sympy.Number))
-                                   for a in e.expand_expr().atoms()))
+                            if e.is_constant_expression())
         return cset
 
     def expressions_dynamic(self):
@@ -1375,7 +1408,7 @@ class Model(object):
         """
         # FIXME I don't even want to think about the inefficiency of this, but at least it works
         try:
-            return (i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)).next()
+            return next((i for i, s_cp in enumerate(self.species) if s_cp.is_equivalent_to(complex_pattern)))
         except StopIteration:
             return None
 
@@ -1469,7 +1502,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
 
     It behaves mostly like an ordered set, but components can also be retrieved
     by name *or* index by using the [] operator (like a combination of a dict
-    and a list). Components can not be removed or replaced, but they can be
+    and a list). Components cannot be removed or replaced, but they can be
     renamed. Iteration returns the component objects.
 
     Parameters
@@ -1594,16 +1627,25 @@ class ComponentDuplicateNameError(ValueError):
 
 
 def extract_site_conditions(conditions=None, **kwargs):
-    """Parse MonomerPattern site conditions."""
+    """Parse MonomerPattern/ComplexPattern site conditions."""
     # enforce site conditions as kwargs or a dict but not both
     if conditions and kwargs:
-        raise Exception("Site conditions may be specified as EITHER keyword arguments OR a single dict")
+        raise RedundantSiteConditionsError()
     # handle normal cases
     elif conditions:
         site_conditions = conditions.copy()
     else:
         site_conditions = kwargs
     return site_conditions
+
+
+class RedundantSiteConditionsError(ValueError):
+    """Both conditions dict and kwargs both passed to create pattern."""
+    def __init__(self):
+        ValueError.__init__(
+            self,
+            ("Site conditions may be specified as EITHER keyword arguments "
+             "OR a single dict"))
 
 
 # Some light infrastructure for defining symbols that act like "keywords", i.e.

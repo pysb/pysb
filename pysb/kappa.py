@@ -11,8 +11,7 @@ The other functions are used internally and manage the execution of the Kappa
 software and the parsing of the data into a Numpy format.
 """
 
-__author__ = "johnbachman"
-
+from __future__ import print_function as _
 import pysb
 from pysb.generator.kappa import KappaGenerator
 import os
@@ -21,6 +20,13 @@ import random
 import re
 import sympy
 import numpy as np
+try:
+    from future_builtins import zip
+except ImportError:
+    pass
+
+__author__ = "johnbachman"
+
 
 def run_simulation(model, **kwargs):
     """Runs the given model using KaSim and returns the parsed results.
@@ -159,7 +165,7 @@ def run_complx(gen, kappa_filename, args):
         kappa_file.write(gen.get_content())
         kappa_file.close()
         cmd = 'complx ' + ' '.join(args) + ' ' + kappa_filename
-        print "Command: " + cmd
+        print("Command: " + cmd)
         p = subprocess.Popen(['complx'] + args + [kappa_filename],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         #p.communicate()
@@ -261,7 +267,7 @@ def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
 
         kappa_file.close()
 
-        print "Running kasim"
+        print("Running kasim")
         p = subprocess.Popen(['KaSim'] + args)
                            #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         p.communicate()
@@ -321,7 +327,7 @@ def parse_kasim_outfile(out_filename):
             else: column_names.append(raw_name)
 
         # Create the dtype argument for the numpy record array
-        dt = zip(column_names, ('float',)*len(column_names))
+        dt = list(zip(column_names, ('float',)*len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
         arr = np.loadtxt(out_filename, dtype=dt, skiprows=1)
