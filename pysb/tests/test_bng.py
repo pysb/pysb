@@ -29,6 +29,21 @@ def test_compartment_species_equivalence():
     ok_(model.species[2].is_equivalent_to(Q(x=1) ** C % R(y=1) ** C))
 
 @with_model
+def test_bidirectional_rules_collapse():
+    Monomer('A')
+    Monomer('B')
+    Initial(B(), Parameter('B_init', 0))
+    Initial(A(), Parameter('A_init', 100))
+    Rule('Rule1', B() <> A(), Parameter('k3', 10), Parameter('k1', 1))
+    Rule('Rule2', A() <> B(), k1, Parameter('k2', 1))
+    Rule('Rule3', B() >> A(), Parameter('k4', 5))
+    generate_equations(model)
+    ok_(len(model.reactions) == 4)
+    ok_(len(model.reactions_bidirectional) == 1)
+    ok_(len(model.reactions_bidirectional[0]['rule']) == 3)
+    ok_(model.reactions_bidirectional[0]['reversible'])
+
+@with_model
 def test_bidirectional_rules():
     Monomer('A')
     Monomer('B')
@@ -37,9 +52,8 @@ def test_bidirectional_rules():
     Rule('Rule2', B() >> A(), Parameter('k3', 10))
     Rule('Rule3', B() >> A(), Parameter('k4', 5))
     generate_equations(model)
-    ok_(len(model.reactions)==4)
-    ok_(len(model.reactions_bidirectional)==1)
-    ok_(len(model.reactions_bidirectional[0]['rule'])==3)
+    ok_(len(model.reactions) == 4)
+    ok_(len(model.reactions_bidirectional) == 1)
+    ok_(len(model.reactions_bidirectional[0]['rule']) == 3)
     ok_(model.reactions_bidirectional[0]['reversible'])
     #TODO Check that 'rate' has 4 terms
-

@@ -331,7 +331,7 @@ def _parse_netfile(model, lines):
             _parse_reaction(model, line)
         # fix up reactions whose reverse version we saw first
         for r in model.reactions_bidirectional:
-            if r['reverse']:
+            if all(r['reverse']):
                 r['reactants'], r['products'] = r['products'], r['reactants']
                 r['rate'] *= -1
             # now the 'reverse' value is no longer needed
@@ -420,18 +420,24 @@ def _parse_reaction(model, line):
     # bidirectional reactions
     key = (reactants, products)
     key_reverse = (products, reactants)
-    reaction_bd = reaction_cache.get(key_reverse)
-    if reaction_bd is None:
+    if key in reaction_cache:
+        reaction_bd = reaction_cache.get(key)
+        reaction_bd['rate'] += combined_rate
+        reaction_bd['rule'] += tuple(r for r in rule_name if r not in
+                                     reaction_bd['rule'])
+    elif key_reverse in reaction_cache:
+        reaction_bd = reaction_cache.get(key_reverse)
+        reaction_bd['reversible'] = True
+        reaction_bd['rate'] -= combined_rate
+        reaction_bd['rule'] += tuple(r for r in rule_name if r not in
+                                         reaction_bd['rule'])
+    else:
         # make a copy of the reaction dict
         reaction_bd = dict(reaction)
         # default to false until we find a matching reverse reaction
         reaction_bd['reversible'] = False
         reaction_cache[key] = reaction_bd
         model.reactions_bidirectional.append(reaction_bd)
-    else:
-        reaction_bd['reversible'] = True
-        reaction_bd['rate'] -= combined_rate
-        reaction_bd['rule'] += tuple(r for r in rule_name if r not in reaction_bd['rule'])
     # odes
     for p in products:
         model.odes[p] += combined_rate
