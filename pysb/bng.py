@@ -627,7 +627,7 @@ def _parse_reaction(model, line):
     rule_name, is_reverse = zip(*[re.subn('^_reverse_|\(reverse\)$', '', r) for r in rule_list])
     is_reverse = tuple(bool(i) for i in is_reverse)
     r_names = ['__s%d' % r for r in reactants]
-    combined_rate = sympy.Mul(*[sympy.Symbol(t) for t in r_names + rate])
+    combined_rate = sympy.Mul(*[sympy.S(t) for t in r_names + rate])
     reaction = {
         'reactants': reactants,
         'products': products,
