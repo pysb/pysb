@@ -11,6 +11,7 @@ import tempfile
 from pkg_resources import parse_version
 import abc
 from warnings import warn
+import shutil
 
 try:
     from cStringIO import StringIO
@@ -120,9 +121,7 @@ class BngBaseInterface(object):
         return
 
     def _delete_tmpdir(self):
-        for f in os.listdir(self.base_directory):
-            os.unlink(os.path.join(self.base_directory, f))
-        os.rmdir(self.base_directory)
+        shutil.rmtree(self.base_directory)
 
     def _check_model(self):
         """
