@@ -1654,8 +1654,10 @@ class RedundantSiteConditionsError(ValueError):
 # implements an alternate __str__ method which just returns the base name.
 
 class KeywordMeta(type):
-    def __str__(cls):
+    def __repr__(cls):
         return cls.__name__
+    def __str__(cls):
+        return repr(cls)
 
 class Keyword(object): __metaclass__ = KeywordMeta
 
