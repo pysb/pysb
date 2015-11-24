@@ -2173,7 +2173,7 @@ def chain_species_base(base, basesite, subunit, site1, site2, size, comp=1):
         >>> Monomer('Complex2', ['s1', 's2'])
         Monomer('Complex2', ['s1', 's2'])
         >>> chain_species_base(Base(b2=ANY), 'b1', Unit, 'p1', 'p2', 4, Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY))
-        MatchOnce(Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=None))
+        MatchOnce(Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=None))
     """
     _verify_sites(base, basesite)
     _verify_sites(subunit, site1, site2)
@@ -2262,10 +2262,10 @@ def assemble_chain_sequential_base(base, basesite, subunit, site1, site2, max_si
         Monomer('Complex2', ['s1', 's2'])
         >>> assemble_chain_sequential_base(Base(b2=ANY), 'b1', Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2, Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY)) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('assemble_chain_sequential_base_Unit_2', Unit(p1=None, p2=None) + Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=None) <> Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None), assemble_chain_sequential_base_Unit_2_kf, assemble_chain_sequential_base_Unit_2_kr),
+         Rule('assemble_chain_sequential_base_Unit_2', Unit(p1=None, p2=None) + Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=None) <> Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None), assemble_chain_sequential_base_Unit_2_kf, assemble_chain_sequential_base_Unit_2_kr),
          Parameter('assemble_chain_sequential_base_Unit_2_kf', 0.0001),
          Parameter('assemble_chain_sequential_base_Unit_2_kr', 0.1),
-         Rule('assemble_chain_sequential_base_Unit_3', Unit(p1=None, p2=None) + Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None) <> MatchOnce(Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=None)), assemble_chain_sequential_base_Unit_3_kf, assemble_chain_sequential_base_Unit_3_kr),
+         Rule('assemble_chain_sequential_base_Unit_3', Unit(p1=None, p2=None) + Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None) <> MatchOnce(Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=None)), assemble_chain_sequential_base_Unit_3_kf, assemble_chain_sequential_base_Unit_3_kr),
          Parameter('assemble_chain_sequential_base_Unit_3_kf', 0.0001),
          Parameter('assemble_chain_sequential_base_Unit_3_kr', 0.1),
          ])
