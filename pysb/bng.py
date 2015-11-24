@@ -11,6 +11,7 @@ import tempfile
 from pkg_resources import parse_version
 import abc
 from warnings import warn
+import shutil
 
 try:
     from cStringIO import StringIO
@@ -101,7 +102,7 @@ class BngBaseInterface(object):
 
     @abc.abstractmethod
     def __init__(self, model, verbose=False, cleanup=False,
-                 output_prefix=None):
+                 output_prefix=None, output_dir=None):
         self.verbose = verbose
         self.cleanup = cleanup
         self.output_prefix = 'tmpBNG' if output_prefix is None else \
@@ -109,12 +110,18 @@ class BngBaseInterface(object):
         self.generator = BngGenerator(model)
         self._check_model()
 
+        self.base_directory = tempfile.mkdtemp(prefix=self.output_prefix,
+                                               dir=output_dir)
+
     def __enter__(self):
         return self
 
     @abc.abstractmethod
     def __exit__(self):
         return
+
+    def _delete_tmpdir(self):
+        shutil.rmtree(self.base_directory)
 
     def _check_model(self):
         """
@@ -191,7 +198,64 @@ class BngBaseInterface(object):
         """
         Returns the base filename (without extension) for BNG output files
         """
-        return os.path.splitext(self.bng_filename)[0]
+        return os.path.join(self.base_directory, 'pysb')
+
+    @property
+    def bng_filename(self):
+        """
+        Returns the BNG command list (.bngl) filename (does not check
+        whether the file exists)
+        """
+        return self.base_filename + '.bngl'
+
+    @property
+    def net_filename(self):
+        """
+        Returns the BNG network filename (does not check whether the file
+        exists)
+        """
+        return self.base_filename + '.net'
+
+    def read_netfile(self):
+        """
+        Reads a BNG network file as a string. Note that you must execute
+        network generation separately before attempting this, or the file will
+        not be found.
+        :return: Contents of the BNG network file as a string
+        """
+        with open(self.net_filename, 'r') as net_file:
+            output = net_file.read()
+
+        return output
+
+    def read_simulation_results(self):
+        """
+        Reads the results of a BNG simulation and parses them into a numpy
+        array
+        """
+        # Read concentrations data
+        cdat_arr = numpy.loadtxt(self.base_filename + '.cdat', skiprows=1)
+        # Read groups data
+        if len(self.model.observables):
+            # Exclude first column (time)
+            gdat_arr = numpy.loadtxt(self.base_filename + '.gdat',
+                                     skiprows=1)[:,1:]
+        else:
+            gdat_arr = numpy.ndarray((len(cdat_arr), 0))
+
+        # -1 for time column
+        names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)]
+        yfull_dtype = list(zip(names, itertools.repeat(float)))
+        if len(self.model.observables):
+            yfull_dtype += list(zip(self.model.observables.keys(),
+                                    itertools.repeat(float)))
+        yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
+
+        yfull_view = yfull.view(float).reshape(len(yfull), -1)
+        yfull_view[:, :len(names)] = cdat_arr
+        yfull_view[:, len(names):] = gdat_arr
+
+        return yfull
 
 
 class BngConsole(BngBaseInterface):
@@ -200,7 +264,7 @@ class BngConsole(BngBaseInterface):
                  output_dir=None, output_prefix=None, timeout=30,
                  suppress_warnings=False):
         super(BngConsole, self).__init__(model, verbose, cleanup,
-                                         output_prefix)
+                                         output_prefix, output_dir)
 
         try:
             import pexpect
@@ -213,37 +277,28 @@ class BngConsole(BngBaseInterface):
 
         try:
             # Generate BNGL file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.bngl',
-                                             prefix=self.output_prefix,
-                                             dir=output_dir,
-                                             delete=False) as bng_file:
-                self.bng_filename = bng_file.name
+            with open(self.bng_filename, mode='w') as bng_file:
                 bng_file.write(self.generator.get_content())
 
             # Start BNG Console and load BNGL
             self.console = pexpect.spawn('perl %s --console' % _get_bng_path(),
-                                         cwd=os.path.dirname(
-                                             self.bng_filename),
+                                         cwd=self.base_directory,
                                          timeout=timeout)
             self._console_wait()
-            self.console.sendline('load %s' % bng_file.name)
+            self.console.sendline('load %s' % self.bng_filename)
             self._console_wait()
         except Exception as e:
             raise BngInterfaceError(e)
-        finally:
-            if self.bng_filename:
-                try:
-                    os.unlink(self.bng_filename)
-                except OSError:
-                    pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         In console mode, commands have already been executed, so we simply
-        close down the console when down.
+        close down the console and erase the temporary directory if applicable.
         """
         self.console.sendline('done')
         self.console.close()
+        if self.cleanup:
+            self._delete_tmpdir()
 
     def _console_wait(self):
         """
@@ -268,19 +323,10 @@ class BngConsole(BngBaseInterface):
             Overwrite existing network file, if any
         """
         try:
-            net_filename = self.base_filename + '.net'
             self.action('generate_network', overwrite=overwrite)
-            with open(net_filename, 'r') as net_file:
-                bng_network = net_file.read()
+            bng_network = self.read_netfile()
         except Exception as e:
             raise BngInterfaceError(e)
-        finally:
-            if self.cleanup:
-                try:
-                    os.unlink(net_filename)
-                except OSError:
-                    # File may have been deleted already, or be open elsewhere
-                    pass
         return bng_network
 
     def action(self, action, **kwargs):
@@ -309,31 +355,57 @@ class BngFileInterface(BngBaseInterface):
     def __init__(self, model, verbose=False, output_dir=None,
                  output_prefix=None, cleanup=True):
         super(BngFileInterface, self).__init__(model, verbose, cleanup,
-                                               output_prefix)
+                                               output_prefix, output_dir)
+        self._init_command_queue()
+
+    def _init_command_queue(self):
+        """
+        Initializes the BNG command queue
+        """
         self.command_queue = StringIO()
         self.command_queue.write('begin actions\n')
 
-        # Create the BNGL file now so we know where to find it
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.bngl',
-                                         prefix=self.output_prefix,
-                                         dir=output_dir,
-                                         delete=False) as bng_file:
-            self.bng_filename = bng_file.name
-
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        In file mode, we execute all the queued commands when leaving the
-        context manager (i.e. now) by adding them to the BNGL
+        In file interface mode, we close the command queue buffer (whether
+        or not it's been executed) and erase the temporary directory if
+        applicable.
+        """
+        self.command_queue.close()
+        if self.cleanup:
+            self._delete_tmpdir()
+
+    def execute(self, reload_netfile=False):
+        """
+        Executes all BNG commands in the command queue.
+
+        Parameters
+        ----------
+        reload_netfile: bool
+            If true, attempts to reload an existing .net file from a
+            previous execute() iteration. This is useful for running
+            multiple actions in a row, where results need to be read
+            into PySB before a new series of actions is executed.
         """
         self.command_queue.write('end actions\ndone\n')
+        bng_commands = self.command_queue.getvalue()
         try:
             # Generate BNGL file
             with open(self.bng_filename, 'w') as bng_file:
-                bng_file.write(self.generator.get_content())
-                bng_file.write(self.command_queue.getvalue())
+                if reload_netfile:
+                    bng_commands = bng_commands.replace('begin actions\n',
+                                         'begin actions\n\treadFile({'
+                                         'file=>"%s"});\n' % self.net_filename)
+                else:
+                    bng_file.write(self.generator.get_content())
+                bng_file.write(bng_commands)
+
+            # Reset the command queue, in case execute() is called again
+            self.command_queue.close()
+            self._init_command_queue()
 
             p = subprocess.Popen(['perl', _get_bng_path(), self.bng_filename],
-                                 cwd=os.path.dirname(self.bng_filename),
+                                 cwd=self.base_directory,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             if self.verbose:
@@ -346,11 +418,6 @@ class BngFileInterface(BngBaseInterface):
                                            p_err.rstrip())
         except Exception as e:
             raise BngInterfaceError(e)
-        finally:
-            try:
-                os.unlink(self.bng_filename)
-            except OSError:
-                pass
 
     def action(self, action, **kwargs):
         """
@@ -393,14 +460,15 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
             model.parameters.
     output_dir : string, optional
         Location for temporary files generated by BNG. If None (the
-        default), uses a temporary directory provided by the system.
+        default), uses a temporary directory provided by the system. A
+        temporary directory with a random name is created within the
+        supplied location.
     output_file_basename : string, optional
-        The basename for the .bngl, .gdat, .cdat, and .net files that are
-        generated by BNG. If None (the default), creates a random basename.
+        This argument is used as a prefix for the temporary BNG
+        output directory, rather than the individual files.
     cleanup : bool, optional
         If True (default), delete the temporary files after the simulation is
-        finished. If False, leave them in place (in `output_dir`). Useful for
-        debugging.
+        finished. If False, leave them in place. Useful for debugging.
     verbose: bool, optional
         If True, print BNG screen output.
     additional_args: kwargs, optional
@@ -418,51 +486,21 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
         for i in range(len(param_values)):
             model.parameters[i].value = param_values[i]
 
-    try:
-        with BngFileInterface(model, verbose=verbose, output_dir=output_dir,
-                              output_prefix=output_file_basename,
-                              cleanup=cleanup) as bngfile:
-            output_file_basename = bngfile.base_filename
-            gdat_filename = output_file_basename + '.gdat'
-            cdat_filename = output_file_basename + '.cdat'
-            net_filename = output_file_basename + '.net'
+    with BngFileInterface(model, verbose=verbose, output_dir=output_dir,
+                          output_prefix=output_file_basename,
+                          cleanup=cleanup) as bngfile:
+        bngfile.action('generate_network', overwrite=True, verbose=verbose)
+        bngfile.action('simulate', **additional_args)
 
-            bngfile.action('generate_network', overwrite=True, verbose=verbose)
-            bngfile.action('simulate', **additional_args)
+        bngfile.execute()
 
-        # Read in the network file
-        with open(net_filename, 'r') as net_file:
-            output = net_file.read()
+        output = bngfile.read_netfile()
 
         # Parse netfile (in case this hasn't already been done)
         if not model.species:
             _parse_netfile(model, iter(output.split('\n')))
 
-        cdat_arr = numpy.loadtxt(cdat_filename, skiprows=1) # keep first column (time)
-        if len(model.observables):
-            gdat_arr = numpy.loadtxt(gdat_filename, skiprows=1)[:,1:] # exclude first column (time)
-        else:
-            gdat_arr = numpy.ndarray((len(cdat_arr), 0))
-
-        names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)] # -1 for time column
-        yfull_dtype = list(zip(names, itertools.repeat(float)))
-        if len(model.observables):
-            yfull_dtype += list(zip(model.observables.keys(),
-                                    itertools.repeat(float)))
-        yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
-        
-        yfull_view = yfull.view(float).reshape(len(yfull), -1)
-        yfull_view[:, :len(names)] = cdat_arr 
-        yfull_view[:, len(names):] = gdat_arr
-
-    finally:
-        if cleanup:
-            for filename in [gdat_filename,
-                             cdat_filename, net_filename]:
-                try:
-                    os.unlink(filename)
-                except OSError:
-                    pass
+        yfull = bngfile.read_simulation_results()
 
     return yfull
 
@@ -492,9 +530,9 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as bngfile:
         net_filename = bngfile.base_filename + '.net'
         bngfile.action('generate_network', overwrite=True, verbose=verbose)
+        bngfile.execute()
 
-    with open(net_filename, 'r') as net_file:
-            output = net_file.read()
+        output = bngfile.read_netfile()
 
     return output
 
