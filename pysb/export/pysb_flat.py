@@ -48,11 +48,12 @@ class PysbFlatExporter(Exporter):
         output = StringIO()
 
         # Convenience function for writing out a componentset.
-        def write_cset(cset):
+        def write_cset(cset): 
             for c in cset:
                 output.write(repr(c))
                 output.write("\n")
-            output.write("\n")
+            if cset:
+                output.write("\n")
 
         if self.docstring:
             output.write('"""')
@@ -61,7 +62,8 @@ class PysbFlatExporter(Exporter):
         output.write("# exported from PySB model '%s'\n" % self.model.name)
         output.write("\n")
         output.write("from pysb import Model, Monomer, Parameter, Expression, "
-                     "Compartment, Rule, Observable, Initial, ANY, WILD\n")
+                     "Compartment, Rule, Observable, Initial, Annotation, "
+                     "ANY, WILD\n")
         output.write("\n")
         output.write("Model()\n")
         output.write("\n")
@@ -75,5 +77,6 @@ class PysbFlatExporter(Exporter):
         for pattern, value in self.model.initial_conditions:
             output.write("Initial(%s, %s)\n" % (repr(pattern), value.name))
         output.write("\n")
+        write_cset(self.model.annotations)
 
         return output.getvalue()
