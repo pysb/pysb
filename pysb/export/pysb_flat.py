@@ -48,11 +48,12 @@ class PysbFlatExporter(Exporter):
         output = StringIO()
 
         # Convenience function for writing out a componentset.
-        def write_cset(cset):
+        def write_cset(cset): 
             for c in cset:
                 output.write(repr(c))
                 output.write("\n")
-            output.write("\n")
+            if cset:
+                output.write("\n")
 
         if self.docstring:
             output.write('"""')
