@@ -26,6 +26,7 @@ before_install:
 - cd KaSim-KaSim3
 - make
 - export KAPPA_HOME=`pwd`/KaSim
+- cd ../
 install:
   python setup.py build --build-lib=build/lib
 script:
