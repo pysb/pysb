@@ -219,13 +219,18 @@ def format_site_condition(site, state):
                         "element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
 
-def sympy_to_muparser(expr):
-    code = sympy.fcode(expr)
+def sympy_to_kasim_expression(expr):
+    """Render the Expression as a Kappa compatible string."""
+    # sympy.printing.sstr is the preferred way to render an Expression as a
+    # string (rather than, e.g., str(Expression.expr) or repr(Expression.expr).
+    # Note: "For large expressions where speed is a concern, use the setting
+    # order='none'"
+    code = sympy.printing.sstr(expression.expr, order='none')
     code = code.replace('\n @', '')
     code = code.replace('**', '^')
     # kasim syntax cannot handle Fortran scientific notation (must use 'e'
     # instead of 'd')
-    code = sub('(?<=[0-9])d','e',code)
+    code = sub('(?<=[0-9])d', 'e', code)
     return code
 
 class KappaException(Exception):
