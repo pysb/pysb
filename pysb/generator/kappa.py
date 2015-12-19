@@ -38,11 +38,10 @@ class KappaGenerator(object):
             self.__content += ("%%var: \'%s\' %e\n") % (p.name, p.value)
         for e in self.model.expressions:
             sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
-            str_expr = str(sympy_to_muparser(e.expr))
+            str_expr = str(expression_to_muparser(e))
             for n in sym_names:
                 str_expr = str_expr.replace(n,"\'%s\'"%n)
-            self.__content += ("%%var: \'%s\' %s\n") % \
-                              (e.name, str_expr.replace('**','^'))
+            self.__content += "%%var: \'%s\' %s\n" % (e.name, str_expr)
         self.__content += "\n"
 
     #def generate_compartments(self):
@@ -219,7 +218,7 @@ def format_site_condition(site, state):
                         "element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
 
-def sympy_to_kasim_expression(expr):
+def expression_to_muparser(expression):
     """Render the Expression as a Kappa compatible string."""
     # sympy.printing.sstr is the preferred way to render an Expression as a
     # string (rather than, e.g., str(Expression.expr) or repr(Expression.expr).
