@@ -342,7 +342,7 @@ def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
         kappa_file.write(gen.get_content())
         kappa_file.close()
 
-        print "Running KaSa"
+        print("Running KaSa")
         p = subprocess.Popen(['KaSa'] + args)
                            #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         p.communicate()
