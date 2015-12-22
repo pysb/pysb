@@ -1,4 +1,6 @@
 import pysb
+import sympy
+from re import sub
 
 class KappaGenerator(object):
 
@@ -15,24 +17,32 @@ class KappaGenerator(object):
 
     def generate_content(self):
         self.__content = ''
-        #self.generate_parameters()
         #self.generate_compartments()
 
         # Agent declarations appear to be required in kasim
         # but prohibited in complx
         if (self.dialect == 'kasim'):
             self.generate_molecule_types() 
+            self.generate_parameters() # parameters/variables/expressions allowed in kasim
 
         self.generate_reaction_rules()
         self.generate_observables()
         self.generate_species()
 
-    #def generate_parameters(self):
-    #    self.__content += "begin parameters\n"
-    #    max_length = max(len(p.name) for p in self.model.parameters)
-    #    for p in self.model.parameters:
-    #        self.__content += ("  %-" + str(max_length) + "s   %e\n") % (p.name, p.value)
-    #    self.__content += "end parameters\n\n"
+    def generate_parameters(self):
+        #self.__content += "begin parameters\n"
+        #max_length = max(len(p.name) for p in self.model.parameters)
+        names = [x.name for x in self.model.parameters] + [x.name for x in self.model.expressions]
+        for p in self.model.parameters:
+            self.__content += ("%%var: \'%s\' %e\n") % (p.name, p.value)
+        for e in self.model.expressions:
+            sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
+            str_expr = str(sympy_to_muparser(e.expr))
+            for n in sym_names:
+                str_expr = str_expr.replace(n,"\'%s\'"%n)
+            self.__content += ("%%var: \'%s\' %s\n") % (e.name, str_expr.replace('**','^'))
+        #self.__content += "end parameters\n\n"
+        self.__content += "\n"
 
     #def generate_compartments(self):
     #    self.__content += "begin compartments\n"
@@ -53,20 +63,28 @@ class KappaGenerator(object):
     def generate_reaction_rules(self):
         #self.__content += "begin reaction rules\n"
         #max_length = max(len(r.name) for r in self.model.rules) + 1  # +1 for the colon
-        max_length = 0
         for r in self.model.rules:
             label = '\'' + r.name + '\''
             reactants_code = format_reactionpattern(r.reactant_pattern)
             products_code  = format_reactionpattern(r.product_pattern)
             arrow = '->'
+            
+            if isinstance(r.rate_forward,pysb.core.Expression) and self.dialect == 'complx':
+              raise InvalidExpressionException
+            f_rate_code = ("\'" + r.rate_forward.name + "\'" if self.dialect == 'kasim' 
+                else float(r.rate_forward.value))
             self.__content += ("%s %s %s %s @ %s") % \
-                (label, reactants_code, arrow, products_code, float(r.rate_forward.value))
+                (label, reactants_code, arrow, products_code, f_rate_code)
             self.__content += "\n"
 
             if r.is_reversible:
+              if isinstance(r.rate_reverse,pysb.core.Expression) and self.dialect == 'complx':
+                  raise InvalidExpressionException
+              r_rate_code = ("\'" + r.rate_reverse.name + "\'" if self.dialect == 'kasim' 
+                  else float(r.rate_reverse.value))
               label = '\'' + r.name + '_rev' + '\''
               self.__content += ("%s %s %s %s @ %s") % \
-                (label, products_code, arrow, reactants_code, float(r.rate_reverse.value))
+                (label, products_code, arrow, reactants_code, r_rate_code)
               self.__content += "\n"
 
         self.__content += "\n"
@@ -87,7 +105,6 @@ class KappaGenerator(object):
             raise Exception("BNG generator requires initial conditions.")
         species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
         #max_length = max(len(code) for code in species_codes)
-        max_length = 0
         #self.__content += "begin species\n"
         for i, code in enumerate(species_codes):
             param = self.model.initial_conditions[i][1]
@@ -95,9 +112,11 @@ class KappaGenerator(object):
             if (self.dialect == 'kasim'):
                 # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
                 # for large integers
-                self.__content += ("%%init: %d %s\n") % (float(param.value), code)
+                self.__content += ("%%init: \'%s\' %s\n") % (param.name, code)
                 #self.__content += ("%%init: %10g %s\n") % (param.value, code)
             else:
+                if isinstance(param,pysb.core.Expression):
+                  raise InvalidExpressionException
                 # Switched from %g (float) to %d (int) because kappa didn't like scientific notation
                 # for large integers
                 self.__content += ("%%init: %10d * %s\n") % (float(param.value), code)
@@ -142,11 +161,23 @@ def format_site_condition(site, state):
     elif type(state) == str:
         state_code = '~' + state
     elif type(state) == tuple:
-        if state[1] == pysb.WILD:
-            state = (state[0], '?')
-        state_code = '~%s!%s' % state
+        if state[1] == pysb.core.ANY:
+            state = (state[0], '_')
+        state_code = '~%s!%s' % state if state[1] != pysb.WILD else '~%s?' % state[0]
     elif state == pysb.ANY:
         state_code = '!_'
     else:
         raise Exception("Kappa generator has encountered an unknown element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
+
+def sympy_to_muparser(expr):
+    code = sympy.fcode(expr)
+    code = code.replace('\n @', '')
+    code = code.replace('**', '^')
+    # kasim syntax cannot handle Fortran scientific notation (must use 'e' instead of 'd')
+    code = sub('(?<=[0-9])d','e',code)
+    return code
+
+class InvalidExpressionException(Exception):
+    """complx syntax does not allow Expressions"""
+    pass

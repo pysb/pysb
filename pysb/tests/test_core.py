@@ -74,6 +74,11 @@ def test_monomer_as_complex_pattern():
     as_complex_pattern(A)
 
 @with_model
+def test_monomerpattern():
+    A = Monomer('A',sites=['a'],site_states={'a':['u','p']},_export=False)
+    Aw = A({'a':('u',ANY)})
+
+@with_model
 def test_observable_constructor_with_monomer():
     A = Monomer('A', _export=False)
     o = Observable('o', A, _export=False)

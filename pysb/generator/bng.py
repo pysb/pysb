@@ -186,6 +186,8 @@ def format_site_condition(site, state):
         # bond is wildcard (zero or more unspecified bonds)
         if state[1] == pysb.WILD:
             state = (state[0], '?')
+        elif state[1] == pysb.ANY:
+            state = (state[0], '+')
         state_code = '~%s!%s' % state
     # one or more unspecified bonds
     elif state is pysb.ANY:
