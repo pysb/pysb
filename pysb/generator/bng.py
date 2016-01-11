@@ -18,7 +18,7 @@ class BngGenerator(object):
         return self.__content
 
     def generate_content(self):
-        self.__content = ''
+        self.__content = "begin model\n"
         self.generate_parameters()
         self.generate_compartments()
         self.generate_molecule_types()
@@ -26,6 +26,7 @@ class BngGenerator(object):
         self.generate_functions()
         self.generate_species()
         self.generate_reaction_rules()
+        self.__content += "end model\n"
 
     def generate_parameters(self):
         exprs = self.model.expressions_constant()
