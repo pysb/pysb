@@ -139,6 +139,9 @@ def run_complx(gen, kappa_filename, args):
             ['--output-high-res-contact-map-jpg', jpg_filename]
     """
 
+    warnings.warn("Complx is no longer supported, please use run_kasa instead",
+                  DeprecationWarning, stacklevel=2)
+
     try:
         kappa_file = open(kappa_filename, 'w')
         kappa_file.write(gen.get_content())
