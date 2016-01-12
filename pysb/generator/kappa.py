@@ -35,7 +35,7 @@ class KappaGenerator(object):
         names = [x.name for x in self.model.parameters] + \
                 [x.name for x in self.model.expressions]
         for p in self.model.parameters:
-            self.__content += ("%%var: '%s' %e\n") % (p.name, p.value)
+            self.__content += "%%var: '%s' %e\n" % (p.name, p.value)
         for e in self.model.expressions:
             sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
             str_expr = str(expression_to_muparser(e))
@@ -51,8 +51,8 @@ class KappaGenerator(object):
     #            parent_name = ''
     #        else:
     #            parent_name = c.parent.name
-    #        self.__content += ("  %s  %d  %f  %s\n") % \
-    #                          (c.name, c.dimension, c.size, parent_name)
+    #        self.__content += ("  %s  %d  %f  %s\n" %
+    #                          (c.name, c.dimension, c.size, parent_name))
     #    self.__content += "end compartments\n\n"
 
     def generate_molecule_types(self):
