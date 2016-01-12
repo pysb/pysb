@@ -139,8 +139,7 @@ class KappaGenerator(object):
                     raise KappaException("complx does not support Expressions.")
                 # Switched from %g (float) to %d (int) because kappa didn't
                 # like scientific notation for large integers
-                self.__content += ("%%init: %10d * %s\n") % \
-                                  (float(param.value), code)
+                self.__content += "%%init: %10d * %s\n" % (param.value, code)
         self.__content += "\n"
 
 
