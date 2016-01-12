@@ -35,13 +35,13 @@ class KappaGenerator(object):
         names = [x.name for x in self.model.parameters] + \
                 [x.name for x in self.model.expressions]
         for p in self.model.parameters:
-            self.__content += ("%%var: \'%s\' %e\n") % (p.name, p.value)
+            self.__content += ("%%var: '%s' %e\n") % (p.name, p.value)
         for e in self.model.expressions:
             sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
             str_expr = str(expression_to_muparser(e))
             for n in sym_names:
-                str_expr = str_expr.replace(n,"\'%s\'"%n)
-            self.__content += "%%var: \'%s\' %s\n" % (e.name, str_expr)
+                str_expr = str_expr.replace(n,"'%s'"%n)
+            self.__content += "%%var: '%s' %s\n" % (e.name, str_expr)
         self.__content += "\n"
 
     #def generate_compartments(self):
@@ -65,7 +65,7 @@ class KappaGenerator(object):
         # +1 for the colon
         #max_length = max(len(r.name) for r in self.model.rules) + 1
         for r in self.model.rules:
-            label = '\'' + r.name + '\''
+            label = "'" + r.name + "'"
             reactants_code = format_reactionpattern(r.reactant_pattern)
             products_code  = format_reactionpattern(r.product_pattern)
             arrow = '->'
@@ -75,7 +75,7 @@ class KappaGenerator(object):
                 raise KappaException("Expressions are not supported by complx.")
             # Get the rate code depending on the dialect
             if self.dialect == 'kasim':
-                f_rate_code = "\'" + r.rate_forward.name + "\'"
+                f_rate_code = "'" + r.rate_forward.name + "'"
             else:
                 f_rate_code = float(r.rate_forward.value)
 
@@ -91,11 +91,11 @@ class KappaGenerator(object):
                                          "complx.")
                 # Get the rate code depending on the dialect
                 if self.dialect == 'kasim':
-                    r_rate_code = "\'" + r.rate_reverse.name + "\'"
+                    r_rate_code = "'" + r.rate_reverse.name + "'"
                 else:
                     r_rate_code = float(r.rate_reverse.value)
 
-                label = '\'' + r.name + '_rev' + '\''
+                label = "'" + r.name + '_rev' + "'"
                 self.__content += ("%s %s %s %s @ %s") % \
                       (label, products_code, arrow, reactants_code, r_rate_code)
                 self.__content += "\n"
@@ -106,7 +106,7 @@ class KappaGenerator(object):
         if not self.model.observables:
             return
         for obs in self.model.observables:
-            name = '\'' + obs.name + '\''
+            name = "'" + obs.name + "'"
             observable_code = format_reactionpattern(obs.reaction_pattern)
             # In the near future (KaSim 4.0), the observable syntax will
             # require pipe characters around the expression. However, for the
@@ -135,7 +135,7 @@ class KappaGenerator(object):
             if (self.dialect == 'kasim'):
                 # Switched from %g (float) to %d (int) because kappa didn't
                 # like scientific notation for large integers
-                self.__content += ("%%init: \'%s\' %s\n") % (param.name, code)
+                self.__content += ("%%init: '%s' %s\n") % (param.name, code)
                 #self.__content += ("%%init: %10g %s\n") % (param.value, code)
             else:
                 if isinstance(param,pysb.core.Expression):
