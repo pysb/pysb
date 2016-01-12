@@ -133,10 +133,7 @@ class KappaGenerator(object):
             #self.__content += ("%%init:  %-" + str(max_length) + \
             #                  "s   %s\n") % (code, param.name)
             if (self.dialect == 'kasim'):
-                # Switched from %g (float) to %d (int) because kappa didn't
-                # like scientific notation for large integers
                 self.__content += ("%%init: '%s' %s\n") % (param.name, code)
-                #self.__content += ("%%init: %10g %s\n") % (param.value, code)
             else:
                 if isinstance(param,pysb.core.Expression):
                     raise KappaException("complx does not support Expressions.")
@@ -144,8 +141,6 @@ class KappaGenerator(object):
                 # like scientific notation for large integers
                 self.__content += ("%%init: %10d * %s\n") % \
                                   (float(param.value), code)
-                #self.__content += ("%%init: %10g * %s\n") % (param.value, code)
-
         self.__content += "\n"
 
 
