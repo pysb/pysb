@@ -1,12 +1,18 @@
-from pysb.simulate import Simulator
-from pysb.bng import generate_equations
-import numpy as np
-from scipy.constants import N_A
+# coding=utf-8
 import os
-import warnings
-import subprocess
 import re
-import itertools
+import subprocess
+import time
+import warnings
+
+import numpy as np
+import pandas
+from scipy.constants import N_A
+
+from pysb.bng import generate_equations
+from pysb.simulate import Simulator
+
+read_csv = pandas.read_csv
 
 _cupsoda_path = None
 
@@ -15,30 +21,32 @@ _cupsoda_path = None
 # Obviously, the only integrator currently supported is "cupSODA" (case insensitive).
 default_integrator_options = {
     'cupsoda': {
-        'max_steps': 20000,         # max no. of internal iterations (LSODA's MXSTEP)
-        'atol': 1e-8,               # absolute tolerance
-        'rtol': 1e-8,               # relative tolerance
-        'n_blocks': None,           # number of GPU blocks
-        'gpu': 0,                   # which GPU
-        'vol': None,                # volume
-        'obs_species_only': True,   # print only observable species
-        'load_ydata': True,         # load conc data after simulation
-        'memory_usage': 0,          # memory usage type: 
-                                    # 0: global memory (default; suggested for medium-large models)
-                                    # 1: shared memory 
-                                    # 2: both shared and constant memory
-        },
-    }
+        'max_steps': 20000,  # max no. of internal iterations (LSODA's MXSTEP)
+        'atol': 1e-8,  # absolute tolerance
+        'rtol': 1e-8,  # relative tolerance
+        'n_blocks': None,  # number of GPU blocks
+        'gpu': 0,  # which GPU
+        'vol': None,  # volume
+        'obs_species_only': True,  # print only observable species
+        'load_ydata': True,  # load conc data after simulation
+        'memory_usage': 0,  # memory usage type:
+        # 0: global memory (default; suggested for medium-large models)
+        # 1: shared memory
+        # 2: both shared and constant memory
+    },
+}
 
-def set_cupsoda_path(dir):
+
+def set_cupsoda_path(directory):
     global _cupsoda_path
-    _cupsoda_path = os.path.join(dir,'cupSODA')
+    _cupsoda_path = os.path.join(directory, 'cupSODA')
     # Make sure file exists and that it is not a directory
     if not os.access(_cupsoda_path, os.F_OK) or not os.path.isfile(_cupsoda_path):
-        raise Exception('Could not find cupSODA binary in ' + os.path.abspath(dir) + '.')
+        raise Exception('Could not find cupSODA binary in ' + os.path.abspath(directory) + '.')
     # Make sure file has executable permissions
     elif not os.access(_cupsoda_path, os.X_OK):
-        raise Exception("cupSODA binary in " + os.path.abspath(dir) + " does not have executable permissions.")
+        raise Exception("cupSODA binary in " + os.path.abspath(directory) + " does not have executable permissions.")
+
 
 def _get_cupsoda_path():
     """
@@ -49,19 +57,20 @@ def _get_cupsoda_path():
 
     """
     global _cupsoda_path
-    
+
     # Just return cached value if it's available
-    if _cupsoda_path: return _cupsoda_path
+    if _cupsoda_path:
+        return _cupsoda_path
 
     bin_dirs = [
         '/usr/local/share/',
         'c:/Program Files/',
-        ]
+    ]
 
     def check_bin_dir(bin_dir):
         # Return the full path to the cupSODA executable or False if it
         # can't be found in one of the expected places.
-        bin_path = os.path.join(bin_dir,'cupSODA')
+        bin_path = os.path.join(bin_dir, 'cupSODA')
         if os.access(bin_path, os.F_OK):
             return bin_path
         else:
@@ -72,13 +81,14 @@ def _get_cupsoda_path():
         if check_bin_dir(b):
             break
         else:
-            raise Exception('Could not find cupSODA installed in one of the following locations:' + 
+            raise Exception('Could not find cupSODA installed in one of the following locations:' +
                             ''.join('\n    ' + x for x in bin_dirs) + '\nPlease put the executable ' +
                             '(or a link to it) in one of these locations or set the path using set_cupsoda_path().')
-            
+
     # Cache path for future use
     _cupsoda_path = bin_path
     return bin_path
+
 
 class CupsodaSolver(Simulator):
     """An interface for running cupSODA, a CUDA implementation of LSODA.
@@ -169,23 +179,24 @@ class CupsodaSolver(Simulator):
        argument to cupSODA.run() is set to True (the default) or if the cupSODA.load_data() 
        method is called directly.
     """
-    
+
     def __init__(self, model, tspan=None, cleanup=True, verbose=False, integrator='cupsoda', **integrator_options):
         super(CupsodaSolver, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
 
         # Set integrator options to defaults
         self.options = {}
-        integrator = integrator.lower() # case insensitive
+        integrator = integrator.lower()  # case insensitive
         if default_integrator_options.get(integrator.lower()):
             self.options.update(default_integrator_options[integrator])
         else:
             raise Exception("Integrator type '" + integrator + "' not recognized.")
-        
-        # overwrite default integrator options
-        self.options.update(integrator_options)   
 
-    def run(self, param_values, y0, tspan=None, outdir=os.getcwd(), prefix=None, **integrator_options):
+        # overwrite default integrator options
+        self.options.update(integrator_options)
+
+    def run(self, param_values, y0, tspan=None, outdir=os.getcwd(),
+            prefix=None, **integrator_options):
         """Perform a set of integrations.
 
         Returns nothing; if load_ydata=True, can access the object's 
@@ -216,233 +227,272 @@ class CupsodaSolver(Simulator):
         If load_ydata=True and obs_species_only=True, concentrations of species not in 
         observables are set to 'nan'.
         """
+        start_time = time.time()
         # make sure tspan is defined somewhere
         if tspan is not None:
             self.tspan = tspan
         elif self.tspan is None:
             raise Exception("'tspan' must be defined.")
-        
+
         # overwrite default integrator options
-        self.options.update(integrator_options)        
-        
+        self.options.update(integrator_options)
+
         # just to be safe
         param_values = np.array(param_values)
         y0 = np.array(y0)
-        
+
         # Error checks on 'param_values' and 'y0'
         if len(param_values) != len(y0):
-            raise Exception("Lengths of 'param_values' (len=" + str(len(param_values)) +") and 'y0' (len=" + str(len(y0)) + ") must be equal.")
+            raise Exception("Lengths of 'param_values' (len=" + str(len(param_values)) + ") and 'y0' (len=" + str(
+                len(y0)) + ") must be equal.")
         if len(param_values.shape) != 2 or param_values.shape[1] != len(self.model.parameters_rules()):
-            raise Exception("'param_values' must be a 2D array with dimensions N_SIMS x len(model.parameters_rules()): param_values.shape=" + str(self.param_values.shape))
+            raise Exception(
+                "'param_values' must be a 2D array with dimensions N_SIMS x len(model.parameters_rules()):\
+                 param_values.shape=" + str(param_values.shape))
         if len(y0.shape) != 2 or y0.shape[1] != len(self.model.species):
-            raise Exception("'y0' must be a 2D array with dimensions N_SIMS x len(model.species): y0.shape=" + str(y0.shape))
-        
+            raise Exception(
+                "'y0' must be a 2D array with dimensions N_SIMS x len(model.species): y0.shape=" + str(y0.shape))
+
         # Create outdir if it doesn't exist
         self.outdir = outdir
-        if not os.path.exists(self.outdir): 
+        if not os.path.exists(self.outdir):
             os.makedirs(self.outdir)
 
         # Default prefix is model name
-        if not prefix: 
+        if not prefix:
             prefix = self.model.name
-        
+
         # Path to cupSODA executable
-        bin_path = _get_cupsoda_path() 
-    
+        bin_path = _get_cupsoda_path()
+
         # Put the cupSODA input files in a directory within the output directory
-        cupsoda_files = os.path.join(self.outdir,"__CUPSODA_FILES")
+        cupsoda_files = os.path.join(self.outdir, "__CUPSODA_FILES")
         if os.path.exists(cupsoda_files):
             for f in os.listdir(cupsoda_files):
-                os.remove(os.path.join(cupsoda_files,f))
+                os.remove(os.path.join(cupsoda_files, f))
         else:
             os.mkdir(cupsoda_files)
-        
+
+        self.model_parameter_rules = self.model.parameters_rules()
+        self.len_rxns = len(self.model.reactions)
+        self.len_species = len(self.model.species)
+        self.model_rxns = self.model.reactions
+        self.tspan_length = len(self.tspan)
+
         # Simple default for number of blocks
         n_blocks = self.options.get('n_blocks')
+
         if not n_blocks:
-            shared_memory_per_block = 48*1024 # bytes
+            shared_memory_per_block = 48 * 1024  # bytes
             default_threads_per_block = 32
-            n_species = len(self.model.species)
+            n_species = self.len_species
             bytes_per_float = 8
-            memory_per_thread = (n_species+1)*bytes_per_float # +1 for time variable
+            memory_per_thread = (n_species + 1) * bytes_per_float  # +1 for time variable
             upper_limit_threads_per_block = 512
-            max_threads_per_block = min( shared_memory_per_block/memory_per_thread , upper_limit_threads_per_block )
-            threads_per_block = min( max_threads_per_block , default_threads_per_block )
+            max_threads_per_block = min(shared_memory_per_block / memory_per_thread, upper_limit_threads_per_block)
+            threads_per_block = min(max_threads_per_block, default_threads_per_block)
             n_sims = param_values.shape[0]
-            n_blocks = int(np.ceil(1.*n_sims/threads_per_block))
-        
+            n_blocks = int(np.ceil(1. * n_sims / threads_per_block))
+
         # Create c_matrix
-        c_matrix = np.zeros((len(param_values), len(self.model.reactions)))
-        par_names = [p.name for p in self.model.parameters_rules()]
+
+        c_matrix = np.zeros((len(param_values), self.len_rxns))
+        par_names = [p.name for p in self.model_parameter_rules]
         rate_args = []
-        for rxn in self.model.reactions:
-            rate_args.append([arg for arg in rxn['rate'].args if not re.match("_*s",str(arg))])
-        output = 0.01*len(param_values)
+        for rxn in self.model_rxns:
+            rate_args.append([arg for arg in rxn['rate'].args if not re.match("_*s", str(arg))])
+        output = 0.01 * len(param_values)
         output = int(output) if output > 1 else 1
         for i in range(len(param_values)):
-            if self.verbose and i % output == 0: 
-                print str(int(round(100.*i/len(param_values))))+"%"
-            for j in range(len(self.model.reactions)):
+            if self.verbose and i % output == 0:
+                print str(int(round(100. * i / len(param_values)))) + "%"
+            for j in range(self.len_rxns):
                 rate = 1.0
                 for r in rate_args[j]:
                     x = str(r)
                     if x in par_names:
-                        rate *= self.model.parameters_rules()[x].value
-                    else: # FIXME: need to detect non-numbers and throw an error
+                        rate *= param_values[i][j]
+                    else:  # FIXME: need to detect non-numbers and throw an error
                         rate *= float(x)
                 c_matrix[i][j] = rate
+
         if self.verbose:
             print "100%"
-        
+
         # Create cupSODA input files
         self._create_input_files(cupsoda_files, c_matrix, y0)
-            
+        end_time = time.time()
+        print "Set up  time = %4.4f " % (end_time - start_time)
         # Build command
-        # ./cupSODA input_model_folder blocks output_folder simulation_file_prefix gpu_number fitness_calculation memory_use dump        
+        # ./cupSODA input_model_folder blocks output_folder simulation_file_prefix gpu_number
+        # fitness_calculation memory_use dump
+        # noinspection PyPep8
         command = [bin_path, cupsoda_files, str(n_blocks), self.outdir, prefix, str(self.options['gpu']), \
                    '0', str(self.options['memory_usage']), '1' if self.verbose else '0']
         print "Running cupSODA: " + ' '.join(command)
-        
-        # Run simulation
-        subprocess.call(command)
 
+        # Run simulation
+
+        start_time = time.time()
+        p = subprocess.Popen(command,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
+
+        for line in iter(p.stdout.readline, b''):
+            if line.startswith('Running'):
+                self.time = float(line.split(':')[1].replace('seconds', ''))
+            print(">>> " + line.rstrip())
+        # subprocess.call(command)
+        end_time = time.time()
+        print "Total time = %4.4f " % (end_time - start_time)
+        print "cupSODA = %4.4f" % self.time
+        print "Total - cupSODA = %4.4f" % ((end_time - start_time) - self.time)
         # Load concentration data if requested   
         if self.options.get('load_ydata'):
+            start_time = time.time()
             self._get_y(prefix=prefix)
+            end_time = time.time()
+            print "Get_y time = %4.4f " % (end_time - start_time)
+            start_time = time.time()
             self._calc_yobs_yexpr(param_values)
-    
+            end_time = time.time()
+            print "Calc yopbs_yepr time = %4.4f " % (end_time - start_time)
+
     def _create_input_files(self, cupsoda_files, param_values, y0):
-        
+
         # Number of sims, rxns, and species
-        n_sims,n_rxns = param_values.shape
+        n_sims, n_rxns = param_values.shape
         n_species = len(y0[0])
-        
+
         # atol_vector 
-        atol_vector = open(os.path.join(cupsoda_files,"atol_vector"), 'wb')
-        for i in range(len(self.model.species)):
-            atol_vector.write(str(self.options.get('atol')))
-            if i < len(self.model.species)-1: atol_vector.write("\n")
-        atol_vector.close()
-        
+        with open(os.path.join(cupsoda_files, "atol_vector"), 'wb') as atol_vector:
+            for i in range(self.len_species):
+                atol_vector.write(str(self.options.get('atol')))
+                if i < self.len_species - 1:
+                    atol_vector.write("\n")
+
         # c_matrix
-        c_matrix = open(os.path.join(cupsoda_files,"c_matrix"), 'wb')
-        for i in range(n_sims):
-            line = ""
-            for j in range(n_rxns):
-                if j > 0: line += "\t"
-                line += str(param_values[i][j])
-            c_matrix.write(line)
-            if i < n_sims-1: c_matrix.write("\n")
-        c_matrix.close()
-        
+        with open(os.path.join(cupsoda_files, "c_matrix"), 'wb') as c_matrix:
+            for i in range(n_sims):
+                line = ""
+                for j in range(n_rxns):
+                    if j > 0:
+                        line += "\t"
+                    line += str(param_values[i][j])
+                c_matrix.write(line)
+                if i < n_sims - 1:
+                    c_matrix.write("\n")
+
         # cs_vector
-        cs_vector = open(os.path.join(cupsoda_files,"cs_vector"), 'wb')
-        out_species = range(len(self.model.species))
-        if self.options.get('obs_species_only'):
-            out_species = [False for sp in self.model.species]
-            for obs in self.model.observables:
-                for i in obs.species:
-                    out_species[i] = True
-            out_species = [i for i in range(len(out_species)) if out_species[i]]
-        for i in range(len(out_species)):
-            if i > 0: cs_vector.write("\n")
-            cs_vector.write(str(out_species[i]))
-        cs_vector.close()
-                
+        with open(os.path.join(cupsoda_files, "cs_vector"), 'wb') as cs_vector:
+            out_species = range(self.len_species)
+            if self.options.get('obs_species_only'):
+                out_species = [False for sp in self.model.species]
+                for obs in self.model.observables:
+                    for i in obs.species:
+                        out_species[i] = True
+                out_species = [i for i in range(len(out_species)) if out_species[i]]
+            for i in range(len(out_species)):
+                if i > 0:
+                    cs_vector.write("\n")
+                cs_vector.write(str(out_species[i]))
+
         # left_side
-        left_side = open(os.path.join(cupsoda_files,"left_side"), 'wb')
-        for i in range(len(self.model.reactions)):
-            line = ""
-            for j in range(len(self.model.species)):
-                if j > 0: line += "\t"
-                stoich = 0
-                for k in self.model.reactions[i]['reactants']:
-                    if j == k: stoich += 1
-                line += str(stoich)
-            if (i < len(self.model.reactions)-1): left_side.write(line+"\n")
-            else: left_side.write(line)
-        left_side.close()
-        
+        with open(os.path.join(cupsoda_files, "left_side"), 'wb') as left_side:
+            for i in range(self.len_rxns):
+                line = ""
+                for j in range(self.len_species):
+                    if j > 0:
+                        line += "\t"
+                    stoich = 0
+                    for k in self.model_rxns[i]['reactants']:
+                        if j == k:
+                            stoich += 1
+                    line += str(stoich)
+                if i < self.len_rxns - 1:
+                    left_side.write(line + "\n")
+                else:
+                    left_side.write(line)
+
         # max_steps
-        mxsteps = open(os.path.join(cupsoda_files,"max_steps"), 'wb')
-        mxsteps.write(str(self.options['max_steps']))
-        mxsteps.close()
-        
+        with open(os.path.join(cupsoda_files, "max_steps"), 'wb') as mxsteps:
+            mxsteps.write(str(self.options['max_steps']))
+
         # modelkind
-        modelkind = open(os.path.join(cupsoda_files,"modelkind"), 'wb')
-        vol = self.options['vol']
-        if not vol: 
-            modelkind.write("deterministic")
-        else: 
-            modelkind.write("stochastic")
-        modelkind.close()
-        
+        with open(os.path.join(cupsoda_files, "modelkind"), 'wb') as modelkind:
+            vol = self.options['vol']
+            if not vol:
+                modelkind.write("deterministic")
+            else:
+                modelkind.write("stochastic")
+
         # volume
         if vol:
-            volume = open(os.path.join(cupsoda_files,"volume"), 'wb')
-            volume.write(str(vol))
-            volume.close()
+            with open(os.path.join(cupsoda_files, "volume"), 'wb') as volume:
+                volume.write(str(vol))
+
             # Set population of __source() to N_A*vol and warn the user
             warnings.warn("Number units detected in cupSODA.run(). Setting the population " +
-                          "of __source() (if it exists) equal to %g*%g." % (N_A,vol))
-            for i,sp in enumerate(self.model.species):
+                          "of __source() (if it exists) equal to %g*%g." % (N_A, vol))
+            for i, sp in enumerate(self.model.species):
                 if str(sp) == '__source()':
-                    y0[:,i] = N_A*vol
+                    y0[:, i] = N_A * vol
                     break
         # MX_0
-        MX_0 = open(os.path.join(cupsoda_files,"MX_0"), 'wb')
-        for i in range(n_sims):
-            line = ""
-            for j in range(n_species):
-                if j > 0: line += "\t"
-                line += str(y0[i][j])
-            MX_0.write(line)
-            if i < n_sims-1: MX_0.write("\n")
-        MX_0.close()
-        
+        with open(os.path.join(cupsoda_files, "MX_0"), 'wb') as MX_0:
+            for i in range(n_sims):
+                line = ""
+                for j in range(n_species):
+                    if j > 0:
+                        line += "\t"
+                    line += str(y0[i][j])
+                MX_0.write(line)
+                if i < n_sims - 1:
+                    MX_0.write("\n")
+
         # M_feed
-        M_feed = open(os.path.join(cupsoda_files,"M_feed"), 'wb')
-        line = ""
-        for j,sp in enumerate(self.model.species):
-            if j > 0: line += "\t"
-            if str(sp) == '__source()':
-                line += str(y0[0,j])
-            else:
-                line += '0'
-        M_feed.write(line)
-        M_feed.close()
-        
-        # right_side
-        right_side = open(os.path.join(cupsoda_files,"right_side"), 'wb')
-        for i in range(len(self.model.reactions)):
+        with open(os.path.join(cupsoda_files, "M_feed"), 'wb') as M_feed:
             line = ""
-            for j in range(len(self.model.species)):
-                if j > 0: line += "\t"
-                stoich = 0
-                for k in self.model.reactions[i]['products']:
-                    if j == k: stoich += 1
-                line += str(stoich)
-            if (i < len(self.model.reactions)-1): right_side.write(line+"\n")
-            else: right_side.write(line)
-        right_side.close()
-        
+            for j, sp in enumerate(self.model.species):
+                if j > 0:
+                    line += "\t"
+                if str(sp) == '__source()':
+                    line += str(y0[0, j])
+                else:
+                    line += '0'
+            M_feed.write(line)
+
+        # right_side
+        with open(os.path.join(cupsoda_files, "right_side"), 'wb') as right_side:
+            for i in range(self.len_rxns):
+                line = ""
+                for j in range(self.len_species):
+                    if j > 0:
+                        line += "\t"
+                    stochiometry = 0
+                    for k in self.model_rxns[i]['products']:
+                        if j == k:
+                            stochiometry += 1
+                    line += str(stochiometry)
+                if i < self.len_rxns - 1:
+                    right_side.write(line + "\n")
+                else:
+                    right_side.write(line)
+
         # rtol
-        rtol = open(os.path.join(cupsoda_files,"rtol"), 'wb')
-        rtol.write(str(self.options.get('rtol')))
-        rtol.close()
-        
+        with open(os.path.join(cupsoda_files, "rtol"), 'wb') as rtol:
+            rtol.write(str(self.options.get('rtol')))
+
         # t_vector
-        t_vector = open(os.path.join(cupsoda_files,"t_vector"), 'wb')
-        t_vector.write("\n")
-        for t in self.tspan:
-            t_vector.write(str(float(t))+"\n")
-        t_vector.close()
-        
+        with open(os.path.join(cupsoda_files, "t_vector"), 'wb') as t_vector:
+            t_vector.write("\n")
+            for t in self.tspan:
+                t_vector.write(str(float(t)) + "\n")
+
         # time_max
-        time_max = open(os.path.join(cupsoda_files,"time_max"), 'wb')
-        time_max.write(str(float(self.tspan[-1])))
-        time_max.close() 
-    
+        with open(os.path.join(cupsoda_files, "time_max"), 'wb') as time_max:
+            time_max.write(str(float(self.tspan[-1])))
+
     def _get_y(self, indir=None, prefix=None, out_species=None):
         """Read simulation results from output files. 
 
@@ -460,53 +510,78 @@ class CupsodaSolver(Simulator):
             file). If not specified, an attempt will be made to read them from the 
             'cs_vector' file in 'indir/__CUPSODA_FILES/'.
         """
-        if indir is None: 
+        if indir is None:
             indir = self.outdir
-        if prefix is None: 
+        if prefix is None:
             prefix = self.model.name
         if out_species is None:
             try:
-                out_species = np.loadtxt(os.path.join(indir,"__CUPSODA_FILES","cs_vector"), dtype=int)
+                out_species = np.loadtxt(os.path.join(indir, "__CUPSODA_FILES", "cs_vector"), dtype=int)
             except IOError:
                 print "ERROR: Cannot determine which species have been printed to file. Either provide an"
                 print "'out_species' array or place the '__CUPSODA_FILES' directory in the input directory."
                 raise
-        
-        FILES = [file for file in os.listdir(indir) if re.match(prefix, file)]
-        if len(FILES)==0: 
+
+        files = [filename for filename in os.listdir(indir) if re.match(prefix, filename)]
+        if len(files) == 0:
             raise Exception("Cannot find any output files to load data from.")
-        
-        self.y = len(FILES) * [None]
-        self.tout = len(FILES) * [None]
+
+        self.y = len(files) * [None]
+        self.tout = len(files) * [None]
+
+        option = 1
+        start_total_time = time.time()
+        y_n = np.ones((self.tspan_length, self.len_species)) * float('nan')
+        t_out = np.ones(self.tspan_length) * float('nan')
         for n in range(len(self.y)):
-            self.y[n] = np.ones((len(self.tspan), len(self.model.species)))*float('nan')
-            self.tout[n] = np.ones(len(self.tspan))*float('nan')
+            self.y[n] = y_n
+            self.tout[n] = t_out
             # Read data from file
-            file = os.path.join(indir,prefix)+"_"+str(n)
-            if not os.path.isfile(file):
-                raise Exception("Cannot find input file "+file)
-            if self.verbose: 
-                print "Reading "+file+" ...",
-            f = open(file, 'rb')
-            for i in range(len(self.y[n])):
-                data = f.readline().split()
-                self.tout[n][i] = data[0]
-                self.y[n][i,out_species] = data[1:] # exclude first column (time)
-            f.close()
-            if self.verbose: print "Done."
-#             if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
-#                 self.y[i:, :] = 'nan'
+            filename = os.path.join(indir, prefix) + "_" + str(n)
+            if not os.path.isfile(filename):
+                raise Exception("Cannot find input file " + filename)
+            if self.verbose:
+                print "Reading " + filename + " ...",
+            if n == 0:
+                start_time = time.time()
+            if option == 1:
+                with open(filename, 'rb') as f:
+                    for i in range(len(self.y[n])):
+                        data = f.readline().split()
+                        self.tout[n][i] = data[0]
+                        self.y[n][i, out_species] = data[1:]  # exclude first column (time)
+            if n == 0:
+                end_time = time.time()
+                method_1 = end_time - start_time
+                start_time = time.time()
+            if n == 0 or option == 2:
+                data = read_csv(filename, sep='\t', skiprows=None, header=None)
+                data = data.as_matrix()
+                self.tout[n] = data[:, 0]
+                self.y[n][:, out_species] = data[:, 1:]
+            if self.verbose:
+                print "Done."
+            #             if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
+            #                 self.y[i:, :] = 'nan'
+            if n == 0:
+                end_time = time.time()
+                method_2 = end_time - start_time
+            if n == 0:
+                if method_1 > method_2:
+                    option = 2
+        end_total_time = time.time()
+        print "Python I/O = %f" % (end_total_time - start_total_time)
         self.tout = np.array(self.tout)
         self.y = np.array(self.y)
-        
+
     def _calc_yobs_yexpr(self, param_values=None):
         super(CupsodaSolver, self)._calc_yobs_yexpr()
-        
+
     def get_yfull(self):
         return super(CupsodaSolver, self).get_yfull()
 
-def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
 
+def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
     sim = CupsodaSolver(model, verbose=verbose, **integrator_options)
     sim.run(param_values, y0, tspan, outdir, prefix)
     if sim.options.get('load_ydata'):
