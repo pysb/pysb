@@ -245,9 +245,9 @@ class CupsodaSolver(Simulator):
         if len(param_values) != len(y0):
             raise Exception("Lengths of 'param_values' (len=" + str(len(param_values)) + ") and 'y0' (len=" + str(
                 len(y0)) + ") must be equal.")
-        if len(param_values.shape) != 2 or param_values.shape[1] != len(self.model.parameters_rules()):
+        if len(param_values.shape) != 2 or param_values.shape[1] != len(self.model.parameters):
             raise Exception(
-                "'param_values' must be a 2D array with dimensions N_SIMS x len(model.parameters_rules()):\
+                "'param_values' must be a 2D array with dimensions N_SIMS x len(model.parameters):\
                  param_values.shape=" + str(param_values.shape))
         if len(y0.shape) != 2 or y0.shape[1] != len(self.model.species):
             raise Exception(
@@ -272,7 +272,7 @@ class CupsodaSolver(Simulator):
                 os.remove(os.path.join(cupsoda_files, f))
         else:
             os.mkdir(cupsoda_files)
-
+        self/
         self.model_parameter_rules = self.model.parameters_rules()
         self.len_rxns = len(self.model.reactions)
         self.len_species = len(self.model.species)
@@ -295,10 +295,13 @@ class CupsodaSolver(Simulator):
             n_blocks = int(np.ceil(1. * n_sims / threads_per_block))
 
         # Create c_matrix
-
         c_matrix = np.zeros((len(param_values), self.len_rxns))
         par_names = [p.name for p in self.model_parameter_rules]
+        rate_params = self.model_parameter_rules
+        rate_mask = np.array([p in rate_params for p in self.model.parameters])
+        par_dict = {par_names[i]: i for i in range(len(par_names))}
         rate_args = []
+        param_values = param_values[:,rate_mask]
         for rxn in self.model_rxns:
             rate_args.append([arg for arg in rxn['rate'].args if not re.match("_*s", str(arg))])
         output = 0.01 * len(param_values)
@@ -311,7 +314,7 @@ class CupsodaSolver(Simulator):
                 for r in rate_args[j]:
                     x = str(r)
                     if x in par_names:
-                        rate *= param_values[i][j]
+                        rate *= param_values[i][par_dict[x]]
                     else:  # FIXME: need to detect non-numbers and throw an error
                         rate *= float(x)
                 c_matrix[i][j] = rate
@@ -340,13 +343,16 @@ class CupsodaSolver(Simulator):
 
         for line in iter(p.stdout.readline, b''):
             if line.startswith('Running'):
-                self.time = float(line.split(':')[1].replace('seconds', ''))
+                self.cupsoda_ti+.me = float(line.split(':')[1].replace('seconds', ''))
             print(">>> " + line.rstrip())
         # subprocess.call(command)
         end_time = time.time()
+        self.time = end_time - start_time
+        print "cupSODA = %4.4f" % self.cupsoda_time
         print "Total time = %4.4f " % (end_time - start_time)
-        print "cupSODA = %4.4f" % self.time
-        print "Total - cupSODA = %4.4f" % ((end_time - start_time) - self.time)
+
+        print "Total - cupSODA = %4.4f" % (self.time - self.cupsoda_time)
+
         # Load concentration data if requested   
         if self.options.get('load_ydata'):
             start_time = time.time()
@@ -561,7 +567,7 @@ class CupsodaSolver(Simulator):
                 self.y[n][:, out_species] = data[:, 1:]
             if self.verbose:
                 print "Done."
-            #             if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
+            # if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
             #                 self.y[i:, :] = 'nan'
             if n == 0:
                 end_time = time.time()
