@@ -192,7 +192,7 @@ class Solver(object):
         # We'll keep the code for putting together the matrix in Sympy
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
-        jac_fn = None
+        self.jac_fn = None
         if self._use_analytic_jacobian:
             species_names = ['__s%d' % i for i in range(len(self.model.species))]
             jac_matrix = []
@@ -246,7 +246,7 @@ class Solver(object):
             # jac = self.jac as defined in jacobian() earlier
             # Initialization of matrix for storing the Jacobian
             self.jac = numpy.zeros((len(self.model.odes), len(self.model.species)))
-            jac_fn = jacobian
+            self.jac_fn = jacobian
 
         # build integrator options list from our defaults and any kwargs passed to this function
         options = {}
@@ -282,9 +282,10 @@ class Solver(object):
             self.integrator = integrator
             # lsoda's arguments are in a different order to other integrators
             self.func = lambda t, y, p: rhs(y, t, p)
-            self.jac_fn = lambda t, y, p: jacobian(y, t, p)
+            if self._use_analytic_jacobian:
+                self.jac_fn = lambda t, y, p: jacobian(y, t, p)
         else:
-            self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
+            self.integrator = scipy.integrate.ode(rhs, jac=self.jac_fn)
             with warnings.catch_warnings():
                 warnings.filterwarnings('error', 'No integrator name match')
                 self.integrator.set_integrator(integrator, **options)

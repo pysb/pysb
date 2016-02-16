@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import numpy as np
 import itertools
+import sympy
 
 class Simulator:
     """An abstract base class for numerical simulation of models.
@@ -101,18 +102,25 @@ class Simulator:
         self.yobs_view = len(self.y) * [None]
         self.yexpr = len(self.y) * [None]
         self.yexpr_view = len(self.y) * [None]
+        len_tout = len(self.tout[0])
+        tmp_obs = np.ndarray(len_tout, zip(self.model.observables.keys(), itertools.repeat(float)))
+        exprs = self.model.expressions_dynamic()
+        obs_names = self.model.observables.keys()
+        len_obs = len(self.model.observables)
+        model_obs = self.model.observables
         # loop over simulations
         for n in range(len(self.y)):
+            len_tout_n = len(self.tout[n])
             # observables
-            if len(self.model.observables):
-                self.yobs[n] = np.ndarray(len(self.tout[n]), zip(self.model.observables.keys(), itertools.repeat(float)))
+            if len_obs:
+                self.yobs[n] = tmp_obs.copy()
             else:
-                self.yobs[n] = np.ndarray((len(self.tout[n]), 0))
+                self.yobs[n] = np.ndarray((len_tout_n, 0))
             self.yobs_view[n] = self.yobs[n].view(float).reshape(len(self.yobs[n]), -1)
-            for i,obs in enumerate(self.model.observables):
+            for i,obs in enumerate(model_obs):
                 self.yobs_view[n][:,i] = (self.y[n][:,obs.species] * obs.coefficients).sum(axis=1)
             # expressions
-            exprs = self.model.expressions_dynamic()
+
             if len(exprs):
                 self.yexpr[n] = np.ndarray(len(self.tout[n]), zip(exprs.keys(), itertools.repeat(float)))
             else:
@@ -121,9 +129,9 @@ class Simulator:
             if param_values is None:
                 param_values = [p.value for p in self.model.parameters]
             p_subs = { p.name : param_values[i] for i,p in enumerate(self.model.parameters) }
-            obs_names = self.model.observables.keys()
+
             obs_dict = { name : self.yobs_view[n][:,i] for i,name in enumerate(obs_names) }
-            for i,expr in enumerate(self.model.expressions_dynamic()):
+            for i,expr in enumerate(exprs):
                 expr_subs = expr.expand_expr(self.model).subs(p_subs)
                 func = sympy.lambdify(obs_names, expr_subs, "numpy")
                 self.yexpr_view[n][:,i] = func(**obs_dict)
