@@ -272,7 +272,6 @@ class CupsodaSolver(Simulator):
                 os.remove(os.path.join(cupsoda_files, f))
         else:
             os.mkdir(cupsoda_files)
-        self/
         self.model_parameter_rules = self.model.parameters_rules()
         self.len_rxns = len(self.model.reactions)
         self.len_species = len(self.model.species)
@@ -343,7 +342,7 @@ class CupsodaSolver(Simulator):
 
         for line in iter(p.stdout.readline, b''):
             if line.startswith('Running'):
-                self.cupsoda_ti+.me = float(line.split(':')[1].replace('seconds', ''))
+                self.cupsoda_time = float(line.split(':')[1].replace('seconds', ''))
             print(">>> " + line.rstrip())
         # subprocess.call(command)
         end_time = time.time()
