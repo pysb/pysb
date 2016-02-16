@@ -112,7 +112,7 @@ class Simulator:
         for n in range(len(self.y)):
             len_tout_n = len(self.tout[n])
             # observables
-            if len(len_obs):
+            if len_obs:
                 self.yobs[n] = tmp_obs.copy()
             else:
                 self.yobs[n] = np.ndarray((len_tout_n, 0))
