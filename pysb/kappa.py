@@ -20,39 +20,159 @@ import random
 import re
 import sympy
 import numpy as np
+import tempfile
+import shutil
+import warnings
+
 try:
     from future_builtins import zip
 except ImportError:
     pass
 
-__author__ = "johnbachman"
+class KasimInterfaceError(RuntimeError):
+    pass
 
-
-def run_simulation(model, **kwargs):
+def run_simulation(model, time=10000, points=200, cleanup=True,
+                   output_prefix=None, output_dir=None, flux_map=False,
+                   perturbation=None, verbose=False):
     """Runs the given model using KaSim and returns the parsed results.
 
     Parameters
     ----------
-    **kwargs : List of keyword arguments
-        All keyword arguments specifying conditions for the simulation are
-        passed to the function :py:func:`run_kasim` (see documentation
-        associated with that function for more information).
+    model : pysb.core.Model
+        The model to simulate/analyze using KaSim.
+    time : number
+        The amount of time (in arbitrary units) to run a simulation.
+        Identical to the -t argument when using KaSim at the command line.
+        Default value is 10000. If set to 0, no simulation will be run, but
+        the influence map will be generated (if dump_influence_map is set to
+        True).
+    points : integer
+        The number of data points to collect for plotting.
+        Identical to the -p argument when using KaSim at the command line.
+        Default value is 200. Note that the number of points returned by the
+        simulator will be points + 1 (including the 0 point).
+    cleanup : boolean
+        Specifies whether output files produced by KaSim should be deleted
+        after execution is completed. Default value is False.
+    output_prefix: str
+        Prefix of the temporary directory name. Default is 'tmpKappa'.
+    output_dir : string
+        The directory in which to create the temporary directory for
+        the .ka and other output files. Defaults to the system temporary file
+        directory (e.g. /tmp). If the specified directory does not exist,
+        an Exception is thrown.
+    flux_map: boolean
+        Specifies whether or not to produce the flux map (generated over the
+        full duration of the simulation). Default value is False.
+    perturbation : string or None
+        Optional perturbation language syntax to be appended to the Kappa file.
+        See KaSim manual for more details. Default value is None (no
+        perturbation).
 
     Returns
     -------
-    numpy.ndarray
-        Returns the kasim simulation data as a Numpy ndarray. Data is accessed
-        using the syntax::
+    If flux_map is False, returns the kasim simulation data as a Numpy ndarray.
+    Data is accessed using the syntax::
 
             results[index_name]
 
-        The index 'time' gives the data for the time coordinates of the
-        simulation. Data for the observables can be accessed by indexing the
-        array with the names of the observables.
+    The index 'time' gives the data for the time coordinates of the
+    simulation. Data for the observables can be accessed by indexing the
+    array with the names of the observables. Each entry in the ndarray
+    has length points + 1, due to the inclusion of both the 0 point and the
+    final timepoint.
+
+    If flux_map is True, returns a two-tuple whose first element is the
+    simulation ndarray, and whose second element is an instance of a pygraphviz
+    AGraph containing the flux map. The flux map can be rendered as a pdf
+    using the dot layout program as follows::
+
+        fluxmap.draw('fluxmap.pdf', prog='dot')
     """
 
-    outs = run_kasim(model, **kwargs)
-    return parse_kasim_outfile(outs['out'])
+    gen = KappaGenerator(model)
+
+    if output_prefix is None:
+        output_prefix = 'tmpKappa_%s_' % model.name
+
+    base_directory = tempfile.mkdtemp(prefix=output_prefix, dir=output_dir)
+
+    base_filename = os.path.join(base_directory, model.name)
+    kappa_filename = base_filename + '.ka'
+    fm_filename = base_filename + '_fm.dot'
+    out_filename = base_filename + '.out'
+
+    args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
+            '-o', out_filename]
+
+    try:
+        kappa_file = open(kappa_filename, 'w')
+
+        # Generate the Kappa model code from the PySB model and write it to
+        # the Kappa file:
+        kappa_file.write(gen.get_content())
+
+        # If desired, add instructions to the kappa file to generate the
+        # flux map:
+        if flux_map:
+            kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
+                             fm_filename)
+
+        # If any perturbation language code has been passed in, add it to the
+        # Kappa file:
+        if perturbation:
+            kappa_file.write('\n%s\n' % perturbation)
+
+        kappa_file.close()
+
+        p = subprocess.Popen(['kasim'] + args,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if verbose:
+            for line in iter(p.stdout.readline, b''):
+                print('@@', line, end='')
+        (p_out, p_err) = p.communicate()
+
+        if p.returncode:
+            raise KasimInterfaceError(p_out + '\n' + p_err)
+
+        # The simulation data, as a numpy array
+        data = parse_kasim_outfile(out_filename)
+
+        if flux_map:
+            try:
+                import pygraphviz
+                flux_graph = pygraphviz.AGraph(fm_filename)
+            except ImportError:
+                if cleanup:
+                    raise ImportError(
+                            "Couldn't import pygraphviz, which is "
+                            "required to return the flux map as a "
+                            "pygraphviz AGraph object. Either install "
+                            "pygraphviz or set cleanup=False to retain "
+                            "dot files.")
+                else:
+                    warnings.warn(
+                            "pygraphviz could not be imported so no AGraph "
+                            "object returned (returning None); flux map "
+                            "dot file available at %s" % fm_filename)
+                    flux_graph = None
+
+    except Exception as e:
+        raise Exception("Problem running KaSim: " + str(e))
+
+    finally:
+        if cleanup:
+            shutil.rmtree(base_directory)
+
+    # If a flux map was generated, return both the simulation output and the
+    # flux map as a pygraphviz graph
+    if flux_map:
+        return (data, flux_graph)
+    # If no flux map was requested, return only the simulation data
+    else:
+        return data
+
 
 def influence_map(model, do_open=False, **kwargs):
     """Generates the influence map via KaSa.
@@ -159,116 +279,6 @@ def run_complx(gen, kappa_filename, args):
     except Exception as e:
         raise Exception("problem running complx: " + str(e))
 
-
-def run_kasim(model, time=10000, points=200, output_dir='.', cleanup=False,
-              base_filename=None, dump_influence_map=False,
-              perturbation=None):
-    """Run KaSim on the given model with the provided arguments.
-
-    Parameters
-    ----------
-    model : pysb.core.Model
-        The model to simulate/analyze using KaSim.
-    time : number
-        The amount of time (in arbitrary units) to run a simulation.
-        Identical to the -t argument when using KaSim at the command line.
-        Default value is 10000. If set to 0, no simulation will be run, but
-        the influence map will be generated (if dump_influence_map is set to
-        True).
-    points : integer
-        The number of data points to collect for plotting.
-        Identical to the -p argument when using KaSim at the command line.
-        Default value is 200.
-    output_dir : string
-        The subdirectory in which to generate the Kappa (.ka) file for the
-        model and all output files produced by KaSim. Default value is '.'
-        Note that only relative paths can be specified; paths are relative
-        to the directory where the current Python instance is running.
-        If the specified directory does not exist, an Exception is thrown.
-    cleanup : boolean
-        Specifies whether output files produced by KaSim should be deleted
-        after execution is completed. Default value is False.
-    base_filename : The base filename to be used for generation of the Kappa
-        (.ka) file and all output files produced by KaSim. Defaults to a
-        string of the form::
-
-            '%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
-
-        The influence map filename appends '_im.dot' to this base filename; the
-        flux map filename appends '_fm.dot'; and the simulation output file
-        appends '.out'
-    dump_influence_map : boolean
-        Specifies whether or not to produce the influence map. Default value
-        is False.
-    perturbation : string or None
-        Optional perturbation language syntax to be appended to the Kappa file.
-        See KaSim manual for more details. Default value is None (no
-        perturbation).
-
-    Returns
-    -------
-    A dict with three entries giving the filenames for the files produced:
-
-        * output_dict['out'] gives the .out filename
-        * output_dict['im'] gives the influence map filename
-        * output_dict['fm'] gives the flux map filename
-    """
-
-    gen = KappaGenerator(model)
-
-    if not base_filename:
-        base_filename = '%s/%s_%d_%d_temp' % (output_dir,
-                        model.name, os.getpid(), random.randint(0, 10000))
-
-    kappa_filename = base_filename + '.ka'
-    im_filename = base_filename + '_im.dot'
-    fm_filename = base_filename + '_fm.dot'
-    out_filename = base_filename + '.out'
-
-    args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
-            '-o', out_filename]
-
-    try:
-        kappa_file = open(kappa_filename, 'w')
-
-        # Generate the Kappa model code from the PySB model and write it to
-        # the Kappa file:
-        kappa_file.write(gen.get_content())
-
-        # If desired, add instructions to the kappa file to generate the
-        # influence map:
-        if dump_influence_map:
-            kappa_file.write('%def: "dumpInfluenceMap" "true"\n')
-            kappa_file.write('%%def: "influenceMapFileName" "%s"\n\n' %
-                             im_filename)
-
-        # If any perturbation language code has been passed in, add it to the
-        # Kappa file:
-        if perturbation:
-            kappa_file.write('\n%s\n' % perturbation)
-
-        kappa_file.close()
-
-        print("Running kasim")
-        p = subprocess.Popen(['KaSim'] + args)
-                           #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        p.communicate()
-
-        if p.returncode:
-            raise Exception(p.stdout.read())
-
-    except Exception as e:
-        raise Exception("Problem running KaSim: " + str(e))
-
-    finally:
-        if cleanup:
-            for filename in [kappa_filename, im_filename,
-                            fm_filename, out_filename]:
-                if os.access(filename, os.F_OK):
-                    os.unlink(filename)
-
-    output_dict = {'out':out_filename, 'im':im_filename, 'fm':'flux.dot'}
-    return output_dict
 
 
 def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
