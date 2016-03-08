@@ -451,14 +451,14 @@ class CupsodaSolver(Simulator):
         if vol:
             with open(os.path.join(cupsoda_files, "volume"), 'wb') as volume:
                 volume.write(str(vol))
-
             # Set population of __source() to N_A*vol and warn the user
-            warnings.warn("Number units detected in cupSODA.run(). Setting the population " +
-                          "of __source() (if it exists) equal to %g*%g." % (N_A, vol))
-            for i, sp in enumerate(self.model.species):
-                if str(sp) == '__source()':
-                    y0[:, i] = N_A * vol
-                    break
+#             warnings.warn("Number units detected in cupSODA.run(). Setting the population " +
+#                           "of __source() (if it exists) equal to %g*%g." % (N_A, vol))
+#             for i, sp in enumerate(self.model.species):
+#                 if str(sp) == '__source()':
+#                     y0[:, i] = N_A * vol
+#                     break
+                
         # MX_0
         with open(os.path.join(cupsoda_files, "MX_0"), 'wb') as MX_0:
             for i in range(n_sims):
@@ -478,7 +478,7 @@ class CupsodaSolver(Simulator):
                 if j > 0:
                     line += "\t"
                 if str(sp) == '__source()':
-                    line += str(y0[0, j])
+                    line += '1'
                 else:
                     line += '0'
             M_feed.write(line)
