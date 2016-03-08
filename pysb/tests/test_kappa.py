@@ -89,7 +89,7 @@ def test_contact_map_kasa():
     Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=1),
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
-    contact_map(model, cleanup=True, base_filename='test1')
+    contact_map(model, cleanup=False, output_dir='.')
 
 @with_model
 def test_influence_map_kasa():
@@ -105,5 +105,5 @@ def test_influence_map_kasa():
     Rule('B_activates_C',
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
-    influence_map(model, cleanup=True, base_filename='test2')
+    influence_map(model, cleanup=True)
 
