@@ -243,48 +243,6 @@ def contact_map(model, do_open=False, **kwargs):
 
 ### "PRIVATE" Functions ###############################################
 
-def run_complx(gen, kappa_filename, args):
-    """Generalized method for passing arguments to the complx executable.
-
-    *DEPRECATED* because complx itself is deprecated. Switching over to using
-    KaSa for static analysis.
-
-    Parameters
-    ----------
-    gen : :py:class:`pysb.generator.KappaGenerator`
-        A KappaGenerator object that is used to produce the Kappa content
-        for writing to a file.
-    kappa_filename : string
-        The name of the file to write the generated Kappa to.
-    args : list of strings
-        List of command line arguments to pass to complx, with one entry for
-        each argument, for example::
-
-            ['--output-high-res-contact-map-jpg', jpg_filename]
-    """
-
-    warnings.warn("Complx is no longer supported, please use run_kasa instead",
-                  DeprecationWarning, stacklevel=2)
-
-    try:
-        kappa_file = open(kappa_filename, 'w')
-        kappa_file.write(gen.get_content())
-        kappa_file.close()
-        cmd = 'complx ' + ' '.join(args) + ' ' + kappa_filename
-        print("Command: " + cmd)
-        p = subprocess.Popen(['complx'] + args + [kappa_filename],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        #p.communicate()
-        p.wait()
-
-        if p.returncode:
-            raise Exception(p.stderr.read())
-
-    except Exception as e:
-        raise Exception("problem running complx: " + str(e))
-
-
-
 def run_static_analysis(model, influence_map=False, contact_map=False,
                         cleanup=True, output_prefix=None, output_dir=None,
                         verbose=False):
