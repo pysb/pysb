@@ -207,8 +207,6 @@ def influence_map(model, do_open=False, **kwargs):
                                     contact_map=False, **kwargs)
     return kasa_result.influence_map
 
-    #if do_open:
-    #    open_file(im_filename)
 
 def contact_map(model, do_open=False, **kwargs):
     """Generates the contact map via KaSa.
@@ -236,12 +234,6 @@ def contact_map(model, do_open=False, **kwargs):
                                     contact_map=True, **kwargs)
     return kasa_result.contact_map
 
-    #if do_open:
-    #    open_file(cm_filename)
-
-
-
-### "PRIVATE" Functions ###############################################
 
 def run_static_analysis(model, influence_map=False, contact_map=False,
                         cleanup=True, output_prefix=None, output_dir=None,
@@ -365,6 +357,8 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
 
     return StaticAnalysisResult(cmap, imap)
 
+### "PRIVATE" Functions ###############################################
+
 def parse_kasim_outfile(out_filename):
     """
     Parses the KaSim .out file into a Numpy ndarray.
@@ -413,21 +407,3 @@ def parse_kasim_outfile(out_filename):
 
     return arr
 
-
-def open_file(filename):
-    """Utility function for opening files for display on Mac OS X.
-
-    Uses the 'open' command to open the given file using the default program
-    associated with the file's filetype. Ultimately this should be rewritten to
-    auto-detect the operating system and use the appropriate system call.
-    """
-
-    try:
-        p = subprocess.Popen(['open'] + [filename],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        #p.communicate()
-        p.wait()
-        if p.returncode:
-            raise Exception(p.stderr.read())
-    except Exception as e:
-        raise Exception("Problem opening file: ", e)
