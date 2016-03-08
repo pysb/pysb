@@ -23,6 +23,7 @@ import numpy as np
 import tempfile
 import shutil
 import warnings
+from collections import namedtuple
 
 try:
     from future_builtins import zip
@@ -31,6 +32,12 @@ except ImportError:
 
 class KasimInterfaceError(RuntimeError):
     pass
+
+class KasaInterfaceError(RuntimeError):
+    pass
+
+StaticAnalysisResult = namedtuple('StaticAnalysisResult',
+                                  ['contact_map', 'influence_map'])
 
 def run_simulation(model, time=10000, points=200, cleanup=True,
                    output_prefix=None, output_dir=None, flux_map=False,
@@ -77,11 +84,10 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
 
             results[index_name]
 
-    The index 'time' gives the data for the time coordinates of the
-    simulation. Data for the observables can be accessed by indexing the
-    array with the names of the observables. Each entry in the ndarray
-    has length points + 1, due to the inclusion of both the 0 point and the
-    final timepoint.
+    The index 'time' gives the time coordinates of the simulation. Data for the
+    observables can be accessed by indexing the array with the names of the
+    observables. Each entry in the ndarray has length points + 1, due to the
+    inclusion of both the zero point and the final timepoint.
 
     If flux_map is True, returns a two-tuple whose first element is the
     simulation ndarray, and whose second element is an instance of a pygraphviz
@@ -145,7 +151,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
                 flux_graph = pygraphviz.AGraph(fm_filename)
             except ImportError:
                 if cleanup:
-                    raise ImportError(
+                    raise RuntimeError(
                             "Couldn't import pygraphviz, which is "
                             "required to return the flux map as a "
                             "pygraphviz AGraph object. Either install "
@@ -159,6 +165,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
                     flux_graph = None
 
     except Exception as e:
+        # FIXME
         raise Exception("Problem running KaSim: " + str(e))
 
     finally:
@@ -187,7 +194,7 @@ def influence_map(model, do_open=False, **kwargs):
         files (e.g., GraphViz).
     **kwargs : other keyword arguments
         Any other keyword arguments are passed to the function
-        :py:func:`run_kasa`.
+        :py:func:`run_static_analysis`.
 
     Returns
     -------
@@ -196,14 +203,12 @@ def influence_map(model, do_open=False, **kwargs):
         has been stored.
     """
 
-    kasa_dict = run_kasa(model, influence_map=True, contact_map=False,
-                         **kwargs)
-    im_filename = kasa_dict['im']
+    kasa_result = run_static_analysis(model, influence_map=True,
+                                    contact_map=False, **kwargs)
+    return kasa_result.influence_map
 
-    if do_open:
-        open_file(im_filename)
-
-    return im_filename
+    #if do_open:
+    #    open_file(im_filename)
 
 def contact_map(model, do_open=False, **kwargs):
     """Generates the contact map via KaSa.
@@ -218,7 +223,7 @@ def contact_map(model, do_open=False, **kwargs):
         files (e.g., GraphViz).
     **kwargs : other keyword arguments
         Any other keyword arguments are passed to the function
-        :py:func:`run_kasa`.
+        :py:func:`run_static_analysis`.
 
     Returns
     -------
@@ -227,14 +232,13 @@ def contact_map(model, do_open=False, **kwargs):
         has been stored.
     """
 
-    kasa_dict = run_kasa(model, influence_map=False, contact_map=True,
-                         **kwargs)
-    cm_filename = kasa_dict['cm']
+    kasa_result = run_static_analysis(model, influence_map=False,
+                                    contact_map=True, **kwargs)
+    return kasa_result.contact_map
 
-    if do_open:
-        open_file(cm_filename)
+    #if do_open:
+    #    open_file(cm_filename)
 
-    return cm_filename
 
 
 ### "PRIVATE" Functions ###############################################
@@ -281,9 +285,10 @@ def run_complx(gen, kappa_filename, args):
 
 
 
-def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
-             cleanup=False, base_filename=None):
-    """Run KaSa (static analyzer) on the given model.
+def run_static_analysis(model, influence_map=False, contact_map=False,
+                        cleanup=True, output_prefix=None, output_dir=None,
+                        verbose=False):
+    """Run static analysis (KaSa) on the given model.
 
     Parameters
     ----------
@@ -303,7 +308,7 @@ def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
         Specifies whether output files produced by KaSim should be deleted
         after execution is completed. Default value is False.
     base_filename : The base filename to be used for generation of the Kappa
-        (.ka) file and all output files produced by KaSim. Defaults to a
+        (.ka) file and all output files produced by KaSa. Defaults to a
         string of the form::
 
             '%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
@@ -323,10 +328,12 @@ def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
 
     gen = KappaGenerator(model)
 
-    if not base_filename:
-        base_filename = '%s/%s_%d_%d_temp' % (output_dir,
-                        model.name, os.getpid(), random.randint(0, 10000))
+    if output_prefix is None:
+        output_prefix = 'tmpKappa_%s_' % model.name
 
+    base_directory = tempfile.mkdtemp(prefix=output_prefix, dir=output_dir)
+
+    base_filename = os.path.join(base_directory, model.name)
     kappa_filename = base_filename + '.ka'
     im_filename = base_filename + '_im.dot'
     cm_filename = base_filename + '_cm.dot'
@@ -334,17 +341,17 @@ def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
     # Contact map args
     if contact_map:
         cm_args = ['--compute-contact-map', '--output-contact-map',
-                   cm_filename]
+                   os.path.basename(cm_filename)]
     else:
         cm_args = ['--no-compute-contact-map']
     # Influence map args
     if influence_map:
         im_args = ['--compute-influence-map', '--output-influence-map',
-                   im_filename]
+                   os.path.basename(im_filename)]
     else:
         im_args = ['--no-compute-influence-map']
     # Full arg list
-    args = [kappa_filename, '--output-directory', output_dir] \
+    args = [kappa_filename, '--output-directory', base_directory] \
             + cm_args + im_args
 
     try:
@@ -355,26 +362,50 @@ def run_kasa(model, influence_map=False, contact_map=False, output_dir='.',
         kappa_file.write(gen.get_content())
         kappa_file.close()
 
-        print("Running KaSa")
-        p = subprocess.Popen(['KaSa'] + args)
-                           #stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        p.communicate()
+        p = subprocess.Popen(['KaSa'] + args,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if verbose:
+            for line in iter(p.stdout.readline, b''):
+                print('@@', line, end='')
+        (p_out, p_err) = p.communicate()
 
         if p.returncode:
-            raise Exception(p.stdout.read())
+            raise KasaInterfaceError(p_out + '\n' + p_err)
+
+        # Try to create the graphviz objects
+        try:
+            import pygraphviz
+            # Convert the contact map to a Graph
+            cmap = pygraphviz.AGraph(cm_filename) if contact_map else None
+            imap = pygraphviz.AGraph(im_filename) if influence_map else None
+
+        except ImportError:
+            if cleanup:
+                raise ImportError(
+                        "Couldn't import pygraphviz, which is "
+                        "required to return the influence and contact maps "
+                        " as pygraphviz AGraph objects. Either install "
+                        "pygraphviz or set cleanup=False to retain "
+                        "dot files.")
+            else:
+                warnings.warn(
+                        "pygraphviz could not be imported so no AGraph "
+                        "objects returned (returning None); "
+                        "contact/influence maps available at %s" %
+                        base_directory)
+                cmap = None
+                imap = None
 
     except Exception as e:
+        # FIXME
         raise Exception("Problem running KaSa: " + str(e))
 
     finally:
         if cleanup:
-            for filename in [kappa_filename, im_filename, cm_filename]:
-                if os.access(filename, os.F_OK):
-                    os.unlink(filename)
+            shutil.rmtree(base_directory)
 
-    output_dict = {'im':im_filename, 'cm':cm_filename}
-    return output_dict
-
+    return StaticAnalysisResult(cmap, imap)
 
 def parse_kasim_outfile(out_filename):
     """
