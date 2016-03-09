@@ -136,7 +136,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
                 kappa_file.write('\n%s\n' % perturbation)
 
         # Run KaSim
-        p = subprocess.Popen(['kasim'] + args,
+        p = subprocess.Popen(['KaSim'] + args,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if verbose:
             for line in iter(p.stdout.readline, b''):
