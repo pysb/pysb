@@ -120,60 +120,55 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
             '-o', out_filename]
 
-    try:
-        # Generate the Kappa model code from the PySB model and write it to
-        # the Kappa file:
-        with open(kappa_filename, 'w') as kappa_file:
-            kappa_file.write(gen.get_content())
-            # If desired, add instructions to the kappa file to generate the
-            # flux map:
-            if flux_map:
-                kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
-                                 fm_filename)
-            # If any perturbation language code has been passed in, add it to
-            # the Kappa file:
-            if perturbation:
-                kappa_file.write('\n%s\n' % perturbation)
-
-        # Run KaSim
-        p = subprocess.Popen(['KaSim'] + args,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if verbose:
-            for line in iter(p.stdout.readline, b''):
-                print('@@', line, end='')
-        (p_out, p_err) = p.communicate()
-
-        if p.returncode:
-            raise KasimInterfaceError(p_out + '\n' + p_err)
-
-        # The simulation data, as a numpy array
-        data = parse_kasim_outfile(out_filename)
-
+    # Generate the Kappa model code from the PySB model and write it to
+    # the Kappa file:
+    with open(kappa_filename, 'w') as kappa_file:
+        kappa_file.write(gen.get_content())
+        # If desired, add instructions to the kappa file to generate the
+        # flux map:
         if flux_map:
-            try:
-                import pygraphviz
-                flux_graph = pygraphviz.AGraph(fm_filename)
-            except ImportError:
-                if cleanup:
-                    raise RuntimeError(
-                            "Couldn't import pygraphviz, which is "
-                            "required to return the flux map as a "
-                            "pygraphviz AGraph object. Either install "
-                            "pygraphviz or set cleanup=False to retain "
-                            "dot files.")
-                else:
-                    warnings.warn(
-                            "pygraphviz could not be imported so no AGraph "
-                            "object returned (returning None); flux map "
-                            "dot file available at %s" % fm_filename)
-                    flux_graph = None
+            kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
+                             fm_filename)
+        # If any perturbation language code has been passed in, add it to
+        # the Kappa file:
+        if perturbation:
+            kappa_file.write('\n%s\n' % perturbation)
 
-    except Exception as e:
-        raise Exception("Problem running KaSim: " + str(e))
+    # Run KaSim
+    p = subprocess.Popen(['KaSim'] + args,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if verbose:
+        for line in iter(p.stdout.readline, b''):
+            print('@@', line, end='')
+    (p_out, p_err) = p.communicate()
 
-    finally:
-        if cleanup:
-            shutil.rmtree(base_directory)
+    if p.returncode:
+        raise KasimInterfaceError(p_out + '\n' + p_err)
+
+    # The simulation data, as a numpy array
+    data = _parse_kasim_outfile(out_filename)
+
+    if flux_map:
+        try:
+            import pygraphviz
+            flux_graph = pygraphviz.AGraph(fm_filename)
+        except ImportError:
+            if cleanup:
+                raise RuntimeError(
+                        "Couldn't import pygraphviz, which is "
+                        "required to return the flux map as a "
+                        "pygraphviz AGraph object. Either install "
+                        "pygraphviz or set cleanup=False to retain "
+                        "dot files.")
+            else:
+                warnings.warn(
+                        "pygraphviz could not be imported so no AGraph "
+                        "object returned (returning None); flux map "
+                        "dot file available at %s" % fm_filename)
+                flux_graph = None
+
+    if cleanup:
+        shutil.rmtree(base_directory)
 
     # If a flux map was generated, return both the simulation output and the
     # flux map as a pygraphviz graph
@@ -228,7 +223,7 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         raise ValueError('Either contact_map or influence_map (or both) must '
                          'be set to True in order to perform static analysis.')
 
-    gen = KappaGenerator(model)
+    gen = KappaGenerator(model, _warn_no_ic=False)
 
     if output_prefix is None:
         output_prefix = 'tmpKappa_%s_' % model.name
@@ -260,52 +255,48 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     args = [kappa_filename, '--output-directory', base_directory] \
             + cm_args + im_args
 
-    # Run KaSa
+    # Generate the Kappa model code from the PySB model and write it to
+    # the Kappa file:
+    with open(kappa_filename, 'w') as kappa_file:
+        kappa_file.write(gen.get_content())
+
+    # Run KaSa using the given args
+    p = subprocess.Popen(['KaSa'] + args,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if verbose:
+        for line in iter(p.stdout.readline, b''):
+            print('@@', line, end='')
+    (p_out, p_err) = p.communicate()
+
+    if p.returncode:
+        raise KasaInterfaceError(p_out + '\n' + p_err)
+
+    # Try to create the graphviz objects from the .dot files created
     try:
-        # Generate the Kappa model code from the PySB model and write it to
-        # the Kappa file:
-        with open(kappa_filename, 'w') as kappa_file:
-            kappa_file.write(gen.get_content())
-
-        # Run KaSa using the given args
-        p = subprocess.Popen(['KaSa'] + args,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if verbose:
-            for line in iter(p.stdout.readline, b''):
-                print('@@', line, end='')
-        (p_out, p_err) = p.communicate()
-
-        if p.returncode:
-            raise KasaInterfaceError(p_out + '\n' + p_err)
-
-        # Try to create the graphviz objects from the .dot files created
-        try:
-            import pygraphviz
-            # Convert the contact map to a Graph
-            cmap = pygraphviz.AGraph(cm_filename) if contact_map else None
-            imap = pygraphviz.AGraph(im_filename) if influence_map else None
-        except ImportError:
-            if cleanup:
-                raise RuntimeError(
-                        "Couldn't import pygraphviz, which is "
-                        "required to return the influence and contact maps "
-                        " as pygraphviz AGraph objects. Either install "
-                        "pygraphviz or set cleanup=False to retain "
-                        "dot files.")
-            else:
-                warnings.warn(
-                        "pygraphviz could not be imported so no AGraph "
-                        "objects returned (returning None); "
-                        "contact/influence maps available at %s" %
-                        base_directory)
-                cmap = None
-                imap = None
-    except Exception as e:
-        raise Exception("Problem running KaSa: " + str(e))
-    # Clean up the temp directory if desired
-    finally:
+        import pygraphviz
+        # Convert the contact map to a Graph
+        cmap = pygraphviz.AGraph(cm_filename) if contact_map else None
+        imap = pygraphviz.AGraph(im_filename) if influence_map else None
+    except ImportError:
         if cleanup:
-            shutil.rmtree(base_directory)
+            raise RuntimeError(
+                    "Couldn't import pygraphviz, which is "
+                    "required to return the influence and contact maps "
+                    " as pygraphviz AGraph objects. Either install "
+                    "pygraphviz or set cleanup=False to retain "
+                    "dot files.")
+        else:
+            warnings.warn(
+                    "pygraphviz could not be imported so no AGraph "
+                    "objects returned (returning None); "
+                    "contact/influence maps available at %s" %
+                    base_directory)
+            cmap = None
+            imap = None
+
+    # Clean up the temp directory if desired
+    if cleanup:
+        shutil.rmtree(base_directory)
 
     return StaticAnalysisResult(cmap, imap)
 
@@ -361,7 +352,7 @@ def influence_map(model, **kwargs):
 
 ### "PRIVATE" Functions ###############################################
 
-def parse_kasim_outfile(out_filename):
+def _parse_kasim_outfile(out_filename):
     """
     Parses the KaSim .out file into a Numpy ndarray.
 
@@ -404,9 +395,9 @@ def parse_kasim_outfile(out_filename):
         dt = list(zip(column_names, ('float', ) * len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
-        arr = np.loadtxt(out_filename, dtype=dt, skiprows=1)
-
+        arr = np.loadtxt(out_filename, dtype=float, skiprows=1)
+        recarr = arr.view(dt)
     except Exception as e:
         raise Exception("problem parsing KaSim outfile: " + str(e))
 
-    return arr
+    return recarr
