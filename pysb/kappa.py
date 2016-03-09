@@ -30,14 +30,20 @@ try:
 except ImportError:
     pass
 
+
 class KasimInterfaceError(RuntimeError):
     pass
+
 
 class KasaInterfaceError(RuntimeError):
     pass
 
 StaticAnalysisResult = namedtuple('StaticAnalysisResult',
                                   ['contact_map', 'influence_map'])
+
+SimulationResult = namedtuple('SimulationResult',
+                                  ['timecourse', 'flux_map'])
+
 
 def run_simulation(model, time=10000, points=200, cleanup=True,
                    output_prefix=None, output_dir=None, flux_map=False,
@@ -51,19 +57,18 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     time : number
         The amount of time (in arbitrary units) to run a simulation.
         Identical to the -t argument when using KaSim at the command line.
-        Default value is 10000. If set to 0, no simulation will be run, but
-        the influence map will be generated (if dump_influence_map is set to
-        True).
+        Default value is 10000. If set to 0, no simulation will be run.
     points : integer
         The number of data points to collect for plotting.
         Identical to the -p argument when using KaSim at the command line.
-        Default value is 200. Note that the number of points returned by the
-        simulator will be points + 1 (including the 0 point).
+        Default value is 200. Note that the number of points actually returned
+        by the simulator will be points + 1 (including the 0 point).
     cleanup : boolean
         Specifies whether output files produced by KaSim should be deleted
-        after execution is completed. Default value is False.
+        after execution is completed. Default value is True.
     output_prefix: str
-        Prefix of the temporary directory name. Default is 'tmpKappa'.
+        Prefix of the temporary directory name. Default is
+        'tmpKappa_<model name>_'.
     output_dir : string
         The directory in which to create the temporary directory for
         the .ka and other output files. Defaults to the system temporary file
@@ -76,6 +81,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         Optional perturbation language syntax to be appended to the Kappa file.
         See KaSim manual for more details. Default value is None (no
         perturbation).
+    verbose : boolean
+        Whether to pass the output of KaSim through to stdout/stderr.
 
     Returns
     -------
@@ -89,10 +96,11 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     observables. Each entry in the ndarray has length points + 1, due to the
     inclusion of both the zero point and the final timepoint.
 
-    If flux_map is True, returns a two-tuple whose first element is the
-    simulation ndarray, and whose second element is an instance of a pygraphviz
-    AGraph containing the flux map. The flux map can be rendered as a pdf
-    using the dot layout program as follows::
+    If flux_map is True, returns an instance of SimulationResult, a namedtuple
+    with two members, `timecourse` and `flux_map`. The `timecourse` field
+    contains the simulation ndarray, and the `flux_map` field is an instance of
+    a pygraphviz AGraph containing the flux map. The flux map can be rendered
+    as a pdf using the dot layout program as follows::
 
         fluxmap.draw('fluxmap.pdf', prog='dot')
     """
@@ -113,25 +121,21 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
             '-o', out_filename]
 
     try:
-        kappa_file = open(kappa_filename, 'w')
-
         # Generate the Kappa model code from the PySB model and write it to
         # the Kappa file:
-        kappa_file.write(gen.get_content())
+        with open(kappa_filename, 'w') as kappa_file:
+            kappa_file.write(gen.get_content())
+            # If desired, add instructions to the kappa file to generate the
+            # flux map:
+            if flux_map:
+                kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
+                                 fm_filename)
+            # If any perturbation language code has been passed in, add it to
+            # the Kappa file:
+            if perturbation:
+                kappa_file.write('\n%s\n' % perturbation)
 
-        # If desired, add instructions to the kappa file to generate the
-        # flux map:
-        if flux_map:
-            kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
-                             fm_filename)
-
-        # If any perturbation language code has been passed in, add it to the
-        # Kappa file:
-        if perturbation:
-            kappa_file.write('\n%s\n' % perturbation)
-
-        kappa_file.close()
-
+        # Run KaSim
         p = subprocess.Popen(['kasim'] + args,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if verbose:
@@ -165,7 +169,6 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
                     flux_graph = None
 
     except Exception as e:
-        # FIXME
         raise Exception("Problem running KaSim: " + str(e))
 
     finally:
@@ -175,70 +178,19 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     # If a flux map was generated, return both the simulation output and the
     # flux map as a pygraphviz graph
     if flux_map:
-        return (data, flux_graph)
+        return SimulationResult(data, flux_graph)
     # If no flux map was requested, return only the simulation data
     else:
         return data
 
 
-def influence_map(model, do_open=False, **kwargs):
-    """Generates the influence map via KaSa.
-
-    Parameters
-    ----------
-    model : pysb.core.Model
-        The model for generating the influence map.
-    do_open : boolean
-        If do_open is set to True, then calls the :py:func:`open_file` method
-        to display the influence map using the default program for opening .dot
-        files (e.g., GraphViz).
-    **kwargs : other keyword arguments
-        Any other keyword arguments are passed to the function
-        :py:func:`run_static_analysis`.
-
-    Returns
-    -------
-    string
-        Returns the name of the .dot file where the influence map
-        has been stored.
-    """
-
-    kasa_result = run_static_analysis(model, influence_map=True,
-                                    contact_map=False, **kwargs)
-    return kasa_result.influence_map
-
-
-def contact_map(model, do_open=False, **kwargs):
-    """Generates the contact map via KaSa.
-
-    Parameters
-    ----------
-    model : pysb.core.Model
-        The model for generating the influence map.
-    do_open : boolean
-        If do_open is set to True, then calls the :py:func:`open_file` method
-        to display the influence map using the default program for opening .dot
-        files (e.g., GraphViz).
-    **kwargs : other keyword arguments
-        Any other keyword arguments are passed to the function
-        :py:func:`run_static_analysis`.
-
-    Returns
-    -------
-    string
-        Returns the name of the .dot file where the contact map
-        has been stored.
-    """
-
-    kasa_result = run_static_analysis(model, influence_map=False,
-                                    contact_map=True, **kwargs)
-    return kasa_result.contact_map
-
-
 def run_static_analysis(model, influence_map=False, contact_map=False,
                         cleanup=True, output_prefix=None, output_dir=None,
                         verbose=False):
-    """Run static analysis (KaSa) on the given model.
+    """Run static analysis (KaSa) on to get the contact and influence maps.
+
+    If neither influence_map nor contact_map are set to True, then a ValueError
+    is raised.
 
     Parameters
     ----------
@@ -248,33 +200,33 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         Whether to compute the influence map.
     contact_map : boolean
         Whether to compute the contact map.
-    output_dir : string
-        The subdirectory in which to generate the Kappa (.ka) file for the
-        model and all output files produced by KaSim. Default value is '.'
-        Note that only relative paths can be specified; paths are relative
-        to the directory where the current Python instance is running.
-        If the specified directory does not exist, an Exception is thrown.
     cleanup : boolean
-        Specifies whether output files produced by KaSim should be deleted
-        after execution is completed. Default value is False.
-    base_filename : The base filename to be used for generation of the Kappa
-        (.ka) file and all output files produced by KaSa. Defaults to a
-        string of the form::
-
-            '%s_%d_%d_temp' % (model.name, program id, random.randint(0,10000))
-
-        The influence map filename appends '_im.dot' to this base filename; the
-        contact map filename appends '_cm.dot'.
+        Specifies whether output files produced by KaSa should be deleted
+        after execution is completed. Default value is True.
+    output_prefix: str
+        Prefix of the temporary directory name. Default is
+        'tmpKappa_<model name>_'.
+    output_dir : string
+        The directory in which to create the temporary directory for
+        the .ka and other output files. Defaults to the system temporary file
+        directory (e.g. /tmp). If the specified directory does not exist,
+        an Exception is thrown.
+    verbose : boolean
+        Whether to pass the output of KaSa through to stdout/stderr.
 
     Returns
     -------
-    A dict with two entries giving the filenames for the files produced
-
-        * output_dict['im'] gives the influence map filename, or None if not
-          produced
-        * output_dict['cm'] gives the contact map filename, or None if not
-          produced
+    StaticAnalysisResult, a namedtuple with two fields, `contact_map` and
+    `influence_map`, each containing the respective result as an instance
+    of a pygraphviz AGraph. If the either the contact_map or influence_map
+    argument to the function is False, the corresponding entry in the
+    StaticAnalysisResult returned by the function will be None.
     """
+
+    # Make sure the user has asked for an output!
+    if not influence_map and not contact_map:
+        raise ValueError('Either contact_map or influence_map (or both) must '
+                         'be set to True in order to perform static analysis.')
 
     gen = KappaGenerator(model)
 
@@ -288,13 +240,17 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     im_filename = base_filename + '_im.dot'
     cm_filename = base_filename + '_cm.dot'
 
-    # Contact map args
+    # NOTE: in the args passed to KaSa, the directory for the .dot files is
+    # specified by the --output_directory option, and the output_contact_map
+    # and output_influence_map should only be the base filenames (without
+    # a directory prefix).
+    # Contact map args:
     if contact_map:
         cm_args = ['--compute-contact-map', '--output-contact-map',
                    os.path.basename(cm_filename)]
     else:
         cm_args = ['--no-compute-contact-map']
-    # Influence map args
+    # Influence map args:
     if influence_map:
         im_args = ['--compute-influence-map', '--output-influence-map',
                    os.path.basename(im_filename)]
@@ -304,17 +260,16 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     args = [kappa_filename, '--output-directory', base_directory] \
             + cm_args + im_args
 
+    # Run KaSa
     try:
-        kappa_file = open(kappa_filename, 'w')
-
         # Generate the Kappa model code from the PySB model and write it to
         # the Kappa file:
-        kappa_file.write(gen.get_content())
-        kappa_file.close()
+        with open(kappa_filename, 'w') as kappa_file:
+            kappa_file.write(gen.get_content())
 
+        # Run KaSa using the given args
         p = subprocess.Popen(['KaSa'] + args,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
         if verbose:
             for line in iter(p.stdout.readline, b''):
                 print('@@', line, end='')
@@ -323,16 +278,15 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         if p.returncode:
             raise KasaInterfaceError(p_out + '\n' + p_err)
 
-        # Try to create the graphviz objects
+        # Try to create the graphviz objects from the .dot files created
         try:
             import pygraphviz
             # Convert the contact map to a Graph
             cmap = pygraphviz.AGraph(cm_filename) if contact_map else None
             imap = pygraphviz.AGraph(im_filename) if influence_map else None
-
         except ImportError:
             if cleanup:
-                raise ImportError(
+                raise RuntimeError(
                         "Couldn't import pygraphviz, which is "
                         "required to return the influence and contact maps "
                         " as pygraphviz AGraph objects. Either install "
@@ -346,16 +300,64 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
                         base_directory)
                 cmap = None
                 imap = None
-
     except Exception as e:
-        # FIXME
         raise Exception("Problem running KaSa: " + str(e))
-
+    # Clean up the temp directory if desired
     finally:
         if cleanup:
             shutil.rmtree(base_directory)
 
     return StaticAnalysisResult(cmap, imap)
+
+
+def contact_map(model, **kwargs):
+    """Generates the contact map via KaSa.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model for generating the influence map.
+    **kwargs : other keyword arguments
+        Any other keyword arguments are passed to the function
+        :py:func:`run_static_analysis`.
+
+    Returns
+    -------
+    pygraphviz AGraph object containing the contact map.
+    The contact map can be rendered as a pdf using the dot layout program
+    as follows::
+
+        contact_map.draw('contact_map.pdf', prog='dot')
+    """
+
+    kasa_result = run_static_analysis(model, influence_map=False,
+                                    contact_map=True, **kwargs)
+    return kasa_result.contact_map
+
+
+def influence_map(model, **kwargs):
+    """Generates the influence map via KaSa.
+
+    Parameters
+    ----------
+    model : pysb.core.Model
+        The model for generating the influence map.
+    **kwargs : other keyword arguments
+        Any other keyword arguments are passed to the function
+        :py:func:`run_static_analysis`.
+
+    Returns
+    -------
+    pygraphviz AGraph object containing the influence map.
+    The influence map can be rendered as a pdf using the dot layout program
+    as follows::
+
+        influence_map.draw('influence_map.pdf', prog='dot')
+    """
+
+    kasa_result = run_static_analysis(model, influence_map=True,
+                                    contact_map=False, **kwargs)
+    return kasa_result.influence_map
 
 ### "PRIVATE" Functions ###############################################
 
@@ -384,7 +386,7 @@ def parse_kasim_outfile(out_filename):
     try:
         out_file = open(out_filename, 'r')
 
-        line = out_file.readline().strip() # Get the first line
+        line = out_file.readline().strip()  # Get the first line
         out_file.close()
         line = line[2:]  # strip off opening '# '
         raw_names = re.split(' ', line)
@@ -393,11 +395,13 @@ def parse_kasim_outfile(out_filename):
         # Get rid of the quotes surrounding the observable names
         for raw_name in raw_names:
             mo = re.match("'(.*)'", raw_name)
-            if (mo): column_names.append(mo.group(1))
-            else: column_names.append(raw_name)
+            if (mo):
+                column_names.append(mo.group(1))
+            else:
+                column_names.append(raw_name)
 
         # Create the dtype argument for the numpy record array
-        dt = list(zip(column_names, ('float',)*len(column_names)))
+        dt = list(zip(column_names, ('float', ) * len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
         arr = np.loadtxt(out_filename, dtype=dt, skiprows=1)
@@ -406,4 +410,3 @@ def parse_kasim_outfile(out_filename):
         raise Exception("problem parsing KaSim outfile: " + str(e))
 
     return arr
-
