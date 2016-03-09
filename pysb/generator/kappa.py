@@ -6,10 +6,11 @@ import warnings
 class KappaGenerator(object):
 
     # Dialect can be either 'complx' or 'kasim' (default)
-    def __init__(self, model, dialect='kasim'):
+    def __init__(self, model, dialect='kasim', _warn_no_ic=True):
         self.model = model
         self.__content = None
         self.dialect = dialect
+        self._warn_no_ic = _warn_no_ic
 
     def get_content(self):
         if self.__content == None:
@@ -122,7 +123,7 @@ class KappaGenerator(object):
         self.__content += "\n"
 
     def generate_species(self):
-        if not self.model.initial_conditions:
+        if self._warn_no_ic and not self.model.initial_conditions:
             warnings.warn("Warning: No initial conditions.")
 
         species_codes = [format_complexpattern(cp)
