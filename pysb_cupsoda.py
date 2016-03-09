@@ -4,6 +4,9 @@ import re
 import subprocess
 import time
 import warnings
+import pycuda.autoinit
+import pycuda.driver as cuda
+
 
 import numpy as np
 import pandas
@@ -184,6 +187,12 @@ class CupsodaSolver(Simulator):
         super(CupsodaSolver, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
 
+
+        self.model_parameter_rules = self.model.parameters_rules()
+        self.len_rxns = len(self.model.reactions)
+        self.len_species = len(self.model.species)
+        self.model_rxns = self.model.reactions
+        self.tspan_length = len(self.tspan)
         # Set integrator options to defaults
         self.options = {}
         integrator = integrator.lower()  # case insensitive
@@ -272,26 +281,33 @@ class CupsodaSolver(Simulator):
                 os.remove(os.path.join(cupsoda_files, f))
         else:
             os.mkdir(cupsoda_files)
-        self.model_parameter_rules = self.model.parameters_rules()
-        self.len_rxns = len(self.model.reactions)
-        self.len_species = len(self.model.species)
-        self.model_rxns = self.model.reactions
-        self.tspan_length = len(self.tspan)
+
 
         # Simple default for number of blocks
         n_blocks = self.options.get('n_blocks')
 
         if not n_blocks:
-            shared_memory_per_block = 48 * 1024  # bytes
-            default_threads_per_block = 32
-            n_species = self.len_species
-            bytes_per_float = 8
+            device = cuda.Device(0)
+            attrs = device.get_attributes()
+
+            # Beyond this point is just pretty printing
+            #print("\n===Attributes for device %d" % 0)
+            #for (key, value) in attrs.iteritems():
+            #    print("%s:%s" % (str(key), str(value)))
+
+            shared_memory_per_block = attrs[pycuda._driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
+            default_threads_per_block = 16
+            n_species = len(self.model.species)
+            bytes_per_float = 4
             memory_per_thread = (n_species + 1) * bytes_per_float  # +1 for time variable
-            upper_limit_threads_per_block = 512
+            upper_limit_threads_per_block = attrs[pycuda._driver.device_attribute.MAX_THREADS_PER_BLOCK]
             max_threads_per_block = min(shared_memory_per_block / memory_per_thread, upper_limit_threads_per_block)
             threads_per_block = min(max_threads_per_block, default_threads_per_block)
-            n_sims = param_values.shape[0]
+            #print ('Shared_mem_per_block/mem_per_block = %f' % (shared_memory_per_block / memory_per_thread))
+            print('Threads per block %i ' % threads_per_block)
+            n_sims = len(param_values)
             n_blocks = int(np.ceil(1. * n_sims / threads_per_block))
+            print('Number of blocks %i ' % n_blocks)
 
         # Create c_matrix
         c_matrix = np.zeros((len(param_values), self.len_rxns))
@@ -535,12 +551,11 @@ class CupsodaSolver(Simulator):
         self.tout = len(files) * [None]
 
         option = 1
-        start_total_time = time.time()
         y_n = np.ones((self.tspan_length, self.len_species)) * float('nan')
         t_out = np.ones(self.tspan_length) * float('nan')
         for n in range(len(self.y)):
-            self.y[n] = y_n
-            self.tout[n] = t_out
+            self.y[n] = y_n.copy()
+            self.tout[n] = t_out.copy()
             # Read data from file
             filename = os.path.join(indir, prefix) + "_" + str(n)
             if not os.path.isfile(filename):
@@ -566,18 +581,18 @@ class CupsodaSolver(Simulator):
                 self.y[n][:, out_species] = data[:, 1:]
             if self.verbose:
                 print "Done."
-            # if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
-            #                 self.y[i:, :] = 'nan'
+            #if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
+            #                self.y[i:, :] = 'nan'
             if n == 0:
                 end_time = time.time()
                 method_2 = end_time - start_time
             if n == 0:
                 if method_1 > method_2:
                     option = 2
-        end_total_time = time.time()
-        print "Python I/O = %f" % (end_total_time - start_total_time)
         self.tout = np.array(self.tout)
-        self.y = np.array(self.y)
+        self.y = np.asarray(self.y)
+
+
 
     def _calc_yobs_yexpr(self, param_values=None):
         super(CupsodaSolver, self)._calc_yobs_yexpr()
