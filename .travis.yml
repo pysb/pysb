@@ -26,7 +26,7 @@ before_install:
 - export BNGPATH=`pwd`/BioNetGen-2.2.6-stable
 # First install ocamlfind via opam (needed to build KaSim/KaSa)
 - opam init -a git://github.com/ocaml/opam-repository && eval $(opam config env)
-- opam install ocamlfind
+- opam install ocamlfind --yes
 # Install KaSim/KaSa
 - git clone https://github.com/Kappa-Dev/KaSim.git
 - cd KaSim
