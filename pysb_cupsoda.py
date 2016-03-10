@@ -285,29 +285,29 @@ class CupsodaSolver(Simulator):
 
         # Simple default for number of blocks
         n_blocks = self.options.get('n_blocks')
-
+        gpu = self.options.get('gpu')
+        if not gpu:
+            gpu = 0
         if not n_blocks:
-            device = cuda.Device(0)
+
+            device = cuda.Device(gpu)
             attrs = device.get_attributes()
-
-            # Beyond this point is just pretty printing
-            #print("\n===Attributes for device %d" % 0)
-            #for (key, value) in attrs.iteritems():
-            #    print("%s:%s" % (str(key), str(value)))
-
             shared_memory_per_block = attrs[pycuda._driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
+            upper_limit_threads_per_block = attrs[pycuda._driver.device_attribute.MAX_THREADS_PER_BLOCK]
+
             default_threads_per_block = 16
             n_species = len(self.model.species)
             bytes_per_float = 4
             memory_per_thread = (n_species + 1) * bytes_per_float  # +1 for time variable
-            upper_limit_threads_per_block = attrs[pycuda._driver.device_attribute.MAX_THREADS_PER_BLOCK]
+
             max_threads_per_block = min(shared_memory_per_block / memory_per_thread, upper_limit_threads_per_block)
             threads_per_block = min(max_threads_per_block, default_threads_per_block)
-            #print ('Shared_mem_per_block/mem_per_block = %f' % (shared_memory_per_block / memory_per_thread))
-            print('Threads per block %i ' % threads_per_block)
             n_sims = len(param_values)
             n_blocks = int(np.ceil(1. * n_sims / threads_per_block))
-            print('Number of blocks %i ' % n_blocks)
+            if self.verbose:
+                print ('Shared_mem_per_block/mem_per_block = %f' % (shared_memory_per_block / memory_per_thread))
+                print('Threads per block %i ' % threads_per_block)
+                print('Number of blocks %i ' % n_blocks)
 
         # Create c_matrix
         c_matrix = np.zeros((len(param_values), self.len_rxns))
@@ -317,15 +317,25 @@ class CupsodaSolver(Simulator):
         par_dict = {par_names[i]: i for i in range(len(par_names))}
         rate_args = []
         param_values = param_values[:,rate_mask]
+        rate_order = []
+        self.vol = self.options['vol']
         for rxn in self.model_rxns:
             rate_args.append([arg for arg in rxn['rate'].args if not re.match("_*s", str(arg))])
+            reactants = 0
+            for i in rxn['reactants']:
+                if not str(self.model.species[i]) == '__source()':
+                    reactants += 1
+            rate_order.append(reactants)
         output = 0.01 * len(param_values)
         output = int(output) if output > 1 else 1
         for i in range(len(param_values)):
-            if self.verbose and i % output == 0:
-                print str(int(round(100. * i / len(param_values)))) + "%"
+            #if self.verbose and i % output == 0:
+                #print str(int(round(100. * i / len(param_values)))) + "%"
             for j in range(self.len_rxns):
-                rate = 1.0
+                if self.vol:
+                    rate = 1*(N_A*self.vol)**(rate_order[j] - 1)
+                else:
+                    rate = 1.0
                 for r in rate_args[j]:
                     x = str(r)
                     if x in par_names:
@@ -340,17 +350,17 @@ class CupsodaSolver(Simulator):
         # Create cupSODA input files
         self._create_input_files(cupsoda_files, c_matrix, y0)
         end_time = time.time()
-        print "Set up  time = %4.4f " % (end_time - start_time)
+        if self.verbose:
+            print "Set up  time = %4.4f " % (end_time - start_time)
         # Build command
         # ./cupSODA input_model_folder blocks output_folder simulation_file_prefix gpu_number
         # fitness_calculation memory_use dump
         # noinspection PyPep8
-        command = [bin_path, cupsoda_files, str(n_blocks), self.outdir, prefix, str(self.options['gpu']), \
+        command = [bin_path, cupsoda_files, str(n_blocks), os.path.join(self.outdir, "Output"), prefix, str(self.options['gpu']),
                    '0', str(self.options['memory_usage']), '1' if self.verbose else '0']
         print "Running cupSODA: " + ' '.join(command)
 
         # Run simulation
-
         start_time = time.time()
         p = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
@@ -363,21 +373,23 @@ class CupsodaSolver(Simulator):
         # subprocess.call(command)
         end_time = time.time()
         self.time = end_time - start_time
-        print "cupSODA = %4.4f" % self.cupsoda_time
-        print "Total time = %4.4f " % (end_time - start_time)
-
-        print "Total - cupSODA = %4.4f" % (self.time - self.cupsoda_time)
+        if self.verbose:
+            print "cupSODA = %4.4f" % self.cupsoda_time
+            print "Total time = %4.4f " % (end_time - start_time)
+            print "Total - cupSODA = %4.4f" % (self.time - self.cupsoda_time)
 
         # Load concentration data if requested   
         if self.options.get('load_ydata'):
             start_time = time.time()
             self._get_y(prefix=prefix)
             end_time = time.time()
-            print "Get_y time = %4.4f " % (end_time - start_time)
+            if self.verbose:
+                print "Get_y time = %4.4f " % (end_time - start_time)
             start_time = time.time()
             self._calc_yobs_yexpr(param_values)
             end_time = time.time()
-            print "Calc yopbs_yepr time = %4.4f " % (end_time - start_time)
+            if self.verbose:
+                print "Calc yopbs_yepr time = %4.4f " % (end_time - start_time)
 
     def _create_input_files(self, cupsoda_files, param_values, y0):
 
@@ -439,25 +451,20 @@ class CupsodaSolver(Simulator):
         with open(os.path.join(cupsoda_files, "max_steps"), 'wb') as mxsteps:
             mxsteps.write(str(self.options['max_steps']))
 
-        # modelkind
-        with open(os.path.join(cupsoda_files, "modelkind"), 'wb') as modelkind:
+        # model_kind
+        with open(os.path.join(cupsoda_files, "modelkind"), 'wb') as model_kind:
+            model_kind.write("deterministic")
             vol = self.options['vol']
-            if not vol:
-                modelkind.write("deterministic")
-            else:
-                modelkind.write("stochastic")
-
-        # volume
-        if vol:
-            with open(os.path.join(cupsoda_files, "volume"), 'wb') as volume:
-                volume.write(str(vol))
-            # Set population of __source() to N_A*vol and warn the user
-#             warnings.warn("Number units detected in cupSODA.run(). Setting the population " +
-#                           "of __source() (if it exists) equal to %g*%g." % (N_A, vol))
-#             for i, sp in enumerate(self.model.species):
-#                 if str(sp) == '__source()':
-#                     y0[:, i] = N_A * vol
-#                     break
+            # volume
+            if vol:
+                # Set population of __source() to N_A*vol and warn the user
+                warnings.warn("Number units detected in cupSODA.run(). Setting the population \
+                              of __source() (if it exists) equal to %g*%g." % (N_A, vol))
+                y0 = y0/(N_A*vol)
+                for i, sp in enumerate(self.model.species):
+                    if str(sp) == '__source()':
+                        y0[:, i] = 1.
+                        break
                 
         # MX_0
         with open(os.path.join(cupsoda_files, "MX_0"), 'wb') as MX_0:
@@ -532,12 +539,12 @@ class CupsodaSolver(Simulator):
             'cs_vector' file in 'indir/__CUPSODA_FILES/'.
         """
         if indir is None:
-            indir = self.outdir
+            indir = os.path.join(self.outdir, "Output")
         if prefix is None:
             prefix = self.model.name
         if out_species is None:
             try:
-                out_species = np.loadtxt(os.path.join(indir, "__CUPSODA_FILES", "cs_vector"), dtype=int)
+                out_species = np.loadtxt(os.path.join(self.outdir, "__CUPSODA_FILES", "cs_vector"), dtype=int)
             except IOError:
                 print "ERROR: Cannot determine which species have been printed to file. Either provide an"
                 print "'out_species' array or place the '__CUPSODA_FILES' directory in the input directory."
@@ -560,8 +567,8 @@ class CupsodaSolver(Simulator):
             filename = os.path.join(indir, prefix) + "_" + str(n)
             if not os.path.isfile(filename):
                 raise Exception("Cannot find input file " + filename)
-            if self.verbose:
-                print "Reading " + filename + " ...",
+            #if self.verbose:
+            #    print "Reading " + filename + " ...",
             if n == 0:
                 start_time = time.time()
             if option == 1:
@@ -579,8 +586,8 @@ class CupsodaSolver(Simulator):
                 data = data.as_matrix()
                 self.tout[n] = data[:, 0]
                 self.y[n][:, out_species] = data[:, 1:]
-            if self.verbose:
-                print "Done."
+            #if self.verbose:
+            #    print "Done."
             #if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
             #                self.y[i:, :] = 'nan'
             if n == 0:
@@ -589,6 +596,7 @@ class CupsodaSolver(Simulator):
             if n == 0:
                 if method_1 > method_2:
                     option = 2
+            self.y[0]*self.vol*N_A
         self.tout = np.array(self.tout)
         self.y = np.asarray(self.y)
 
