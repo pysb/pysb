@@ -596,7 +596,8 @@ class CupsodaSolver(Simulator):
             if n == 0:
                 if method_1 > method_2:
                     option = 2
-            self.y[0]*self.vol*N_A
+            if self.vol:
+                self.y[n]*self.vol*N_A
         self.tout = np.array(self.tout)
         self.y = np.asarray(self.y)
 
