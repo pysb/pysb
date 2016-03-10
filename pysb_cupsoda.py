@@ -585,7 +585,10 @@ class CupsodaSolver(Simulator):
                 data = read_csv(filename, sep='\t', skiprows=None, header=None)
                 data = data.as_matrix()
                 self.tout[n] = data[:, 0]
-                self.y[n][:, out_species] = data[:, 1:]
+                if self.vol:
+                    self.y[n][:, out_species] = data[:, 1:] * self.vol * N_A
+                else:
+                    self.y[n][:, out_species] = data[:, 1:]
             #if self.verbose:
             #    print "Done."
             #if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
@@ -596,8 +599,6 @@ class CupsodaSolver(Simulator):
             if n == 0:
                 if method_1 > method_2:
                     option = 2
-            if self.vol:
-                self.y[n]*self.vol*N_A
         self.tout = np.array(self.tout)
         self.y = np.asarray(self.y)
 
