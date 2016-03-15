@@ -4,10 +4,13 @@ import re
 import subprocess
 import time
 import warnings
-import pycuda.autoinit
-import pycuda.driver as cuda
-
-
+try:
+    import pycuda.autoinit
+    import pycuda.driver as cuda
+    use_pycuda = True
+except ImportError, e:
+    use_pycuda = False
+    pass
 import numpy as np
 import pandas
 from scipy.constants import N_A
@@ -289,25 +292,25 @@ class CupsodaSolver(Simulator):
         if not gpu:
             gpu = 0
         if not n_blocks:
-
-            device = cuda.Device(gpu)
-            attrs = device.get_attributes()
-            shared_memory_per_block = attrs[pycuda._driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
-            upper_limit_threads_per_block = attrs[pycuda._driver.device_attribute.MAX_THREADS_PER_BLOCK]
-
             default_threads_per_block = 16
             n_species = len(self.model.species)
             bytes_per_float = 4
             memory_per_thread = (n_species + 1) * bytes_per_float  # +1 for time variable
-
-            max_threads_per_block = min(shared_memory_per_block / memory_per_thread, upper_limit_threads_per_block)
-            threads_per_block = min(max_threads_per_block, default_threads_per_block)
             n_sims = len(param_values)
-            n_blocks = int(np.ceil(1. * n_sims / threads_per_block))
-            if self.verbose:
-                print ('Shared_mem_per_block/mem_per_block = %f' % (shared_memory_per_block / memory_per_thread))
-                print('Threads per block %i ' % threads_per_block)
-                print('Number of blocks %i ' % n_blocks)
+            if use_pycuda:
+                device = cuda.Device(gpu)
+                attrs = device.get_attributes()
+                shared_memory_per_block = attrs[pycuda._driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
+                upper_limit_threads_per_block = attrs[pycuda._driver.device_attribute.MAX_THREADS_PER_BLOCK]
+                max_threads_per_block = min(shared_memory_per_block / memory_per_thread, upper_limit_threads_per_block)
+                threads_per_block = min(max_threads_per_block, default_threads_per_block)
+                n_blocks = int(np.ceil(1. * n_sims / threads_per_block))
+                if self.verbose:
+                    print ('Shared_mem_per_block/mem_per_block = %f' % (shared_memory_per_block / memory_per_thread))
+                    print('Threads per block %i ' % threads_per_block)
+                    print('Number of blocks %i ' % n_blocks)
+            else:
+                n_blocks = int(np.ceil(1.*n_sims)/default_threads_per_block)
 
         # Create c_matrix
         c_matrix = np.zeros((len(param_values), self.len_rxns))
