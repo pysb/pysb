@@ -211,6 +211,7 @@ class CupsodaSolver(Simulator):
         self.len_species = len(self.model.species)
         self.model_rxns = self.model.reactions
         self.tspan_length = len(self.tspan)
+        self.outdir = None
         # Set integrator options to defaults
         self.options = {}
         integrator = integrator.lower()  # case insensitive
@@ -349,7 +350,6 @@ class CupsodaSolver(Simulator):
         rate_args = []
         param_values = param_values[:, rate_mask]
         rate_order = []
-        self.vol = self.options['vol']
         for rxn in self.model_rxns:
             rate_args.append([arg for arg in rxn['rate'].args if
                               not re.match("_*s", str(arg))])
@@ -364,8 +364,9 @@ class CupsodaSolver(Simulator):
             if self.verbose and i % output == 0:
                 print(str(int(round(100. * i / len(param_values)))) + "%")
             for j in range(self.len_rxns):
-                if self.vol:
-                    rate = 1 * (N_A * self.vol) ** (rate_order[j] - 1)
+                if self.options['vol']:
+                    rate = 1 * (N_A * self.options['vol']) ** \
+                               (rate_order[j] - 1)
                 else:
                     rate = 1.0
                 for r in rate_args[j]:
@@ -399,18 +400,19 @@ class CupsodaSolver(Simulator):
                              stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT)
 
+        cupsoda_time = -1
         for line in iter(p.stdout.readline, b''):
             if line.startswith('Running'):
-                self.cupsoda_time = float(
+                cupsoda_time = float(
                     line.split(':')[1].replace('seconds', ''))
             print(">>> " + line.rstrip())
         # subprocess.call(command)
         end_time = time.time()
-        self.time = end_time - start_time
+        total_time = end_time - start_time
         if self.verbose:
-            print("cupSODA = %4.4f" % self.cupsoda_time)
+            print("cupSODA = %4.4f" % cupsoda_time)
             print("Total time = %4.4f " % (end_time - start_time))
-            print("Total - cupSODA = %4.4f" % (self.time - self.cupsoda_time))
+            print("Total - cupSODA = %4.4f" % (total_time - cupsoda_time))
 
         # Load concentration data if requested   
         if self.options.get('load_ydata'):
@@ -624,9 +626,10 @@ class CupsodaSolver(Simulator):
                     for i in range(len(self.y[n])):
                         data = f.readline().split()
                         self.tout[n][i] = data[0]
-                        self.y[n][i, out_species] = data[1:]  # exclude first column (time)
-                if self.vol:
-                    self.y[n][:,:] *= self.vol * N_A
+                        # exclude first column (time)
+                        self.y[n][i, out_species] = data[1:]
+                if self.options['vol']:
+                    self.y[n][:, :] *= self.options['vol'] * N_A
             if n == 0:
                 end_time = time.time()
                 method_1 = end_time - start_time
@@ -635,8 +638,9 @@ class CupsodaSolver(Simulator):
                 data = read_csv(filename, sep='\t', skiprows=None, header=None)
                 data = data.as_matrix()
                 self.tout[n] = data[:, 0]
-                if self.vol:
-                    self.y[n][:, out_species] = data[:, 1:] * self.vol * N_A
+                if self.options['vol']:
+                    self.y[n][:, out_species] = data[:, 1:] * \
+                                                self.options['vol'] * N_A
                 else:
                     self.y[n][:, out_species] = data[:, 1:]
             if n == 0:
