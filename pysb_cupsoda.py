@@ -35,10 +35,7 @@ default_integrator_options = {
         'vol': None,  # volume
         'obs_species_only': True,  # print only observable species
         'load_ydata': True,  # load conc data after simulation
-        'memory_usage': 0,  # memory usage type:
-        # 0: global memory (default; suggested for medium-large models)
-        # 1: shared memory
-        # 2: both shared and constant memory
+        'memory_usage': 'global'  # global memory (see _memory_options dict)
     },
 }
 
@@ -132,11 +129,12 @@ class CupsodaSolver(Simulator):
                              observables (default: True)
         * load_ydata       : read species concentrations from output files
                              after simulation (default: True)
-        * memory_usage     : type of memory usage (default: 0)
-                             * 0: global memory (suggested for medium-large
-                               models)
-                             * 1: shared memory 
-                             * 2: both shared and constant memory
+        * memory_usage     : type of memory usage (default: 'global')
+                             * 'global': global memory (suggested for
+                               medium-large models)
+                             * 'shared': shared memory
+                             * 'sharedconstant': both shared and constant
+                               memory
 
     Attributes
     ----------
@@ -200,6 +198,8 @@ class CupsodaSolver(Simulator):
        'load_conc_data' argument to cupSODA.run() is set to True (the
        default) or if the cupSODA.load_data() method is called directly.
     """
+
+    _memory_options = {'global': '0', 'shared': '1', 'sharedconstant': '2'}
 
     def __init__(self, model, tspan=None, cleanup=True, verbose=False,
                  integrator='cupsoda', **integrator_options):
@@ -385,13 +385,15 @@ class CupsodaSolver(Simulator):
         self._create_input_files(cupsoda_files, c_matrix, y0)
         end_time = time.time()
         if self.verbose:
-            print("Set up  time = %4.4f " % (end_time - start_time))
+            print("Set up time = %4.4f " % (end_time - start_time))
         # Build command
-        # ./cupSODA input_model_folder blocks output_folder simulation_file_prefix gpu_number
-        # fitness_calculation memory_use dump
-        # noinspection PyPep8
-        command = [bin_path, cupsoda_files, str(n_blocks), os.path.join(self.outdir, "Output"), prefix, str(self.options['gpu']),
-                   '0', str(self.options['memory_usage']), '1' if self.verbose else '0']
+        # ./cupSODA input_model_folder blocks output_folder simulation_
+        # file_prefix gpu_number fitness_calculation memory_use dump
+        command = [bin_path, cupsoda_files, str(n_blocks),
+                   os.path.join(self.outdir, "Output"), prefix,
+                   str(self.options['gpu']),
+                   '0', self._memory_usage,
+                   '1' if self.verbose else '0']
         print("Running cupSODA: " + ' '.join(command))
 
         # Run simulation
@@ -426,6 +428,14 @@ class CupsodaSolver(Simulator):
             end_time = time.time()
             if self.verbose:
                 print("Calc yopbs_yepr time = %4.4f " % (end_time - start_time))
+
+    @property
+    def _memory_usage(self):
+        try:
+            return self._memory_options[self.options['memory_usage']]
+        except KeyError:
+            raise Exception('memory_usage must be one of %s',
+                            self._memory_options.keys())
 
     def _create_input_files(self, cupsoda_files, param_values, y0):
 
