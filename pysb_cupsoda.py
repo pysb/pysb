@@ -14,7 +14,6 @@ except ImportError, e:
 import numpy as np
 import pandas
 from scipy.constants import N_A
-
 from pysb.bng import generate_equations
 from pysb.simulate import Simulator
 
@@ -22,9 +21,10 @@ read_csv = pandas.read_csv
 
 _cupsoda_path = None
 
-# Putting this here because the cupSODA class may be generalized in the future to a MultiSolver.
-# All supported integrators should be included here, even if they don't have default options.
-# Obviously, the only integrator currently supported is "cupSODA" (case insensitive).
+# Putting this here because the cupSODA class may be generalized in the future
+# to a MultiSolver. All supported integrators should be included here,
+# even if they don't have default options. Obviously, the only integrator
+# currently supported is "cupSODA" (case insensitive).
 default_integrator_options = {
     'cupsoda': {
         'max_steps': 20000,  # max no. of internal iterations (LSODA's MXSTEP)
@@ -47,11 +47,14 @@ def set_cupsoda_path(directory):
     global _cupsoda_path
     _cupsoda_path = os.path.join(directory, 'cupSODA')
     # Make sure file exists and that it is not a directory
-    if not os.access(_cupsoda_path, os.F_OK) or not os.path.isfile(_cupsoda_path):
-        raise Exception('Could not find cupSODA binary in ' + os.path.abspath(directory) + '.')
+    if not os.access(_cupsoda_path, os.F_OK) or not \
+            os.path.isfile(_cupsoda_path):
+        raise Exception('Could not find cupSODA binary in ' +
+                        os.path.abspath(directory) + '.')
     # Make sure file has executable permissions
     elif not os.access(_cupsoda_path, os.X_OK):
-        raise Exception("cupSODA binary in " + os.path.abspath(directory) + " does not have executable permissions.")
+        raise Exception("cupSODA binary in " + os.path.abspath(directory) +
+                        " does not have executable permissions.")
 
 
 def _get_cupsoda_path():
@@ -62,6 +65,7 @@ def _get_cupsoda_path():
     or in a user-defined location set via ``set_cupsoda_path``.
 
     """
+
     global _cupsoda_path
 
     # Just return cached value if it's available
@@ -87,9 +91,12 @@ def _get_cupsoda_path():
         if check_bin_dir(b):
             break
         else:
-            raise Exception('Could not find cupSODA installed in one of the following locations:' +
-                            ''.join('\n    ' + x for x in bin_dirs) + '\nPlease put the executable ' +
-                            '(or a link to it) in one of these locations or set the path using set_cupsoda_path().')
+            raise Exception('Could not find cupSODA installed in one of the '
+                            'following locations:' +
+                            ''.join('\n    ' + x for x in bin_dirs) +
+                            '\nPlease put the executable (or a link to it) in'
+                            ' one of these locations or set the path using'
+                            ' set_cupsoda_path().')
 
     # Cache path for future use
     _cupsoda_path = bin_path
@@ -103,8 +110,8 @@ class CupsodaSolver(Simulator):
     model : pysb.Model
         Model to integrate.
     tspan : vector-like, optional (default: None)
-        Time values at which the integrations are sampled. The first and last values 
-        define the time range.
+        Time values at which the integrations are sampled. The first and last
+        values define the time range.
     cleanup : bool, optional
         If True (default), delete the temporary files after the simulation is
         finished. If False, leave them in place. Useful for debugging.
@@ -114,18 +121,20 @@ class CupsodaSolver(Simulator):
         Name of the integrator to use, taken from the integrators listed in 
         pysb.tools.cupSODA.default_integrator_options.
     integrator_options :
-        * max_steps        : max no. of internal iterations (LSODA's MXSTEP) (default: None)
+        * max_steps        : max no. of internal iterations (LSODA's MXSTEP)
+                             (default: None)
         * atol             : absolute tolerance (default: 1e-8)
         * rtol             : relative tolerance (default: 1e-8)
         * n_blocks         : number of GPU blocks (default: 64)
         * gpu              : index of GPU to run on (default: 0)
         * vol              : volume (required if number units; default: None)
-        * obs_species_only : print only the concentrations of species in observables 
-                             (default: True)
-        * load_ydata       : read species concentrations from output files after simulation 
-                             (default: True)
+        * obs_species_only : print only the concentrations of species in
+                             observables (default: True)
+        * load_ydata       : read species concentrations from output files
+                             after simulation (default: True)
         * memory_usage     : type of memory usage (default: 0)
-                             * 0: global memory (suggested for medium-large models)
+                             * 0: global memory (suggested for medium-large
+                               models)
                              * 1: shared memory 
                              * 2: both shared and constant memory
 
@@ -154,42 +163,48 @@ class CupsodaSolver(Simulator):
         Expression trajectories. Dimensionality is ``(n_sims, len(tspan))`` 
         and record names follow ``model.expressions_dynamic()`` names.
     yexpr_view : numpy.ndarray
-        An array view (sharing the same data buffer) on ``yexpr``. Dimensionality
-        is ``(n_sims, len(tspan), len(model.expressions_dynamic()))``.
+        An array view (sharing the same data buffer) on ``yexpr``.
+        Dimensionality is ``(n_sims, len(tspan),
+        len(model.expressions_dynamic()))``.
     outdir : string, optional (default: os.getcwd())
             Output directory.
 
     Notes
     -----
-    1) The expensive step of generating the reaction network is performed during 
-       initialization only if the network does not already exist (len(model.reactions)==0 
-       and len(model.species)==0) OR if it is explicitly requested (gen_net==True).
-    2) The cupSODA class is derived from the Solver class in pysb.integrate although 
-       it overrides all of the functions of the Solver class (i.e, __init__() and run()). 
-       This was done with the idea that eventually a lower level BaseSolver class will 
-       be created from which the Solver and cupSODA classes will be derived. This will 
-       probably be necessary for performing multiscale simulations where one would want 
-       to embed a (potentially different) solver within each entity (e.g., cell) in the 
-       simulation environment. Note that this is also why the argument list for the 
-       __init__() function is identical to that of the Solver class.
-    3) Like the Solver class, the cupSODA class accepts an optional 'integrator' string 
-       argument. However, if anything other than 'cupsoda' (case insensitive) is passed 
-       an Exception is thrown. The idea behind this design is that the cupSODA class may 
-       eventually be generalized to a MultiSolver class, for which cupSODA is just one 
-       of multiple supported integrators. This is analogous to the Solver class, which 
-       currently supports all of the integrators included in :py:class:`scipy.integrate.ode`.
-    4) The arrays 'y', 'yobs', and 'yobs_view' from the pysb.integrate.Solver base class
-       have been overridden as dictionaries in which the keys are simulation numbers (ints)
-       and the values are the same ndarrays as in the base class. For efficiency, these
-       objects are initialized as empty dictionaries and only filled if the 'load_conc_data'
-       argument to cupSODA.run() is set to True (the default) or if the cupSODA.load_data() 
-       method is called directly.
+    1) The expensive step of generating the reaction network is performed
+       during initialization only if the network does not already exist
+       (len(model.reactions)==0 and len(model.species)==0) OR if it is
+       explicitly requested (gen_net==True).
+    2) The cupSODA class is derived from the Solver class in pysb.integrate
+       although it overrides all of the functions of the Solver class (i.e,
+       __init__() and run()). This was done with the idea that eventually a
+       lower level BaseSolver class will be created from which the Solver
+       and cupSODA classes will be derived. This will probably be necessary
+       for performing multiscale simulations where one would want to embed a
+       (potentially different) solver within each entity (e.g., cell) in the
+       simulation environment. Note that this is also why the argument list
+       for the __init__() function is identical to that of the Solver class.
+    3) Like the Solver class, the cupSODA class accepts an optional
+       'integrator' string argument. However, if anything other than
+       'cupsoda' (case insensitive) is passed an Exception is thrown. The
+       idea behind this design is that the cupSODA class may eventually be
+       generalized to a MultiSolver class, for which cupSODA is just one of
+       multiple supported integrators. This is analogous to the Solver
+       class, which currently supports all of the integrators included in
+       :py:class:`scipy.integrate.ode`.
+    4) The arrays 'y', 'yobs', and 'yobs_view' from the
+       pysb.integrate.Solver base class have been overridden as dictionaries in
+       which the keys are simulation numbers (ints) and the values are the
+       same ndarrays as in the base class. For efficiency, these objects are
+       initialized as empty dictionaries and only filled if the
+       'load_conc_data' argument to cupSODA.run() is set to True (the
+       default) or if the cupSODA.load_data() method is called directly.
     """
 
-    def __init__(self, model, tspan=None, cleanup=True, verbose=False, integrator='cupsoda', **integrator_options):
+    def __init__(self, model, tspan=None, cleanup=True, verbose=False,
+                 integrator='cupsoda', **integrator_options):
         super(CupsodaSolver, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
-
 
         self.model_parameter_rules = self.model.parameters_rules()
         self.len_rxns = len(self.model.reactions)
@@ -202,7 +217,8 @@ class CupsodaSolver(Simulator):
         if default_integrator_options.get(integrator.lower()):
             self.options.update(default_integrator_options[integrator])
         else:
-            raise Exception("Integrator type '" + integrator + "' not recognized.")
+            raise Exception(
+                "Integrator type '" + integrator + "' not recognized.")
 
         # overwrite default integrator options
         self.options.update(integrator_options)
@@ -217,13 +233,14 @@ class CupsodaSolver(Simulator):
         Parameters
         ----------
         param_values : list-like
-            Rate constants for all reactions for all simulations. Dimensions are 
-            ``(N_SIMS, len(model.reactions))``.
+            Rate constants for all reactions for all simulations. Dimensions
+            are ``(N_SIMS, len(model.reactions))``.
         y0 : list-like
-            Initial species concentrations for all reactions for all simulations. 
-            Dimensions are ``(N_SIMS, len(model.species))``.
+            Initial species concentrations for all reactions for all
+            simulations. Dimensions are ``(N_SIMS, len(model.species))``.
         tspan : vector-like, optional
-            Time values (exception thrown if set to None both here and in constructor).
+            Time values (exception thrown if set to None both here and in
+            constructor).
         outdir : string, optional (default: os.getcwd())
             Output directory.
         prefix : string, optional (default: model.name)
@@ -232,13 +249,14 @@ class CupsodaSolver(Simulator):
         
         Notes
         -----
-        If 'vol' is provided, cupSODA will assume that species counts are in number units 
-        and will automatically convert them to concentrations by dividing by N_A*vol 
-        (N_A = Avogadro's number).
+        If 'vol' is provided, cupSODA will assume that species counts are in
+        number units  and will automatically convert them to concentrations
+        by dividing by N_A*vol (N_A = Avogadro's number).
         
-        If load_ydata=True and obs_species_only=True, concentrations of species not in 
-        observables are set to 'nan'.
+        If load_ydata=True and obs_species_only=True, concentrations of
+        species not in observables are set to 'nan'.
         """
+
         start_time = time.time()
         # make sure tspan is defined somewhere
         if tspan is not None:
@@ -255,15 +273,19 @@ class CupsodaSolver(Simulator):
 
         # Error checks on 'param_values' and 'y0'
         if len(param_values) != len(y0):
-            raise Exception("Lengths of 'param_values' (len=" + str(len(param_values)) + ") and 'y0' (len=" + str(
+            raise Exception("Lengths of 'param_values' (len=" + str(
+                len(param_values)) + ") and 'y0' (len=" + str(
                 len(y0)) + ") must be equal.")
-        if len(param_values.shape) != 2 or param_values.shape[1] != len(self.model.parameters):
+        if len(param_values.shape) != 2 or param_values.shape[1] != len(
+                self.model.parameters):
             raise Exception(
-                "'param_values' must be a 2D array with dimensions N_SIMS x len(model.parameters):\
-                 param_values.shape=" + str(param_values.shape))
+                "'param_values' must be a 2D array with dimensions N_SIMS x "
+                "len(model.parameters): param_values.shape=" +
+                str(param_values.shape))
         if len(y0.shape) != 2 or y0.shape[1] != len(self.model.species):
             raise Exception(
-                "'y0' must be a 2D array with dimensions N_SIMS x len(model.species): y0.shape=" + str(y0.shape))
+                "'y0' must be a 2D array with dimensions N_SIMS x "
+                "len(model.species): y0.shape=" + str(y0.shape))
 
         # Create outdir if it doesn't exist
         self.outdir = outdir
@@ -277,14 +299,13 @@ class CupsodaSolver(Simulator):
         # Path to cupSODA executable
         bin_path = _get_cupsoda_path()
 
-        # Put the cupSODA input files in a directory within the output directory
+        # Put the cupSODA input files within the output directory
         cupsoda_files = os.path.join(self.outdir, "__CUPSODA_FILES")
         if os.path.exists(cupsoda_files):
             for f in os.listdir(cupsoda_files):
                 os.remove(os.path.join(cupsoda_files, f))
         else:
             os.mkdir(cupsoda_files)
-
 
         # Simple default for number of blocks
         n_blocks = self.options.get('n_blocks')
@@ -295,22 +316,30 @@ class CupsodaSolver(Simulator):
             default_threads_per_block = 16
             n_species = len(self.model.species)
             bytes_per_float = 4
-            memory_per_thread = (n_species + 1) * bytes_per_float  # +1 for time variable
+            # +1 for time variable
+            memory_per_thread = (n_species + 1) * bytes_per_float
             n_sims = len(param_values)
             if use_pycuda:
                 device = cuda.Device(gpu)
                 attrs = device.get_attributes()
-                shared_memory_per_block = attrs[pycuda._driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
-                upper_limit_threads_per_block = attrs[pycuda._driver.device_attribute.MAX_THREADS_PER_BLOCK]
-                max_threads_per_block = min(shared_memory_per_block / memory_per_thread, upper_limit_threads_per_block)
-                threads_per_block = min(max_threads_per_block, default_threads_per_block)
+                shared_memory_per_block = attrs[
+                  pycuda._driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
+                upper_limit_threads_per_block = attrs[
+                  pycuda._driver.device_attribute.MAX_THREADS_PER_BLOCK]
+                max_threads_per_block = min(
+                  shared_memory_per_block / memory_per_thread,
+                  upper_limit_threads_per_block)
+                threads_per_block = min(max_threads_per_block,
+                                        default_threads_per_block)
                 n_blocks = int(np.ceil(1. * n_sims / threads_per_block))
                 if self.verbose:
-                    print ('Shared_mem_per_block/mem_per_block = %f' % (shared_memory_per_block / memory_per_thread))
+                    print ('Shared_mem_per_block/mem_per_block = %f' % (
+                        shared_memory_per_block / memory_per_thread))
                     print('Threads per block %i ' % threads_per_block)
                     print('Number of blocks %i ' % n_blocks)
             else:
-                n_blocks = int(np.ceil(1.*n_sims)/default_threads_per_block)
+                n_blocks = int(
+                    np.ceil(1. * n_sims) / default_threads_per_block)
 
         # Create c_matrix
         c_matrix = np.zeros((len(param_values), self.len_rxns))
@@ -319,11 +348,12 @@ class CupsodaSolver(Simulator):
         rate_mask = np.array([p in rate_params for p in self.model.parameters])
         par_dict = {par_names[i]: i for i in range(len(par_names))}
         rate_args = []
-        param_values = param_values[:,rate_mask]
+        param_values = param_values[:, rate_mask]
         rate_order = []
         self.vol = self.options['vol']
         for rxn in self.model_rxns:
-            rate_args.append([arg for arg in rxn['rate'].args if not re.match("_*s", str(arg))])
+            rate_args.append([arg for arg in rxn['rate'].args if
+                              not re.match("_*s", str(arg))])
             reactants = 0
             for i in rxn['reactants']:
                 if not str(self.model.species[i]) == '__source()':
@@ -332,18 +362,19 @@ class CupsodaSolver(Simulator):
         output = 0.01 * len(param_values)
         output = int(output) if output > 1 else 1
         for i in range(len(param_values)):
-            #if self.verbose and i % output == 0:
-                #print str(int(round(100. * i / len(param_values)))) + "%"
+            # if self.verbose and i % output == 0:
+            # print str(int(round(100. * i / len(param_values)))) + "%"
             for j in range(self.len_rxns):
                 if self.vol:
-                    rate = 1*(N_A*self.vol)**(rate_order[j] - 1)
+                    rate = 1 * (N_A * self.vol) ** (rate_order[j] - 1)
                 else:
                     rate = 1.0
                 for r in rate_args[j]:
                     x = str(r)
                     if x in par_names:
                         rate *= param_values[i][par_dict[x]]
-                    else:  # FIXME: need to detect non-numbers and throw an error
+                    else:
+                        # FIXME: need to detect non-numbers and throw an error
                         rate *= float(x)
                 c_matrix[i][j] = rate
 
@@ -356,11 +387,13 @@ class CupsodaSolver(Simulator):
         if self.verbose:
             print "Set up  time = %4.4f " % (end_time - start_time)
         # Build command
-        # ./cupSODA input_model_folder blocks output_folder simulation_file_prefix gpu_number
-        # fitness_calculation memory_use dump
-        # noinspection PyPep8
-        command = [bin_path, cupsoda_files, str(n_blocks), os.path.join(self.outdir, "Output"), prefix, str(self.options['gpu']),
-                   '0', str(self.options['memory_usage']), '1' if self.verbose else '0']
+        # ./cupSODA input_model_folder blocks output_folder simulation_
+        # file_prefix gpu_number fitness_calculation memory_use dump
+        command = [bin_path, cupsoda_files, str(n_blocks),
+                   os.path.join(self.outdir, "Output"), prefix,
+                   str(self.options['gpu']),
+                   '0', str(self.options['memory_usage']),
+                   '1' if self.verbose else '0']
         print "Running cupSODA: " + ' '.join(command)
 
         # Run simulation
@@ -371,7 +404,8 @@ class CupsodaSolver(Simulator):
 
         for line in iter(p.stdout.readline, b''):
             if line.startswith('Running'):
-                self.cupsoda_time = float(line.split(':')[1].replace('seconds', ''))
+                self.cupsoda_time = float(
+                    line.split(':')[1].replace('seconds', ''))
             print(">>> " + line.rstrip())
         # subprocess.call(command)
         end_time = time.time()
@@ -401,7 +435,8 @@ class CupsodaSolver(Simulator):
         n_species = len(y0[0])
 
         # atol_vector 
-        with open(os.path.join(cupsoda_files, "atol_vector"), 'wb') as atol_vector:
+        with open(os.path.join(cupsoda_files, "atol_vector"),
+                  'wb') as atol_vector:
             for i in range(self.len_species):
                 atol_vector.write(str(self.options.get('atol')))
                 if i < self.len_species - 1:
@@ -427,7 +462,8 @@ class CupsodaSolver(Simulator):
                 for obs in self.model.observables:
                     for i in obs.species:
                         out_species[i] = True
-                out_species = [i for i in range(len(out_species)) if out_species[i]]
+                out_species = [i for i in range(len(out_species)) if
+                               out_species[i]]
             for i in range(len(out_species)):
                 if i > 0:
                     cs_vector.write("\n")
@@ -455,20 +491,22 @@ class CupsodaSolver(Simulator):
             mxsteps.write(str(self.options['max_steps']))
 
         # model_kind
-        with open(os.path.join(cupsoda_files, "modelkind"), 'wb') as model_kind:
+        with open(os.path.join(cupsoda_files, "modelkind"),
+                  'wb') as model_kind:
             model_kind.write("deterministic")
             vol = self.options['vol']
             # volume
             if vol:
                 # Set population of __source() to N_A*vol and warn the user
                 warnings.warn("Number units detected in cupSODA.run(). Setting the population \
-                              of __source() (if it exists) equal to %g*%g." % (N_A, vol))
-                y0 = y0/(N_A*vol)
+                              of __source() (if it exists) equal to %g*%g." % (
+                    N_A, vol))
+                y0 = y0 / (N_A * vol)
                 for i, sp in enumerate(self.model.species):
                     if str(sp) == '__source()':
                         y0[:, i] = 1.
                         break
-                
+
         # MX_0
         with open(os.path.join(cupsoda_files, "MX_0"), 'wb') as MX_0:
             for i in range(n_sims):
@@ -494,7 +532,8 @@ class CupsodaSolver(Simulator):
             M_feed.write(line)
 
         # right_side
-        with open(os.path.join(cupsoda_files, "right_side"), 'wb') as right_side:
+        with open(os.path.join(cupsoda_files, "right_side"),
+                  'wb') as right_side:
             for i in range(self.len_rxns):
                 line = ""
                 for j in range(self.len_species):
@@ -536,24 +575,31 @@ class CupsodaSolver(Simulator):
         prefix : string, optional (default: model.name)
             Prefix for output filenames (e.g., "egfr" for egfr_0,...).
         out_species: integer or list of integers, optional 
-            Indices of species present in the data file (e.g., in cupSODA.run(), if
-            obs_species_only=True then only species involved in observables are output to 
-            file). If not specified, an attempt will be made to read them from the 
-            'cs_vector' file in 'indir/__CUPSODA_FILES/'.
+            Indices of species present in the data file (e.g., in
+            cupSODA.run(), if obs_species_only=True then only species
+            involved in observables are output to file). If not specified,
+            an attempt will be made to read them from the  'cs_vector' file
+            in 'indir/__CUPSODA_FILES/'.
         """
+
         if indir is None:
             indir = os.path.join(self.outdir, "Output")
         if prefix is None:
             prefix = self.model.name
         if out_species is None:
             try:
-                out_species = np.loadtxt(os.path.join(self.outdir, "__CUPSODA_FILES", "cs_vector"), dtype=int)
+                out_species = np.loadtxt(
+                    os.path.join(self.outdir, "__CUPSODA_FILES", "cs_vector"),
+                    dtype=int)
             except IOError:
-                print "ERROR: Cannot determine which species have been printed to file. Either provide an"
-                print "'out_species' array or place the '__CUPSODA_FILES' directory in the input directory."
+                print "ERROR: Cannot determine which species have been " \
+                      "printed to file. Either provide an 'out_species' " \
+                      "array or place the '__CUPSODA_FILES' directory in " \
+                      "the input directory."
                 raise
 
-        files = [filename for filename in os.listdir(indir) if re.match(prefix, filename)]
+        files = [filename for filename in os.listdir(indir) if
+                 re.match(prefix, filename)]
         if len(files) == 0:
             raise Exception("Cannot find any output files to load data from.")
 
@@ -570,7 +616,7 @@ class CupsodaSolver(Simulator):
             filename = os.path.join(indir, prefix) + "_" + str(n)
             if not os.path.isfile(filename):
                 raise Exception("Cannot find input file " + filename)
-            #if self.verbose:
+            # if self.verbose:
             #    print "Reading " + filename + " ...",
             if n == 0:
                 start_time = time.time()
@@ -579,7 +625,8 @@ class CupsodaSolver(Simulator):
                     for i in range(len(self.y[n])):
                         data = f.readline().split()
                         self.tout[n][i] = data[0]
-                        self.y[n][i, out_species] = data[1:]  # exclude first column (time)
+                        # exclude first column (time)
+                        self.y[n][i, out_species] = data[1:]
             if n == 0:
                 end_time = time.time()
                 method_1 = end_time - start_time
@@ -592,10 +639,6 @@ class CupsodaSolver(Simulator):
                     self.y[n][:, out_species] = data[:, 1:] * self.vol * N_A
                 else:
                     self.y[n][:, out_species] = data[:, 1:]
-            #if self.verbose:
-            #    print "Done."
-            #if self.integrator.t < self.tspan[-1]: # NOT SURE IF THIS IS AN ISSUE HERE OR NOT
-            #                self.y[i:, :] = 'nan'
             if n == 0:
                 end_time = time.time()
                 method_2 = end_time - start_time
@@ -605,8 +648,6 @@ class CupsodaSolver(Simulator):
         self.tout = np.array(self.tout)
         self.y = np.asarray(self.y)
 
-
-
     def _calc_yobs_yexpr(self, param_values=None):
         super(CupsodaSolver, self)._calc_yobs_yexpr()
 
@@ -614,7 +655,8 @@ class CupsodaSolver(Simulator):
         return super(CupsodaSolver, self).get_yfull()
 
 
-def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(), prefix=None, verbose=False, **integrator_options):
+def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(),
+                prefix=None, verbose=False, **integrator_options):
     sim = CupsodaSolver(model, verbose=verbose, **integrator_options)
     sim.run(param_values, y0, tspan, outdir, prefix)
     if sim.options.get('load_ydata'):
