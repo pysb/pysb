@@ -646,7 +646,6 @@ class CupsodaSolver(Simulator):
             if n == 0:
                 end_time = time.time()
                 method_2 = end_time - start_time
-            if n == 0:
                 if method_1 > method_2:
                     option = 2
         self.tout = np.array(self.tout)
