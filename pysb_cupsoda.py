@@ -310,6 +310,8 @@ class CupsodaSolver(Simulator):
 
         # Create outdir if it doesn't exist
         self.outdir = tempfile.mkdtemp(prefix=prefix, dir=outdir)
+        if self.verbose:
+            print("Output directory is %s" % self.outdir)
 
         # Path to cupSODA executable
         bin_path = _get_cupsoda_path()
