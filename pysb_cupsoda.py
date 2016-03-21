@@ -4,6 +4,7 @@ import re
 import subprocess
 import time
 import warnings
+import tempfile
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
@@ -235,7 +236,7 @@ class CupsodaSolver(Simulator):
         # overwrite default integrator options
         self.options.update(integrator_options)
 
-    def run(self, param_values, y0, tspan=None, outdir=os.getcwd(),
+    def run(self, param_values, y0, tspan=None, outdir=None,
             prefix=None, **integrator_options):
         """Perform a set of integrations.
 
@@ -253,10 +254,14 @@ class CupsodaSolver(Simulator):
         tspan : vector-like, optional
             Time values (exception thrown if set to None both here and in
             constructor).
-        outdir : string, optional (default: os.getcwd())
-            Output directory.
+        outdir : string, optional (default: None)
+            Output directory. Note that a directory is created within the
+            specified one using ``tempfile.mkdtemp``. If None, a system
+            temporary directory is used. The location is accessible via the
+            ``outdir`` attribute.
         prefix : string, optional (default: model.name)
-            Output files will be named "prefix_i", for i=[0,N_SIMS).
+            Output files will be named "prefix_i", for i=[0,N_SIMS). The
+            prefix is also used for the output directory (see above argument).
         integrator_options : See CupsodaSolver constructor.
         
         Notes
@@ -299,25 +304,19 @@ class CupsodaSolver(Simulator):
                 "'y0' must be a 2D array with dimensions N_SIMS x "
                 "len(model.species): y0.shape=" + str(y0.shape))
 
-        # Create outdir if it doesn't exist
-        self.outdir = outdir
-        if not os.path.exists(self.outdir):
-            os.makedirs(self.outdir)
-
         # Default prefix is model name
         if not prefix:
             prefix = self.model.name
+
+        # Create outdir if it doesn't exist
+        self.outdir = tempfile.mkdtemp(prefix=prefix, dir=outdir)
 
         # Path to cupSODA executable
         bin_path = _get_cupsoda_path()
 
         # Put the cupSODA input files within the output directory
         cupsoda_files = os.path.join(self.outdir, "__CUPSODA_FILES")
-        if os.path.exists(cupsoda_files):
-            for f in os.listdir(cupsoda_files):
-                os.remove(os.path.join(cupsoda_files, f))
-        else:
-            os.mkdir(cupsoda_files)
+        os.mkdir(cupsoda_files)
 
         # Simple default for number of blocks
         n_blocks = self.options.get('n_blocks')
