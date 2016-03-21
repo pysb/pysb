@@ -58,9 +58,9 @@ def _get_cupsoda_path():
     """
     Return the path to the cupSODA executable.
 
-    Looks for the cupSODA executable in a few hard-coded standard locations
-    or in a user-defined location set via ``set_cupsoda_path``.
-
+    Looks for the cupSODA executable in a user-defined location set via
+    ``set_cupsoda_path``, the environment variable CUPSODAPATH or in a few
+    hard-coded standard locations.
     """
 
     global _cupsoda_path
@@ -69,6 +69,7 @@ def _get_cupsoda_path():
     if _cupsoda_path:
         return _cupsoda_path
 
+    path_var = 'CUPSODAPATH'
     bin_dirs = [
         '/usr/local/share/',
         'c:/Program Files/',
@@ -83,17 +84,27 @@ def _get_cupsoda_path():
         else:
             return False
 
+    # First check the environment variable, which has the highest precedence
+    if path_var in os.environ:
+        script_path = check_bin_dir(os.environ[path_var])
+        if not script_path:
+            raise Exception('Environment variable %s is set but the path could'
+                            ' not be found, is not accessible or does not '
+                            'contain a cupSODA executable file.' % path_var)
+    # If the environment variable isn't set, check the standard locations
     # Check the standard locations for the executable
-    for b in bin_dirs:
-        if check_bin_dir(b):
-            break
-        else:
-            raise Exception('Could not find cupSODA installed in one of the '
-                            'following locations:' +
-                            ''.join('\n    ' + x for x in bin_dirs) +
-                            '\nPlease put the executable (or a link to it) in'
-                            ' one of these locations or set the path using'
-                            ' set_cupsoda_path().')
+    else:
+        for b in bin_dirs:
+            bin_path = check_bin_dir(b)
+            if bin_path:
+                break
+            else:
+                raise Exception('Could not find cupSODA installed in one of '
+                                'the following locations:' +
+                                ''.join('\n    ' + x for x in bin_dirs) +
+                                '\nPlease put the executable (or a link to '
+                                'it) in one of these locations or set the '
+                                'path using set_cupsoda_path().')
 
     # Cache path for future use
     _cupsoda_path = bin_path
