@@ -72,8 +72,8 @@ def _get_cupsoda_path():
 
     path_var = 'CUPSODAPATH'
     bin_dirs = [
-        '/usr/local/share/',
-        'c:/Program Files/',
+        '/usr/local/share/cupSODA',
+        'c:/Program Files/cupSODA',
     ]
 
     def check_bin_dir(bin_dir):
