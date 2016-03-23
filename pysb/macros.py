@@ -8,9 +8,9 @@ following general guidelines:
 * All components created by the macro are implicitly added to the current model
   and explicitly returned in a ComponentSet.
 
-* Parameters may be passed as Parameter objects, or as plain numbers for which
-  Parameter objects will be automatically created using an appropriate naming
-  convention.
+* Parameters may be passed as Parameter or Expression objects, or as plain
+  numbers for which Parameter objects will be automatically created using an
+  appropriate naming convention.
 
 * Arguments which accept a MonomerPattern should also accept Monomers, which are
   to be interpreted as MonomerPatterns on that Monomer with an empty condition
@@ -95,18 +95,18 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
     rule_expression : RuleExpression
         An expression specifying the form of the rule; gets passed directly
         to the Rule constructor.
-    klist : list of Parameters or list of numbers
+    klist : list of Parameters or Expressions, or list of numbers
         If the rule is unidirectional, the list must contain one element
-        (either a Parameter or number); if the rule is reversible, it must
-        contain two elements. If the rule is reversible, the first element
-        in the list is taken to be the forward rate, and the second element
-        is taken as the reverse rate. 
+        (either a Parameter/Expression or number); if the rule is reversible,
+        it must contain two elements. If the rule is reversible, the first
+        element in the list is taken to be the forward rate, and the second
+        element is taken as the reverse rate. 
     ksuffixes : list of strings
-        If klist contains numbers rather than Parameters, the strings in
-        ksuffixes are used to automatically generate the necessary Parameter
-        objects. The suffixes are appended to the rule name to generate the
-        associated parameter name. ksuffixes must contain one element if the
-        rule is unidirectional, two if it is reversible.
+        If klist contains numbers rather than Parameters or Expressions, the
+        strings in ksuffixes are used to automatically generate the necessary
+        Parameter objects. The suffixes are appended to the rule name to
+        generate the associated parameter name. ksuffixes must contain one
+        element if the rule is unidirectional, two if it is reversible.
     name_func : function, optional
         A function which takes a RuleExpression and returns a string label for
         it, to be called as part of the automatic rule name generation. If not
@@ -167,7 +167,7 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
         if len(klist) != 2 or len(ksuffixes) != 2:
             raise ValueError("A bidirectional rule must have two parameters.")
 
-    if all(isinstance(x, Parameter) for x in klist):
+    if all(isinstance(x, (Parameter, Expression)) for x in klist):
         k1 = klist[0]
         if rule_expression.is_reversible:
             k2 = klist[1]
@@ -181,7 +181,7 @@ def _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,
                            klist[1])
             params_created.add(k2)
     else:
-        raise ValueError("klist must contain Parameter objects or numbers.")
+        raise ValueError("klist must contain Parameters, Expressions, or numbers.")
 
     if rule_expression.is_reversible:
         r = Rule(r_name, rule_expression, k1, k2)
@@ -2173,7 +2173,7 @@ def chain_species_base(base, basesite, subunit, site1, site2, size, comp=1):
         >>> Monomer('Complex2', ['s1', 's2'])
         Monomer('Complex2', ['s1', 's2'])
         >>> chain_species_base(Base(b2=ANY), 'b1', Unit, 'p1', 'p2', 4, Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY))
-        MatchOnce(Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=None))
+        MatchOnce(Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=4) % Unit(p1=4, p2=None))
     """
     _verify_sites(base, basesite)
     _verify_sites(subunit, site1, site2)
@@ -2262,10 +2262,10 @@ def assemble_chain_sequential_base(base, basesite, subunit, site1, site2, max_si
         Monomer('Complex2', ['s1', 's2'])
         >>> assemble_chain_sequential_base(Base(b2=ANY), 'b1', Unit, 'p1', 'p2', 3, [[1e-4, 1e-1]] * 2, Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY)) # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
-         Rule('assemble_chain_sequential_base_Unit_2', Unit(p1=None, p2=None) + Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=None) <> Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None), assemble_chain_sequential_base_Unit_2_kf, assemble_chain_sequential_base_Unit_2_kr),
+         Rule('assemble_chain_sequential_base_Unit_2', Unit(p1=None, p2=None) + Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=None) <> Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None), assemble_chain_sequential_base_Unit_2_kf, assemble_chain_sequential_base_Unit_2_kr),
          Parameter('assemble_chain_sequential_base_Unit_2_kf', 0.0001),
          Parameter('assemble_chain_sequential_base_Unit_2_kr', 0.1),
-         Rule('assemble_chain_sequential_base_Unit_3', Unit(p1=None, p2=None) + Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None) <> MatchOnce(Complex1(s1=<class 'pysb.core.ANY'>) % Complex2(s1=<class 'pysb.core.ANY'>, s2=<class 'pysb.core.ANY'>) % Base(b1=1, b2=<class 'pysb.core.ANY'>) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=None)), assemble_chain_sequential_base_Unit_3_kf, assemble_chain_sequential_base_Unit_3_kr),
+         Rule('assemble_chain_sequential_base_Unit_3', Unit(p1=None, p2=None) + Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=None) <> MatchOnce(Complex1(s1=ANY) % Complex2(s1=ANY, s2=ANY) % Base(b1=1, b2=ANY) % Unit(p1=1, p2=2) % Unit(p1=2, p2=3) % Unit(p1=3, p2=None)), assemble_chain_sequential_base_Unit_3_kf, assemble_chain_sequential_base_Unit_3_kr),
          Parameter('assemble_chain_sequential_base_Unit_3_kf', 0.0001),
          Parameter('assemble_chain_sequential_base_Unit_3_kr', 0.1),
          ])

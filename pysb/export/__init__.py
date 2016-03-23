@@ -21,6 +21,7 @@ contains an instance of ``pysb.core.Model`` instantiated as a global variable).
 - ``potterswheel``
 - ``sbml``
 - ``python``
+- ``pysb_flat``
 - ``mathematica``
 - ``matlab``
 
@@ -68,6 +69,7 @@ documentation for the exporter classes in the package :py:mod:`pysb.export`:
    bng_net
    kappa
    python
+   pysb_flat
 """
 
 import re
@@ -124,6 +126,7 @@ formats = {
         'potterswheel': 'PottersWheelExporter',
         'sbml': 'SbmlExporter',
         'python': 'PythonExporter',
+        'pysb_flat': 'PysbFlatExporter',
         'mathematica': 'MathematicaExporter',
         'matlab': 'MatlabExporter',
         }

@@ -321,8 +321,9 @@ class MonomerPattern(object):
     * *list of int* : multi-bond (not valid in Kappa)
     * ``ANY`` : \"any\" bond (bound to something, but don't care what)
     * ``WILD`` : \"wildcard\" bond (bound or not bound)
-    * *tuple of (str, int)* : state with bond
+    * *tuple of (str, int)* : state with specified bond
     * *tuple of (str, WILD)* : state with wildcard bond
+    * *tuple of (str, ANY)* : state with any bond
 
     If a site is not listed in site_conditions then the pattern will match any
     state for that site, i.e. \"don't write, don't care\".
@@ -348,7 +349,7 @@ class MonomerPattern(object):
                 continue
             elif type(state) == str:
                 continue
-            elif type(state) == tuple and type(state[0]) == str and (type(state[1]) == int or state[1] == WILD):
+            elif type(state) == tuple and type(state[0]) == str and (type(state[1]) == int or state[1] is WILD or state[1] is ANY):
                 continue
             elif state is ANY:
                 continue
@@ -1654,8 +1655,10 @@ class RedundantSiteConditionsError(ValueError):
 # implements an alternate __str__ method which just returns the base name.
 
 class KeywordMeta(type):
-    def __str__(cls):
+    def __repr__(cls):
         return cls.__name__
+    def __str__(cls):
+        return repr(cls)
 
 class Keyword(object): __metaclass__ = KeywordMeta
 
