@@ -111,7 +111,8 @@ def test_integrate_with_expression():
     Monomer('s16')
     Monomer('s20')
 
-    Parameter('ka',2e-5)
+    # Parameters should be able to contain s(\d+) without error
+    Parameter('ks0',2e-5)
     Parameter('ka20', 1e5)
 
     Initial(s9(), Parameter('s9_0', 10000))
@@ -121,10 +122,10 @@ def test_integrate_with_expression():
     Observable('s16_obs', s16())
     Observable('s20_obs', s20())
 
-    Expression('keff', (ka*ka20)/(ka20+s9_obs))
+    Expression('keff', (ks0*ka20)/(ka20+s9_obs))
 
-    Rule('R1', None >> s16(), ka)
-    Rule('R2', None >> s20(), ka)
+    Rule('R1', None >> s16(), ks0)
+    Rule('R2', None >> s20(), ks0)
     Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
     time = linspace(0, 40, 100)

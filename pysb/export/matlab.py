@@ -256,9 +256,9 @@ class MatlabExporter(Exporter):
         # Flatten to a string and add correct indentation
         odes_str = ('\n'+' '*12).join(odes_species_list)
 
-        # Change species names from, e.g., 's(0)' to 'y0(1)' (note change
+        # Change species names from, e.g., '__s(0)' to 'y0(1)' (note change
         # from zero-based indexing to 1-based indexing)
-        odes_str = re.sub(r's(\d+)', \
+        odes_str = re.sub(r'__s(\d+)', \
                           lambda m: 'y0(%s)' % (int(m.group(1))+1), odes_str)
         # Change C code 'pow' function to MATLAB 'power' function
         odes_str = re.sub(r'pow\(', 'power(', odes_str)

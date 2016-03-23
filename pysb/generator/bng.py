@@ -18,7 +18,7 @@ class BngGenerator(object):
         return self.__content
 
     def generate_content(self):
-        self.__content = ''
+        self.__content = "begin model\n"
         self.generate_parameters()
         self.generate_compartments()
         self.generate_molecule_types()
@@ -26,6 +26,7 @@ class BngGenerator(object):
         self.generate_functions()
         self.generate_species()
         self.generate_reaction_rules()
+        self.__content += "end model\n"
 
     def generate_parameters(self):
         exprs = self.model.expressions_constant()
@@ -186,6 +187,8 @@ def format_site_condition(site, state):
         # bond is wildcard (zero or more unspecified bonds)
         if state[1] == pysb.WILD:
             state = (state[0], '?')
+        elif state[1] == pysb.ANY:
+            state = (state[0], '+')
         state_code = '~%s!%s' % state
     # one or more unspecified bonds
     elif state is pysb.ANY:

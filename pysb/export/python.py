@@ -107,9 +107,10 @@ class PythonExporter(Exporter):
         for i, p in enumerate(self.model.parameters):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
 
-        output.write('"""')
-        output.write(self.docstring)
-        output.write('"""\n\n')
+        if self.docstring:
+            output.write('"""')
+            output.write(self.docstring)
+            output.write('"""\n\n')
         output.write("# exported from PySB model '%s'\n" % self.model.name)
         output.write(pad(r"""
             import numpy

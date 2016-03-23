@@ -152,7 +152,7 @@ class Solver(object):
                 eqns = re.sub(r'\b(%s)\b' % obs.name, obs_string, eqns)
 
             # Substitute 'y[i]' for 'si'
-            eqns = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))),
+            eqns = re.sub(r'\b__s(\d+)\b', lambda m: 'y[%s]' % (int(m.group(1))),
                        eqns)
 
             # Substitute 'p[i]' for any named parameters

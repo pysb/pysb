@@ -34,7 +34,7 @@ def main():
           # We should really specify some minimum versions here.
           install_requires=['numpy', 'scipy', 'sympy'],
           setup_requires=['nose'],
-          tests_require=['coverage', 'pygraphviz', 'matplotlib'],
+          tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect'],
           cmdclass=cmdclass,
           use_2to3=True,
           keywords=['systems', 'biology', 'model', 'rules'],
