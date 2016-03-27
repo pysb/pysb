@@ -518,11 +518,10 @@ class CupsodaSolver(Simulator):
             vol = self.options['vol']
             # volume
             if vol:
-                # Set population of __source() to N_A*vol and warn the user
-                warnings.warn("Number units detected in cupSODA.run(). Setting the population \
-                              of __source() (if it exists) equal to %g*%g." % (
-                    N_A, vol))
+                # If a volume has been defined, divide the 
+                # populations by N_A*vol to get concentrations.
                 y0 = y0 / (N_A * vol)
+                # Set the concentration of __source() to 1
                 for i, sp in enumerate(self.model.species):
                     if str(sp) == '__source()':
                         y0[:, i] = 1.
@@ -541,16 +540,16 @@ class CupsodaSolver(Simulator):
                     MX_0.write("\n")
 
         # M_feed
-        with open(os.path.join(cupsoda_files, "M_feed"), 'wb') as M_feed:
-            line = ""
-            for j, sp in enumerate(self.model.species):
-                if j > 0:
-                    line += "\t"
-                if str(sp) == '__source()':
-                    line += '1'
-                else:
-                    line += '0'
-            M_feed.write(line)
+#         with open(os.path.join(cupsoda_files, "M_feed"), 'wb') as M_feed:
+#             line = ""
+#             for j, sp in enumerate(self.model.species):
+#                 if j > 0:
+#                     line += "\t"
+#                 if str(sp) == '__source()':
+#                     line += '1'
+#                 else:
+#                     line += '0'
+#             M_feed.write(line)
 
         # right_side
         with open(os.path.join(cupsoda_files, "right_side"),
