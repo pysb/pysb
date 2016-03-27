@@ -387,7 +387,7 @@ class BngFileInterface(BngBaseInterface):
             multiple actions in a row, where results need to be read
             into PySB before a new series of actions is executed.
         """
-        self.command_queue.write('end actions\ndone\n')
+        self.command_queue.write('end actions\n')
         bng_commands = self.command_queue.getvalue()
         try:
             # Generate BNGL file
