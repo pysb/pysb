@@ -87,8 +87,8 @@ def _get_cupsoda_path():
 
     # First check the environment variable, which has the highest precedence
     if path_var in os.environ:
-        script_path = check_bin_dir(os.environ[path_var])
-        if not script_path:
+        bin_path = check_bin_dir(os.environ[path_var])
+        if not bin_path:
             raise Exception('Environment variable %s is set but the path could'
                             ' not be found, is not accessible or does not '
                             'contain a cupSODA executable file.' % path_var)
