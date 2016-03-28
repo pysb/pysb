@@ -1,20 +1,20 @@
 from pysb.examples.tyson_oscillator import model
-from pysb.simulators.cupsoda import *
+from pysb.simulators.cupsoda import CupSodaSolver
 import numpy as np
 import matplotlib.pyplot as plt
 
 tspan = np.linspace(0, 500, 501)
 
-set_cupsoda_path("/Users/lopezlab/cupSODA") #FIXME: should search for cupSODA in standard locations
-solver = CupSodaSolver(model, tspan, atol=1e-12, rtol=1e-6, max_steps=20000, verbose=True)
+solver = CupSodaSolver(model, tspan, atol=1e-12, rtol=1e-6, max_steps=20000,
+                       verbose=False)
 
 n_sims = 100
 
 # Rate constants
-param_values = np.ones((n_sims, len(model.parameters_rules())))
+param_values = np.ones((n_sims, len(model.parameters)))
 for i in range(len(param_values)):
     for j in range(len(param_values[i])):
-        param_values[i][j] *= model.parameters_rules()[j].value
+        param_values[i][j] *= model.parameters[j].value
 
 # Initial concentrations
 y0 = np.zeros((n_sims, len(model.species)))
@@ -25,5 +25,14 @@ for i in range(len(y0)):
                 y0[i][j] = ic[1].value
                 break
 
-solver.run(param_values, y0) #, outdir=os.path.join(outdir,'NSAMPLES_'+str(n_samples))) #obs_species_only=False, load_conc_data=False)
-        
+solver.run(param_values=param_values, y0=y0)
+yfull = solver.get_yfull()
+
+# Plot the results of the first simulation
+plt.plot(tspan, yfull['YT'][0], lw=2, label='YT', color='b')
+plt.plot(tspan, yfull['M'][0], lw=2, label='M', color='g')
+plt.legend(loc=0)
+plt.ylim(ymin=1)
+plt.ylabel('molecules')
+plt.xlabel('time')
+plt.show()
