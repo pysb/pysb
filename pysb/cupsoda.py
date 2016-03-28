@@ -637,9 +637,13 @@ class CupsodaSolver(Simulator):
             # if self.verbose:
             #    print "Reading " + filename + " ...",
             # Optimizing the time to read in data back to Python
-            # When reading in data for the first simulation, it checks to see if reading the data line
-            # line is faster, or if using pandas.read_csv is faster.
-            # For the remaining data that is read in, it uses the faster of the two methods.
+            # When reading in data for the first simulation, it checks to see
+            # if reading the data line line is faster, or if using
+            # pandas.read_csv is faster. For the remaining data that is read
+            # in, it uses the faster of the two methods.
+            #
+            # TODO: Move the testing code into a subroutine (_optimize_input)
+            #
             if n == 0:
                 start_time = time.time()
             if option == 1:
@@ -661,7 +665,7 @@ class CupsodaSolver(Simulator):
                 self.tout[n] = data[:, 0]
                 if self.options['vol']:
                     self.y[n][:, out_species] = data[:, 1:] * \
-                                                self.options['vol'] * N_A
+                                                self.options['vol'] * N_A # TODO: Move this calculation to outside the loop
                 else:
                     self.y[n][:, out_species] = data[:, 1:]
             if n == 0:
@@ -670,7 +674,7 @@ class CupsodaSolver(Simulator):
                 if method_1 > method_2:
                     option = 2
         self.tout = np.array(self.tout)
-        self.y = np.asarray(self.y)
+        self.y = np.asarray(self.y) # TODO: Why asarray() and not array()
 
     def _calc_yobs_yexpr(self, param_values=None):
         super(CupsodaSolver, self)._calc_yobs_yexpr()
