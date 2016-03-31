@@ -279,11 +279,24 @@ class Solver(object):
 
         # Integrator
         if integrator == 'lsoda':
+            # lsoda is accessed via scipy.integrate.odeint which, as a function,
+            # requires that we pass its args at the point of call. Thus we need
+            # to stash stuff like the rhs and jacobian functions in self so we
+            # can pass them in later.
             self.integrator = integrator
-            # lsoda's arguments are in a different order to other integrators
+            # lsoda's rhs and jacobian function arguments are in a different
+            # order to other integrators, so we define these shims that swizzle
+            # the argument order appropriately.
             self.func = lambda t, y, p: rhs(y, t, p)
-            self.jac_fn = lambda t, y, p: jacobian(y, t, p)
+            if jac_fn is None:
+                self.jac_fn = None
+            else:
+                self.jac_fn = lambda t, y, p: jac_fn(y, t, p)
         else:
+            # The scipy.integrate.ode integrators on the other hand are object
+            # oriented and hold the functions and such internally. Once we set
+            # up the integrator object we only need to retain a reference to it
+            # and can forget about the other bits.
             self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
             with warnings.catch_warnings():
                 warnings.filterwarnings('error', 'No integrator name match')
