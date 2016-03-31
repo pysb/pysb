@@ -282,7 +282,10 @@ class Solver(object):
             self.integrator = integrator
             # lsoda's arguments are in a different order to other integrators
             self.func = lambda t, y, p: rhs(y, t, p)
-            self.jac_fn = lambda t, y, p: jacobian(y, t, p)
+            if jac_fn is None:
+                self.jac_fn = None
+            else:
+                self.jac_fn = lambda t, y, p: jac_fn(y, t, p)
         else:
             self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
             with warnings.catch_warnings():
