@@ -29,81 +29,98 @@ try:
 except ImportError:
     pass
 
-# Cached value of KAPPA path
-_kappa_path = None
+# Cached value of Kappa program paths
+_kasim_path = None
+_kasa_path = None
+
+def _check_dist_dir(kappa_prog, dist_dir):
+    kappa_prog_path = os.path.join(dist_dir, kappa_prog)
+    if os.access(kappa_prog_path, os.F_OK):
+        return kappa_prog_path
+    else:
+        return None
 
 def set_kappa_path(dir):
-    global _kappa_path
-    _kappa_path = dir
+    """Set the path to the KaSim and KaSa executables.
+
+    Parameters
+    ----------
+    dir : string
+        Directory containing KaSim and Kasa executables.
+    """
+
+    global _kasim_path
+    global _kasa_path
     # Check locations of both KaSim and KaSa
-    for kappa_prog in ['KaSim', 'KaSa']:
-        kappa_prog_path = os.path.join(dir, kappa_prog)
-        # Make sure file exists and is not a directory
-        if not os.access(kappa_prog_path, os.F_OK) or \
-           not os.path.isfile(kappa_prog_path):
-            raise Exception('Could not find %s in %s.' %
-                            (kappa_prog, os.path.abspath(dir)))
-        # Make sure file has executable permissions
-        elif not os.access(kappa_prog_path, os.X_OK):
-            raise Exception("%s in %s does not have executable permissions." %
-                            (kappa_prog, os.path.abspath(dir)))
+    kasim_path = _check_dist_dir('KaSim', dir)
+    kasa_path = _check_dist_dir('KaSa', dir)
 
+    # Check that KaSim executable exists and is not a directory
+    if kasim_path is None:
+        raise Exception('Could not find KaSim in %s.' % os.path.abspath(dir))
+    else:
+        _kasim_path = kasim_path
 
-def _get_bng_path():
+    # Check KaSa, but only raise a warning if it's not found because it's
+    # not installed by default with the KaSim distribution.
+    if kasa_path is None:
+        warnings.warn('Could not find KaSa in %s; install KaSa for static '
+                      'analysis features.' % os.path.abspath(dir))
+    else:
+        _kasa_path = kasa_path
+
+def _get_kappa_path(kappa_prog):
     """
-    Return the path to BioNetGen's BNG2.pl.
+    Return the path to the KaSim or KaSa executable.
 
-    Looks for a BNG distribution at the path stored in the BNGPATH environment
-    variable if that's set, or else in a few hard-coded standard locations.
-
+    Looks for a KaSim/KaSa distribution at the path stored in the KAPPAPATH
+    environment variable if that's set, or else in a few hard-coded standard
+    locations.
     """
 
-    global _kappa_path
+    if kappa_prog not in ['KaSim', 'KaSa']:
+        raise ValueError("kappa_prog must be one of 'KaSim', 'KaSa'.")
+
+    global _kasim_path
+    global _kasa_path
 
     # Just return cached value if it's available
-    if _kappa_path:
-        return _kappa_path
+    if kappa_prog == 'KaSim' and _kasim_path is not None:
+        return _kasim_path
+    elif kappa_prog == 'KaSa' and _kasa_path is not None:
+        return _kasa_path
 
-    path_var = 'BNGPATH'
+    path_var = 'KAPPAPATH'
     dist_dirs = [
-        '/usr/local/share/BioNetGen',
-        'c:/Program Files/BioNetGen',
+        '/usr/local/share/KaSim',
+        'c:/Program Files/KaSim',
         ]
-    # BNG 2.1.8 moved BNG2.pl up out of the Perl2 subdirectory, so to be more
-    # compatible we check both the old and new locations.
-    script_subdirs = ['', 'Perl2']
-
-    def check_dist_dir(dist_dir):
-        # Return the full path to BNG2.pl inside a BioNetGen distribution
-        # directory, or False if directory does not contain a BNG2.pl in one of
-        # the expected places.
-        for subdir in script_subdirs:
-            script_path = os.path.join(dist_dir, subdir, 'BNG2.pl')
-            if os.access(script_path, os.F_OK):
-                return script_path
-        else:
-            return False
 
     # First check the environment variable, which has the highest precedence
     if path_var in os.environ:
-        script_path = check_dist_dir(os.environ[path_var])
-        if not script_path:
-            raise Exception('Environment variable %s is set but BNG2.pl could'
-                            ' not be found there' % path_var)
+        kappa_prog_path = _check_dist_dir(kappa_prog, os.environ[path_var])
+        if not kappa_prog_path:
+            raise Exception('Environment variable %s is set to but %s could'
+                            ' not be found there' % (path_var, kappa_prog))
     # If the environment variable isn't set, check the standard locations
     else:
         for dist_dir in dist_dirs:
-            script_path = check_dist_dir(dist_dir)
-            if script_path:
+            kappa_prog_path = _check_dist_dir(kappa_prog, dist_dir)
+            if kappa_prog_path:
                 break
         else:
-            raise Exception('Could not find BioNetGen installed in one of the '
-                            'following locations:' +
-                            ''.join('\n    ' + d for d in dist_dirs))
+            raise Exception('Could not find %s installed in one of the '
+                            'following locations:' % kappa_prog +
+                            ''.join('\n    ' + d for d in dist_dirs) +
+                            '\nSet KAPPAPATH environment variable to '
+                            'directory containing KaSim and KaSa.')
     # Cache path for future use
-    _kappa_path = script_path
-    return script_path
+    if kappa_prog == 'KaSim':
+        _kasim_path = kappa_prog_path
+    else:
+        _kasa_path = kappa_prog_path
 
+    return kappa_prog_path
 
 
 class KasimInterfaceError(RuntimeError):
@@ -210,7 +227,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
             kappa_file.write('\n%s\n' % perturbation)
 
     # Run KaSim
-    kasim_path = os.path.join(_kappa_path, 'KaSim')
+    kasim_path = _get_kappa_path('KaSim')
     p = subprocess.Popen([kasim_path] + args,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if verbose:
@@ -337,7 +354,7 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         kappa_file.write(gen.get_content())
 
     # Run KaSa using the given args
-    kasa_path = os.path.join(_kappa_path, 'KaSa')
+    kasa_path = _get_kappa_path('KaSa')
     p = subprocess.Popen([kasa_path] + args,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if verbose:
