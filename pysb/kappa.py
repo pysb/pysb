@@ -40,34 +40,29 @@ def _check_dist_dir(kappa_prog, dist_dir):
     else:
         return None
 
-def set_kappa_path(dir):
+def set_kappa_path(path):
     """Set the path to the KaSim and KaSa executables.
 
     Parameters
     ----------
-    dir : string
+    path: string
         Directory containing KaSim and Kasa executables.
     """
 
     global _kasim_path
     global _kasa_path
     # Check locations of both KaSim and KaSa
-    kasim_path = _check_dist_dir('KaSim', dir)
-    kasa_path = _check_dist_dir('KaSa', dir)
-
-    # Check that KaSim executable exists and is not a directory
+    kasim_path = _check_dist_dir('KaSim', path)
+    kasa_path = _check_dist_dir('KaSa', path)
+    # KaSim is required, so raise if we didn't find it.
     if kasim_path is None:
-        raise Exception('Could not find KaSim in %s.' % os.path.abspath(dir))
-    else:
-        _kasim_path = kasim_path
-
-    # Check KaSa, but only raise a warning if it's not found because it's
-    # not installed by default with the KaSim distribution.
+        raise Exception('Could not find KaSim in %s.' % os.path.abspath(path))
+    # KaSa is optional, so only warn if we didn't find it.
     if kasa_path is None:
         warnings.warn('Could not find KaSa in %s; install KaSa for static '
-                      'analysis features.' % os.path.abspath(dir))
-    else:
-        _kasa_path = kasa_path
+                      'analysis features.' % os.path.abspath(path))
+    _kasim_path = kasim_path
+    _kasa_path = kasa_path
 
 def _get_kappa_path(kappa_prog):
     """
@@ -98,10 +93,12 @@ def _get_kappa_path(kappa_prog):
 
     # First check the environment variable, which has the highest precedence
     if path_var in os.environ:
-        kappa_prog_path = _check_dist_dir(kappa_prog, os.environ[path_var])
+        kappapath = os.environ[path_var]
+        kappa_prog_path = _check_dist_dir(kappa_prog, kappapath)
         if not kappa_prog_path:
-            raise Exception('Environment variable %s is set to but %s could'
-                            ' not be found there' % (path_var, kappa_prog))
+            raise Exception('Environment variable %s is set to "%s" but %s '
+                            'could not be found there.' %
+                            (path_var, kappapath, kappa_prog))
     # If the environment variable isn't set, check the standard locations
     else:
         for dist_dir in dist_dirs:
@@ -112,12 +109,12 @@ def _get_kappa_path(kappa_prog):
             raise Exception('Could not find %s installed in one of the '
                             'following locations:' % kappa_prog +
                             ''.join('\n    ' + d for d in dist_dirs) +
-                            '\nSet KAPPAPATH environment variable to '
-                            'directory containing KaSim and KaSa.')
+                            '\nSet the environment variable %s to the '
+                            'directory containing KaSim and KaSa.' % path_var)
     # Cache path for future use
     if kappa_prog == 'KaSim':
         _kasim_path = kappa_prog_path
-    else:
+    elif kappa_prog == 'KaSa':
         _kasa_path = kappa_prog_path
 
     return kappa_prog_path
