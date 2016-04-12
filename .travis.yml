@@ -32,7 +32,7 @@ before_install:
 - cd KaSim
 - git checkout f87eada
 - make all
-- export PATH=$PATH:`pwd`
+- export KAPPAPATH=`pwd`
 - cd ../
 install:
   python setup.py build --build-lib=build/lib
