@@ -59,40 +59,60 @@ Option 2: Installing the dependencies yourself
 Required software
 ^^^^^^^^^^^^^^^^^
 
-These are the minimum requirements needed to simulate a model and plot the
-results. Listed versions are the ones that are known to work well. Later
-versions should work but earlier versions may not. The major exception to this
-guideline is Python itself -- see below.
+These are the minimum requirements needed to simulate a model. The given version
+numbers have been explicitly tested, and where a number is followed by a ``+`` we
+believe all newer versions will work as well. Older versions may also work but
+we haven't formally tested anything older than what's listed below.
 
-* `Python`_ 2.7
+* `Python`_ 2.7.x or 3.4+
+* `NumPy`_ 1.6+
+* `SciPy`_ 0.9+
+* `SymPy`_ 0.7+
+* `BioNetGen`_ 2.2.5+ (requires Perl -- see Perl requirement below)
 
-  **PySB requires Python 2.7**! Earlier versions of Python (2.6 and lower) are not
-  compatible, nor are later versions (3.x).
+  Rename the unzipped ``BioNetGen-x.y.z`` folder to just ``BioNetGen`` and move
+  it into ``/usr/local/share`` (Mac or Linux) or ``C:\\Program Files``
+  (Windows). If you would like to put it somewhere else, set the ``BNGPATH``
+  environment variable to the full path to the ``BioNetGen-x.y.z`` folder.
 
-* `SciPy`_ 0.9
-* `NumPy`_ 1.6
-* `SymPy`_ 0.7
-* `matplotlib`_ 1.1
-* `BioNetGen`_ 2.2 (requires Perl -- see below)
-* `Perl`_ 5.8
+* `Perl`_ 5.8+
 
-  Any newer 5.x version is OK too. Mac and Linux users can use the version of
-  Perl included with their operating system. Windows users should get Strawberry
-  Perl from http://strawberryperl.com/.
+  Mac and Linux users can use the version of Perl included with their operating
+  system. Windows users should get Strawberry Perl from
+  http://strawberryperl.com/.
 
 Recommended software
 ^^^^^^^^^^^^^^^^^^^^
 
-* `IPython`_: An alternate interactive Python shell, much improved over the
-  standard one.
-* `Kappa`_: A rule-based modeling tool that can produce several useful model
-  visualizations or perform an agent-based model simulation. PySB provides
-  direct integration with some of these capabilities. Both the older `Kappa`
-  (simplx/complx) and the newer `KaSim` packages are supported.
+* `matplotlib`_
 
-.. _Ubuntu Linux: http://www.ubuntu.com
-.. _Kappa: http://www.kappalanguage.org
-.. _Git: http://git-scm.com
+  This Python package allows you to plot the results of your simulations. It
+  is not a hard requirement of PySB but many of the example scripts use it.
+
+* `IPython`_
+
+  An alternate interactive Python shell, much improved over the standard one.
+
+* `Kappa`_ 4.0
+
+  Kappa is a rule-based modeling tool that can produce several useful model
+  visualizations or perform an agent-based model simulation. PySB optionally
+  interfaces with its *KaSim* simulator and *KaSa* static analyzer.
+
+  To install Kappa for PySB use, put the ``KaSim`` executable (and optionally
+  ``KaSa`` if you have it) in ``/usr/local/share/KaSim`` (Mac or Linux) or
+  ``C:\\Program Files\\KaSim`` (Windows). If you would like to put it somewhere
+  else, set the ``KAPPAPATH`` environment variable to the full path to the
+  folder containing the ``KaSim`` and ``KaSa`` executables. Note that if you
+  have downloaded the official binary build of KaSim, it will be named something
+  like ``KaSim_4.0_winxp.exe`` or ``KaSim_4.0_mac_OSX_10.10``. Regardless of
+  where you install it, you will need to rename the file to strip out the
+  version and operating system information so that you have just ``KaSim.exe``
+  (Windows) or ``KaSim`` (Mac or Linux).
+
+.. _Ubuntu Linux: http://www.ubuntu.com/
+.. _Kappa: http://www.kappalanguage.org/
+.. _Git: http://git-scm.com/
 .. _IPython: http://ipython.org/
 .. _OCaml: http://caml.inria.fr/ocaml/
 .. _GraphViz: http://www.graphviz.org/
@@ -101,8 +121,8 @@ Recommended software
 .. _Parallels: http://www.parallels.com/
 .. _Python: http://www.python.org/
 .. _SciPy: http://www.scipy.org/
-.. _NumPy: http://numpy.scipy.org/
-.. _SymPy: http://sympy.org/
+.. _NumPy: http://www.numpy.org/
+.. _SymPy: http://www.sympy.org/
 .. _matplotlib: http://matplotlib.org/
 .. _BioNetGen: http://www.bionetgen.org/
 .. _Perl: http://www.perl.org/
