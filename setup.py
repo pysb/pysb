@@ -35,6 +35,7 @@ def main():
           install_requires=['numpy', 'scipy', 'sympy'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect'],
+          py_modules=['ez_setup'],
           cmdclass=cmdclass,
           use_2to3=True,
           keywords=['systems', 'biology', 'model', 'rules'],
