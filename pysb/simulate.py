@@ -67,7 +67,24 @@ class Simulator:
         self.yobs_view = None
         self.yexpr = None
         self.yexpr_view = None
-    
+
+    @classmethod
+    def execute(cls, model, **kwargs):
+        """
+        Convenience method to instantiate a Simulator object, call its run()
+        method, and return a ``yfull`` object of trajectories.
+
+        Parameters
+        ----------
+        model : pysb.Model
+            Model passed to the simulator constructor
+        **kwargs: dict
+            Keyword arguments for the run() method
+        """
+        simulator = type(cls)(model)
+        simulator.run(**kwargs)
+        return simulator.get_yfull()
+
     @abstractmethod
     def run(self, tspan=None, param_values=None, y0=None):
         """Run a simulation.
