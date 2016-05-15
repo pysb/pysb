@@ -316,6 +316,8 @@ class BngConsole(BngBaseInterface):
             print(self.console.before)
         elif not self.suppress_warnings and "WARNING:" in self.console.before:
             warn(self.console.before)
+        if "ERROR:" in self.console.before:
+            raise BngInterfaceError(self.console.before)
         return self.console.before
 
     def generate_network(self, overwrite=False):
