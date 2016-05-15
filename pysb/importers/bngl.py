@@ -127,14 +127,16 @@ class BNGLBuilder(Builder):
         for o in self.x.iterfind(_ns('{0}ListOfObservables/{0}Observable')):
             o_name = o.get('name')
             cplx_pats = []
-            for mp in self._parse_species(o.iterfind(
-                    _ns('{0}ListOfPatterns/{0}Pattern'))):
+            for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
                 match_once = mp.get('matchOnce')
                 match_once = 1 if match_once is not None \
                     and match_once == "1" else 0
-                cplx_pats.append(ComplexPattern(mp, compartment=None,
+                cplx_pats.append(ComplexPattern(self._parse_species(mp),
+                                                compartment=None,
                                                 match_once=match_once))
-            self.observable(o_name, cplx_pats, match=o.get('type').lower())
+            self.observable(o_name,
+                            ReactionPattern(cplx_pats),
+                            match=o.get('type').lower())
 
     def parse_initials(self):
         for i in self.x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
@@ -203,20 +205,27 @@ class BNGLBuilder(Builder):
                 r_name = r_name[9:]
                 rev_rates[r_name] = r_rate
                 continue
-            rp = r.find(_ns('{0}ListOfReactantPatterns/'
-                            '{0}ReactantPattern'))
-            reactant_pats = self._parse_species(rp)
-            pp = r.find(_ns('{0}ListOfProductPatterns/'
-                            '{0}ProductPattern'))
-            product_pats = self._parse_species(pp)
-            rule_exp = RuleExpression(ReactionPattern(
-                                          [ComplexPattern(reactant_pats,
-                                                          None)]),
-                                      ReactionPattern(
-                                          [ComplexPattern(product_pats,
-                                                          None)]),
-                                      False)
-            self.rule(r_name, rule_exp, r_rate)
+            reactant_pats = []
+            for rp in r.iterfind(_ns('{0}ListOfReactantPatterns/'
+                                     '{0}ReactantPattern')):
+                reactant_pats.append(ComplexPattern(self._parse_species(rp),
+                                                    rp.get('compartment')))
+            product_pats = []
+            for pp in r.iterfind(_ns('{0}ListOfProductPatterns/'
+                                 '{0}ProductPattern')):
+                product_pats.append(ComplexPattern(self._parse_species(pp),
+                                                   pp.get('compartment')))
+            rule_exp = RuleExpression(ReactionPattern(reactant_pats),
+                                      ReactionPattern(product_pats),
+                                      is_reversible=False)
+            delete_molecules = False
+            for del_operations in r.iterfind(_ns('{0}ListOfOperations/'
+                                                 '{0}Delete')):
+                if del_operations.get('DeleteMolecules') == "1":
+                    delete_molecules = True
+                    break
+            self.rule(r_name, rule_exp, r_rate,
+                      delete_molecules=delete_molecules)
 
         # Set the reverse rates
         for r_name, rev_rate in rev_rates.items():
