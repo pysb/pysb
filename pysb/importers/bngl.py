@@ -5,33 +5,46 @@ from pysb.bng import BngConsole
 import xml.etree.ElementTree
 import re
 from sympy.parsing.sympy_parser import parse_expr
+import warnings
 
 
 def _ns(tag_string):
+    """
+    Shorthand to apply XML namespace
+    """
     return tag_string.format('{http://www.sbml.org/sbml/level3}')
 
 
-class BNGLBuilder(Builder):
+class BnglImportError(Exception):
+    pass
+
+
+class BnglBuilder(Builder):
+    """
+    Class for assembling a Model from a .bngl file. See
+    :py:func:`model_from_bngl` for further details.
+    """
     def __init__(self, filename):
-        super(BNGLBuilder, self).__init__()
+        super(BnglBuilder, self).__init__()
         with BngConsole(model=None) as con:
             con.load_bngl(filename)
             con.action('writeXML', evaluate_expressions=0)
-            # import shutil
-            # shutil.copy(con.base_filename+'.xml', '/Users/alex/tmp')
             self.x = xml.etree.ElementTree.parse('%s.xml' %
-                             con.base_filename).getroot().find(_ns('{0}model'))
+                           con.base_filename).getroot().find(_ns('{0}model'))
             self._model_env = {}
         self.parse_bng_xml()
 
     def _eval_in_model_env(self, expression):
+        """
+        Evaluates an expression string in the model environment
+        """
         components = dict((c.name, c) for c in self.model.all_components())
         self._model_env.update(components)
 
         # Quick security check on the expression
         if not re.match(r'^[\w\s\(\)/\+\-\._\*]*$', expression):
-            raise Exception('Security check on expression "%s" failed' %
-                            expression)
+            raise BnglImportError('Security check on expression "%s" failed' %
+                                  expression)
 
         return eval(expression, {}, self._model_env)
 
@@ -45,7 +58,8 @@ class BNGLBuilder(Builder):
         for bond in species_xml.iterfind(_ns('{0}ListOfBonds/{0}Bond')):
             for bond_attr in bond.attrib.keys():
                 if bond_attr.startswith('site'):
-                    bond_ids[bond.attrib[bond_attr]] = next_bond_id
+                    bond_ids.setdefault(bond.attrib[bond_attr], [])\
+                                        .append(next_bond_id)
             next_bond_id += 1
 
         # Create a list of monomer patterns
@@ -60,17 +74,19 @@ class BNGLBuilder(Builder):
                 if bonds == "0":
                     mon_states[state_nm] = None
                 elif bonds == "1":
-                    mon_states[state_nm] = bond_ids[comp.get('id')]
+                    bond_list = bond_ids[comp.get('id')]
+                    assert int(bonds) == len(bond_list)
+                    mon_states[state_nm] = bond_list[0]
                 elif bonds == "?":
                     mon_states[state_nm] = WILD
                 elif bonds == "+":
                     mon_states[state_nm] = ANY
                 else:
-                    raise Exception('Bond %s on monomer %s has '
-                                    'unknown/unsupported number '
-                                    'of bonds: %s ' % (state_nm,
-                                                       mon_name,
-                                                       bonds))
+                    raise BnglImportError('Bond %s on monomer %s has '
+                                          'unknown/unsupported number '
+                                          'of bonds: %s ' % (state_nm,
+                                                             mon_name,
+                                                             bonds))
                 state = comp.get('state')
                 if state:
                     if mon_states[state_nm]:
@@ -102,12 +118,12 @@ class BNGLBuilder(Builder):
                 self.monomer(mon_name, sites, states)
             except Exception as e:
                 if e.message.startswith('Duplicate sites specified'):
-                    raise NotImplementedError('Molecule %s has multiple '
-                                              'sites with the same name. '
-                                              'This is not supported in '
-                                              'PySB.' % mon_name)
+                    raise BnglImportError('Molecule %s has multiple '
+                                          'sites with the same name. '
+                                          'This is not supported in '
+                                          'PySB.' % mon_name)
                 else:
-                    raise e
+                    raise BnglImportError(e.message)
 
     def parse_parameters(self):
         for p in self.x.iterfind(_ns('{0}ListOfParameters/{0}Parameter')):
@@ -119,11 +135,10 @@ class BNGLBuilder(Builder):
                 self.expression(name=p_name,
                                 expr=self._eval_in_model_env(p.get('value')))
             else:
-                raise Exception('Parameter %s has unknown type: %s' % (
-                    p_name, p.get('type')))
+                raise BnglImportError('Parameter %s has unknown type: %s' %
+                                      (p_name, p.get('type')))
 
     def parse_observables(self):
-        # @TODO: Species-level compartment for observables?
         for o in self.x.iterfind(_ns('{0}ListOfObservables/{0}Observable')):
             o_name = o.get('name')
             cplx_pats = []
@@ -140,6 +155,10 @@ class BNGLBuilder(Builder):
 
     def parse_initials(self):
         for i in self.x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
+            if i.get('Fixed') is not None and i.get('Fixed') == "1":
+                warnings.warn('Species %s is fixed, but will be treated as '
+                              'an ordinary species in PySB.' % i.get('name'))
+
             value_param = i.get('concentration')
             try:
                 value = float(value_param)
@@ -149,7 +168,7 @@ class BNGLBuilder(Builder):
                 try:
                     value_param = self.parameter(name, value)
                 except ValueError as ve:
-                    raise Exception(ve.message)
+                    raise BnglImportError(ve.message)
             except ValueError:
                 # Retrieve existing parameter or (constant) expression
                 try:
@@ -159,8 +178,7 @@ class BNGLBuilder(Builder):
                         'concentration')]
             mon_pats = self._parse_species(i)
             species_cpt = self.model.compartments.get(i.get('compartment'))
-            self.initial(ComplexPattern(mon_pats, species_cpt),
-                             value_param)
+            self.initial(ComplexPattern(mon_pats, species_cpt), value_param)
 
     def parse_compartments(self):
         for c in self.x.iterfind(_ns('{0}ListOfCompartments/{0}compartment')):
@@ -187,8 +205,8 @@ class BNGLBuilder(Builder):
         elif rl.get('type') == 'Function':
             return self.model.expressions[rl.get('name')]
         else:
-            raise Exception('Rate law %s has unknown type %s' %
-                            (rl.get('id'), rl.get('type')))
+            raise BnglImportError('Rate law %s has unknown type %s' %
+                                  (rl.get('id'), rl.get('type')))
 
     def parse_rules(self):
         # Store reversible rates for post-processing (we don't know if we'll
@@ -197,33 +215,52 @@ class BNGLBuilder(Builder):
         for r in self.x.iterfind(_ns('{0}ListOfReactionRules/'
                                      '{0}ReactionRule')):
             r_name = r.get('name')
+
             r_rate_xml = r.find(_ns('{}RateLaw'))
             if r_rate_xml is None:
-                raise Exception('Rate law missing for rule %s' % r_name)
+                raise BnglImportError('Rate law missing for rule %s' % r_name)
             r_rate = self._parse_rate_law(r_rate_xml)
+
+            # Store reverse rates for post-processing
             if r_name.startswith('_reverse_'):
                 r_name = r_name[9:]
                 rev_rates[r_name] = r_rate
                 continue
+
+            # Compile reactant and product patterns
             reactant_pats = []
             for rp in r.iterfind(_ns('{0}ListOfReactantPatterns/'
                                      '{0}ReactantPattern')):
+                cpt = self.model.compartments.get(rp.get('compartment'))
                 reactant_pats.append(ComplexPattern(self._parse_species(rp),
-                                                    rp.get('compartment')))
+                                                    cpt))
             product_pats = []
             for pp in r.iterfind(_ns('{0}ListOfProductPatterns/'
-                                 '{0}ProductPattern')):
+                                     '{0}ProductPattern')):
+                cpt = self.model.compartments.get(pp.get('compartment'))
                 product_pats.append(ComplexPattern(self._parse_species(pp),
-                                                   pp.get('compartment')))
+                                                   cpt))
             rule_exp = RuleExpression(ReactionPattern(reactant_pats),
                                       ReactionPattern(product_pats),
                                       is_reversible=False)
+
+            # Process any DeleteMolecules declaration
             delete_molecules = False
             for del_operations in r.iterfind(_ns('{0}ListOfOperations/'
                                                  '{0}Delete')):
                 if del_operations.get('DeleteMolecules') == "1":
                     delete_molecules = True
                     break
+
+            # Give warning if ListOfExcludeReactants or ListOfExcludeProducts
+            # is present
+            if r.find(_ns('{}ListOfExcludeReactants')) is not None or \
+               r.find(_ns('{}ListOfExcludeProducts')) is not None:
+                warnings.warn('ListOfExcludeReactants and/or '
+                              'ListOfExcludeProducts declarations will be '
+                              'ignored. This may lead to long network '
+                              'generation times.')
+
             self.rule(r_name, rule_exp, r_rate,
                       delete_molecules=delete_molecules)
 
@@ -237,8 +274,8 @@ class BNGLBuilder(Builder):
     def parse_expressions(self):
         for e in self.x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             if e.find(_ns('{0}ListOfArguments/{0}Argument')) is not None:
-                raise NotImplementedError('Function %s is local, which is not '
-                                          'supported in PySB' % e.get('id'))
+                raise BnglImportError('Function %s is local, which is not '
+                                      'supported in PySB' % e.get('id'))
             self.expression(e.get('id'), parse_expr(e.find(_ns(
                 '{0}Expression')).text.replace('^', '**')))
 
@@ -251,10 +288,32 @@ class BNGLBuilder(Builder):
         self.parse_observables()
         self.parse_expressions()
         self.parse_rules()
-        # for r in self.model.rules:
-            # print(r)
 
 
-def read_bngl(filename):
-    bb = BNGLBuilder(filename)
+def model_from_bngl(filename):
+    """
+    Convert a BioNetGen .bngl model definition file into a PySB Model
+    object, using the BioNetGen XML format as an intermediary.
+
+    Limitations
+    -----------
+
+    * Fixed species (like $Null) are imported as regular species. A warning
+      will be shown.
+    * BNG excluded or included reaction patterns (which are deprecated) are
+      ignored, with a warning.
+    * Files with BNG local functions will cause an error.
+    * Files containing Molecules with identically named sites, such as
+      ``M(l,l)`` will cause an error.
+    * Files using BNG's custom rate law functions, such as ``MM`` and
+      ``Sat`` will cause an error.
+    * Files with multiple bonds at the same site, such as ``M(l!1!2)`` will
+      cause an error.
+
+    Parameters
+    ----------
+    filename :
+        A BioNetGen .bngl file
+    """
+    bb = BnglBuilder(filename)
     return bb.model
