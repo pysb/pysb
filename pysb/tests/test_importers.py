@@ -4,9 +4,10 @@ from pysb.bng import BngConsole
 from pysb.importers.bngl import model_from_bngl, BnglImportError
 import numpy
 from nose.tools import assert_raises_regexp
+import warnings
 
 
-def bng_import_compare_simulations(bng_file, sim_times=range(0, 100, 10)):
+def bngl_import_compare_simulations(bng_file, sim_times=range(0, 100, 10)):
     """
     Test BNGL file import by running an ODE simulation on the imported model
     and on the BNGL file directly to compare trajectories.
@@ -35,10 +36,20 @@ def bng_import_compare_simulations(bng_file, sim_times=range(0, 100, 10)):
         assert numpy.allclose(yfull1[species], yfull2[species])
 
 
-def validate_bngl_import(filename):
+def _bngl_location(filename):
+    """
+    Gets the location of one of BioNetGen's validation model files in BNG's
+    Validate directory. Currently, this function outputs a warning and
+    returns None if the file is not found, as some files are missing on some
+    platforms due to a BNG packaging error.
+    """
     bng_dir = os.path.dirname(pysb.bng._get_bng_path())
-    bngl_files_dir = os.path.join(bng_dir, 'Validate')
-    bng_import_compare_simulations(os.path.join(bngl_files_dir, filename))
+    bngl_file = os.path.join(bng_dir, 'Validate', filename + '.bngl')
+    if not os.path.exists(bngl_file):
+        warnings.warn('BioNetGen model file %s was not found, skipping '
+                      'test...' % bngl_file)
+        return None
+    return bngl_file
 
 
 def test_bngl_import_expected_passes():
@@ -65,7 +76,10 @@ def test_bngl_import_expected_passes():
                      'toy-jim',
                      'univ_synth',
                      'visualize'):
-        yield (validate_bngl_import, filename + '.bngl')
+        full_filename = _bngl_location(filename)
+        if not full_filename:
+            return
+        yield (bngl_import_compare_simulations, full_filename)
 
 
 def test_bngl_import_expected_errors():
@@ -94,9 +108,13 @@ def test_bngl_import_expected_errors():
                        'tlbr': errtype['dupsites'],
                        'tlmr': errtype['dupsites']
                        }
+
     for filename, errmsg in expected_errors.items():
+        full_filename = _bngl_location(filename)
+        if not full_filename:
+            return
         yield (assert_raises_regexp,
                BnglImportError,
                errmsg,
-               validate_bngl_import,
-               filename + '.bngl')
+               bngl_import_compare_simulations,
+               full_filename)
