@@ -117,13 +117,13 @@ class BnglBuilder(Builder):
             try:
                 self.monomer(mon_name, sites, states)
             except Exception as e:
-                if e.message.startswith('Duplicate sites specified'):
+                if str(e).startswith('Duplicate sites specified'):
                     raise BnglImportError('Molecule %s has multiple '
                                           'sites with the same name. '
                                           'This is not supported in '
                                           'PySB.' % mon_name)
                 else:
-                    raise BnglImportError(e.message)
+                    raise BnglImportError(str(e))
 
     def parse_parameters(self):
         for p in self.x.iterfind(_ns('{0}ListOfParameters/{0}Parameter')):
@@ -168,7 +168,7 @@ class BnglBuilder(Builder):
                 try:
                     value_param = self.parameter(name, value)
                 except ValueError as ve:
-                    raise BnglImportError(ve.message)
+                    raise BnglImportError(str(ve))
             except ValueError:
                 # Retrieve existing parameter or (constant) expression
                 try:
