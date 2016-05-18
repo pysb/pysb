@@ -12,6 +12,7 @@ from pkg_resources import parse_version
 import abc
 from warnings import warn
 import shutil
+import collections
 
 try:
     from cStringIO import StringIO
@@ -153,8 +154,10 @@ class BngBaseInterface(object):
         """
         if isinstance(param, str):
             return '"%s"' % param
-        if isinstance(param, bool):
+        elif isinstance(param, bool):
             return 1 if param else 0
+        elif isinstance(param, (collections.Sequence, numpy.ndarray)):
+            return list(param)
         return param
 
     @abc.abstractmethod
@@ -312,13 +315,15 @@ class BngConsole(BngBaseInterface):
         :return: BNG console output from the previous command
         """
         self.console.expect('BNG>')
-        if self.verbose:
-            print(self.console.before)
-        elif not self.suppress_warnings and "WARNING:" in self.console.before:
-            warn(self.console.before)
-        if "ERROR:" in self.console.before:
-            raise BngInterfaceError(self.console.before)
-        return self.console.before
+        # Python 3 requires explicit conversion of 'bytes' to 'str'
+        console_msg = self.console.before.decode('utf-8')
+        if "ERROR:" in console_msg:
+            raise BngInterfaceError(console_msg)
+        elif not self.suppress_warnings and "WARNING:" in console_msg:
+            warn(console_msg)
+        elif self.verbose:
+            print(console_msg)
+        return console_msg
 
     def generate_network(self, overwrite=False):
         """
