@@ -4,7 +4,6 @@ from pysb.bng import BngConsole
 from pysb.importers.bngl import model_from_bngl, BnglImportError
 import numpy
 from nose.tools import assert_raises_regexp
-import warnings
 
 
 def bngl_import_compare_simulations(bng_file, sim_times=range(0, 100, 10)):
@@ -39,16 +38,10 @@ def bngl_import_compare_simulations(bng_file, sim_times=range(0, 100, 10)):
 def _bngl_location(filename):
     """
     Gets the location of one of BioNetGen's validation model files in BNG's
-    Validate directory. Currently, this function outputs a warning and
-    returns None if the file is not found, as some files are missing on some
-    platforms due to a BNG packaging error.
+    Validate directory.
     """
     bng_dir = os.path.dirname(pysb.bng._get_bng_path())
     bngl_file = os.path.join(bng_dir, 'Validate', filename + '.bngl')
-    if not os.path.exists(bngl_file):
-        warnings.warn('BioNetGen model file %s was not found, skipping '
-                      'test...' % bngl_file)
-        return None
     return bngl_file
 
 
@@ -77,8 +70,6 @@ def test_bngl_import_expected_passes():
                      'univ_synth',
                      'visualize'):
         full_filename = _bngl_location(filename)
-        if not full_filename:
-            return
         yield (bngl_import_compare_simulations, full_filename)
 
 
@@ -111,8 +102,6 @@ def test_bngl_import_expected_errors():
 
     for filename, errmsg in expected_errors.items():
         full_filename = _bngl_location(filename)
-        if not full_filename:
-            return
         yield (assert_raises_regexp,
                BnglImportError,
                errmsg,
