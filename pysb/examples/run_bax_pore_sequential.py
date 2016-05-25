@@ -3,7 +3,7 @@
 
 from __future__ import print_function
 from pylab import *
-from pysb.integrate import odesolve
+from pysb.simulator.scipy import ScipyOdeSimulator
 
 from bax_pore_sequential import model, max_size
 
@@ -12,7 +12,7 @@ from bax_pore_sequential import model, max_size
 # vector of time points happens to help with the integration
 t = logspace(-3, 5) # 1e-3 to 1e5
 print("Simulating...")
-x = odesolve(model, t)
+x = ScipyOdeSimulator.execute(model, tspan=t)
 
 # Plot trajectory of each pore
 for i in range(1, max_size + 1):

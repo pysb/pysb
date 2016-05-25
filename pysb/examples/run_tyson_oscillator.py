@@ -1,12 +1,12 @@
 from pysb.examples.tyson_oscillator import model
-from pysb.integrate import odesolve
+from pysb.simulator import ScipyOdeSimulator
 from numpy import *
 #from pysb.tools.tropicalize import *
 import matplotlib.pyplot as plt
 # from varsens import *
 
 t = linspace(0, 100, 10001)
-x = odesolve(model, t)
+x = ScipyOdeSimulator.execute(model, tspan=t)
 ref = x
 
 #plot(t, x['CT'])  # Good validation of mass balance for cdc2, should be constant at 1
