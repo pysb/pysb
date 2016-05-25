@@ -482,10 +482,10 @@ you are using iPython, you can press tab twice after "m.mymodel" to
 tab complete and see all the possible options). 
 
 
-Now, we will import the *PyLab* and PySB integrator module. Enter
+Now, we will import the *PyLab* and PySB simulator module. Enter
 the commands as shown below::
 
-   >>> from pysb.integrate import odesolve
+   >>> from pysb.simulator.scipy import ScipyOdeSolver
    >>> import pylab as pl
 
 We have now loaded the integration engine and the graph engine into
@@ -523,7 +523,7 @@ These are the points at which we will get data for each ODE from the
 integrator. With this, we can now run our simulation. Enter the
 following commands to run the simulation::
 
-   >>> yout = odesolve(m.model, t)
+   >>> yout = ScipyOdeSolver.execute(m.model, tspan=t)
 
 To verify that the simulation run you can see the content of the
 *yout* object. For example, check for the content of the *Bid*
