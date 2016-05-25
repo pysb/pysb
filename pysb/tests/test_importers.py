@@ -2,6 +2,7 @@ import pysb
 import os
 from pysb.bng import BngConsole
 from pysb.importers.bngl import model_from_bngl, BnglImportError
+from pysb.importers.sbml import model_from_sbml
 import numpy
 from nose.tools import assert_raises_regexp
 
@@ -43,6 +44,17 @@ def _bngl_location(filename):
     bng_dir = os.path.dirname(pysb.bng._get_bng_path())
     bngl_file = os.path.join(bng_dir, 'Validate', filename + '.bngl')
     return bngl_file
+
+
+def _sbml_location(filename):
+    """
+    Gets the location of one of BioNetGen's validation SBML files in BNG's
+    Validate/INPUT_FILES directory.
+    """
+    bng_dir = os.path.dirname(pysb.bng._get_bng_path())
+    sbml_file = os.path.join(bng_dir, 'Validate/INPUT_FILES', filename +
+                             '.xml')
+    return sbml_file
 
 
 def test_bngl_import_expected_passes():
@@ -107,3 +119,11 @@ def test_bngl_import_expected_errors():
                errmsg,
                bngl_import_compare_simulations,
                full_filename)
+
+
+def test_sbml_import_flat_model():
+    model_from_sbml(_sbml_location('test_sbml_flat_SBML'))
+
+
+def test_sbml_import_structured_model():
+    model_from_sbml(_sbml_location('test_sbml_structured_SBML'), atomize=True)
