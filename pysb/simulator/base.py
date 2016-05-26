@@ -61,6 +61,7 @@ class Simulator(object):
         self._yobs_view = None
         self._yexpr = None
         self._yexpr_view = None
+        self._yfull = None
         # Per-run initial conditions/parameter/tspan override
         self.tspan = kwargs.get('tspan', None)
         self._initials = None
@@ -77,6 +78,7 @@ class Simulator(object):
         self._yobs_view = None
         self._yexpr = None
         self._yexpr_view = None
+        self._yfull = None
 
     @property
     def initials(self):
@@ -235,30 +237,34 @@ class Simulator(object):
     def concs_all(self, squeeze=True):
         """Aggregate species, observables, and expressions trajectories into
         a numpy.ndarray with record-style data-type for return to the user."""
-        if self._yobs is None:
-            self._calc_yobs_yexpr()
-        sp_names = ['__s%d' % i for i in range(len(self.model.species))]
-        yfull_dtype = zip(sp_names, itertools.repeat(float))
-        if len(self.model.observables):
-            yfull_dtype += zip(self.model.observables.keys(),
-                               itertools.repeat(float))
-        if len(self.model.expressions_dynamic()):
-            yfull_dtype += zip(self.model.expressions_dynamic().keys(),
-                               itertools.repeat(float))
-        yfull = len(self._y) * [None]
-        # loop over simulations
-        for n in range(self.n_sims):
-            yfull[n] = np.ndarray(len(self.tout[n]), yfull_dtype)
-            yfull_view = yfull[n].view(float).reshape((len(yfull[n]), -1))
-            n_sp = self._y[n].shape[1]
-            n_ob = self._yobs_view[n].shape[1]
-            n_ex = self._yexpr_view[n].shape[1]
-            yfull_view[:, :n_sp] = self._y[n]
-            yfull_view[:, n_sp:n_sp + n_ob] = self._yobs_view[n]
-            yfull_view[:, n_sp + n_ob:n_sp + n_ob + n_ex] = self._yexpr_view[n]
+        if self._yfull is None:
+            if self._yobs is None:
+                self._calc_yobs_yexpr()
+            sp_names = ['__s%d' % i for i in range(len(self.model.species))]
+            yfull_dtype = zip(sp_names, itertools.repeat(float))
+            if len(self.model.observables):
+                yfull_dtype += zip(self.model.observables.keys(),
+                                   itertools.repeat(float))
+            if len(self.model.expressions_dynamic()):
+                yfull_dtype += zip(self.model.expressions_dynamic().keys(),
+                                   itertools.repeat(float))
+            yfull = len(self._y) * [None]
+            # loop over simulations
+            for n in range(self.n_sims):
+                yfull[n] = np.ndarray(len(self.tout[n]), yfull_dtype)
+                yfull_view = yfull[n].view(float).reshape((len(yfull[n]), -1))
+                n_sp = self._y[n].shape[1]
+                n_ob = self._yobs_view[n].shape[1]
+                n_ex = self._yexpr_view[n].shape[1]
+                yfull_view[:, :n_sp] = self._y[n]
+                yfull_view[:, n_sp:n_sp + n_ob] = self._yobs_view[n]
+                yfull_view[:, n_sp + n_ob:n_sp + n_ob + n_ex] = \
+                    self._yexpr_view[n]
+            self._yfull = yfull
+
         if self.n_sims == 1 and squeeze:
-            return yfull[0]
-        return yfull
+            return self._yfull[0]
+        return self._yfull
 
     def concs_species(self, squeeze=True):
         if self.n_sims == 1 and squeeze:
