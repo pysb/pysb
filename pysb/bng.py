@@ -12,6 +12,7 @@ from pkg_resources import parse_version
 import abc
 from warnings import warn
 import shutil
+import collections
 
 try:
     from cStringIO import StringIO
@@ -103,12 +104,16 @@ class BngBaseInterface(object):
     @abc.abstractmethod
     def __init__(self, model, verbose=False, cleanup=False,
                  output_prefix=None, output_dir=None):
+        self._base_file_stem = 'pysb'
         self.verbose = verbose
         self.cleanup = cleanup
         self.output_prefix = 'tmpBNG' if output_prefix is None else \
             output_prefix
-        self.generator = BngGenerator(model)
-        self._check_model()
+        if model:
+            self.generator = BngGenerator(model)
+            self._check_model()
+        else:
+            self.generator = None
 
         self.base_directory = tempfile.mkdtemp(prefix=self.output_prefix,
                                                dir=output_dir)
@@ -149,8 +154,10 @@ class BngBaseInterface(object):
         """
         if isinstance(param, str):
             return '"%s"' % param
-        if isinstance(param, bool):
+        elif isinstance(param, bool):
             return 1 if param else 0
+        elif isinstance(param, (collections.Sequence, numpy.ndarray)):
+            return list(param)
         return param
 
     @abc.abstractmethod
@@ -191,14 +198,14 @@ class BngBaseInterface(object):
 
         :return: PySB model used in BNG interface constructor
         """
-        return self.generator.model
+        return self.generator.model if self.generator else None
 
     @property
     def base_filename(self):
         """
         Returns the base filename (without extension) for BNG output files
         """
-        return os.path.join(self.base_directory, 'pysb')
+        return os.path.join(self.base_directory, self._base_file_stem)
 
     @property
     def bng_filename(self):
@@ -236,7 +243,7 @@ class BngBaseInterface(object):
         # Read concentrations data
         cdat_arr = numpy.loadtxt(self.base_filename + '.cdat', skiprows=1)
         # Read groups data
-        if len(self.model.observables):
+        if self.model and len(self.model.observables):
             # Exclude first column (time)
             gdat_arr = numpy.loadtxt(self.base_filename + '.gdat',
                                      skiprows=1)[:,1:]
@@ -246,7 +253,7 @@ class BngBaseInterface(object):
         # -1 for time column
         names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)]
         yfull_dtype = list(zip(names, itertools.repeat(float)))
-        if len(self.model.observables):
+        if self.model and len(self.model.observables):
             yfull_dtype += list(zip(self.model.observables.keys(),
                                     itertools.repeat(float)))
         yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
@@ -277,16 +284,18 @@ class BngConsole(BngBaseInterface):
 
         try:
             # Generate BNGL file
-            with open(self.bng_filename, mode='w') as bng_file:
-                bng_file.write(self.generator.get_content())
+            if self.model:
+                with open(self.bng_filename, mode='w') as bng_file:
+                    bng_file.write(self.generator.get_content())
 
             # Start BNG Console and load BNGL
             self.console = pexpect.spawn('perl %s --console' % _get_bng_path(),
                                          cwd=self.base_directory,
                                          timeout=timeout)
             self._console_wait()
-            self.console.sendline('load %s' % self.bng_filename)
-            self._console_wait()
+            if self.model:
+                self.console.sendline('load %s' % self.bng_filename)
+                self._console_wait()
         except Exception as e:
             raise BngInterfaceError(e)
 
@@ -306,11 +315,15 @@ class BngConsole(BngBaseInterface):
         :return: BNG console output from the previous command
         """
         self.console.expect('BNG>')
-        if self.verbose:
-            print(self.console.before)
-        elif not self.suppress_warnings and "WARNING:" in self.console.before:
-            warn(self.console.before)
-        return self.console.before
+        # Python 3 requires explicit conversion of 'bytes' to 'str'
+        console_msg = self.console.before.decode('utf-8')
+        if "ERROR:" in console_msg:
+            raise BngInterfaceError(console_msg)
+        elif not self.suppress_warnings and "WARNING:" in console_msg:
+            warn(console_msg)
+        elif self.verbose:
+            print(console_msg)
+        return console_msg
 
     def generate_network(self, overwrite=False):
         """
@@ -349,6 +362,19 @@ class BngConsole(BngBaseInterface):
 
         # Wait for the command to execute and return the result
         return self._console_wait()
+
+    def load_bngl(self, bngl_file):
+        """
+        Loads a BNGL file in the BNG console
+
+        Parameters
+        ----------
+        bngl_file : string
+            The filename of a .bngl file
+        """
+        self.console.sendline('load %s' % bngl_file)
+        self._console_wait()
+        self._base_file_stem = os.path.splitext(os.path.basename(bngl_file))[0]
 
 
 class BngFileInterface(BngBaseInterface):
@@ -528,7 +554,6 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         If True, print output from BNG to stdout.
     """
     with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as bngfile:
-        net_filename = bngfile.base_filename + '.net'
         bngfile.action('generate_network', overwrite=True, verbose=verbose)
         bngfile.execute()
 
