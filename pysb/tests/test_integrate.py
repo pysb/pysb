@@ -65,30 +65,6 @@ class TestSolver(object):
                                   use_analytic_jacobian=True)
         solver_lsoda_jac.run()
 
-    @raises(NotImplementedError)
-    def test_y0_as_dictionary_monomer_species(self):
-        """Test y0 with model-defined species."""
-        self.solver.run(y0={"A(a=None)": 10, "B(b=1) % A(a=1)": 0,
-                        "B(b=None)": 0})
-        assert np.allclose(self.solver.y[0, 0], 10)
-
-    @raises(NotImplementedError)
-    def test_y0_as_dictionary_with_bound_species(self):
-        """Test y0 with dynamically generated species."""
-        self.solver.run(y0={"A(a=None)": 0, "B(b=1) % A(a=1)": 100,
-                        "B(b=None)": 0})
-        assert np.allclose(self.solver.y[0, 3], 100)
-
-    @raises(NotImplementedError)
-    def test_y0_invalid_dictionary_key(self):
-        """Test y0 with invalid monomer name."""
-        self.solver.run(y0={"C(c=None)": 1})
-
-    @raises(NotImplementedError)
-    def test_y0_non_numeric_value(self):
-        """Test y0 with non-numeric value."""
-        self.solver.run(y0={"A(a=None)": 'eggs'})
-
     def test_param_values_as_dictionary(self):
         """Test param_values as a dictionary."""
         self.solver.run(param_values={'kbindAB': 0})
