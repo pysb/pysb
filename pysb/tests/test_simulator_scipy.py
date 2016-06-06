@@ -32,6 +32,9 @@ class TestScipySimulator(object):
 
         self.model = model
 
+        # Convenience shortcut for accessing model monomer objects
+        self.mon = lambda m: self.model.monomers[m]
+
         # This timespan is chosen to be enough to trigger a Jacobian evaluation
         # on the various solvers.
         self.time = np.linspace(0, 1)
@@ -67,29 +70,24 @@ class TestScipySimulator(object):
                                              use_analytic_jacobian=True)
         solver_lsoda_jac.run()
 
-    @raises(NotImplementedError)
     def test_y0_as_dictionary_monomer_species(self):
         """Test y0 with model-defined species."""
-        self.sim.run(initials={"A(a=None)": 10, "B(b=1) % A(a=1)": 0,
-                               "B(b=None)": 0})
-        assert np.allclose(self.sim.concs_all()[0, 0], 10)
+        self.sim.run(initials={self.mon('A')(a=None): 10,
+                               self.mon('B')(b=1) % self.mon('A')(a=1): 0,
+                               self.mon('B')(b=None): 0})
+        assert np.allclose(self.sim.concs_observables()['A_free'][0], 10)
 
-    @raises(NotImplementedError)
     def test_y0_as_dictionary_with_bound_species(self):
         """Test y0 with dynamically generated species."""
-        self.sim.run(initials={"A(a=None)": 0, "B(b=1) % A(a=1)": 100,
-                                 "B(b=None)": 0})
-        assert np.allclose(self.sim.concs_all()[0, 3], 100)
+        self.sim.run(initials={self.mon('A')(a=None): 0,
+                               self.mon('B')(b=1) % self.mon('A')(a=1): 100,
+                               self.mon('B')(b=None): 0})
+        assert np.allclose(self.sim.concs_observables()['AB_complex'][0], 100)
 
-    @raises(NotImplementedError)
-    def test_y0_invalid_dictionary_key(self):
-        """Test y0 with invalid monomer name."""
-        self.sim.run(initials={"C(c=None)": 1})
-
-    @raises(NotImplementedError)
+    @raises(TypeError)
     def test_y0_non_numeric_value(self):
         """Test y0 with non-numeric value."""
-        self.sim.run(initials={"A(a=None)": 'eggs'})
+        self.sim.run(initials={self.mon('A')(a=None): 'eggs'})
 
     def test_param_values_as_dictionary(self):
         """Test param_values as a dictionary."""

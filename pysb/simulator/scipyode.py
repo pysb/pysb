@@ -246,7 +246,7 @@ class ScipyOdeSimulator(Simulator):
                                "run")
         self._clear_outputs()
         self._y = np.ndarray((1, len(self.tspan), len(self.model.species)))
-        y0 = self.initials
+        y0 = self.initials_list
         param_values = self.param_values
         if self.integrator == 'lsoda':
             self._y[0] = scipy.integrate.odeint(self.func,

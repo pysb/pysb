@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import itertools
 import sympy
+from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern
 
 
 class SimulatorException(Exception):
@@ -85,41 +86,68 @@ class Simulator(object):
         if self._initials:
             return self._initials
         else:
-            # Get initials from the model if no override is specified
-            y0 = np.zeros((len(self.model.species),))
-            param_vals = self.param_values
-            subs = dict((p, param_vals[i]) for i, p in
-                        enumerate(self.model.parameters))
-
-            for cp, value_obj in self.model.initial_conditions:
-                if value_obj in self.model.parameters:
-                    pi = self.model.parameters.index(value_obj)
-                    value = param_vals[pi]
-                elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr().evalf(subs=subs)
-                else:
-                    raise ValueError("Unexpected initial condition value type")
-                si = self.model.get_species_index(cp)
-                if si is None:
-                    raise IndexError("Species not found in model: %s" %
-                                     repr(cp))
-                y0[si] = value
-
-            return y0
+            return self.initials_list
 
     @initials.setter
     def initials(self, new_initials):
         if new_initials is None:
             self._initials = None
         else:
-            # check if y0 is a dict (not supported yet)
+            # check if y0 is a dict, and if so validate the keys
+            # (ComplexPatterns)
             if isinstance(new_initials, dict):
-                raise NotImplementedError
+                for cplx_pat, val in new_initials.items():
+                    if not isinstance(cplx_pat, (MonomerPattern,
+                                                 ComplexPattern)):
+                        raise SimulatorException('Dictionary key %s is not a '
+                                                 'MonomerPattern or '
+                                                 'ComplexPattern' %
+                                                 repr(cplx_pat))
+                self._initials = new_initials
             # accept vector of species amounts as an argument
-            if len(new_initials) != self._y.shape[1]:
+            elif len(new_initials) != self._y.shape[1]:
                 raise ValueError("y0 must be the same length as model.species")
-            if not isinstance(new_initials, np.ndarray):
+            elif not isinstance(new_initials, np.ndarray):
                 self._initials = np.array(new_initials)
+
+    @property
+    def initials_list(self):
+        """
+        Returns the model's initial conditions as a list, with the order
+        matching model.initial_conditions
+        """
+        y0 = np.zeros((len(self.model.species),))
+        param_vals = self.param_values
+        subs = dict((p, param_vals[i]) for i, p in
+                    enumerate(self.model.parameters))
+
+        def _set_initials(initials_source):
+            for cp, value_obj in initials_source:
+                cp = as_complex_pattern(cp)
+                si = self.model.get_species_index(cp)
+                if si is None:
+                    raise IndexError("Species not found in model: %s" %
+                                     repr(cp))
+                # If this initial condition has already been set, skip it
+                if y0[si] != 0:
+                    continue
+                if isinstance(value_obj, (int, float)):
+                    value = value_obj
+                elif value_obj in self.model.parameters:
+                    pi = self.model.parameters.index(value_obj)
+                    value = param_vals[pi]
+                elif value_obj in self.model.expressions:
+                    value = value_obj.expand_expr().evalf(subs=subs)
+                else:
+                    raise ValueError("Unexpected initial condition value type")
+                y0[si] = value
+
+        if isinstance(self._initials, dict):
+            _set_initials(self._initials.items())
+        _set_initials(self.model.initial_conditions)
+
+        return y0
+
 
     @property
     def param_values(self):
