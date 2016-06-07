@@ -83,7 +83,7 @@ class Simulator(object):
 
     @property
     def initials(self):
-        if self._initials:
+        if self._initials is not None:
             return self._initials
         else:
             return self.initials_list
@@ -109,6 +109,53 @@ class Simulator(object):
                 raise ValueError("y0 must be the same length as model.species")
             elif not isinstance(new_initials, np.ndarray):
                 self._initials = np.array(new_initials)
+            else:
+                self._initials = new_initials
+
+    @property
+    def initials_list(self):
+        """
+        Returns the model's initial conditions as a list, with the order
+        matching model.initial_conditions
+        """
+        # If we already have a list internally, just return that
+        if isinstance(self._initials, np.ndarray):
+            return self._initials
+        # Otherwise, build the list from the model, and any overrides
+        # specified in the self._initials dictionary
+        y0 = np.zeros((len(self.model.species),))
+        param_vals = self.param_values
+        subs = dict((p, param_vals[i]) for i, p in
+                    enumerate(self.model.parameters))
+
+        def _set_initials(initials_source):
+            for cp, value_obj in initials_source:
+                cp = as_complex_pattern(cp)
+                si = self.model.get_species_index(cp)
+                if si is None:
+                    raise IndexError("Species not found in model: %s" %
+                                     repr(cp))
+                # If this initial condition has already been set, skip it
+                if y0[si] != 0:
+                    continue
+                if isinstance(value_obj, (int, float)):
+                    value = value_obj
+                elif value_obj in self.model.parameters:
+                    pi = self.model.parameters.index(value_obj)
+                    value = param_vals[pi]
+                elif value_obj in self.model.expressions:
+                    value = value_obj.expand_expr().evalf(subs=subs)
+                else:
+                    raise ValueError("Unexpected initial condition value type")
+                y0[si] = value
+
+        # Process any overrides
+        if isinstance(self._initials, dict):
+            _set_initials(self._initials.items())
+        # Get remaining initials from the model itself
+        _set_initials(self.model.initial_conditions)
+
+        return y0
 
     @property
     def initials_list(self):
@@ -180,19 +227,21 @@ class Simulator(object):
         if new_params is None:
             self._params = None
             return
-        if not isinstance(new_params, dict):
-            # accept vector of parameter values as an argument
-            if len(new_params) != len(self.model.parameters):
-                raise ValueError("new_params must be the same length as "
-                                 "model.parameters")
-            if not isinstance(new_params, np.ndarray):
-                self._params = np.array(new_params)
-        else:
+        if isinstance(new_params, dict):
             for k in new_params.keys():
                 if k not in self.model.parameters.keys():
                     raise IndexError("new_params dictionary has unknown "
                                      "parameter name (%s)" % k)
             self._params = new_params
+        else:
+            # accept vector of parameter values as an argument
+            if len(new_params) != len(self.model.parameters):
+                raise ValueError("new_params must be the same length as "
+                                 "model.parameters")
+            if isinstance(new_params, np.ndarray):
+                self._params = new_params
+            else:
+                self._params = np.array(new_params)
 
     @classmethod
     def execute(cls, model, verbose=False, **kwargs):
