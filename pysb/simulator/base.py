@@ -83,7 +83,7 @@ class Simulator(object):
 
     @property
     def initials(self):
-        if self._initials:
+        if self._initials is not None:
             return self._initials
         else:
             return self.initials_list
@@ -109,6 +109,8 @@ class Simulator(object):
                 raise ValueError("y0 must be the same length as model.species")
             elif not isinstance(new_initials, np.ndarray):
                 self._initials = np.array(new_initials)
+            else:
+                self._initials = new_initials
 
     @property
     def initials_list(self):
@@ -155,7 +157,6 @@ class Simulator(object):
 
         return y0
 
-
     @property
     def param_values(self):
         if self._params and not isinstance(self._params, dict):
@@ -180,19 +181,21 @@ class Simulator(object):
         if new_params is None:
             self._params = None
             return
-        if not isinstance(new_params, dict):
-            # accept vector of parameter values as an argument
-            if len(new_params) != len(self.model.parameters):
-                raise ValueError("new_params must be the same length as "
-                                 "model.parameters")
-            if not isinstance(new_params, np.ndarray):
-                self._params = np.array(new_params)
-        else:
+        if isinstance(new_params, dict):
             for k in new_params.keys():
                 if k not in self.model.parameters.keys():
                     raise IndexError("new_params dictionary has unknown "
                                      "parameter name (%s)" % k)
             self._params = new_params
+        else:
+            # accept vector of parameter values as an argument
+            if len(new_params) != len(self.model.parameters):
+                raise ValueError("new_params must be the same length as "
+                                 "model.parameters")
+            if isinstance(new_params, np.ndarray):
+                self._params = new_params
+            else:
+                self._params = np.array(new_params)
 
     @classmethod
     def execute(cls, model, verbose=False, **kwargs):
