@@ -75,6 +75,11 @@ class TestScipySimulator(object):
         self.sim.run(initials=[10, 20, 0, 0])
         assert np.allclose(self.sim.concs_observables()['A_free'][0], 10)
 
+    def test_y0_as_ndarray(self):
+        """Test y0 with numpy ndarray of initial conditions"""
+        self.sim.run(initials=np.asarray([10, 20, 0, 0]))
+        assert np.allclose(self.sim.concs_observables()['A_free'][0], 10)
+
     def test_y0_as_dictionary_monomer_species(self):
         """Test y0 with model-defined species."""
         self.sim.run(initials={self.mon('A')(a=None): 10,
