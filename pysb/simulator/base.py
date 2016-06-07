@@ -105,7 +105,7 @@ class Simulator(object):
                                                  repr(cplx_pat))
                 self._initials = new_initials
             # accept vector of species amounts as an argument
-            elif len(new_initials) != self._y.shape[1]:
+            elif len(new_initials) != self._y[0].shape[1]:
                 raise ValueError("y0 must be the same length as model.species")
             elif not isinstance(new_initials, np.ndarray):
                 self._initials = np.array(new_initials)
@@ -116,6 +116,11 @@ class Simulator(object):
         Returns the model's initial conditions as a list, with the order
         matching model.initial_conditions
         """
+        # If we already have a list internally, just return that
+        if isinstance(self._initials, np.ndarray):
+            return self._initials
+        # Otherwise, build the list from the model, and any overrides
+        # specified in the self._initials dictionary
         y0 = np.zeros((len(self.model.species),))
         param_vals = self.param_values
         subs = dict((p, param_vals[i]) for i, p in
@@ -142,8 +147,10 @@ class Simulator(object):
                     raise ValueError("Unexpected initial condition value type")
                 y0[si] = value
 
+        # Process any overrides
         if isinstance(self._initials, dict):
             _set_initials(self._initials.items())
+        # Get remaining initials from the model itself
         _set_initials(self.model.initial_conditions)
 
         return y0
