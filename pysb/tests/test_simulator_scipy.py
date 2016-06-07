@@ -48,7 +48,9 @@ class TestScipySimulator(object):
 
     def test_vode_solver_run(self):
         """Test vode."""
+        assert self.sim.n_sims == 0
         self.sim.run()
+        assert self.sim.n_sims == 1
 
     def test_vode_jac_solver_run(self):
         """Test vode and analytic jacobian."""
@@ -72,7 +74,14 @@ class TestScipySimulator(object):
 
     def test_y0_as_list(self):
         """Test y0 with list of initial conditions"""
-        self.sim.run(initials=[10, 20, 0, 0])
+        # Test the initials getter method before anything is changed
+        assert np.allclose(self.sim.initials[0:3],
+                           [ic[1].value for ic in
+                            self.model.initial_conditions])
+
+        initials = [10, 20, 0, 0]
+        self.sim.run(initials=initials)
+        assert np.allclose(self.sim.initials, initials)
         assert np.allclose(self.sim.concs_observables()['A_free'][0], 10)
 
     def test_y0_as_ndarray(self):
@@ -85,6 +94,7 @@ class TestScipySimulator(object):
         self.sim.run(initials={self.mon('A')(a=None): 10,
                                self.mon('B')(b=1) % self.mon('A')(a=1): 0,
                                self.mon('B')(b=None): 0})
+        assert np.allclose(self.sim.initials_list, [10, 0, 1, 0])
         assert np.allclose(self.sim.concs_observables()['A_free'][0], 10)
 
     def test_y0_as_dictionary_with_bound_species(self):
@@ -104,6 +114,16 @@ class TestScipySimulator(object):
         self.sim.run(param_values={'kbindAB': 0})
         # kbindAB=0 should ensure no AB_complex is produced.
         assert np.allclose(self.sim.concs_observables()["AB_complex"], 0)
+
+    def test_param_values_as_list_ndarray(self):
+        """Test param_values as a list and ndarray."""
+        param_values = [50, 60, 70, 0, 0, 1]
+        self.sim.run(param_values=param_values)
+        assert np.allclose(self.sim.param_values, param_values)
+        # Same thing, but with a numpy array
+        param_values = np.asarray([55, 65, 75, 0, 0, 1])
+        self.sim.run(param_values=param_values)
+        assert np.allclose(self.sim.param_values, param_values)
 
     @raises(IndexError)
     def test_param_values_invalid_dictionary_key(self):
@@ -143,7 +163,11 @@ def test_integrate_with_expression():
     Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
     time = np.linspace(0, 40)
-    x = ScipyOdeSimulator.execute(model, tspan=time)
+    sim = ScipyOdeSimulator(model, tspan=time)
+    sim.run()
+    keff_vals = sim.concs_expressions()['keff']
+    assert len(keff_vals) == len(time)
+    assert np.allclose(keff_vals, 1.8181818181818182e-05)
 
 
 def test_robertson_integration():

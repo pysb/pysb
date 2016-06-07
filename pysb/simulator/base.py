@@ -159,7 +159,7 @@ class Simulator(object):
 
     @property
     def param_values(self):
-        if self._params and not isinstance(self._params, dict):
+        if self._params is not None and not isinstance(self._params, dict):
             return self._params
         else:
             # create parameter vector from the values in the model
