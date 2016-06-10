@@ -1,6 +1,6 @@
-# requirements just for building the docs (mainly to help out readthedocs)
-numpydoc>=0.4
-numpy
-scipy
-sympy
-setuptools
+# Requirements just for building the docs (used by readthedocs, but also
+# helpful for building docs locally).
+sphinx>=1.4
+numpydoc>=0.6
+mock>=1.0
+setuptools>=20.0
