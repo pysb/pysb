@@ -82,7 +82,8 @@ def sbml_translator(input_file,
             print(line, end="")
     (p_out, p_err) = p.communicate()
     if p.returncode:
-        raise SbmlTranslationError(p_out + "\n" + p_err)
+        raise SbmlTranslationError(p_out.decode('utf-8') + "\n" +
+                                   p_err.decode('utf-8'))
 
     return output_file
 
