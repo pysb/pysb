@@ -48,7 +48,6 @@ def sbml_translator(input_file,
     if output_file is None:
         output_file = os.path.splitext(input_file)[0] + '.bngl'
     sbmltrans_args.extend(['-o', output_file])
-    working_dir = os.path.dirname(output_file)
 
     if convention_file:
         sbmltrans_args.extend(['-c', convention_file])
@@ -73,7 +72,7 @@ def sbml_translator(input_file,
         print(" ".join(sbmltrans_args))
 
     p = subprocess.Popen(sbmltrans_args,
-                         cwd=working_dir,
+                         cwd=os.getcwd(),
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
 
