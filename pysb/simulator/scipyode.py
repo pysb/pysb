@@ -38,6 +38,9 @@ class ScipyOdeSimulator(Simulator):
             'method': 'bdf',
             'iteration': 'newton',
         },
+        'lsoda': {
+            'mxstep': 2**31-1,
+        }
     }
 
     def __init__(self, model, verbose=False, **kwargs):
@@ -249,6 +252,7 @@ class ScipyOdeSimulator(Simulator):
         y0 = self.initials_list
         param_values = self.param_values
         if self.integrator == 'lsoda':
+            print(self.opts)
             self._y[0] = scipy.integrate.odeint(self.func,
                                                 y0,
                                                 self.tspan,
