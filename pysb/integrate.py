@@ -255,27 +255,8 @@ class Solver(object):
 
         options.update(integrator_options) # overwrite defaults
         self.opts = options
-        self.y = numpy.ndarray((len(self.tspan), len(self.model.species))) # species concentrations
-        self.ydot = numpy.ndarray(len(self.model.species))
-
-        # Initialize record array for observable timecourses
-        if len(self.model.observables):
-            self.yobs = numpy.ndarray(len(self.tspan),
-                                      list(zip(self.model.observables.keys(),
-                                          itertools.repeat(float))))
-        else:
-            self.yobs = numpy.ndarray((len(self.tspan), 0))
-        self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
-
-        # Initialize array for expression timecourses
-        exprs = self.model.expressions_dynamic()
-        if len(exprs):
-            self.yexpr = numpy.ndarray(len(self.tspan), list(zip(exprs.keys(),
-                                                       itertools.repeat(
-                                                           float))))
-        else:
-            self.yexpr = numpy.ndarray((len(self.tspan), 0))
-        self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
+        # Allocate output arrays
+        self._reallocate_output_arrays()
 
         # Integrator
         if integrator == 'lsoda':
@@ -302,6 +283,40 @@ class Solver(object):
                 warnings.filterwarnings('error', 'No integrator name match')
                 self.integrator.set_integrator(integrator, **options)
 
+    def set_tspan(self, tspan):
+        """Set the time values used by the solver.
+
+        tspan : vector-like
+            Time values over which to integrate. The first and last values
+            define the time range, and the returned trajectories will be
+            sampled at every value.
+        """
+        self.tspan = tspan
+        self._reallocate_output_arrays()
+
+    def _reallocate_output_arrays(self):
+        # Species concentrations
+        self.y = numpy.ndarray((len(self.tspan), len(self.model.species)))
+        self.ydot = numpy.ndarray(len(self.model.species))
+
+        # Initialize record array for observable timecourses
+        if len(self.model.observables):
+            self.yobs = numpy.ndarray(len(self.tspan),
+                                      list(zip(self.model.observables.keys(),
+                                          itertools.repeat(float))))
+        else:
+            self.yobs = numpy.ndarray((len(self.tspan), 0))
+        self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
+
+        # Initialize array for expression timecourses
+        exprs = self.model.expressions_dynamic()
+        if len(exprs):
+            self.yexpr = numpy.ndarray(len(self.tspan), list(zip(exprs.keys(),
+                                                       itertools.repeat(
+                                                           float))))
+        else:
+            self.yexpr = numpy.ndarray((len(self.tspan), 0))
+        self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
 
     def run(self, param_values=None, y0=None):
         """Perform an integration.
