@@ -5,6 +5,7 @@ import re
 import numpy as np
 from collections import OrderedDict
 
+
 def listdir_fullpath(d):
     """Return a list of path of files in directory
 
@@ -24,23 +25,6 @@ def read_pars(par_path):
     data = csv.reader(f)
     param = [float(d[1]) for d in data]
     return param
-
-
-def read_all_pars(pars_path):
-    if os.path.isfile(pars_path):
-        par_sets = pd.read_csv(pars_path, names=['parameters'])['parameters'].tolist()
-    elif os.path.isdir(pars_path):
-        par_sets = listdir_fullpath(pars_path)
-    else:
-        raise Exception("Not valid parameter file or path")
-
-    all_pars = pd.DataFrame()
-    for i, pat in enumerate(par_sets):
-        var = pd.read_table(pat, sep=',', names=['parameters', 'val'])
-        all_pars['par%d' % i] = var.val
-    all_pars.set_index(var.parameters, inplace=True)
-    all_pars_t = all_pars.transpose()
-    return all_pars_t
 
 
 def parse_name(spec):
