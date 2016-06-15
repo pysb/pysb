@@ -80,15 +80,15 @@ class RenderModel:
             modifiers = reactants & products
             reactants = reactants - modifiers
             products = products - modifiers
-            attr_reversible = {'source-arrow-shape': 'DIAMOND', 'target-arrow-shape': 'ARROW',
+            attr_reversible = {'source-arrow-shape': 'DIAMOND', 'target-arrow-shape': 'DELTA',
                                'source-arrow-fill': 'hollow', 'width': 3} if reaction['reversible'] else {
-                'source-arrow-shape': 'NONE', 'width': 6, 'target-arrow-shape': 'ARROW'}
+                'source-arrow-shape': 'NONE', 'width': 6, 'target-arrow-shape': 'DELTA'}
             for s in reactants:
                 r_link_reactions(graph, s, i, **attr_reversible)
             for s in products:
                 r_link_reactions(graph, s, i, _flip=True, **attr_reversible)
             for s in modifiers:
-                attr_arrow = {'source-arrow-shape': 'NONE', 'width': 6, 'target-arrow-shape': 'DELTA'}
+                attr_arrow = {'source-arrow-shape': 'NONE', 'width': 6, 'target-arrow-shape': 'ARROW'}
                 r_link_reactions(graph, s, i, **attr_arrow)
 
         self.graph = graph
@@ -109,9 +109,9 @@ class RenderModel:
         for reaction in self.model.reactions_bidirectional:
             reactants = set(reaction['reactants'])
             products = set(reaction['products'])
-            attr_reversible = {'source-arrow-shape': 'DIAMOND', 'target-arrow-shape': 'ARROW',
+            attr_reversible = {'source-arrow-shape': 'DIAMOND', 'target-arrow-shape': 'DELTA',
                                'source-arrow-fill': 'hollow', 'width': 3} if reaction['reversible'] else {
-                'source-arrow-shape': 'NONE', 'width': 6, 'target-arrow-shape': 'ARROW'}
+                'source-arrow-shape': 'NONE', 'width': 6, 'target-arrow-shape': 'DELTA'}
             for s in reactants:
                 for p in products:
                     r_link_species(graph, s, p, **attr_reversible)

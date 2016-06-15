@@ -21,6 +21,7 @@ before_install:
     nose h5py pexpect
 - pip install -i https://pypi.binstar.org/pypi/simple pygraphviz==1.3rc1
 - pip install python-coveralls
+- pip install git+ https://github.com/LoLab-VU/py2cytoscape.git
 - python scripts/install_bng.py /tmp/BioNetGen
 - export BNGPATH=/tmp/BioNetGen
 # First install ocamlfind via opam (needed to build KaSim/KaSa)
