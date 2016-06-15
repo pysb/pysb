@@ -65,7 +65,7 @@ class Solver(object):
         If True (default), delete the temporary files after the simulation is
         finished. If False, leave them in place. Useful for debugging.
     verbose : bool, optional (default: False)
-        Verbose output 
+        Verbose output
     integrator_options
         Additional parameters for the integrator.
 
@@ -82,14 +82,14 @@ class Solver(object):
         Observable trajectories. Length is ``len(tspan)`` and record names
         follow ``model.observables`` names.
     yobs_view : numpy.ndarray
-        An array view (sharing the same data buffer) on ``yobs``. Dimensionality
-        is ``(len(tspan), len(model.observables))``.
+        An array view (sharing the same data buffer) on ``yobs``.
+        Dimensionality is ``(len(tspan), len(model.observables))``.
     yexpr : numpy.ndarray with record-style data-type
         Expression trajectories. Length is ``len(tspan)`` and record names
         follow ``model.expressions_dynamic()`` names.
     yexpr_view : numpy.ndarray
-        An array view (sharing the same data buffer) on ``yexpr``. Dimensionality
-        is ``(len(tspan), len(model.expressions_dynamic()))``.
+        An array view (sharing the same data buffer) on ``yexpr``.
+        Dimensionality is ``(len(tspan), len(model.expressions_dynamic()))``.
     integrator : scipy.integrate.ode
         Integrator object.
 
@@ -115,7 +115,6 @@ class Solver(object):
                     distutils.errors.CompileError, ImportError):
                 pass
 
-
     def __init__(self, model, tspan, use_analytic_jacobian=False,
                  integrator='vode', cleanup=True,
                  verbose=False, **integrator_options):
@@ -124,7 +123,7 @@ class Solver(object):
         self.model = model
         self.tspan = tspan
         # We'll need to know if we're using the Jacobian when we get to run()
-        self._use_analytic_jacobian = use_analytic_jacobian        
+        self._use_analytic_jacobian = use_analytic_jacobian
         # Generate the equations for the model
         pysb.bng.generate_equations(self.model, cleanup, self.verbose)
 
@@ -152,8 +151,8 @@ class Solver(object):
                 eqns = re.sub(r'\b(%s)\b' % obs.name, obs_string, eqns)
 
             # Substitute 'y[i]' for 'si'
-            eqns = re.sub(r'\b__s(\d+)\b', lambda m: 'y[%s]' % (int(m.group(1))),
-                       eqns)
+            eqns = re.sub(r'\b__s(\d+)\b',
+                          lambda m: 'y[%s]' % (int(m.group(1))), eqns)
 
             # Substitute 'p[i]' for any named parameters
             for i, p in enumerate(self.model.parameters):
@@ -166,18 +165,22 @@ class Solver(object):
                               (i, sympy.ccode(self.model.odes[i]))
                               for i in range(len(self.model.odes))])
         code_eqs = eqn_substitutions(code_eqs)
-        
+
         Solver._test_inline()
 
-        # If we can't use weave.inline to run the C code, compile it as Python code instead for use with
-        # exec. Note: C code with array indexing, basic math operations, and pow() just happens to also
-        # be valid Python.  If the equations ever have more complex things in them, this might fail.
+        # If we can't use weave.inline to run the C code, compile it as
+        # Python code instead for use with exec. Note: C code with array
+        # indexing, basic math operations, and pow() just happens to also
+        # be valid Python.  If the equations ever have more complex things
+        # in them, this might fail.
         if not Solver._use_inline:
-            code_eqs_py = compile(code_eqs, '<%s odes>' % self.model.name, 'exec')
+            code_eqs_py = compile(code_eqs, '<%s odes>' % self.model.name,
+                                  'exec')
         else:
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
-                code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,'%s(\\1)' % macro, code_eqs)
+                code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
+                                  '%s(\\1)' % macro, code_eqs)
 
         def rhs(t, y, p):
             ydot = self.ydot
@@ -187,7 +190,7 @@ class Solver(object):
             else:
                 _exec(code_eqs_py, locals())
             return ydot
-        
+
         # JACOBIAN -----------------------------------------------
         # We'll keep the code for putting together the matrix in Sympy
         # in case we want to do manipulations of the matrix later (e.g., to
@@ -208,7 +211,7 @@ class Solver(object):
                     d = sympy.diff(eqn, species_name)
                     jac_row.append(d)
                 jac_matrix.append(jac_row)
-    
+
             # Next, prepare the stringified Jacobian equations
             jac_eqs_list = []
             for i, row in enumerate(jac_matrix):
@@ -219,10 +222,11 @@ class Solver(object):
                     jac_eq_str = 'jac[%d, %d] = %s;' % (i, j, sympy.ccode(entry))
                     jac_eqs_list.append(jac_eq_str)
             jac_eqs = eqn_substitutions('\n'.join(jac_eqs_list))
-            
+
             # Try to inline the Jacobian if possible (as above for RHS)
             if not Solver._use_inline:
-                jac_eqs_py = compile(jac_eqs, '<%s jacobian>' % self.model.name, 'exec')
+                jac_eqs_py = compile(jac_eqs, '<%s jacobian>' % self.model.name,
+                                     'exec')
             else:
                 # Substitute array refs with calls to the JAC1 macro for inline
                 jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
@@ -231,7 +235,7 @@ class Solver(object):
                 for arr_name in ('y', 'p'):
                     macro = arr_name.upper() + '1'
                     jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
-                                      '%s(\\1)' % macro, jac_eqs)
+                                     '%s(\\1)' % macro, jac_eqs)
 
             def jacobian(t, y, p):
                 jac = self.jac
@@ -241,29 +245,32 @@ class Solver(object):
                 else:
                     _exec(jac_eqs_py, locals())
                 return jac
-            
-            # Initialize the jacobian argument to None if we're not going to use it
-            # jac = self.jac as defined in jacobian() earlier
+
+            # Initialize the jacobian argument to None if we're not going
+            # to use it jac = self.jac as defined in jacobian() earlier
             # Initialization of matrix for storing the Jacobian
-            self.jac = numpy.zeros((len(self.model.odes), len(self.model.species)))
+            self.jac = numpy.zeros((len(self.model.odes),
+                                   len(self.model.species)))
             jac_fn = jacobian
 
-        # build integrator options list from our defaults and any kwargs passed to this function
+        # build integrator options list from our defaults and any
+        # kwargs passed to this function
         options = {}
         if default_integrator_options.get(integrator):
-            options.update(default_integrator_options[integrator]) # default options
+            # default options
+            options.update(default_integrator_options[integrator])
 
-        options.update(integrator_options) # overwrite defaults
+        options.update(integrator_options)  # overwrite defaults
         self.opts = options
         # Allocate output arrays
         self._reallocate_output_arrays()
 
         # Integrator
         if integrator == 'lsoda':
-            # lsoda is accessed via scipy.integrate.odeint which, as a function,
-            # requires that we pass its args at the point of call. Thus we need
-            # to stash stuff like the rhs and jacobian functions in self so we
-            # can pass them in later.
+            # lsoda is accessed via scipy.integrate.odeint which, as a
+            # function, requires that we pass its args at the point of call.
+            # Thus we need to stash stuff like the rhs and jacobian functions
+            # in self so we can pass them in later.
             self.integrator = integrator
             # lsoda's rhs and jacobian function arguments are in a different
             # order to other integrators, so we define these shims that swizzle
@@ -303,7 +310,7 @@ class Solver(object):
         if len(self.model.observables):
             self.yobs = numpy.ndarray(len(self.tspan),
                                       list(zip(self.model.observables.keys(),
-                                          itertools.repeat(float))))
+                                               itertools.repeat(float))))
         else:
             self.yobs = numpy.ndarray((len(self.tspan), 0))
         self.yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
@@ -312,8 +319,7 @@ class Solver(object):
         exprs = self.model.expressions_dynamic()
         if len(exprs):
             self.yexpr = numpy.ndarray(len(self.tspan), list(zip(exprs.keys(),
-                                                       itertools.repeat(
-                                                           float))))
+                                       itertools.repeat(float))))
         else:
             self.yexpr = numpy.ndarray((len(self.tspan), 0))
         self.yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr), -1)
@@ -328,15 +334,16 @@ class Solver(object):
         ----------
         param_values : vector-like or dictionary, optional
             Values to use for every parameter in the model. Ordering is
-            determined by the order of model.parameters. 
+            determined by the order of model.parameters.
             If passed as a dictionary, keys must be parameter names.
             If not specified, parameter values will be taken directly from
             model.parameters.
         y0 : vector-like, optional
             Values to use for the initial condition of all species. Ordering is
             determined by the order of model.species. If not specified, initial
-            conditions will be taken from model.initial_conditions (with initial
-            condition parameter values taken from `param_values` if specified).
+            conditions will be taken from model.initial_conditions (with
+            initial condition parameter values taken from `param_values`
+            if specified).
         """
 
         if param_values is not None and not isinstance(param_values, dict):
@@ -348,8 +355,10 @@ class Solver(object):
                 param_values = numpy.array(param_values)
         else:
             # create parameter vector from the values in the model
-            param_values_dict = param_values if isinstance(param_values, dict) else {}
-            param_values = numpy.array([p.value for p in self.model.parameters])
+            param_values_dict = \
+                param_values if isinstance(param_values, dict) else {}
+            param_values = \
+                numpy.array([p.value for p in self.model.parameters])
             for key in param_values_dict.keys():
                 try:
                     pi = self.model.parameters.index(self.model.parameters[key])
@@ -387,7 +396,7 @@ class Solver(object):
                     raise IndexError("Species not found in model: %s" %
                                      repr(cp))
                 y0[si] = value
-        
+
         if self.integrator == 'lsoda':
             self.y = scipy.integrate.odeint(self.func, y0, self.tspan,
                                             Dfun=self.jac_fn,
@@ -406,8 +415,10 @@ class Solver(object):
                 print("\tTime")
                 print("\t----")
                 print("\t%g" % self.integrator.t)
-            while self.integrator.successful() and self.integrator.t < self.tspan[-1]:
-                self.y[i] = self.integrator.integrate(self.tspan[i]) # integration
+            while self.integrator.successful() and \
+                  self.integrator.t < self.tspan[-1]:
+                # integration
+                self.y[i] = self.integrator.integrate(self.tspan[i])
                 i += 1
                 ######
     #             self.integrator.integrate(self.tspan[i],step=True)
@@ -420,7 +431,8 @@ class Solver(object):
 
         # calculate observables
         for i, obs in enumerate(self.model.observables):
-            self.yobs_view[:, i] = (self.y[:, obs.species] * obs.coefficients).sum(1)
+            self.yobs_view[:, i] = \
+                (self.y[:, obs.species] * obs.coefficients).sum(1)
 
         # calculate expressions
         obs_names = self.model.observables.keys()
@@ -430,8 +442,8 @@ class Solver(object):
             func = sympy.lambdify(obs_names, expr_subs, "numpy")
             self.yexpr[expr.name] = func(**obs_dict)
 
-def odesolve(model, tspan, param_values=None, y0=None, integrator='vode', cleanup=True, verbose=False,
-             **integrator_options):
+def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
+             cleanup=True, verbose=False, **integrator_options):
     """Integrate a model's ODEs over a given timespan.
 
     This is a simple function-based interface to integrating (a.k.a. solving or
