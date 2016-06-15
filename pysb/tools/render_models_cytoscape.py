@@ -88,7 +88,8 @@ class RenderModel:
             for s in products:
                 r_link_reactions(graph, s, i, _flip=True, **attr_reversible)
             for s in modifiers:
-                r_link_reactions(graph, s, i, arrowhead="odiamond")
+                attr_arrow = {'source-arrow-shape': 'NONE', 'width': 6, 'target-arrow-shape': 'DELTA'}
+                r_link_reactions(graph, s, i, **attr_arrow)
 
         self.graph = graph
         return self.graph
@@ -132,6 +133,8 @@ class RenderModel:
 
         node_x_values = {node_name2id[i]: pos[i][0] for i in pos}
         node_y_values = {node_name2id[i]: pos[i][1] for i in pos}
+
+        for i in g.edges(data=True): print i[2]
 
         node_label_values = {node_name2id[i[0]]: i[1]['label'] for i in g.nodes(data=True)}
         node_color_values = {node_name2id[i[0]]: i[1]['background-color'] for i in g.nodes(data=True)}
