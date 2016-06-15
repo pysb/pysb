@@ -1,6 +1,5 @@
 import os
 import csv
-import pandas as pd
 import re
 import numpy as np
 from collections import OrderedDict
