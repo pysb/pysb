@@ -134,8 +134,6 @@ class RenderModel:
         node_x_values = {node_name2id[i]: pos[i][0] for i in pos}
         node_y_values = {node_name2id[i]: pos[i][1] for i in pos}
 
-        for i in g.edges(data=True): print i[2]
-
         node_label_values = {node_name2id[i[0]]: i[1]['label'] for i in g.nodes(data=True)}
         node_color_values = {node_name2id[i[0]]: i[1]['background-color'] for i in g.nodes(data=True)}
         edge_source_arrow_head = {edge_name2id[str(i[0]) + ',' + str(i[1])]: i[2]['source-arrow-shape'] for i in
