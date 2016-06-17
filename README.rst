@@ -1,6 +1,10 @@
 PySB
 ====
 
+.. image:: https://badges.gitter.im/pysb/pysb.svg
+   :alt: Join the chat at https://gitter.im/pysb/pysb
+   :target: https://gitter.im/pysb/pysb?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
 .. image:: https://api.travis-ci.org/pysb/pysb.png
 
 Python Systems Biology modeling framework
