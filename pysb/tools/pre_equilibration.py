@@ -7,7 +7,7 @@ def pre_equilibration(model, time_search, tolerance=1e-6, ligand=None, ligand_va
     """
 
     :param model: PySB model
-    :param time_search: time span vector to be used to find the equilibrium
+    :param time_search: time span arry to be used to find the equilibrium
     :param tolerance: (tolerance, -tolerance) Range within equilibrium is considered as reached
     :param ligand: Species whose value want to be changed.
     :param ligand_value: Initial condition of ligand (usually zero)
@@ -63,4 +63,3 @@ def pre_equilibration(model, time_search, tolerance=1e-6, ligand=None, ligand_va
 
     conc_eq = y[:, time_to_equilibration[1]]
     return time_to_equilibration, conc_eq
-

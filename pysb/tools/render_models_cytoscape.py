@@ -19,8 +19,9 @@ def r_link_reactions(graph, s, r, **attrs):
     nodes = ('s%d' % s, 'r%d' % r)
     if attrs.get('_flip'):
         del attrs['_flip']
-        nodes = reversed(nodes)
+        nodes = nodes[::-1]
     attrs.setdefault('arrowhead', 'normal')
+    attrs['name'] = ','.join(i for i in nodes)
     graph.add_edge(*nodes, **attrs)
 
 
@@ -28,8 +29,9 @@ def r_link_species(graph, s, r, **attrs):
     nodes = ('s%d' % s, 's%d' % r)
     if attrs.get('_flip'):
         del attrs['_flip']
-        nodes = reversed(nodes)
+        nodes = nodes[::-1]
     attrs.setdefault('arrowhead', 'normal')
+    attrs['name'] = ','.join(i for i in nodes)
     graph.add_edge(*nodes, **attrs)
 
 
