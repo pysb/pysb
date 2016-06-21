@@ -216,7 +216,7 @@ class FluxVisualization:
 
         # Creates the graph from the model
         self.species_graph()
-        self.sp_graph.add_node('t', {'label': 'time', 'background-color': '#fffaf0'})
+        # self.sp_graph.add_node('t', {'label': 'time', 'background-color': '#fffaf0'})
 
         # Sets up the graph in cytoscape
         self.networkx2cytoscape_setup(self.sp_graph)
@@ -340,6 +340,7 @@ class FluxVisualization:
         """
         pos = nx.drawing.nx_agraph.pygraphviz_layout(g, prog='dot', args="-Grankdir=LR")
         g_cy = cy.network.create_from_networkx(g)
+        g_cy.add_node('t')
         view_id_list = g_cy.get_views()
         self.view1 = g_cy.get_view(view_id_list[0], format='view')
 
@@ -362,6 +363,12 @@ class FluxVisualization:
 
         self.view1.update_node_views(visual_property='NODE_X_LOCATION', values=node_x_values)
         self.view1.update_node_views(visual_property='NODE_Y_LOCATION', values=node_y_values)
+
+        # Setting up the time node (location, fontsize, node size)
+        self.view1.update_node_views(visual_property='NODE_X_LOCATION', values={self.node_name2id['t']: 0})
+        self.view1.update_node_views(visual_property='NODE_Y_LOCATION', values={self.node_name2id['t']: 0})
+        self.view1.update_node_views(visual_property='NODE_LABEL_FONT_SIZE', values={self.node_name2id['t']: 20})
+        self.view1.update_node_views(visual_property='NODE_TRANSPARENCY', values={self.node_name2id['t']: 0})
 
         self.view1.update_node_views(visual_property='NODE_LABEL', values=node_label_values)
         self.view1.update_node_views(visual_property='NODE_FILL_COLOR', values=node_color_values)
