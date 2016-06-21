@@ -158,11 +158,6 @@ class RenderModel:
                                   g.edges(data=True)}
 
         view1.update_node_views(visual_property='NODE_LABEL', values=node_label_values)
-
-        node_views_dict = view1.get_node_views_as_dict()
-        nv_df = pd.DataFrame.from_dict(node_views_dict, orient='index')
-        max_string = nv_df['NODE_LABEL'].str.len().max()
-
         view1.update_node_views(visual_property='NODE_X_LOCATION', values=node_x_values)
         view1.update_node_views(visual_property='NODE_Y_LOCATION', values=node_y_values)
         view1.update_node_views(visual_property='NODE_SHAPE', values=node_shape)
