@@ -4,6 +4,8 @@ from helper_functions import parse_name
 from py2cytoscape.data.cyrest_client import CyRestClient
 from py2cytoscape.data.util_network import NetworkUtil as util
 from collections import OrderedDict
+import pandas as pd
+from PIL import ImageFont
 
 
 class OrderedGraph(nx.DiGraph):
@@ -68,15 +70,14 @@ class RenderModel:
             graph.add_node(species_node, attr_dict=
             {'label': parse_name(self.model.species[i]),
              'font-size': "35",
-             'shape': "roundrectangle",
+             'shape': "ROUND_RECTANGLE",
              'background-color': color})
         for i, reaction in enumerate(self.model.reactions_bidirectional):
             reaction_node = 'r%d' % i
-            graph.add_node(reaction_node, attr_dict=
-            {'label': reaction_node,
-             'font-size': "35",
-             'shape': "roundrectangle",
-             'background-color': "#D3D3D3"})
+            graph.add_node(reaction_node, attr_dict={'label': reaction_node,
+                                                     'font-size': "35",
+                                                     'shape': "ROUND_RECTANGLE",
+                                                     'background-color': "#D3D3D3"})
             reactants = set(reaction['reactants'])
             products = set(reaction['products'])
             modifiers = reactants & products
@@ -99,14 +100,19 @@ class RenderModel:
     def render_species(self):
         pysb.bng.generate_equations(self.model)
         graph = OrderedGraph()
+        ic_species = [cp for cp, parameter in self.model.initial_conditions]
         for idx, cp in enumerate(self.model.species):
             species_node = 's%d' % idx
+            color = "#ccffcc"
+            # color species with an initial condition differently
+            if len([s for s in ic_species if s.is_equivalent_to(cp)]):
+                color = "#aaffff"
 
             graph.add_node(species_node,
                            {'label': parse_name(self.model.species[idx]),
                             'font-size': "35",
-                            'shape': "roundrectangle",
-                            'background-color': "#ccffcc"})
+                            'shape': "ROUND_RECTANGLE",
+                            'background-color': color})
 
         for reaction in self.model.reactions_bidirectional:
             reactants = set(reaction['reactants'])
@@ -136,18 +142,34 @@ class RenderModel:
         node_x_values = {node_name2id[i]: pos[i][0] for i in pos}
         node_y_values = {node_name2id[i]: pos[i][1] for i in pos}
 
+        # node_label_width = {node_name2id[i]: 10 for i in g.nodes()}
+
+        node_shape = {node_name2id[i[0]]: i[1]['shape'] for i in g.nodes(data=True)}
         node_label_values = {node_name2id[i[0]]: i[1]['label'] for i in g.nodes(data=True)}
+
+        font = ImageFont.truetype('LiberationMono-Regular.ttf', 12)
+        node_width_values = {suid: font.getsize(label)[0] for suid, label in node_label_values.items()}
+        node_height_values = {suid: font.getsize(label)[1] for suid, label in node_label_values.items()}
+
         node_color_values = {node_name2id[i[0]]: i[1]['background-color'] for i in g.nodes(data=True)}
         edge_source_arrow_head = {edge_name2id[str(i[0]) + ',' + str(i[1])]: i[2]['source-arrow-shape'] for i in
                                   g.edges(data=True)}
         edge_target_arrow_head = {edge_name2id[str(i[0]) + ',' + str(i[1])]: i[2]['target-arrow-shape'] for i in
                                   g.edges(data=True)}
 
+        view1.update_node_views(visual_property='NODE_LABEL', values=node_label_values)
+
+        node_views_dict = view1.get_node_views_as_dict()
+        nv_df = pd.DataFrame.from_dict(node_views_dict, orient='index')
+        max_string = nv_df['NODE_LABEL'].str.len().max()
+
         view1.update_node_views(visual_property='NODE_X_LOCATION', values=node_x_values)
         view1.update_node_views(visual_property='NODE_Y_LOCATION', values=node_y_values)
-
-        view1.update_node_views(visual_property='NODE_LABEL', values=node_label_values)
+        view1.update_node_views(visual_property='NODE_SHAPE', values=node_shape)
+        view1.update_node_views(visual_property='NODE_WIDTH', values=node_width_values)
+        view1.update_node_views(visual_property='NODE_HEIGHT', values=node_height_values)
         view1.update_node_views(visual_property='NODE_FILL_COLOR', values=node_color_values)
+
         view1.update_edge_views(visual_property='EDGE_SOURCE_ARROW_SHAPE', values=edge_source_arrow_head)
         view1.update_edge_views(visual_property='EDGE_TARGET_ARROW_SHAPE', values=edge_target_arrow_head)
         return
