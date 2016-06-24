@@ -62,8 +62,8 @@ class PysbFlatExporter(Exporter):
         output.write("# exported from PySB model '%s'\n" % self.model.name)
         output.write("\n")
         output.write("from pysb import Model, Monomer, Parameter, Expression, "
-                     "Compartment, Rule, Observable, Initial, Annotation, "
-                     "ANY, WILD\n")
+                     "Compartment, Rule, Observable, Initial, MatchOnce, "
+                     "Annotation, ANY, WILD\n")
         output.write("\n")
         output.write("Model()\n")
         output.write("\n")
