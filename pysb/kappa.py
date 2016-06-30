@@ -320,7 +320,7 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
 
     base_directory = tempfile.mkdtemp(prefix=output_prefix, dir=output_dir)
 
-    base_filename = os.path.join(base_directory, model.name)
+    base_filename = os.path.join(base_directory, str(model.name))
     kappa_filename = base_filename + '.ka'
     im_filename = base_filename + '_im.dot'
     cm_filename = base_filename + '_cm.dot'
