@@ -7,6 +7,8 @@ def with_model(func):
     def inner(*args, **kwargs):
         model = Model(func.__name__, _export=False)
         # manually set up SelfExporter, targeting func's globals
+        selfexporter_state = SelfExporter.do_export
+        SelfExporter.do_export = True
         SelfExporter.default_model = model
         SelfExporter.target_module = func.__module__
         SelfExporter.target_globals = func.__globals__
@@ -17,6 +19,7 @@ def with_model(func):
         finally:
             # clean up the globals
             SelfExporter.cleanup()
+            SelfExporter.do_export = selfexporter_state
     return make_decorator(func)(inner)
 
 def serialize_component_list(model, filename):
