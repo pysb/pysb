@@ -13,14 +13,17 @@ from helper_functions import parse_name
 from py2cytoscape.data.util_network import NetworkUtil as util
 from collections import OrderedDict
 from py2cytoscape.data.cyrest_client import CyRestClient
+import threading
 
 # Cytoscape session
 cy = CyRestClient()
 cy.session.delete()
 
 
-# Networkx Digraph that stores the nodes in the order they are input
 class OrderedGraph(nx.DiGraph):
+    """
+    Networkx Digraph that stores the nodes in the order they are input
+    """
     node_dict_factory = OrderedDict
     adjlist_dict_factory = OrderedDict
 
@@ -163,6 +166,10 @@ def sig_apop(t, f, td, ts):
     return f - f / (1 + numpy.exp((t - td) / (4 * ts)))
 
 
+def button_state(state):
+    return state
+
+
 class FluxVisualization:
     mach_eps = numpy.finfo(float).eps
 
@@ -227,12 +234,53 @@ class FluxVisualization:
 
         if verbose:
             "Updating network"
-        for kx, time in enumerate(self.tspan):
+
+        self.restartable_for(self.tspan)
+
+        # # TODO: the while loop consumes cpu as long as the stop nodes is selected, find a different way to do this
+        # for kx, time in enumerate(self.tspan):
+        #     stop_state = button_state(self.view1.get_node_views_as_dict()[self.node_name2id['Stop']]['NODE_SELECTED'])
+        #     while stop_state:
+        #         tm.sleep(1)
+        #         play_state = button_state(
+        #             self.view1.get_node_views_as_dict()[self.node_name2id['Play']]['NODE_SELECTED'])
+        #         if play_state:
+        #             break
+        #
+        #     edges_size = self.size_time_edges.iloc[:, kx].to_dict()
+        #     edges_color = self.colors_time_edges.iloc[:, kx].to_dict()
+        #     time_stamp = {self.node_name2id['t']: 'Time:' + ' ' + '%d' % time + ' ' + 'sec'}
+        #     self.update_network(edge_color=edges_color, edge_size=edges_size, time_stamp=time_stamp)
+        #     tm.sleep(0.5)
+
+    def restartable_for(self, sequence):
+        restart = False
+        for kx, time in enumerate(sequence):
+            stop_state = button_state(self.view1.get_node_views_as_dict()[self.node_name2id['Stop']]['NODE_SELECTED'])
+            while stop_state:
+                tm.sleep(1)
+                play_state = button_state(
+                    self.view1.get_node_views_as_dict()[self.node_name2id['Play']]['NODE_SELECTED'])
+                if play_state:
+                    break
+
             edges_size = self.size_time_edges.iloc[:, kx].to_dict()
             edges_color = self.colors_time_edges.iloc[:, kx].to_dict()
-            time_stamp = {self.node_name2id['t']: 'time:' + ' ' + '%d' % time + ' ' + 'sec'}
+            time_stamp = {self.node_name2id['t']: 'Time:' + ' ' + '%d' % time + ' ' + 'sec'}
             self.update_network(edge_color=edges_color, edge_size=edges_size, time_stamp=time_stamp)
-            tm.sleep(0.3)
+            tm.sleep(0.5)
+            restart_state = button_state(
+                self.view1.get_node_views_as_dict()[self.node_name2id['Restart']]['NODE_SELECTED'])
+            if restart_state:
+                self.view1.update_node_views(visual_property='NODE_SELECTED',
+                                             values={self.node_name2id['Restart']: False})
+
+                self.view1.update_node_views(visual_property='NODE_SELECTED',
+                                             values={self.node_name2id['Play']: True})
+                restart = True
+                break
+        if restart:
+            self.restartable_for(sequence)
 
     def edges_colors_sizes(self, y):
         """
@@ -341,11 +389,16 @@ class FluxVisualization:
         pos = nx.drawing.nx_agraph.pygraphviz_layout(g, prog='dot', args="-Grankdir=LR")
         g_cy = cy.network.create_from_networkx(g)
         g_cy.add_node('t')
+        g_cy.add_node('Play')
+        g_cy.add_node('Stop')
+        g_cy.add_node('Restart')
         view_id_list = g_cy.get_views()
         self.view1 = g_cy.get_view(view_id_list[0], format='view')
 
-        # Switch current visual style to a simple one...
-        minimal_style = cy.style.create('Minimal')
+        # Visual style
+        minimal_style = cy.style.create('PySB')
+        node_defaults = {'NODE_BORDER_WIDTH': 0}
+        minimal_style.update_defaults(node_defaults)
         cy.style.apply(style=minimal_style, network=g_cy)
 
         self.node_name2id = util.name2suid(g_cy, 'node')
@@ -361,14 +414,37 @@ class FluxVisualization:
         edge_target_arrow_head = {self.edge_name2id[str(i[0]) + ',' + str(i[1])]: i[2]['target-arrow-shape'] for i in
                                   g.edges(data=True)}
 
+        self.view1.update_network_view(visual_property='NETWORK_CENTER_X_LOCATION', value=500)
+        self.view1.update_network_view(visual_property='NETWORK_CENTER_Y_LOCATION', value=0)
+        self.view1.update_network_view(visual_property='NETWORK_SCALE_FACTOR', value=1)
+
         self.view1.update_node_views(visual_property='NODE_X_LOCATION', values=node_x_values)
         self.view1.update_node_views(visual_property='NODE_Y_LOCATION', values=node_y_values)
 
-        # Setting up the time node (location, fontsize, node size)
-        self.view1.update_node_views(visual_property='NODE_X_LOCATION', values={self.node_name2id['t']: 0})
-        self.view1.update_node_views(visual_property='NODE_Y_LOCATION', values={self.node_name2id['t']: 0})
-        self.view1.update_node_views(visual_property='NODE_LABEL_FONT_SIZE', values={self.node_name2id['t']: 20})
-        self.view1.update_node_views(visual_property='NODE_TRANSPARENCY', values={self.node_name2id['t']: 0})
+        # Setting up the time, play and stop node (location, fontsize, node size)
+        self.view1.update_node_views(visual_property='NODE_X_LOCATION',
+                                     values={self.node_name2id['t']: 50, self.node_name2id['Play']: 200,
+                                             self.node_name2id['Stop']: 300, self.node_name2id['Restart']: 400})
+        self.view1.update_node_views(visual_property='NODE_Y_LOCATION',
+                                     values={self.node_name2id['t']: 0, self.node_name2id['Play']: 0,
+                                             self.node_name2id['Stop']: 0, self.node_name2id['Restart']: 0})
+        self.view1.update_node_views(visual_property='NODE_LABEL_FONT_SIZE',
+                                     values={self.node_name2id['t']: 30, self.node_name2id['Play']: 30,
+                                             self.node_name2id['Stop']: 30, self.node_name2id['Restart']: 30})
+        self.view1.update_node_views(visual_property='NODE_TRANSPARENCY',
+                                     values={self.node_name2id['t']: 0})
+        self.view1.update_node_views(visual_property='NODE_BORDER_WIDTH',
+                                     values={self.node_name2id['Play']: 1, self.node_name2id['Stop']: 1,
+                                             self.node_name2id['Restart']: 1})
+        self.view1.update_node_views(visual_property='NODE_LABEL',
+                                     values={self.node_name2id['Play']: 'Play', self.node_name2id['Stop']: 'Stop',
+                                             self.node_name2id['Restart']: 'Restart'})
+        self.view1.update_node_views(visual_property='NODE_WIDTH',
+                                     values={self.node_name2id['Play']: 70, self.node_name2id['Stop']: 70,
+                                             self.node_name2id['Restart']: 70})
+        self.view1.update_node_views(visual_property='NODE_HEIGHT',
+                                     values={self.node_name2id['Play']: 70, self.node_name2id['Stop']: 70,
+                                             self.node_name2id['Restart']: 70})
 
         self.view1.update_node_views(visual_property='NODE_LABEL', values=node_label_values)
         self.view1.update_node_views(visual_property='NODE_FILL_COLOR', values=node_color_values)
@@ -385,6 +461,7 @@ class FluxVisualization:
         :return: Updates Cytoscape network with parameter values
         """
         self.view1.update_edge_views(visual_property='EDGE_WIDTH', values=edge_size)
+        self.view1.update_edge_views(visual_property='EDGE_TOOLTIP', values=edge_size)
         self.view1.update_edge_views(visual_property='EDGE_STROKE_UNSELECTED_PAINT', values=edge_color)
         self.view1.update_edge_views(visual_property='EDGE_SOURCE_ARROW_UNSELECTED_PAINT', values=edge_color)
         self.view1.update_edge_views(visual_property='EDGE_TARGET_ARROW_UNSELECTED_PAINT', values=edge_color)
