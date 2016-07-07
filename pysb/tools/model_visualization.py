@@ -14,6 +14,13 @@ from collections import OrderedDict
 from py2cytoscape.data.cyrest_client import CyRestClient
 from PIL import ImageFont
 from pysb.bng import generate_equations
+import requests
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+from StringIO import StringIO
+import matplotlib.animation as manimation
+
+plt.ioff()
 
 # Cytoscape session
 cy = CyRestClient()
@@ -113,6 +120,16 @@ def button_state(state):
     return state
 
 
+def get_png(cynetwork, height=600):
+    url = '%sviews/first.png?h=%d' % (cynetwork._CyNetwork__url, height)
+    return requests.get(url).content
+
+
+def fit_to_window(cynetwork):
+    url = cy._CyRestClient__url+'apply/fit/%s' % cynetwork.get_id()
+    return requests.get(url).content
+
+
 class FluxVisualization:
     mach_eps = numpy.finfo(float).eps
 
@@ -125,18 +142,19 @@ class FluxVisualization:
         self.colors_time_edges = None
         self.colors_time_nodes = None
         self.size_time_edges = None
-        self.view1 = None
+        self.g_cy = None
         self.node_name2id = None
         self.edge_name2id = None
 
-    def visualize(self, tspan=None, param_values=None, render_type='flux', verbose=False):
+    def visualize(self, tspan=None, param_values=None, render_type='flux', save_video=True, verbose=False):
         """
 
+        :param save_video:
         :param render_type:
         :param tspan: time span for the simulation
         :param param_values: Parameter values for the model
         :param verbose: Verbose option
-        :return: Connects to cytoscape and visualize flow
+        :return: Connects to cytoscape and renders model
         """
         generate_equations(self.model)
         if render_type == 'reactions':
@@ -148,62 +166,86 @@ class FluxVisualization:
         elif render_type == 'flux':
             self.sp_graph = self.species_graph()
             self.networkx2cytoscape_setup(self.sp_graph, flux=True)
+            self.visualize_flux(tspan=tspan, param_values=param_values, save_video=save_video, verbose=verbose)
         else:
             raise Exception("A rendering type must be chosen: 'reactions', 'species', 'flux'")
 
-        if render_type == 'flux':
+    def visualize_flux(self, tspan=None, param_values=None, save_video=False, verbose=False):
+        if verbose:
+            print("Solving Simulation")
 
-            if verbose:
-                print("Solving Simulation")
+        if tspan is not None:
+            self.tspan = tspan
+        elif self.tspan is None:
+            raise Exception("'tspan' must be defined.")
 
-            if tspan is not None:
-                self.tspan = tspan
-            elif self.tspan is None:
-                raise Exception("'tspan' must be defined.")
+        if param_values is not None:
+            # accept vector of parameter values as an argument
+            if len(param_values) != len(self.model.parameters):
+                raise Exception("param_values must be the same length as model.parameters")
+            if not isinstance(param_values, numpy.ndarray):
+                param_values = numpy.array(param_values)
+        else:
+            # create parameter vector from the values in the model
+            param_values = numpy.array([p.value for p in self.model.parameters])
 
-            if param_values is not None:
-                # accept vector of parameter values as an argument
-                if len(param_values) != len(self.model.parameters):
-                    raise Exception("param_values must be the same length as model.parameters")
-                if not isinstance(param_values, numpy.ndarray):
-                    param_values = numpy.array(param_values)
-            else:
-                # create parameter vector from the values in the model
-                param_values = numpy.array([p.value for p in self.model.parameters])
+        # Parameters in a dictionary form
+        self.param_dict = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
 
-            # Parameters in a dictionary form
-            self.param_dict = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
+        # Solution of the differential equations
+        self.y = odesolve(self.model, self.tspan, param_values=self.param_dict)
 
-            # Solution of the differential equations
-            self.y = odesolve(self.model, self.tspan, param_values=self.param_dict)
+        if verbose:
+            print("Creating graph")
 
-            if verbose:
-                print("Creating graph")
+        # Creates panda data frame with color values for edges and nodes.
+        self.edges_colors_sizes(self.y)
+        self.nodes_colors(self.y)
 
-            # Creates panda data frame with color values for edges and nodes.
-            self.edges_colors_sizes(self.y)
-            self.nodes_colors(self.y)
+        if verbose:
+            "Updating network"
 
-            if verbose:
-                "Updating network"
+        if save_video:
+            self.record_video()
 
+        else:
             self.restartable_for(self.tspan)
 
-            # # TODO: the while loop consumes cpu as long as the stop nodes is selected, find a different way to do this
-            # for kx, time in enumerate(self.tspan):
-            #     stop_state = button_state(self.view1.get_node_views_as_dict()[self.node_name2id['Stop']]['NODE_SELECTED'])
-            #     while stop_state:
-            #         tm.sleep(1)
-            #         play_state = button_state(
-            #             self.view1.get_node_views_as_dict()[self.node_name2id['Play']]['NODE_SELECTED'])
-            #         if play_state:
-            #             break
-            #
-            #     edges_size = self.size_time_edges.iloc[:, kx].to_dict()
-            #     edges_color = self.colors_time_edges.iloc[:, kx].to_dict()
-            #     time_stamp = {self.node_name2id['t']: 'Time:' + ' ' + '%d' % time + ' ' + 'sec'}
-            #     self.update_network(edge_color=edges_color, edge_size=edges_size, time_stamp=time_stamp)
-            #     tm.sleep(0.5)
+    def record_video(self):
+        view_id_list = self.g_cy.get_views()
+        view1 = self.g_cy.get_view(view_id_list[0], format='view')
+
+        FFMpegWriter = manimation.writers['ffmpeg']
+        metadata = dict(title='My model', artist='Matplotlib', comment='Movie support!')
+        writer = FFMpegWriter(fps=1, metadata=metadata)
+
+        fig = plt.figure()
+        self.g_cy.delete_node(self.node_name2id['Restart'])
+        with writer.saving(fig, 'my_model.mp4', 200):
+            for kx, time in enumerate(self.tspan):
+                network_png = get_png(self.g_cy, height=800)
+                img = mpimg.imread(StringIO(network_png), format='stream')
+                imgplot = plt.imshow(img)
+                writer.grab_frame()
+                # Check if stop node is selected
+                stop_state = button_state(
+                    view1.get_node_views_as_dict()[self.node_name2id['Stop']]['NODE_SELECTED'])
+                # If the stop node is selected, the loop continues until the play or the restart buttons are selected
+                while stop_state:
+                    tm.sleep(1)
+                    play_state = button_state(
+                        view1.get_node_views_as_dict()[self.node_name2id['Play']]['NODE_SELECTED'])
+                    restart_state1 = button_state(
+                        view1.get_node_views_as_dict()[self.node_name2id['Restart']]['NODE_SELECTED'])
+                    if play_state or restart_state1:
+                        break
+                # Updates the edges size and colors
+                edges_size = self.size_time_edges.iloc[:, kx].to_dict()
+                edges_color = self.colors_time_edges.iloc[:, kx].to_dict()
+                time_stamp = {self.node_name2id['t']: 'Time:' + ' ' + '%d' % time + ' ' + 'sec'}
+                self.update_network(edge_color=edges_color, edge_size=edges_size, time_stamp=time_stamp)
+                fig.clear()
+                tm.sleep(0.5)
 
     def restartable_for(self, sequence):
         """
@@ -211,24 +253,28 @@ class FluxVisualization:
         :param sequence: Iterable for the for loop
         :return:
         """
+        view_id_list = self.g_cy.get_views()
+        view1 = self.g_cy.get_view(view_id_list[0], format='view')
+
         restart = False
         for kx, time in enumerate(sequence):
+
             # Check if stop node is selected
-            stop_state = button_state(self.view1.get_node_views_as_dict()[self.node_name2id['Stop']]['NODE_SELECTED'])
+            stop_state = button_state(view1.get_node_views_as_dict()[self.node_name2id['Stop']]['NODE_SELECTED'])
             restart_state1 = False
             # If the stop node is selected, the loop continues until the play or the restart buttons are selected
             while stop_state:
                 tm.sleep(1)
                 play_state = button_state(
-                    self.view1.get_node_views_as_dict()[self.node_name2id['Play']]['NODE_SELECTED'])
+                    view1.get_node_views_as_dict()[self.node_name2id['Play']]['NODE_SELECTED'])
                 restart_state1 = button_state(
-                    self.view1.get_node_views_as_dict()[self.node_name2id['Restart']]['NODE_SELECTED'])
+                    view1.get_node_views_as_dict()[self.node_name2id['Restart']]['NODE_SELECTED'])
                 if play_state or restart_state1:
                     break
             # Restarts for loop is restart node is selected
             if restart_state1:
-                self.view1.update_node_views(visual_property='NODE_SELECTED',
-                                             values={self.node_name2id['Restart']: False})
+                view1.update_node_views(visual_property='NODE_SELECTED',
+                                        values={self.node_name2id['Restart']: False})
 
                 restart = True
                 break
@@ -239,10 +285,10 @@ class FluxVisualization:
             self.update_network(edge_color=edges_color, edge_size=edges_size, time_stamp=time_stamp)
             tm.sleep(0.5)
             restart_state2 = button_state(
-                self.view1.get_node_views_as_dict()[self.node_name2id['Restart']]['NODE_SELECTED'])
+                view1.get_node_views_as_dict()[self.node_name2id['Restart']]['NODE_SELECTED'])
             if restart_state2:
-                self.view1.update_node_views(visual_property='NODE_SELECTED',
-                                             values={self.node_name2id['Restart']: False})
+                view1.update_node_views(visual_property='NODE_SELECTED',
+                                        values={self.node_name2id['Restart']: False})
 
                 restart = True
                 break
@@ -334,13 +380,13 @@ class FluxVisualization:
             if len([s for s in ic_species if s.is_equivalent_to(cp)]):
                 color = "#aaffff"
             self.sp_graph.add_node(species_node, attr_dict={'label': parse_name(self.model.species[i]),
-                                                            'font-size': 35,
+                                                            'font-size': 18,
                                                             'shape': "ROUND_RECTANGLE",
                                                             'background-color': color})
         for i, reaction in enumerate(self.model.reactions_bidirectional):
             reaction_node = 'r%d' % i
             self.sp_graph.add_node(reaction_node, attr_dict={'label': reaction_node,
-                                                             'font-size': 35,
+                                                             'font-size': 18,
                                                              'shape': "ROUND_RECTANGLE",
                                                              'background-color': "#D3D3D3"})
             reactants = set(reaction['reactants'])
@@ -374,7 +420,7 @@ class FluxVisualization:
                                    {'label': parse_name(self.model.species[idx]),
                                     'background-color': "#ccffcc",
                                     'shape': "ROUND_RECTANGLE",
-                                    'font-size': 35})
+                                    'font-size': 18})
 
         for reaction in self.model.reactions_bidirectional:
             reactants = set(reaction['reactants'])
@@ -460,29 +506,30 @@ class FluxVisualization:
         :return: Sets up Cytoscape graph from Networkx attributes
         """
         pos = nx.drawing.nx_agraph.pygraphviz_layout(g, prog='dot', args="-Grankdir=LR")
-        g_cy = cy.network.create_from_networkx(g)
+        self.g_cy = cy.network.create_from_networkx(g)
         if flux:
-            g_cy.add_node('t')
-            g_cy.add_node('Play')
-            g_cy.add_node('Stop')
-            g_cy.add_node('Restart')
+            self.g_cy.add_node('t')
+            self.g_cy.add_node('Play')
+            self.g_cy.add_node('Stop')
+            self.g_cy.add_node('Restart')
 
-        view_id_list = g_cy.get_views()
-        self.view1 = g_cy.get_view(view_id_list[0], format='view')
+        view_id_list = self.g_cy.get_views()
+        view1 = self.g_cy.get_view(view_id_list[0], format='view')
 
         # Visual style
         minimal_style = cy.style.create('PySB')
         node_defaults = {'NODE_BORDER_WIDTH': 0}
         minimal_style.update_defaults(node_defaults)
-        cy.style.apply(style=minimal_style, network=g_cy)
+        cy.style.apply(style=minimal_style, network=self.g_cy)
 
-        self.node_name2id = util.name2suid(g_cy, 'node')
-        self.edge_name2id = util.name2suid(g_cy, 'edge')
+        self.node_name2id = util.name2suid(self.g_cy, 'node')
+        self.edge_name2id = util.name2suid(self.g_cy, 'edge')
 
         node_x_values = {self.node_name2id[i]: pos[i][0] for i in pos}
         node_y_values = {self.node_name2id[i]: pos[i][1] for i in pos}
 
         node_shape = {self.node_name2id[i[0]]: i[1]['shape'] for i in g.nodes(data=True)}
+        node_fontsize = {self.node_name2id[i[0]]: i[1]['font-size'] for i in g.nodes(data=True)}
         node_label_values = {self.node_name2id[i[0]]: i[1]['label'] for i in g.nodes(data=True)}
         node_color_values = {self.node_name2id[i[0]]: i[1]['background-color'] for i in g.nodes(data=True)}
         edge_source_arrow_head = {self.edge_name2id[str(i[0]) + ',' + str(i[1])]: i[2]['source-arrow-shape'] for i in
@@ -490,62 +537,60 @@ class FluxVisualization:
         edge_target_arrow_head = {self.edge_name2id[str(i[0]) + ',' + str(i[1])]: i[2]['target-arrow-shape'] for i in
                                   g.edges(data=True)}
 
-        font = ImageFont.truetype('LiberationMono-Regular.ttf', 12)
+        font = ImageFont.truetype('LiberationMono-Regular.ttf', 18)
         node_width_values = {suid: font.getsize(label)[0] for suid, label in node_label_values.items()}
         node_height_values = {suid: font.getsize(label)[1] for suid, label in node_label_values.items()}
 
-        # Setting up network layout
-        self.view1.update_network_view(visual_property='NETWORK_CENTER_X_LOCATION', value=500)
-        self.view1.update_network_view(visual_property='NETWORK_CENTER_Y_LOCATION', value=0)
-        self.view1.update_network_view(visual_property='NETWORK_SCALE_FACTOR', value=1)
-
         # Setting up node locations
-        self.view1.update_node_views(visual_property='NODE_X_LOCATION', values=node_x_values)
-        self.view1.update_node_views(visual_property='NODE_Y_LOCATION', values=node_y_values)
+        view1.update_node_views(visual_property='NODE_X_LOCATION', values=node_x_values)
+        view1.update_node_views(visual_property='NODE_Y_LOCATION', values=node_y_values)
 
         # Setting up node properties
-        self.view1.update_node_views(visual_property='NODE_LABEL', values=node_label_values)
-        self.view1.update_node_views(visual_property='NODE_FILL_COLOR', values=node_color_values)
-        self.view1.update_node_views(visual_property='NODE_SHAPE', values=node_shape)
-        self.view1.update_node_views(visual_property='NODE_WIDTH', values=node_width_values)
-        self.view1.update_node_views(visual_property='NODE_HEIGHT', values=node_height_values)
+        view1.update_node_views(visual_property='NODE_LABEL', values=node_label_values)
+        view1.update_node_views(visual_property='NODE_FILL_COLOR', values=node_color_values)
+        view1.update_node_views(visual_property='NODE_SHAPE', values=node_shape)
+        view1.update_node_views(visual_property='NODE_LABEL_FONT_SIZE', values=node_fontsize)
+        view1.update_node_views(visual_property='NODE_WIDTH', values=node_width_values)
+        view1.update_node_views(visual_property='NODE_HEIGHT', values=node_height_values)
 
         # Setting up edge properties
-        self.view1.update_edge_views(visual_property='EDGE_SOURCE_ARROW_SHAPE', values=edge_source_arrow_head)
-        self.view1.update_edge_views(visual_property='EDGE_TARGET_ARROW_SHAPE', values=edge_target_arrow_head)
+        view1.update_edge_views(visual_property='EDGE_SOURCE_ARROW_SHAPE', values=edge_source_arrow_head)
+        view1.update_edge_views(visual_property='EDGE_TARGET_ARROW_SHAPE', values=edge_target_arrow_head)
 
         if flux:
             # Setting up the time, play and stop node (location, fontsize, node size)
-            self.view1.update_node_views(visual_property='NODE_X_LOCATION',
-                                         values={self.node_name2id['t']: 50, self.node_name2id['Play']: 200,
-                                                 self.node_name2id['Stop']: 300, self.node_name2id['Restart']: 420})
-            self.view1.update_node_views(visual_property='NODE_Y_LOCATION',
-                                         values={self.node_name2id['t']: 0, self.node_name2id['Play']: 0,
-                                                 self.node_name2id['Stop']: 0, self.node_name2id['Restart']: 0})
-            self.view1.update_node_views(visual_property='NODE_LABEL_FONT_SIZE',
-                                         values={self.node_name2id['t']: 30, self.node_name2id['Play']: 30,
-                                                 self.node_name2id['Stop']: 30, self.node_name2id['Restart']: 30})
-            self.view1.update_node_views(visual_property='NODE_TRANSPARENCY',
-                                         values={self.node_name2id['t']: 0})
-            self.view1.update_node_views(visual_property='NODE_BORDER_WIDTH',
-                                         values={self.node_name2id['Play']: 1, self.node_name2id['Stop']: 1,
-                                                 self.node_name2id['Restart']: 1})
-            self.view1.update_node_views(visual_property='NODE_LABEL',
-                                         values={self.node_name2id['Play']: 'Play', self.node_name2id['Stop']: 'Stop',
-                                                 self.node_name2id['Restart']: 'Restart'})
-            self.view1.update_node_views(visual_property='NODE_WIDTH',
-                                         values={self.node_name2id['Play']: 70, self.node_name2id['Stop']: 70,
-                                                 self.node_name2id['Restart']: 110})
-            self.view1.update_node_views(visual_property='NODE_HEIGHT',
-                                         values={self.node_name2id['Play']: 70, self.node_name2id['Stop']: 70,
-                                                 self.node_name2id['Restart']: 70})
-            self.view1.update_node_views(visual_property='NODE_FILL_COLOR',
-                                         values={self.node_name2id['Play']: '#ffffff', self.node_name2id['Stop']: '#ffffff',
-                                                 self.node_name2id['Restart']: '#ffffff'})
-            self.view1.update_node_views(visual_property='NODE_SHAPE',
-                                         values={self.node_name2id['Play']: 'ROUND_RECTANGLE',
-                                                 self.node_name2id['Stop']: 'ROUND_RECTANGLE',
-                                                 self.node_name2id['Restart']: 'ROUND_RECTANGLE'})
+            view1.update_node_views(visual_property='NODE_X_LOCATION',
+                                    values={self.node_name2id['t']: 50, self.node_name2id['Play']: 200,
+                                            self.node_name2id['Stop']: 300, self.node_name2id['Restart']: 420})
+            view1.update_node_views(visual_property='NODE_Y_LOCATION',
+                                    values={self.node_name2id['t']: 0, self.node_name2id['Play']: 0,
+                                            self.node_name2id['Stop']: 0, self.node_name2id['Restart']: 0})
+            view1.update_node_views(visual_property='NODE_LABEL_FONT_SIZE',
+                                    values={self.node_name2id['t']: 30, self.node_name2id['Play']: 30,
+                                            self.node_name2id['Stop']: 30, self.node_name2id['Restart']: 30})
+            view1.update_node_views(visual_property='NODE_TRANSPARENCY',
+                                    values={self.node_name2id['t']: 0})
+            view1.update_node_views(visual_property='NODE_BORDER_WIDTH',
+                                    values={self.node_name2id['Play']: 1, self.node_name2id['Stop']: 1,
+                                            self.node_name2id['Restart']: 1})
+            view1.update_node_views(visual_property='NODE_LABEL',
+                                    values={self.node_name2id['Play']: 'Play', self.node_name2id['Stop']: 'Stop',
+                                            self.node_name2id['Restart']: 'Restart'})
+            view1.update_node_views(visual_property='NODE_WIDTH',
+                                    values={self.node_name2id['Play']: 70, self.node_name2id['Stop']: 70,
+                                            self.node_name2id['Restart']: 110})
+            view1.update_node_views(visual_property='NODE_HEIGHT',
+                                    values={self.node_name2id['Play']: 70, self.node_name2id['Stop']: 70,
+                                            self.node_name2id['Restart']: 70})
+            view1.update_node_views(visual_property='NODE_FILL_COLOR',
+                                    values={self.node_name2id['Play']: '#ffffff', self.node_name2id['Stop']: '#ffffff',
+                                            self.node_name2id['Restart']: '#ffffff'})
+            view1.update_node_views(visual_property='NODE_SHAPE',
+                                    values={self.node_name2id['Play']: 'ROUND_RECTANGLE',
+                                            self.node_name2id['Stop']: 'ROUND_RECTANGLE',
+                                            self.node_name2id['Restart']: 'ROUND_RECTANGLE'})
+
+        fit_to_window(self.g_cy)
 
         return
 
@@ -557,17 +602,20 @@ class FluxVisualization:
         :param time_stamp: Dictionary SUID of the node that has the time label
         :return: Updates Cytoscape network with parameter values
         """
-        self.view1.update_edge_views(visual_property='EDGE_WIDTH', values=edge_size)
-        self.view1.update_edge_views(visual_property='EDGE_TOOLTIP', values=edge_size)
-        self.view1.update_edge_views(visual_property='EDGE_STROKE_UNSELECTED_PAINT', values=edge_color)
-        self.view1.update_edge_views(visual_property='EDGE_SOURCE_ARROW_UNSELECTED_PAINT', values=edge_color)
-        self.view1.update_edge_views(visual_property='EDGE_TARGET_ARROW_UNSELECTED_PAINT', values=edge_color)
+        view_id_list = self.g_cy.get_views()
+        view1 = self.g_cy.get_view(view_id_list[0], format='view')
+
+        view1.update_edge_views(visual_property='EDGE_WIDTH', values=edge_size)
+        view1.update_edge_views(visual_property='EDGE_TOOLTIP', values=edge_size)
+        view1.update_edge_views(visual_property='EDGE_STROKE_UNSELECTED_PAINT', values=edge_color)
+        view1.update_edge_views(visual_property='EDGE_SOURCE_ARROW_UNSELECTED_PAINT', values=edge_color)
+        view1.update_edge_views(visual_property='EDGE_TARGET_ARROW_UNSELECTED_PAINT', values=edge_color)
 
         if time_stamp is not None:
-            self.view1.update_node_views(visual_property='NODE_LABEL', values=time_stamp)
+            view1.update_node_views(visual_property='NODE_LABEL', values=time_stamp)
 
 
-def run_visualization(model, tspan, parameters=None, render_type='species', verbose=False):
+def run_visualization(model, tspan=None, parameters=None, render_type='species', verbose=False):
     """
 
     :param render_type:
