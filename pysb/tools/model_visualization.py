@@ -1,7 +1,7 @@
 from __future__ import print_function
 import re
 import numpy
-from pysb.integrate import odesolve
+from pysb.simulator import ScipyOdeSimulator
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 import sympy
@@ -22,10 +22,6 @@ import matplotlib.animation as manimation
 
 plt.ioff()
 
-# Cytoscape session
-cy = CyRestClient()
-cy.session.delete()
-
 
 class OrderedGraph(nx.DiGraph):
     """
@@ -36,6 +32,10 @@ class OrderedGraph(nx.DiGraph):
 
 
 class MidpointNormalize(colors.Normalize):
+    """
+    A class which, when called, can normalize data into the ``[vmin,midpoint,vmax] interval
+    """
+
     def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
         self.midpoint = midpoint
         colors.Normalize.__init__(self, vmin, vmax, clip)
@@ -117,21 +117,22 @@ def sig_apop(t, f, td, ts):
 
 
 def button_state(state):
+    """
+
+    :param state: boolean, state of node (selected or unselected)
+    :return: boolean, return the state of the node
+    """
     return state
 
 
-def get_png(cynetwork, height=600):
-    url = '%sviews/first.png?h=%d' % (cynetwork._CyNetwork__url, height)
-    return requests.get(url).content
-
-
-def fit_to_window(cynetwork):
-    url = cy._CyRestClient__url+'apply/fit/%s' % cynetwork.get_id()
-    return requests.get(url).content
-
-
 class FluxVisualization:
+    """
+    A class to visualize PySB models
+    """
     mach_eps = numpy.finfo(float).eps
+    # Cytoscape session
+    cy = CyRestClient()
+    cy.session.delete()
 
     def __init__(self, model):
         self.model = model
@@ -146,15 +147,15 @@ class FluxVisualization:
         self.node_name2id = None
         self.edge_name2id = None
 
-    def visualize(self, tspan=None, param_values=None, render_type='flux', save_video=True, verbose=False):
+    def visualize(self, tspan=None, param_values=None, render_type='flux', save_video=False, verbose=False):
         """
-
-        :param save_video:
-        :param render_type:
+        Connects to cytoscape and renders model
+        :param save_video: Save video option
+        :param render_type: The type of model rendering, it can be `species`, `reactions`, `flux`
         :param tspan: time span for the simulation
         :param param_values: Parameter values for the model
         :param verbose: Verbose option
-        :return: Connects to cytoscape and renders model
+        :return:
         """
         generate_equations(self.model)
         if render_type == 'reactions':
@@ -171,6 +172,14 @@ class FluxVisualization:
             raise Exception("A rendering type must be chosen: 'reactions', 'species', 'flux'")
 
     def visualize_flux(self, tspan=None, param_values=None, save_video=False, verbose=False):
+        """
+        Updates network using simulation results
+        :param tspan: time span for the simulation
+        :param param_values: Parameter values for the model
+        :param save_video: Save video option
+        :param verbose: Verbose option
+        :return:
+        """
         if verbose:
             print("Solving Simulation")
 
@@ -193,7 +202,7 @@ class FluxVisualization:
         self.param_dict = dict((p.name, param_values[i]) for i, p in enumerate(self.model.parameters))
 
         # Solution of the differential equations
-        self.y = odesolve(self.model, self.tspan, param_values=self.param_dict)
+        self.y = ScipyOdeSimulator.execute(self.model, tspan=self.tspan, param_values=self.param_dict)
 
         if verbose:
             print("Creating graph")
@@ -212,7 +221,14 @@ class FluxVisualization:
             self.restartable_for(self.tspan)
 
     def record_video(self):
+        """
+        Function to record a video from cytoscape frames
+        :return:
+        """
+        # Get views for a network: Cytoscape "may" have multiple views, and that's why it returns list instead of an
+        # object.
         view_id_list = self.g_cy.get_views()
+        # This is a CyNetworkView object
         view1 = self.g_cy.get_view(view_id_list[0], format='view')
 
         FFMpegWriter = manimation.writers['ffmpeg']
@@ -223,7 +239,7 @@ class FluxVisualization:
         self.g_cy.delete_node(self.node_name2id['Restart'])
         with writer.saving(fig, 'my_model.mp4', 200):
             for kx, time in enumerate(self.tspan):
-                network_png = get_png(self.g_cy, height=800)
+                network_png = self.get_png(height=800)
                 img = mpimg.imread(StringIO(network_png), format='stream')
                 imgplot = plt.imshow(img)
                 writer.grab_frame()
@@ -381,13 +397,13 @@ class FluxVisualization:
                 color = "#aaffff"
             self.sp_graph.add_node(species_node, attr_dict={'label': parse_name(self.model.species[i]),
                                                             'font-size': 18,
-                                                            'shape': "ROUND_RECTANGLE",
+                                                            'shape_cy': "ROUND_RECTANGLE",
                                                             'background-color': color})
         for i, reaction in enumerate(self.model.reactions_bidirectional):
             reaction_node = 'r%d' % i
             self.sp_graph.add_node(reaction_node, attr_dict={'label': reaction_node,
                                                              'font-size': 18,
-                                                             'shape': "ROUND_RECTANGLE",
+                                                             'shape_cy': "ROUND_RECTANGLE",
                                                              'background-color': "#D3D3D3"})
             reactants = set(reaction['reactants'])
             products = set(reaction['products'])
@@ -419,7 +435,7 @@ class FluxVisualization:
             self.sp_graph.add_node(species_node,
                                    {'label': parse_name(self.model.species[idx]),
                                     'background-color': "#ccffcc",
-                                    'shape': "ROUND_RECTANGLE",
+                                    'shape_cy': "ROUND_RECTANGLE",
                                     'font-size': 18})
 
         for reaction in self.model.reactions_bidirectional:
@@ -506,7 +522,7 @@ class FluxVisualization:
         :return: Sets up Cytoscape graph from Networkx attributes
         """
         pos = nx.drawing.nx_agraph.pygraphviz_layout(g, prog='dot', args="-Grankdir=LR")
-        self.g_cy = cy.network.create_from_networkx(g)
+        self.g_cy = self.cy.network.create_from_networkx(g)
         if flux:
             self.g_cy.add_node('t')
             self.g_cy.add_node('Play')
@@ -517,10 +533,10 @@ class FluxVisualization:
         view1 = self.g_cy.get_view(view_id_list[0], format='view')
 
         # Visual style
-        minimal_style = cy.style.create('PySB')
+        minimal_style = self.cy.style.create('PySB')
         node_defaults = {'NODE_BORDER_WIDTH': 0}
         minimal_style.update_defaults(node_defaults)
-        cy.style.apply(style=minimal_style, network=self.g_cy)
+        self.cy.style.apply(style=minimal_style, network=self.g_cy)
 
         self.node_name2id = util.name2suid(self.g_cy, 'node')
         self.edge_name2id = util.name2suid(self.g_cy, 'edge')
@@ -528,7 +544,7 @@ class FluxVisualization:
         node_x_values = {self.node_name2id[i]: pos[i][0] for i in pos}
         node_y_values = {self.node_name2id[i]: pos[i][1] for i in pos}
 
-        node_shape = {self.node_name2id[i[0]]: i[1]['shape'] for i in g.nodes(data=True)}
+        node_shape = {self.node_name2id[i[0]]: i[1]['shape_cy'] for i in g.nodes(data=True)}
         node_fontsize = {self.node_name2id[i[0]]: i[1]['font-size'] for i in g.nodes(data=True)}
         node_label_values = {self.node_name2id[i[0]]: i[1]['label'] for i in g.nodes(data=True)}
         node_color_values = {self.node_name2id[i[0]]: i[1]['background-color'] for i in g.nodes(data=True)}
@@ -559,9 +575,10 @@ class FluxVisualization:
 
         if flux:
             # Setting up the time, play and stop node (location, fontsize, node size)
+            # TODO set the nodes automatically depending on the network size
             view1.update_node_views(visual_property='NODE_X_LOCATION',
-                                    values={self.node_name2id['t']: 50, self.node_name2id['Play']: 200,
-                                            self.node_name2id['Stop']: 300, self.node_name2id['Restart']: 420})
+                                    values={self.node_name2id['t']: 100, self.node_name2id['Play']: 250,
+                                            self.node_name2id['Stop']: 350, self.node_name2id['Restart']: 470})
             view1.update_node_views(visual_property='NODE_Y_LOCATION',
                                     values={self.node_name2id['t']: 0, self.node_name2id['Play']: 0,
                                             self.node_name2id['Stop']: 0, self.node_name2id['Restart']: 0})
@@ -590,7 +607,7 @@ class FluxVisualization:
                                             self.node_name2id['Stop']: 'ROUND_RECTANGLE',
                                             self.node_name2id['Restart']: 'ROUND_RECTANGLE'})
 
-        fit_to_window(self.g_cy)
+        self.fit_to_window()
 
         return
 
@@ -614,10 +631,19 @@ class FluxVisualization:
         if time_stamp is not None:
             view1.update_node_views(visual_property='NODE_LABEL', values=time_stamp)
 
+    def get_png(self, height=600):
+        url = '%sviews/first.png?h=%d' % (self.g_cy._CyNetwork__url, height)
+        return requests.get(url).content
 
-def run_visualization(model, tspan=None, parameters=None, render_type='species', verbose=False):
+    def fit_to_window(self):
+        url = self.cy._CyRestClient__url + 'apply/fit/%s' % self.g_cy.get_id()
+        return requests.get(url).content
+
+
+def run_visualization(model, tspan=None, parameters=None, render_type='species', save_video=False, verbose=False):
     """
 
+    :param save_video:
     :param render_type:
     :param model: PySB model to visualize
     :param tspan: Time span of the simulation
@@ -626,4 +652,4 @@ def run_visualization(model, tspan=None, parameters=None, render_type='species',
     :return: Returns flux visualization of the PySB model
     """
     fv = FluxVisualization(model)
-    fv.visualize(tspan=tspan, param_values=parameters, render_type=render_type, verbose=verbose)
+    fv.visualize(tspan=tspan, param_values=parameters, render_type=render_type, save_video=save_video, verbose=verbose)
