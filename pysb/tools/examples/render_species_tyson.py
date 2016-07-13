@@ -1,4 +1,4 @@
-from pysb.tools.render_models_cytoscape import run_render_model
+from pysb.tools.model_visualization import run_visualization
 from pysb.examples.tyson_oscillator import model
 
-run_render_model(model, render_type='species')
+run_visualization(model, render_type='species')
