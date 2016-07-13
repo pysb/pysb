@@ -17,10 +17,9 @@ from pysb.bng import generate_equations
 import requests
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from io import StringIO
+from io import BytesIO
 import matplotlib.animation as manimation
-
-plt.ioff()
+from pysb.simulator.base import SimulatorException
 
 
 class OrderedGraph(nx.DiGraph):
@@ -49,7 +48,7 @@ class MidpointNormalize(colors.Normalize):
 
 def f2hex_edges(fx, vmin=-0.99, vmax=0.99):
     """
-
+    Converts reaction rates values to f2hex colors
     :param fx: Vector of reaction rates (flux)
     :param vmin: Value of minimum for normalization
     :param vmax: Value of maximum for normalization
@@ -66,7 +65,7 @@ def f2hex_edges(fx, vmin=-0.99, vmax=0.99):
 
 def f2hex_nodes(fx, vmin, vmax, midpoint):
     """
-
+    Converts concentrations values to f2hex colors
     :param fx: Vector of species concentration
     :param vmin: Value of minimum for normalization
     :param vmax: Value of maximum for normalization
@@ -84,7 +83,7 @@ def f2hex_nodes(fx, vmin, vmax, midpoint):
 
 def magnitude(x):
     """
-
+    Get magnitude of the input
     :param x: Vector of numbers
     :return: Magnitude of numbers
     """
@@ -93,7 +92,7 @@ def magnitude(x):
 
 def range_normalization(x, min_x, max_x, a=0.1, b=15):
     """
-
+    Normalized vector to the [0.1,15] range
     :param x: Vector of numbers to be normalized
     :param min_x: Minimum value in vector x
     :param max_x: Maximum value in vector x
@@ -118,7 +117,7 @@ def sig_apop(t, f, td, ts):
 
 def button_state(state):
     """
-
+    Gets state of the node (selected or not)
     :param state: boolean, state of node (selected or unselected)
     :return: boolean, return the state of the node
     """
@@ -129,6 +128,8 @@ class FluxVisualization:
     """
     A class to visualize PySB models
     """
+    # Turn matplotlib interactive mode off
+    plt.ioff()
     mach_eps = numpy.finfo(float).eps
     # Cytoscape session
     cy = CyRestClient()
@@ -169,7 +170,7 @@ class FluxVisualization:
             self.networkx2cytoscape_setup(self.sp_graph, flux=True)
             self.visualize_flux(tspan=tspan, param_values=param_values, save_video=save_video, verbose=verbose)
         else:
-            raise Exception("A rendering type must be chosen: 'reactions', 'species', 'flux'")
+            raise ValueError("A rendering type must be chosen: 'reactions', 'species', 'flux'")
 
     def visualize_flux(self, tspan=None, param_values=None, save_video=False, verbose=False):
         """
@@ -186,7 +187,7 @@ class FluxVisualization:
         if tspan is not None:
             self.tspan = tspan
         elif self.tspan is None:
-            raise Exception("'tspan' must be defined.")
+            raise SimulatorException("'tspan' must be defined.")
 
         if param_values is not None:
             # accept vector of parameter values as an argument
@@ -240,7 +241,7 @@ class FluxVisualization:
         with writer.saving(fig, 'my_model.mp4', 200):
             for kx, time in enumerate(self.tspan):
                 network_png = self.get_png(height=800)
-                img = mpimg.imread(StringIO(network_png), format='stream')
+                img = mpimg.imread(BytesIO(network_png), format='stream')
                 imgplot = plt.imshow(img)
                 writer.grab_frame()
                 # Check if stop node is selected
@@ -265,7 +266,7 @@ class FluxVisualization:
 
     def restartable_for(self, sequence):
         """
-
+        Restartable for loop
         :param sequence: Iterable for the for loop
         :return:
         """
@@ -313,7 +314,7 @@ class FluxVisualization:
 
     def edges_colors_sizes(self, y):
         """
-
+        Converts reaction rates values to colors and sizes for the edges
         :param y: Solution of the differential equations (from odesolve)
         :return: Returns a pandas data frame where each row is an edge and each column a time point, with the color value
         """
@@ -365,7 +366,7 @@ class FluxVisualization:
 
     def nodes_colors(self, y):
         """
-
+        Converts concentration values to colors to be used in the nodes
         :param y: Solution of the differential equations (from odesolve)
         :return: Returns a pandas data frame where each row is a node and each column a time point, with the color value
         """
@@ -384,7 +385,7 @@ class FluxVisualization:
 
     def reactions_graph(self):
         """
-
+        Creates a reation graph
         :return: Creates Networkx graph from PySB model
         """
         self.sp_graph = OrderedGraph()
@@ -424,7 +425,7 @@ class FluxVisualization:
 
     def species_graph(self):
         """
-
+        Creates a species graph
         :return: Creates Networkx graph from PySB model
         """
 
@@ -451,7 +452,7 @@ class FluxVisualization:
 
     def _r_link_reactions(self, s, r, **attrs):
         """
-
+        Links two nodes in a reactions graph
         :param s: Source node
         :param r: Target node
         :param attrs: Other attribues for edge
@@ -467,7 +468,7 @@ class FluxVisualization:
 
     def _r_link(self, s, r, **attrs):
         """
-
+        Links two nodes in a species graph
         :param s: Source node
         :param r: Target node
         :param attrs: Other attributes for edge
@@ -483,7 +484,7 @@ class FluxVisualization:
 
     def _change_edge_size(self, edge, size):
         """
-
+        Gets edge and change it to input size
         :param edge: Edge whose size is going to be changed
         :param size: Size assigned to the edge
         :return: Updates edge size
@@ -494,7 +495,7 @@ class FluxVisualization:
 
     def _change_edge_colors(self, edge, color):
         """
-
+        Gets edge and change it to input color
         :param edge: Edge whose color is going to be changed
         :param color: Color assigned to the edge
         :return: Updates edge color
@@ -505,7 +506,7 @@ class FluxVisualization:
 
     def _change_node_colors(self, node, color):
         """
-
+        Gets node and change it to input color
         :param node: Node whose color is going to be changed
         :param color: Color assigned to the node
         :return: Updates node color
@@ -516,7 +517,7 @@ class FluxVisualization:
 
     def networkx2cytoscape_setup(self, g, flux):
         """
-
+        Sets up cytoscape
         :param flux:
         :param g: Networkx graph
         :return: Sets up Cytoscape graph from Networkx attributes
@@ -613,7 +614,7 @@ class FluxVisualization:
 
     def update_network(self, edge_color, edge_size, time_stamp=None):
         """
-
+        Update cytoscape graph with input edge_color and edge_size
         :param edge_color: Dictionary where the keys are SUIDs and values are the colors assigned to edges at each time point
         :param edge_size: Dictionary where the keys are SUIDs and values are the sizes assigned to edges at each time point
         :param time_stamp: Dictionary SUID of the node that has the time label
@@ -632,24 +633,26 @@ class FluxVisualization:
             view1.update_node_views(visual_property='NODE_LABEL', values=time_stamp)
 
     def get_png(self, height=600):
+        """Gets png image of cytoscape network"""
         url = '%sviews/first.png?h=%d' % (self.g_cy._CyNetwork__url, height)
         return requests.get(url).content
 
     def fit_to_window(self):
+        """Fits cytoscape network to window's size"""
         url = self.cy._CyRestClient__url + 'apply/fit/%s' % self.g_cy.get_id()
         return requests.get(url).content
 
 
 def run_visualization(model, tspan=None, parameters=None, render_type='species', save_video=False, verbose=False):
     """
-
+    Run the visualization
     :param save_video:
     :param render_type:
     :param model: PySB model to visualize
     :param tspan: Time span of the simulation
     :param parameters: Model parameter values
     :param verbose: Verbose
-    :return: Returns flux visualization of the PySB model
+    :return: flux visualization of the PySB model
     """
     fv = FluxVisualization(model)
     fv.visualize(tspan=tspan, param_values=parameters, render_type=render_type, save_video=save_video, verbose=verbose)
