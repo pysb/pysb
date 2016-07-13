@@ -175,3 +175,23 @@ def test_run_ssa():
 def test_nonexistent_integrator():
     """Ensure nonexistent integrator raises."""
     Solver(robertson.model, np.linspace(0, 1, 2), integrator='does_not_exist')
+
+def test_initialize_tspan():
+    """Test setting the time span for simulation in constructor."""
+    ts = np.linspace(0, 10, 10)
+    sol = Solver(robertson.model, ts)
+    assert len(ts) == sol.y.shape[0]
+    assert len(ts) == sol.yobs.shape[0]
+    assert len(ts) == sol.yexpr.shape[0]
+
+def test_set_tspan():
+    """Test setting the time span for simulation."""
+    ts1 = np.linspace(0, 10, 10)
+    ts2 = np.linspace(0, 10, 100)
+    sol = Solver(robertson.model, ts1)
+    sol.set_tspan(ts2)
+    assert len(ts2) == sol.y.shape[0]
+    assert len(ts2) == sol.yobs.shape[0]
+    assert len(ts2) == sol.yexpr.shape[0]
+    # Smoke test to make sure solver runs
+    sol.run()
