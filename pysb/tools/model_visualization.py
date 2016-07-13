@@ -17,7 +17,7 @@ from pysb.bng import generate_equations
 import requests
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from StringIO import StringIO
+from io import StringIO
 import matplotlib.animation as manimation
 
 plt.ioff()
