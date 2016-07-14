@@ -23,7 +23,7 @@ except ImportError, e:
     pass
 
 read_csv = pandas.read_csv
-
+readfile = np.fromfile
 _cupsoda_path = None
 
 # Putting this here because the cupSODA class may be generalized in the future
@@ -603,6 +603,7 @@ class CupSodaSolver(Simulator):
         with open(os.path.join(cupsoda_files, "time_max"), 'wb') as time_max:
             time_max.write(str(float(self.tspan[-1])))
 
+    @profile
     def _get_y(self, prefix=None):
         """Read simulation results from output files.
 
@@ -642,23 +643,27 @@ class CupSodaSolver(Simulator):
         self.tout = np.array(self.tout)
         self._y = np.asarray(self._y)  # TODO: Why asarray() and not array()
 
+
     def _optimize_loading_data(self, filename):
         """ calculates the fastest method to load in data
         If the file is large, generally pandas is faster. Significant difference.
 
         :param filename:
-        :return:
+        :return: fastest method
         """
+
         start_time = time.time()
         self._load_with_pandas(0, filename)
         end_time = time.time()
         method_1 = end_time - start_time
+
         start_time = time.time()
         self._load_with_open_file(0, filename)
         end_time = time.time()
         method_2 = end_time - start_time
+
         if method_1 > method_2:
-            return 'read_file'
+            return 'readfile'
         else:
             return 'pandas'
 
@@ -679,13 +684,13 @@ class CupSodaSolver(Simulator):
         :return:
         """
         with open(filename, 'rb') as f:
-            for i in range(len(self._y[index])):
-                data = f.readline().split()
-                self.tout[index][i] = data[0]
-                # exclude first column (time)
-                self._y[index][i, self.out_species] = data[1:]
+            data = [line.rstrip('\n').split() for line in f]
+        data = np.array(data, dtype=np.float, copy=False)
+        self.tout[index] = data[:, 0]
         if self.options['vol']:
-            self._y[index][:, :] *= self.options['vol'] * N_A
+            self._y[index][:, self.out_species] = data[:, 1:] * self.options['vol'] * N_A
+        else:
+            self._y[index][:, self.out_species] = data[:, 1:]
 
     def _calc_yobs_yexpr(self, param_values=None):
         super(CupSodaSolver, self)._calc_yobs_yexpr()
