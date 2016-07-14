@@ -454,11 +454,11 @@ class CupSodaSolver(Simulator):
         self._cupsoda_time = cupsoda_time
 
         end_time = time.time()
-        total_time = end_time - start_time
+        self._total_time = end_time - start_time
         if debug:
             print("cupSODA = %4.4f" % cupsoda_time)
             print("Total time = %4.4f " % (end_time - start_time))
-            print("Total - cupSODA = %4.4f" % (total_time - cupsoda_time))
+            print("Total - cupSODA = %4.4f" % (self._total_time - cupsoda_time))
 
         # Load concentration data if requested
         if self.options.get('load_ydata'):
