@@ -603,7 +603,6 @@ class CupSodaSolver(Simulator):
         with open(os.path.join(cupsoda_files, "time_max"), 'wb') as time_max:
             time_max.write(str(float(self.tspan[-1])))
 
-    @profile
     def _get_y(self, prefix=None):
         """Read simulation results from output files.
 
@@ -642,7 +641,6 @@ class CupSodaSolver(Simulator):
 
         self.tout = np.array(self.tout)
         self._y = np.asarray(self._y)  # TODO: Why asarray() and not array()
-
 
     def _optimize_loading_data(self, filename):
         """ calculates the fastest method to load in data
