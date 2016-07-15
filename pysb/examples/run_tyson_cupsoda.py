@@ -1,7 +1,8 @@
-from pysb.examples.tyson_oscillator import model
-from pysb.simulators.cupsoda import CupSodaSolver
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
+from pysb.examples.tyson_oscillator import model
+from pysb.simulator.cupsoda import CupSodaSolver
 
 tspan = np.linspace(0, 500, 501)
 
