@@ -399,11 +399,11 @@ class CupSodaSolver(Simulator):
                 if not str(self.model.species[i]) == '__source()':
                     reactants += 1
             rate_order.append(reactants)
-        # output = 0.01 * len(param_values)
-        # output = int(output) if output > 1 else 1
+#        output = 0.01 * len(param_values)
+#        output = int(output) if output > 1 else 1
         for i in range(len(param_values)):
-            # if self.verbose and i % output == 0:
-            #    print(str(int(round(100. * i / len(param_values)))) + "%")
+#            if self.verbose and i % output == 0:
+#                print(str(int(round(100. * i / len(param_values)))) + "%")
             for j in range(self._len_rxns):
                 if self.options['vol']:
                     rate = 1 * (N_A * self.options['vol']) ** \
@@ -419,8 +419,8 @@ class CupSodaSolver(Simulator):
                         rate *= float(x)
                 c_matrix[i][j] = rate
 
-        # if self.verbose:
-        #    print("100%")
+#        if self.verbose:
+#            print("100%")
 
         # Create cupSODA input files
         self._create_input_files(cupsoda_files, c_matrix, y0)
@@ -694,13 +694,13 @@ class CupSodaSolver(Simulator):
         super(CupSodaSolver, self)._calc_yobs_yexpr()
 
     def get_yfull(self):
-        return super(CupSodaSolver, self).get_yfull()
+        return super(CupSodaSolver, self).concs_all()
 
 
 def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(),
                 prefix=None, verbose=False, **integrator_options):
-    sim = CupSodaSolver(model, verbose=verbose, **integrator_options)
-    sim.run(param_values, y0, tspan, outdir, prefix)
+    sim = CupSodaSolver(model, tspan, verbose=verbose, **integrator_options)
+    sim.run(tspan, param_values, y0, outdir, prefix)
     if sim.options.get('load_ydata'):
         yfull = sim.get_yfull()
         return sim.tout, yfull
