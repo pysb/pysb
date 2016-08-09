@@ -22,6 +22,18 @@ class Simulator(object):
         the simulation is interrupted for some reason, e.g., due to
         satisfaction
         of a logical stopping criterion (see 'tout' below).
+    initials : vector-like or dict, optional
+        Values to use for the initial condition of all species. Ordering is
+        determined by the order of model.species. If not specified, initial
+        conditions will be taken from model.initial_conditions (with
+        initial condition parameter values taken from `param_values` if
+        specified).
+    param_values : vector-like or dict, optional
+        Values to use for every parameter in the model. Ordering is
+        determined by the order of model.parameters.
+        If passed as a dictionary, keys must be parameter names.
+        If not specified, parameter values will be taken directly from
+        model.parameters.
     verbose : bool, optional (default: False)
         Verbose output.
 
@@ -53,17 +65,18 @@ class Simulator(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, model, verbose=False, **kwargs):
+    def __init__(self, model, tspan=None, initials=None,
+                 param_values=None, verbose=False, **kwargs):
         self.model = model
         self.verbose = verbose
         self.tout = None
         self._init_outputs()
         # Per-run initial conditions/parameter/tspan override
-        self.tspan = kwargs.get('tspan', None)
+        self.tspan = tspan
         self._initials = None
-        self.initials = kwargs.get('initials', None)
+        self.initials = initials
         self._params = None
-        self.param_values = kwargs.get('param_values', None)
+        self.param_values = param_values
 
     def _init_outputs(self):
         """

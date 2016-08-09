@@ -43,8 +43,12 @@ class ScipyOdeSimulator(Simulator):
         }
     }
 
-    def __init__(self, model, verbose=False, **kwargs):
+    def __init__(self, model, tspan=None, initials=None, param_values=None,
+                 verbose=False, **kwargs):
         super(ScipyOdeSimulator, self).__init__(model,
+                                                tspan=tspan,
+                                                initials=initials,
+                                                param_values=param_values,
                                                 verbose=verbose,
                                                 **kwargs)
         # We'll need to know if we're using the Jacobian when we get to run()
