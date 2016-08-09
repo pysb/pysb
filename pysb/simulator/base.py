@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import itertools
 import sympy
+import collections
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern
 
 
@@ -101,9 +102,9 @@ class Simulator(object):
         if new_initials is None:
             self._initials = None
         else:
-            # check if y0 is a dict, and if so validate the keys
+            # check if y0 is a Mapping, and if so validate the keys
             # (ComplexPatterns)
-            if isinstance(new_initials, dict):
+            if isinstance(new_initials, collections.Mapping):
                 for cplx_pat, val in new_initials.items():
                     if not isinstance(cplx_pat, (MonomerPattern,
                                                  ComplexPattern)):
@@ -115,10 +116,8 @@ class Simulator(object):
             # accept vector of species amounts as an argument
             elif len(new_initials) != self._y[0].shape[1]:
                 raise ValueError("y0 must be the same length as model.species")
-            elif not isinstance(new_initials, np.ndarray):
-                self._initials = np.array(new_initials)
             else:
-                self._initials = new_initials
+                self._initials = np.array(new_initials, copy=False)
 
     @property
     def initials_list(self):
