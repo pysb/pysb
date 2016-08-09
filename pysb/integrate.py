@@ -74,6 +74,9 @@ class Solver(object):
     def _use_inline(self):
         return ScipyOdeSimulator._use_inline
 
+    @_use_inline.setter
+    def _use_inline(self, use_inline):
+        ScipyOdeSimulator._use_inline = use_inline
 
     @property
     def yobs(self):
