@@ -240,7 +240,7 @@ class ScipyOdeSimulator(Simulator):
     def run(self, tspan=None, param_values=None, initials=None):
         if tspan is not None:
             self.tspan = tspan
-        self._clear_outputs()
+        self._init_outputs()
         self._y = np.ndarray((1, len(self.tspan), len(self.model.species)))
         if param_values is not None:
             self.param_values = param_values

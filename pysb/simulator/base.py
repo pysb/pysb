@@ -57,12 +57,7 @@ class Simulator(object):
         self.model = model
         self.verbose = verbose
         self.tout = None
-        self._y = None
-        self._yobs = None
-        self._yobs_view = None
-        self._yexpr = None
-        self._yexpr_view = None
-        self._yfull = None
+        self._init_outputs()
         # Per-run initial conditions/parameter/tspan override
         self.tspan = kwargs.get('tspan', None)
         self._initials = None
@@ -70,7 +65,7 @@ class Simulator(object):
         self._params = None
         self.param_values = kwargs.get('param_values', None)
 
-    def _clear_outputs(self):
+    def _init_outputs(self):
         """
         Resets simulation output
         """
