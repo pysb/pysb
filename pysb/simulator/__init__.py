@@ -1,1 +1,1 @@
-from scipyode import ScipyOdeSimulator
+from .scipyode import ScipyOdeSimulator
