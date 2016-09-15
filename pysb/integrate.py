@@ -64,11 +64,12 @@ class Solver(object):
     def __init__(self, model, tspan, use_analytic_jacobian=False,
                  integrator='vode', cleanup=True,
                  verbose=False, **integrator_options):
-        self.sim = ScipyOdeSimulator(model, verbose=verbose, tspan=tspan,
+        self._sim = ScipyOdeSimulator(model, verbose=verbose, tspan=tspan,
                                      use_analytic_jacobian=
                                      use_analytic_jacobian,
                                      integrator=integrator, cleanup=cleanup,
                                      **integrator_options)
+        self.result = None
 
     @property
     def _use_inline(self):
@@ -80,11 +81,11 @@ class Solver(object):
 
     @property
     def yobs(self):
-        return self.sim.concs_observables()
+        return self.result.observables if self.result is not None else None
 
     @property
     def y(self):
-        return self.sim.concs_species()
+        return self.result.species if self.result is not None else None
 
     def run(self, param_values=None, y0=None):
         """Perform an integration.
@@ -107,7 +108,7 @@ class Solver(object):
             initial condition parameter values taken from `param_values` if
             specified).
         """
-        self.sim.run(param_values=param_values, initials=y0)
+        self.result = self._sim.run(param_values=param_values, initials=y0)
 
 
 def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
@@ -224,8 +225,8 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     integrator_options['integrator'] = integrator
     sim = ScipyOdeSimulator(model, tspan=tspan, cleanup=cleanup,
                             verbose=verbose, **integrator_options)
-    sim.run(param_values=param_values, initials=y0)
-    return sim.concs_all()
+    simres = sim.run(param_values=param_values, initials=y0)
+    return simres.all
 
 
 def setup_module(module):

@@ -68,27 +68,15 @@ class Simulator(object):
     @abstractmethod
     def __init__(self, model, tspan=None, initials=None,
                  param_values=None, verbose=False, **kwargs):
-        self.model = model
+        self._model = model
         self.verbose = verbose
         self.tout = None
-        self._init_outputs()
         # Per-run initial conditions/parameter/tspan override
         self.tspan = tspan
         self._initials = None
         self.initials = initials
         self._params = None
         self.param_values = param_values
-
-    def _init_outputs(self):
-        """
-        Resets simulation output
-        """
-        self._y = None
-        self._yobs = None
-        self._yobs_view = None
-        self._yexpr = None
-        self._yexpr_view = None
-        self._yfull = None
 
     @property
     def initials(self):
@@ -114,8 +102,9 @@ class Simulator(object):
                                                  repr(cplx_pat))
                 self._initials = new_initials
             # accept vector of species amounts as an argument
-            elif len(new_initials) != self._y[0].shape[1]:
-                raise ValueError("y0 must be the same length as model.species")
+            elif len(new_initials) != len(self._model.species):
+                raise ValueError("new_initials must be the same length as "
+                                 "model.species")
             else:
                 self._initials = np.array(new_initials, copy=False)
 
@@ -130,15 +119,15 @@ class Simulator(object):
             return self._initials
         # Otherwise, build the list from the model, and any overrides
         # specified in the self._initials dictionary
-        y0 = np.zeros((len(self.model.species),))
+        y0 = np.zeros((len(self._model.species),))
         param_vals = self.param_values
         subs = dict((p, param_vals[i]) for i, p in
-                    enumerate(self.model.parameters))
+                    enumerate(self._model.parameters))
 
         def _set_initials(initials_source):
             for cp, value_obj in initials_source:
                 cp = as_complex_pattern(cp)
-                si = self.model.get_species_index(cp)
+                si = self._model.get_species_index(cp)
                 if si is None:
                     raise IndexError("Species not found in model: %s" %
                                      repr(cp))
@@ -147,10 +136,10 @@ class Simulator(object):
                     continue
                 if isinstance(value_obj, (int, float)):
                     value = value_obj
-                elif value_obj in self.model.parameters:
-                    pi = self.model.parameters.index(value_obj)
+                elif value_obj in self._model.parameters:
+                    pi = self._model.parameters.index(value_obj)
                     value = param_vals[pi]
-                elif value_obj in self.model.expressions:
+                elif value_obj in self._model.expressions:
                     value = value_obj.expand_expr().evalf(subs=subs)
                 else:
                     raise ValueError("Unexpected initial condition value type")
@@ -160,7 +149,7 @@ class Simulator(object):
         if isinstance(self._initials, dict):
             _set_initials(self._initials.items())
         # Get remaining initials from the model itself
-        _set_initials(self.model.initial_conditions)
+        _set_initials(self._model.initial_conditions)
 
         return y0
 
@@ -172,10 +161,10 @@ class Simulator(object):
             # create parameter vector from the values in the model
             param_values_dict = self._params if isinstance(self._params,
                                                            dict) else {}
-            param_values = np.array([p.value for p in self.model.parameters])
+            param_values = np.array([p.value for p in self._model.parameters])
             for key in param_values_dict.keys():
                 try:
-                    pi = self.model.parameters.index(self.model.parameters[
+                    pi = self._model.parameters.index(self._model.parameters[
                                                          key])
                 except KeyError:
                     raise IndexError("new_params dictionary has unknown "
@@ -190,13 +179,13 @@ class Simulator(object):
             return
         if isinstance(new_params, dict):
             for k in new_params.keys():
-                if k not in self.model.parameters.keys():
+                if k not in self._model.parameters.keys():
                     raise IndexError("new_params dictionary has unknown "
                                      "parameter name (%s)" % k)
             self._params = new_params
         else:
             # accept vector of parameter values as an argument
-            if len(new_params) != len(self.model.parameters):
+            if len(new_params) != len(self._model.parameters):
                 raise ValueError("new_params must be the same length as "
                                  "model.parameters")
             if isinstance(new_params, np.ndarray):
@@ -204,48 +193,33 @@ class Simulator(object):
             else:
                 self._params = np.array(new_params)
 
-    @classmethod
-    def execute(cls, model, verbose=False, **kwargs):
-        """
-        Convenience method to instantiate a Simulator object, call its run()
-        method, and return a ``yfull`` object of trajectories.
-
-        Parameters
-        ----------
-        model : pysb.Model
-            Model passed to the simulator constructor
-        verbose : bool
-            Print simulator messages to STDOUT
-        **kwargs: dict
-            Keyword arguments for the constructor
-        """
-        simulator = cls(model, verbose=verbose, **kwargs)
-        simulator.run()
-        return simulator.concs_all()
-
     @abstractmethod
     def run(self, tspan=None, param_values=None, initials=None):
         """Run a simulation.
 
-        Returns nothing. Use appropriate methods to retrieve concentrations
-        after simulation.
+        Implementations should return a :class:`.SimulationResult` object.
         """
-        pass
+        return None
 
-    @property
-    def n_sims(self):
-        if self._y is None:
-            return 0
-        else:
-            return len(self._y)
 
-    def _calc_yobs_yexpr(self):
-        """Calculate ``yobs`` and ``yexpr`` based on values of ``y`` obtained
-        in ``run``."""
-        nsims = self.n_sims
-        exprs = self.model.expressions_dynamic()
+class SimulationResult(object):
+    """
+    Contains the results of a simulation, combined with properties and
+    methods to access them.
+    """
+    def __init__(self, simulator, trajectories):
+        self.squeeze = True
+        self.simulator = type(simulator).__name__
+        self.tout = simulator.tout
+        self._y = trajectories
+        self.nsims = len(self._y)
+        self._yfull = None
+        self._model = simulator._model
+
+        # Calculate ``yobs`` and ``yexpr`` based on values of ``y``
+        exprs = self._model.expressions_dynamic()
         expr_names = [expr.name for expr in exprs]
-        model_obs = self.model.observables
+        model_obs = self._model.observables
         obs_names = model_obs.keys()
         yobs_dtype = zip(obs_names, itertools.repeat(float)) if obs_names \
             else float
@@ -253,18 +227,19 @@ class Simulator(object):
             else float
 
         self._yobs = [np.ndarray((len(self.tout[n]),),
-                                 dtype=yobs_dtype) for n in range(nsims)]
+                                 dtype=yobs_dtype) for n in range(self.nsims)]
         self._yobs_view = [self._yobs[n].view(float).
                            reshape(len(self._yobs[n]), -1) for n in range(
-            nsims)]
+            self.nsims)]
         self._yexpr = [np.ndarray((len(self.tout[n]),),
-                                  dtype=yexpr_dtype) for n in range(nsims)]
+                                  dtype=yexpr_dtype) for n in range(
+            self.nsims)]
         self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
-            self._yexpr[n]), -1) for n in range(nsims)]
-        param_values = self.param_values
+            self._yexpr[n]), -1) for n in range(self.nsims)]
+        param_values = simulator.param_values
 
         # loop over simulations
-        for n in range(nsims):
+        for n in range(self.nsims):
             # observables
             for i, obs in enumerate(model_obs):
                 self._yobs_view[n][:, i] = (
@@ -273,29 +248,28 @@ class Simulator(object):
             # expressions
             obs_dict = dict((k, self._yobs[n][k]) for k in obs_names)
             subs = dict((p, param_values[i]) for i, p in
-                        enumerate(self.model.parameters))
+                        enumerate(self._model.parameters))
             for i, expr in enumerate(exprs):
                 expr_subs = expr.expand_expr().subs(subs)
                 func = sympy.lambdify(obs_names, expr_subs, "numpy")
                 self._yexpr_view[n][:, i] = func(**obs_dict)
 
-    def concs_all(self, squeeze=True):
+    @property
+    def all(self):
         """Aggregate species, observables, and expressions trajectories into
         a numpy.ndarray with record-style data-type for return to the user."""
         if self._yfull is None:
-            if self._yobs is None:
-                self._calc_yobs_yexpr()
-            sp_names = ['__s%d' % i for i in range(len(self.model.species))]
+            sp_names = ['__s%d' % i for i in range(len(self._model.species))]
             yfull_dtype = zip(sp_names, itertools.repeat(float))
-            if len(self.model.observables):
-                yfull_dtype += zip(self.model.observables.keys(),
+            if len(self._model.observables):
+                yfull_dtype += zip(self._model.observables.keys(),
                                    itertools.repeat(float))
-            if len(self.model.expressions_dynamic()):
-                yfull_dtype += zip(self.model.expressions_dynamic().keys(),
+            if len(self._model.expressions_dynamic()):
+                yfull_dtype += zip(self._model.expressions_dynamic().keys(),
                                    itertools.repeat(float))
             yfull = len(self._y) * [None]
             # loop over simulations
-            for n in range(self.n_sims):
+            for n in range(self.nsims):
                 yfull[n] = np.ndarray(len(self.tout[n]), yfull_dtype)
                 yfull_view = yfull[n].view(float).reshape((len(yfull[n]), -1))
                 n_sp = self._y[n].shape[1]
@@ -307,30 +281,27 @@ class Simulator(object):
                     self._yexpr_view[n]
             self._yfull = yfull
 
-        if self.n_sims == 1 and squeeze:
+        if self.nsims == 1 and self.squeeze:
             return self._yfull[0]
         return self._yfull
 
-    def concs_species(self, squeeze=True):
-        if self.n_sims == 1 and squeeze:
+    @property
+    def species(self):
+        if self.nsims == 1 and self.squeeze:
             return self._y[0]
         else:
             return self._y
 
-    def concs_observables(self, squeeze=True, tabular=False):
-        if self._yobs is None:
-            self._calc_yobs_yexpr()
-        retval = self._yobs_view if tabular else self._yobs
-        if self.n_sims == 1 and squeeze:
-            return retval[0]
+    @property
+    def observables(self):
+        if self.nsims == 1 and self.squeeze:
+            return self._yobs[0]
         else:
-            return retval
+            return self._yobs
 
-    def concs_expressions(self, squeeze=True, tabular=False):
-        if self._yexpr is None:
-            self._calc_yobs_yexpr()
-        retval = self._yexpr_view if tabular else self._yexpr
-        if self.n_sims == 1 and squeeze:
-            return retval[0]
+    @property
+    def expressions(self):
+        if self.nsims == 1 and self.squeeze:
+            return self._yexpr[0]
         else:
-            return retval
+            return self._yexpr

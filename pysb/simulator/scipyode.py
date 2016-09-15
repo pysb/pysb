@@ -1,4 +1,4 @@
-from pysb.simulator.base import Simulator, SimulatorException
+from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
 import scipy.integrate
 try:
     # weave is not available under Python 3.
@@ -57,20 +57,20 @@ class ScipyOdeSimulator(Simulator):
         self.cleanup = kwargs.get('cleanup', True)
         integrator = kwargs.get('integrator', 'vode')
         # Generate the equations for the model
-        pysb.bng.generate_equations(self.model, self.cleanup, self.verbose)
+        pysb.bng.generate_equations(self._model, self.cleanup, self.verbose)
 
         def eqn_substitutions(eqns):
             """String substitutions on the sympy C code for the ODE RHS and
             Jacobian functions to use appropriate terms for variables and
             parameters."""
             # Substitute expanded parameter formulas for any named expressions
-            for e in self.model.expressions:
+            for e in self._model.expressions:
                 eqns = re.sub(r'\b(%s)\b' % e.name, '(' + sympy.ccode(
                     e.expand_expr()) + ')', eqns)
 
             # Substitute sums of observable species that could've been added
             # by expressions
-            for obs in self.model.observables:
+            for obs in self._model.observables:
                 obs_string = ''
                 for i in range(len(obs.coefficients)):
                     if i > 0:
@@ -88,15 +88,15 @@ class ScipyOdeSimulator(Simulator):
                           eqns)
 
             # Substitute 'p[i]' for any named parameters
-            for i, p in enumerate(self.model.parameters):
+            for i, p in enumerate(self._model.parameters):
                 eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
             return eqns
 
         # ODE RHS -----------------------------------------------
         # Prepare the string representations of the RHS equations
         code_eqs = '\n'.join(['ydot[%d] = %s;' %
-                              (i, sympy.ccode(self.model.odes[i]))
-                              for i in range(len(self.model.odes))])
+                              (i, sympy.ccode(self._model.odes[i]))
+                              for i in range(len(self._model.odes))])
         code_eqs = eqn_substitutions(code_eqs)
 
         self._test_inline()
@@ -108,7 +108,7 @@ class ScipyOdeSimulator(Simulator):
         # be valid Python.  If the equations ever have more complex things
         # in them, this might fail.
         if not self._use_inline:
-            code_eqs_py = compile(code_eqs, '<%s odes>' % self.model.name,
+            code_eqs_py = compile(code_eqs, '<%s odes>' % self._model.name,
                                   'exec')
         else:
             for arr_name in ('ydot', 'y', 'p'):
@@ -132,13 +132,13 @@ class ScipyOdeSimulator(Simulator):
         jac_fn = None
         if self._use_analytic_jacobian:
             species_names = ['__s%d' % i for i in
-                             range(len(self.model.species))]
+                             range(len(self._model.species))]
             jac_matrix = []
             # Rows of jac_matrix are by equation f_i:
             # [[df1/x1, df1/x2, ..., df1/xn],
             #  [   ...                     ],
             #  [dfn/x1, dfn/x2, ..., dfn/xn],
-            for eqn in self.model.odes:
+            for eqn in self._model.odes:
                 # Derivatives for f_i...
                 jac_row = []
                 for species_name in species_names:
@@ -162,7 +162,7 @@ class ScipyOdeSimulator(Simulator):
             # Try to inline the Jacobian if possible (as above for RHS)
             if not self._use_inline:
                 jac_eqs_py = compile(jac_eqs,
-                                     '<%s jacobian>' % self.model.name, 'exec')
+                                     '<%s jacobian>' % self._model.name, 'exec')
             else:
                 # Substitute array refs with calls to the JAC1 macro for inline
                 jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
@@ -187,7 +187,7 @@ class ScipyOdeSimulator(Simulator):
             # jac = self.jac as defined in jacobian() earlier
             # Initialization of matrix for storing the Jacobian
             self.jac = np.zeros(
-                (len(self.model.odes), len(self.model.species)))
+                (len(self._model.odes), len(self._model.species)))
             jac_fn = jacobian
 
         # build integrator options list from our defaults and any kwargs
@@ -200,7 +200,7 @@ class ScipyOdeSimulator(Simulator):
         options.update(kwargs.get('integrator_options', {}))  # overwrite
         # defaults
         self.opts = options
-        self.ydot = np.ndarray(len(self.model.species))
+        self.ydot = np.ndarray(len(self._model.species))
 
         # Integrator
         if integrator == 'lsoda':
@@ -244,20 +244,19 @@ class ScipyOdeSimulator(Simulator):
     def run(self, tspan=None, param_values=None, initials=None):
         if tspan is not None:
             self.tspan = tspan
-        self._init_outputs()
-        self._y = np.ndarray((1, len(self.tspan), len(self.model.species)))
+        if self.tspan is None:
+            raise SimulatorException("tspan must be defined before "
+                                     "simulation can run")
+        trajectories = np.ndarray((1, len(self.tspan),
+                                  len(self._model.species)))
         if param_values is not None:
             self.param_values = param_values
         if initials is not None:
             self.initials = initials
-        if self.tspan is None:
-            SimulatorException("tspan must be defined before simulation can "
-                               "run")
         y0 = self.initials_list
         param_values = self.param_values
         if self.integrator == 'lsoda':
-            print(self.opts)
-            self._y[0] = scipy.integrate.odeint(self.func,
+            trajectories[0] = scipy.integrate.odeint(self.func,
                                                 y0,
                                                 self.tspan,
                                                 Dfun=self.jac_fn,
@@ -271,7 +270,7 @@ class ScipyOdeSimulator(Simulator):
             self.integrator.set_f_params(param_values)
             if self._use_analytic_jacobian:
                 self.integrator.set_jac_params(param_values)
-            self._y[0][0] = y0
+            trajectories[0][0] = y0
             i = 1
             if self.verbose:
                 print("Integrating...")
@@ -280,11 +279,11 @@ class ScipyOdeSimulator(Simulator):
                 print("\t%g" % self.integrator.t)
             while self.integrator.successful() and self.integrator.t < \
                     self.tspan[-1]:
-                self._y[0][i] = self.integrator.integrate(
-                    self.tspan[i])  # integration
+                trajectories[0][i] = self.integrator.integrate(self.tspan[i])
                 i += 1
                 if self.verbose: print("\t%g" % self.integrator.t)
             if self.verbose: print("...Done.")
             if self.integrator.t < self.tspan[-1]:
-                self._y[0, i:, :] = 'nan'
+                trajectories[0, i:, :] = 'nan'
         self.tout = [self.tspan, ]
+        return SimulationResult(self, trajectories)
