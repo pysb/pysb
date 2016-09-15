@@ -4,6 +4,10 @@ import itertools
 import sympy
 import collections
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 
 class SimulatorException(Exception):
@@ -284,6 +288,19 @@ class SimulationResult(object):
         if self.nsims == 1 and self.squeeze:
             return self._yfull[0]
         return self._yfull
+
+    @property
+    def dataframe(self):
+        if pd is None:
+            raise Exception('Please "pip install pandas" for this feature')
+        sim_ids = (np.repeat(range(self.nsims), [len(t) for t in self.tout]))
+        times = np.concatenate(self.tout)
+        idx = pd.MultiIndex.from_tuples(zip(sim_ids, times),
+                                        names=['simulation', 'time'])
+        simdata = self.all
+        if not isinstance(simdata, np.ndarray):
+            simdata = np.concatenate(simdata)
+        return pd.DataFrame(simdata, index=idx)
 
     @property
     def species(self):

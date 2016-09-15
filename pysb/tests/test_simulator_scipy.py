@@ -133,6 +133,9 @@ class TestScipySimulator(object):
         """Test param_values with non-numeric value."""
         self.sim.run(param_values={'ksynthA': 'eggs'})
 
+    def test_result_dataframe(self):
+        df = self.sim.run().dataframe
+
 
 @with_model
 def test_integrate_with_expression():
