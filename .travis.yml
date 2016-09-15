@@ -2,7 +2,7 @@ language: python
 sudo: false
 python:
 - '2.7'
-- '3.4'
+- '3.5'
 addons:
     apt:
         sources:
@@ -11,15 +11,16 @@ addons:
             - ocaml-nox
             - opam
 before_install:
-- wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+- wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    -O miniconda.sh
 - chmod +x miniconda.sh
 - bash miniconda.sh -b -p $HOME/miniconda
-- export PATH="/home/travis/miniconda/bin:$PATH"
+- export PATH="$HOME/miniconda/bin:$PATH"
 - conda update --yes conda
 - conda install --yes python="$TRAVIS_PYTHON_VERSION" numpy scipy matplotlib sympy networkx
-    nose h5py pexpect
+    nose h5py pexpect pandas
 - pip install -i https://pypi.binstar.org/pypi/simple pygraphviz==1.3rc1
-- pip install python-coveralls pandas
+- pip install python-coveralls
 - wget "http://www.csb.pitt.edu/Faculty/Faeder/?smd_process_download=1&download_id=142"
     -O BioNetGen-2.2.6-stable.tar.gz
 - tar xzf BioNetGen-2.2.6-stable.tar.gz
