@@ -1,8 +1,13 @@
-#!python
+﻿#!python
 
 # Script to download and install BioNetGen
 import tempfile
-from six.moves.urllib.request import urlretrieve
+try:
+    # Python 3
+    from urllib.request import urlretrieve
+except ImportError:
+    # Python 2
+    from urllib import urlretrieve
 import tarfile
 import zipfile
 import sys
@@ -56,41 +61,46 @@ def install_bng(target_directory=None, verbose=True):
     if target_directory is None:
         target_directory = _get_default_bng_directory()
 
-    # Check the target directory is writeable now, rather than failing after
-    # download. It's easier just to actually create the directory here, rather
-    # than check if it could be created or already exists.
+    if os.path.exists(target_directory):
+        raise Exception("BioNetGen directory %s already exists,"
+                        "skipping installation" % target_directory)
     os.mkdir(target_directory)
+    tf = None
 
     try:
         # Download BNG
-        with tempfile.NamedTemporaryFile() as tf:
-            reporthook = _print_download_progress if verbose else None
+        reporthook = _print_download_progress if verbose else None
 
-            # Check binary availability for this platform
-            this_os = platform.system()
-            if this_os not in bng_urls.keys():
-                raise Exception("Could not find a BioNetGen binary for your "
-                                "operating system %s. Please install it "
-                                "manually." % this_os)
+        # Check binary availability for this platform
+        this_os = platform.system()
+        if this_os not in bng_urls.keys():
+            raise Exception("Could not find a BioNetGen binary for your "
+                            "operating system: %s. Please install it "
+                            "manually." % this_os)
 
-            urlretrieve(bng_urls[this_os], tf.name, reporthook=reporthook)
+        tf, _ = urlretrieve(bng_urls[this_os], reporthook=reporthook)
 
-            # Extract BNG
-            if verbose:
-                print("\nExtracting BioNetGen to %s..." % target_directory)
-            with _make_temp_directory() as tempdir:
-                if platform.system() == "Windows":
-                    with zipfile.ZipFile.open(mode="r", fileobj=tf) as zf:
-                        zf.extractall(path=tempdir)
-                else:
-                    with tarfile.open(mode="r:gz", fileobj=tf) as tar:
-                        tar.extractall(path=tempdir)
-                os.rmdir(target_directory)
-                shutil.move(os.path.join(tempdir, os.listdir(tempdir)[0]),
-                            target_directory)
+        # Extract BNG
+        if verbose:
+            print("\nExtracting BioNetGen to %s..." % target_directory)
+        with _make_temp_directory() as tempdir:
+            if platform.system() == "Windows":
+                with zipfile.ZipFile(tf, mode="r") as zf:
+                    zf.extractall(path=tempdir)
+            else:
+                with tarfile.open(tf, mode="r:gz") as tar:
+                    tar.extractall(path=tempdir)
+            os.rmdir(target_directory)
+            shutil.move(os.path.join(tempdir, os.listdir(tempdir)[0]),
+                        target_directory)
     except:
         shutil.rmtree(target_directory, ignore_errors=True)
         raise
+    finally:
+        try:
+            os.remove(tf)
+        except:
+            pass
 
     if verbose:
         print("BioNetGen installation complete.")
