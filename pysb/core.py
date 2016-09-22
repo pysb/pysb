@@ -1429,7 +1429,7 @@ class Model(object):
         source_cp = as_complex_pattern(self.monomers['__source']())
         if self.compartments:
             for c in self.compartments:
-                source_cp.compartment = c
+                source_cp = source_cp ** c
                 if not any(source_cp.is_equivalent_to(other_cp) for
                            other_cp, value in self.initial_conditions):
                     self.initial(source_cp, self.parameters['__source_0'])
