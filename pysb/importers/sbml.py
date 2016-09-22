@@ -21,26 +21,40 @@ def sbml_translator(input_file,
                     pathway_commons=False,
                     verbose=False):
     """
-    Runs the BioNetGen sbmlTranslator binary. For more descriptions of
-    the arguments, see the `sbmlTranslator documentation
-    <http://bionetgen.org/index.php/SBML2BNGL>`_.
+    Runs the BioNetGen sbmlTranslator binary.
 
-    :param input_file: SBML input filename
-    :param output_file: BNGL output filename
-    :param convention_file: Conventions filename
-    :param naming_conventions: Naming conventions filename
-    :param user_structures: User structures filename
-    :param molecule_id: Use SBML molecule IDs (True) or names (False).
-           IDs are less descriptive but more BNGL friendly. Use only if the
-           generated BNGL has syntactic errors
-    :param atomize: Atomize the model, i.e. attempt to infer molecular
-           structure and build rules from the model (True) or just
-           perform a flat import (False)
-    :param pathway_commons: Use pathway commons to infer molecule
-           binding. This setting requires an internet connection and will
-           query the pathway commons web service.
-    :param verbose: Print the SBML conversion output to the console if True
-    :return: BNGL output filename
+    For more descriptions of the arguments, see the `sbmlTranslator
+    documentation <http://bionetgen.org/index.php/SBML2BNGL>`_.
+
+    Parameters
+    ----------
+    input_file : string
+        SBML input filename
+    output_file : string, optional
+        BNGL output filename
+    convention_file : string, optional
+        Conventions filename
+    naming_conventions : string, optional
+        Naming conventions filename
+    user_structures : string, optional
+        User structures filename
+    molecule_id : bool, optional
+        Use SBML molecule IDs (True) or names (False).
+        IDs are less descriptive but more BNGL friendly. Use only if the
+        generated BNGL has syntactic errors
+    atomize : bool, optional
+        Atomize the model, i.e. attempt to infer molecular structure and
+        build rules from the model (True) or just perform a flat import (False)
+        pathway_commons: Use pathway commons to infer molecule binding. This
+        setting requires an internet connection and will query the pathway
+        commons web service.
+    verbose : bool, optional
+        Print the SBML conversion output to the console if True
+
+    Returns
+    -------
+    string
+        BNGL output filename
     """
     sbmltrans_bin = os.path.join(os.path.dirname(_get_bng_path()),
                                  'bin/sbmlTranslator')

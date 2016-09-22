@@ -21,8 +21,9 @@ class BnglImportError(Exception):
 
 class BnglBuilder(Builder):
     """
-    Class for assembling a Model from a .bngl file. See
-    :py:func:`model_from_bngl` for further details.
+    Assemble a Model from a .bngl file.
+
+    See :py:func:`model_from_bngl` for further details.
     """
     def __init__(self, filename):
         super(BnglBuilder, self).__init__()
@@ -144,8 +145,7 @@ class BnglBuilder(Builder):
             cplx_pats = []
             for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
                 match_once = mp.get('matchOnce')
-                match_once = 1 if match_once is not None \
-                    and match_once == "1" else 0
+                match_once = 1 if match_once == "1" else 0
                 cplx_pats.append(ComplexPattern(self._parse_species(mp),
                                                 compartment=None,
                                                 match_once=match_once))
@@ -292,8 +292,7 @@ class BnglBuilder(Builder):
 
 def model_from_bngl(filename):
     """
-    Convert a BioNetGen .bngl model definition file into a PySB Model
-    object, using the BioNetGen XML format as an intermediary.
+    Convert a BioNetGen .bngl model file into a PySB Model.
 
     Limitations
     -----------
