@@ -74,20 +74,17 @@ class BnglBuilder(Builder):
                 bonds = comp.get('numberOfBonds')
                 if bonds == "0":
                     mon_states[state_nm] = None
-                elif bonds == "1":
-                    bond_list = bond_ids[comp.get('id')]
-                    assert int(bonds) == len(bond_list)
-                    mon_states[state_nm] = bond_list[0]
                 elif bonds == "?":
                     mon_states[state_nm] = WILD
                 elif bonds == "+":
                     mon_states[state_nm] = ANY
                 else:
-                    raise BnglImportError('Bond %s on monomer %s has '
-                                          'unknown/unsupported number '
-                                          'of bonds: %s ' % (state_nm,
-                                                             mon_name,
-                                                             bonds))
+                    bond_list = bond_ids[comp.get('id')]
+                    assert int(bonds) == len(bond_list)
+                    if len(bond_list) == 1:
+                        mon_states[state_nm] = bond_list[0]
+                    else:
+                        mon_states[state_nm] = bond_list
                 state = comp.get('state')
                 if state:
                     if mon_states[state_nm]:
@@ -306,8 +303,6 @@ def model_from_bngl(filename):
       ``M(l,l)`` will cause an error.
     * Files using BNG's custom rate law functions, such as ``MM`` and
       ``Sat`` will cause an error.
-    * Files with multiple bonds at the same site, such as ``M(l!1!2)`` will
-      cause an error.
 
     Parameters
     ----------

@@ -69,6 +69,8 @@ def test_bngl_import_expected_passes():
                      'gene_expr_simple',
                      'isomerization',
                      'michment',
+                     'Motivating_example',
+                     'Motivating_example_cBNGL',
                      'motor',
                      'simple_system',
                      'test_compartment_XML',
@@ -89,13 +91,10 @@ def test_bngl_import_expected_errors():
     errtype = {'localfn': 'Function \w* is local',
                'ratelawtype': 'Rate law \w* has unknown type',
                'ratelawmissing': 'Rate law missing for rule',
-               'numbonds': 'unsupported number of bonds',
                'dupsites': 'Molecule \w* has multiple sites with the same name'
               }
     expected_errors = {'ANx': errtype['localfn'],
                        'CaOscillate_Sat': errtype['ratelawtype'],
-                       'Motivating_example': errtype['numbonds'],
-                       'Motivating_example_cBNGL': errtype['numbonds'],
                        'Repressilator': errtype['dupsites'],
                        'blbr': errtype['dupsites'],
                        'fceri_ji': errtype['dupsites'],
