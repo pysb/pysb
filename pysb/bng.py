@@ -102,7 +102,7 @@ class BngBaseInterface(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def __init__(self, model, verbose=False, cleanup=False,
+    def __init__(self, model=None, verbose=False, cleanup=False,
                  output_prefix=None, output_dir=None):
         self._base_file_stem = 'pysb'
         self.verbose = verbose
@@ -111,9 +111,11 @@ class BngBaseInterface(object):
             output_prefix
         if model:
             self.generator = BngGenerator(model)
+            self.model = self.generator.model
             self._check_model()
         else:
             self.generator = None
+            self.model = None
 
         self.base_directory = tempfile.mkdtemp(prefix=self.output_prefix,
                                                dir=output_dir)
@@ -192,15 +194,6 @@ class BngBaseInterface(object):
         return action_args
 
     @property
-    def model(self):
-        """
-        Convenience method to get the PySB model itself
-
-        :return: PySB model used in BNG interface constructor
-        """
-        return self.generator.model if self.generator else None
-
-    @property
     def base_filename(self):
         """
         Returns the base filename (without extension) for BNG output files
@@ -267,7 +260,7 @@ class BngBaseInterface(object):
 
 class BngConsole(BngBaseInterface):
     """ Interact with BioNetGen through BNG Console """
-    def __init__(self, model, verbose=False, cleanup=True,
+    def __init__(self, model=None, verbose=False, cleanup=True,
                  output_dir=None, output_prefix=None, timeout=30,
                  suppress_warnings=False):
         super(BngConsole, self).__init__(model, verbose, cleanup,
@@ -378,7 +371,7 @@ class BngConsole(BngBaseInterface):
 
 
 class BngFileInterface(BngBaseInterface):
-    def __init__(self, model, verbose=False, output_dir=None,
+    def __init__(self, model=None, verbose=False, output_dir=None,
                  output_prefix=None, cleanup=True):
         super(BngFileInterface, self).__init__(model, verbose, cleanup,
                                                output_prefix, output_dir)
