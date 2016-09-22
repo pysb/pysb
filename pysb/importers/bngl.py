@@ -30,10 +30,11 @@ class BnglBuilder(Builder):
         with BngConsole(model=None) as con:
             con.load_bngl(filename)
             con.action('writeXML', evaluate_expressions=0)
-            self.x = xml.etree.ElementTree.parse('%s.xml' %
-                           con.base_filename).getroot().find(_ns('{0}model'))
+            self._x = xml.etree.ElementTree.parse('%s.xml' %
+                                                  con.base_filename)\
+                                           .getroot().find(_ns('{0}model'))
             self._model_env = {}
-        self.parse_bng_xml()
+        self._parse_bng_xml()
 
     def _eval_in_model_env(self, expression):
         """
@@ -97,8 +98,8 @@ class BnglBuilder(Builder):
             mon_pats.append(MonomerPattern(mon_obj, mon_states, mon_cpt))
         return mon_pats
 
-    def parse_monomers(self):
-        for m in self.x.iterfind(_ns('{0}ListOfMoleculeTypes/'
+    def _parse_monomers(self):
+        for m in self._x.iterfind(_ns('{0}ListOfMoleculeTypes/'
                                      '{0}MoleculeType')):
             mon_name = m.get('id')
             sites = []
@@ -123,8 +124,8 @@ class BnglBuilder(Builder):
                 else:
                     raise BnglImportError(str(e))
 
-    def parse_parameters(self):
-        for p in self.x.iterfind(_ns('{0}ListOfParameters/{0}Parameter')):
+    def _parse_parameters(self):
+        for p in self._x.iterfind(_ns('{0}ListOfParameters/{0}Parameter')):
             p_name = p.get('id')
             if p.get('type') == 'Constant':
                 p_value = p.get('value').replace('10^', '1e')
@@ -136,8 +137,8 @@ class BnglBuilder(Builder):
                 raise BnglImportError('Parameter %s has unknown type: %s' %
                                       (p_name, p.get('type')))
 
-    def parse_observables(self):
-        for o in self.x.iterfind(_ns('{0}ListOfObservables/{0}Observable')):
+    def _parse_observables(self):
+        for o in self._x.iterfind(_ns('{0}ListOfObservables/{0}Observable')):
             o_name = o.get('name')
             cplx_pats = []
             for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
@@ -150,8 +151,8 @@ class BnglBuilder(Builder):
                             ReactionPattern(cplx_pats),
                             match=o.get('type').lower())
 
-    def parse_initials(self):
-        for i in self.x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
+    def _parse_initials(self):
+        for i in self._x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
             if i.get('Fixed') is not None and i.get('Fixed') == "1":
                 warnings.warn('Species %s is fixed, but will be treated as '
                               'an ordinary species in PySB.' % i.get('name'))
@@ -177,8 +178,8 @@ class BnglBuilder(Builder):
             species_cpt = self.model.compartments.get(i.get('compartment'))
             self.initial(ComplexPattern(mon_pats, species_cpt), value_param)
 
-    def parse_compartments(self):
-        for c in self.x.iterfind(_ns('{0}ListOfCompartments/{0}compartment')):
+    def _parse_compartments(self):
+        for c in self._x.iterfind(_ns('{0}ListOfCompartments/{0}compartment')):
             cpt_size = None
             if c.get('size'):
                 cpt_size = self.parameter('%s_size' % c.get('id'),
@@ -205,11 +206,11 @@ class BnglBuilder(Builder):
             raise BnglImportError('Rate law %s has unknown type %s' %
                                   (rl.get('id'), rl.get('type')))
 
-    def parse_rules(self):
+    def _parse_rules(self):
         # Store reversible rates for post-processing (we don't know if we'll
         # encounter fwd or rev rule first)
         rev_rates = {}
-        for r in self.x.iterfind(_ns('{0}ListOfReactionRules/'
+        for r in self._x.iterfind(_ns('{0}ListOfReactionRules/'
                                      '{0}ReactionRule')):
             r_name = r.get('name')
 
@@ -268,23 +269,23 @@ class BnglBuilder(Builder):
             rule.is_reversible = True
             rule.rate_reverse = rev_rate
 
-    def parse_expressions(self):
-        for e in self.x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
+    def _parse_expressions(self):
+        for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             if e.find(_ns('{0}ListOfArguments/{0}Argument')) is not None:
                 raise BnglImportError('Function %s is local, which is not '
                                       'supported in PySB' % e.get('id'))
             self.expression(e.get('id'), parse_expr(e.find(_ns(
                 '{0}Expression')).text.replace('^', '**')))
 
-    def parse_bng_xml(self):
-        self.model.name = self.x.get(_ns('id'))
-        self.parse_monomers()
-        self.parse_parameters()
-        self.parse_compartments()
-        self.parse_initials()
-        self.parse_observables()
-        self.parse_expressions()
-        self.parse_rules()
+    def _parse_bng_xml(self):
+        self.model.name = self._x.get(_ns('id'))
+        self._parse_monomers()
+        self._parse_parameters()
+        self._parse_compartments()
+        self._parse_initials()
+        self._parse_observables()
+        self._parse_expressions()
+        self._parse_rules()
 
 
 def model_from_bngl(filename):
