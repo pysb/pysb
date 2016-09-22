@@ -32,8 +32,10 @@ def bngl_import_compare_simulations(bng_file, sim_times=range(0, 100, 10)):
         print(species)
         print(yfull1[species])
         print(yfull2[species])
-        print(numpy.allclose(yfull1[species], yfull2[species]))
-        assert numpy.allclose(yfull1[species], yfull2[species])
+        print(numpy.allclose(yfull1[species], yfull2[species], atol=1e-8,
+                             rtol=1e-8))
+        assert numpy.allclose(yfull1[species], yfull2[species], atol=1e-8,
+                              rtol=1e-8)
 
 
 def _bngl_location(filename):
