@@ -5,14 +5,16 @@ from pysb.importers.bngl import model_from_bngl, BnglImportError
 from pysb.importers.sbml import model_from_sbml
 import numpy
 from nose.tools import assert_raises_regexp
+import warnings
 
 
-def bngl_import_compare_simulations(bng_file, sim_times=range(0, 100, 10)):
+def bngl_import_compare_simulations(bng_file, force=False,
+                                    sim_times=range(0, 100, 10)):
     """
     Test BNGL file import by running an ODE simulation on the imported model
     and on the BNGL file directly to compare trajectories.
     """
-    m = model_from_bngl(bng_file)
+    m = model_from_bngl(bng_file, force=force)
 
     # Simulate using the BNGL file directly
     with BngConsole(model=None, suppress_warnings=True) as bng:
@@ -59,29 +61,37 @@ def _sbml_location(filename):
     return sbml_file
 
 
+def test_bngl_import_expected_passes_with_force():
+    for filename in ('Haugh2b',
+                     'continue',
+                     'gene_expr',
+                     'gene_expr_func',
+                     'Motivating_example',
+                     'Motivating_example_cBNGL',
+                     'test_synthesis_cBNGL_simple',
+                     'test_synthesis_complex',
+                     'test_synthesis_complex_source_cBNGL',
+                     'test_synthesis_simple'
+                     ):
+        full_filename = _bngl_location(filename)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            yield (bngl_import_compare_simulations, full_filename, True)
+
+
 def test_bngl_import_expected_passes():
     for filename in ('CaOscillate_Func',
-                     'Haugh2b',
-                     'continue',
                      'deleteMolecules',
                      'egfr_net',
                      'empty_compartments_block',
-                     'gene_expr',
-                     'gene_expr_func',
                      'gene_expr_simple',
                      'isomerization',
                      'michment',
-                     'Motivating_example',
-                     'Motivating_example_cBNGL',
                      'motor',
                      'simple_system',
                      'test_compartment_XML',
                      'test_setconc',
-                     'test_synthesis_cBNGL_simple',
-                     'test_synthesis_complex',
                      'test_synthesis_complex_0_cBNGL',
-                     'test_synthesis_complex_source_cBNGL',
-                     'test_synthesis_simple',
                      'toy-jim',
                      'univ_synth',
                      'visualize'):

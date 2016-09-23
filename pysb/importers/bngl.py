@@ -25,16 +25,26 @@ class BnglBuilder(Builder):
 
     See :py:func:`model_from_bngl` for further details.
     """
-    def __init__(self, filename):
+    def __init__(self, filename, force=False):
         super(BnglBuilder, self).__init__()
         with BngConsole(model=None) as con:
             con.load_bngl(filename)
             con.action('writeXML', evaluate_expressions=0)
+            self._force = force
             self._x = xml.etree.ElementTree.parse('%s.xml' %
                                                   con.base_filename)\
                                            .getroot().find(_ns('{0}model'))
             self._model_env = {}
         self._parse_bng_xml()
+
+    def _warn_or_except(self, msg):
+        """
+        Raises a warning or Exception, depending of the value of self._force
+        """
+        if self._force:
+            warnings.warn(msg)
+        else:
+            raise BnglImportError(msg)
 
     def _eval_in_model_env(self, expression):
         """
@@ -44,11 +54,12 @@ class BnglBuilder(Builder):
         self._model_env.update(components)
 
         # Quick security check on the expression
-        if not re.match(r'^[\w\s\(\)/\+\-\._\*]*$', expression):
-            raise BnglImportError('Security check on expression "%s" failed' %
-                                  expression)
-
-        return eval(expression, {}, self._model_env)
+        if re.match(r'^[\w\s()/+\-._*]*$', expression):
+            return eval(expression, {}, self._model_env)
+        else:
+            self._warn_or_except('Security check on expression "%s" failed' %
+                                 expression)
+            return None
 
     def _parse_species(self, species_xml):
         # Species may be empty for synthesis/degradation reaction patterns
@@ -100,7 +111,7 @@ class BnglBuilder(Builder):
 
     def _parse_monomers(self):
         for m in self._x.iterfind(_ns('{0}ListOfMoleculeTypes/'
-                                     '{0}MoleculeType')):
+                                      '{0}MoleculeType')):
             mon_name = m.get('id')
             sites = []
             states = {}
@@ -117,10 +128,10 @@ class BnglBuilder(Builder):
                 self.monomer(mon_name, sites, states)
             except Exception as e:
                 if str(e).startswith('Duplicate sites specified'):
-                    raise BnglImportError('Molecule %s has multiple '
-                                          'sites with the same name. '
-                                          'This is not supported in '
-                                          'PySB.' % mon_name)
+                    self._warn_or_except('Molecule %s has multiple '
+                                         'sites with the same name. '
+                                         'This is not supported in PySB.' %
+                                         mon_name)
                 else:
                     raise BnglImportError(str(e))
 
@@ -134,8 +145,8 @@ class BnglBuilder(Builder):
                 self.expression(name=p_name,
                                 expr=self._eval_in_model_env(p.get('value')))
             else:
-                raise BnglImportError('Parameter %s has unknown type: %s' %
-                                      (p_name, p.get('type')))
+                self._warn_or_except('Parameter %s has unknown type: %s' %
+                                     (p_name, p.get('type')))
 
     def _parse_observables(self):
         for o in self._x.iterfind(_ns('{0}ListOfObservables/{0}Observable')):
@@ -154,8 +165,9 @@ class BnglBuilder(Builder):
     def _parse_initials(self):
         for i in self._x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
             if i.get('Fixed') is not None and i.get('Fixed') == "1":
-                warnings.warn('Species %s is fixed, but will be treated as '
-                              'an ordinary species in PySB.' % i.get('name'))
+                self._warn_or_except('Species %s is fixed, but will be '
+                                     'treated as an ordinary species in '
+                                     'PySB.' % i.get('name'))
 
             value_param = i.get('concentration')
             try:
@@ -203,15 +215,16 @@ class BnglBuilder(Builder):
         elif rl.get('type') == 'Function':
             return self.model.expressions[rl.get('name')]
         else:
-            raise BnglImportError('Rate law %s has unknown type %s' %
-                                  (rl.get('id'), rl.get('type')))
+            self._warn_or_except('Rate law %s has unknown type %s' %
+                                 (rl.get('id'), rl.get('type')))
+            return None
 
     def _parse_rules(self):
         # Store reversible rates for post-processing (we don't know if we'll
         # encounter fwd or rev rule first)
         rev_rates = {}
         for r in self._x.iterfind(_ns('{0}ListOfReactionRules/'
-                                     '{0}ReactionRule')):
+                                      '{0}ReactionRule')):
             r_name = r.get('name')
 
             r_rate_xml = r.find(_ns('{}RateLaw'))
@@ -250,14 +263,23 @@ class BnglBuilder(Builder):
                     delete_molecules = True
                     break
 
-            # Give warning if ListOfExcludeReactants or ListOfExcludeProducts
-            # is present
+            # Give warning/error if ListOfExcludeReactants or
+            # ListOfExcludeProducts is present
             if r.find(_ns('{}ListOfExcludeReactants')) is not None or \
                r.find(_ns('{}ListOfExcludeProducts')) is not None:
-                warnings.warn('ListOfExcludeReactants and/or '
-                              'ListOfExcludeProducts declarations will be '
-                              'ignored. This may lead to long network '
-                              'generation times.')
+                self._warn_or_except('ListOfExcludeReactants and/or '
+                                     'ListOfExcludeProducts declarations will '
+                                     'be ignored. This may lead to long '
+                                     'network generation times.')
+
+            # Give warning/error if ListOfIncludeReactants or
+            # ListOfIncludeProducts is present
+            if r.find(_ns('{}ListOfIncludeReactants')) is not None or \
+               r.find(_ns('{}ListOfIncludeProducts')) is not None:
+                self._warn_or_except('ListOfIncludeReactants and/or '
+                                     'ListOfIncludeProducts declarations will '
+                                     'be ignored. This may lead to long '
+                                     'network generation times.')
 
             self.rule(r_name, rule_exp, r_rate,
                       delete_molecules=delete_molecules)
@@ -272,8 +294,8 @@ class BnglBuilder(Builder):
     def _parse_expressions(self):
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             if e.find(_ns('{0}ListOfArguments/{0}Argument')) is not None:
-                raise BnglImportError('Function %s is local, which is not '
-                                      'supported in PySB' % e.get('id'))
+                self._warn_or_except('Function %s is local, which is not '
+                                     'supported in PySB' % e.get('id'))
             self.expression(e.get('id'), parse_expr(e.find(_ns(
                 '{0}Expression')).text.replace('^', '**')))
 
@@ -288,27 +310,33 @@ class BnglBuilder(Builder):
         self._parse_rules()
 
 
-def model_from_bngl(filename):
+def model_from_bngl(filename, force=False):
     """
     Convert a BioNetGen .bngl model file into a PySB Model.
 
     Limitations
     -----------
 
-    * Fixed species (like $Null) are imported as regular species. A warning
-      will be shown.
-    * BNG excluded or included reaction patterns (which are deprecated) are
-      ignored, with a warning.
-    * Files with BNG local functions will cause an error.
-    * Files containing Molecules with identically named sites, such as
-      ``M(l,l)`` will cause an error.
-    * Files using BNG's custom rate law functions, such as ``MM`` and
-      ``Sat`` will cause an error.
+    The following features are not supported in PySB and will cause an error
+    if present in a .bngl file:
+
+    * Fixed species (with a $ prefix, like $Null)
+    * BNG excluded or included reaction patterns (deprecated in BNG)
+    * BNG local functions
+    * Molecules with identically named sites, such as ``M(l,l)``
+    * BNG's custom rate law functions, such as ``MM`` and ``Sat``
+      (deprecated in BNG)
 
     Parameters
     ----------
-    filename :
+    filename : string
         A BioNetGen .bngl file
+    force : bool, optional
+        The default, False, will raise an Exception if there are any errors
+        importing the model to PySB, e.g. due to unsupported features.
+        Setting to True will attempt to ignore any import errors, which may
+        lead to a model that only poorly represents the original. Use at own
+        risk!
     """
-    bb = BnglBuilder(filename)
+    bb = BnglBuilder(filename, force=force)
     return bb.model

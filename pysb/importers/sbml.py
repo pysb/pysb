@@ -45,7 +45,8 @@ def sbml_translator(input_file,
     atomize : bool, optional
         Atomize the model, i.e. attempt to infer molecular structure and
         build rules from the model (True) or just perform a flat import (False)
-        pathway_commons: Use pathway commons to infer molecule binding. This
+    pathway_commons : bool, optional
+        Use pathway commons to infer molecule binding. This
         setting requires an internet connection and will query the pathway
         commons web service.
     verbose : bool, optional
@@ -101,7 +102,7 @@ def sbml_translator(input_file,
     return output_file
 
 
-def model_from_sbml(filename, cleanup=True, **kwargs):
+def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
     """
     Create a PySB Model object from an Systems Biology Markup Language (SBML)
     file, using BioNetGen's
@@ -123,6 +124,12 @@ def model_from_sbml(filename, cleanup=True, **kwargs):
     ----------
     filename :
         A Systems Biology Markup Language .sbml file
+    force : bool, optional
+        The default, False, will raise an Exception if there are any errors
+        importing the model to PySB, e.g. due to unsupported features.
+        Setting to True will attempt to ignore any import errors, which may
+        lead to a model that only poorly represents the original. Use at own
+        risk!
     cleanup : bool
         Delete temporary directory on completion if True. Set to False for
         debugging purposes.
@@ -137,7 +144,7 @@ def model_from_sbml(filename, cleanup=True, **kwargs):
     try:
         bngl_file = os.path.join(tmpdir, 'model.bngl')
         sbml_translator(filename, bngl_file, **kwargs)
-        return model_from_bngl(bngl_file)
+        return model_from_bngl(bngl_file, force=force)
     finally:
         if cleanup:
             shutil.rmtree(tmpdir)
