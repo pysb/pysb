@@ -39,6 +39,7 @@ before_install:
 install:
   python setup.py build --build-lib=build/lib
 script:
-  nosetests build/lib/pysb --with-coverage --cover-inclusive --cover-package=build/lib/pysb
+  nosetests build/lib/pysb --with-coverage --cover-inclusive
+  --cover-package=build/lib/pysb -a '!gpu'
 after_success:
   coveralls

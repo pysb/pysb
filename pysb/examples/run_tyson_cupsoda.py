@@ -1,12 +1,12 @@
 from pysb.examples.tyson_oscillator import model
-from pysb_cupsoda import *
+from pysb.simulators.cupsoda import *
 import numpy as np
 import matplotlib.pyplot as plt
 
 tspan = np.linspace(0, 500, 501)
 
 set_cupsoda_path("/Users/lopezlab/cupSODA") #FIXME: should search for cupSODA in standard locations
-solver = CupsodaSolver(model, tspan, atol=1e-12, rtol=1e-6, max_steps=20000, verbose=True)
+solver = CupSodaSolver(model, tspan, atol=1e-12, rtol=1e-6, max_steps=20000, verbose=True)
 
 n_sims = 100
 

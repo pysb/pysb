@@ -5,6 +5,11 @@ import subprocess
 import time
 import warnings
 import tempfile
+import numpy as np
+import pandas
+from scipy.constants import N_A
+from pysb.bng import generate_equations
+from pysb.simulate import Simulator
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
@@ -12,11 +17,6 @@ try:
 except ImportError, e:
     use_pycuda = False
     pass
-import numpy as np
-import pandas
-from scipy.constants import N_A
-from pysb.bng import generate_equations
-from pysb.simulate import Simulator
 
 read_csv = pandas.read_csv
 
@@ -112,7 +112,7 @@ def _get_cupsoda_path():
     return bin_path
 
 
-class CupsodaSolver(Simulator):
+class CupSodaSolver(Simulator):
     """An interface for running cupSODA, a CUDA implementation of LSODA.
     Parameters
     ----------
@@ -215,7 +215,7 @@ class CupsodaSolver(Simulator):
 
     def __init__(self, model, tspan=None, cleanup=True, verbose=False,
                  integrator='cupsoda', **integrator_options):
-        super(CupsodaSolver, self).__init__(model, tspan, verbose)
+        super(CupSodaSolver, self).__init__(model, tspan, verbose)
         generate_equations(self.model, cleanup, self.verbose)
 
         self.model_parameter_rules = self.model.parameters_rules()
@@ -236,7 +236,7 @@ class CupsodaSolver(Simulator):
         # overwrite default integrator options
         self.options.update(integrator_options)
 
-    def run(self, param_values, y0, tspan=None, outdir=None,
+    def run(self, tspan=None, param_values=None, y0=None, outdir=None,
             prefix=None, **integrator_options):
         """Perform a set of integrations.
 
@@ -262,7 +262,7 @@ class CupsodaSolver(Simulator):
         prefix : string, optional (default: model.name)
             Output files will be named "prefix_i", for i=[0,N_SIMS). The
             prefix is also used for the output directory (see above argument).
-        integrator_options : See CupsodaSolver constructor.
+        integrator_options : See CupSodaSolver constructor.
         
         Notes
         -----
@@ -275,6 +275,29 @@ class CupsodaSolver(Simulator):
         """
 
         start_time = time.time()
+
+        if y0 is None and param_values is None:
+            warnings.warn("Neither 'y0' nor 'param_values' were supplied. "
+                          "Running a single simulation with model defaults.")
+
+        if y0 is None:
+            # Run simulation using same parameters, varying initial conditions
+            species_names = [str(s) for s in self.model.species]
+            y0 = np.zeros(len(species_names))
+            for ic in self.model.initial_conditions:
+                y0[species_names.index(str(ic[0]))] = ic[1].value
+            y0 = np.repeat([y0],
+                           1 if param_values is None else
+                           param_values.shape[0],
+                           axis=0)
+
+        if param_values is None:
+            # Run simulation using same initial conditions, varying parameters
+            param_values = np.repeat(np.array([[p.value for p in
+                                              self.model.parameters]]),
+                                     y0.shape[0],
+                                     axis=0)
+
         # make sure tspan is defined somewhere
         if tspan is not None:
             self.tspan = tspan
@@ -677,15 +700,15 @@ class CupsodaSolver(Simulator):
         self.y = np.asarray(self.y) # TODO: Why asarray() and not array()
 
     def _calc_yobs_yexpr(self, param_values=None):
-        super(CupsodaSolver, self)._calc_yobs_yexpr()
+        super(CupSodaSolver, self)._calc_yobs_yexpr()
 
     def get_yfull(self):
-        return super(CupsodaSolver, self).get_yfull()
+        return super(CupSodaSolver, self).get_yfull()
 
 
 def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(),
                 prefix=None, verbose=False, **integrator_options):
-    sim = CupsodaSolver(model, verbose=verbose, **integrator_options)
+    sim = CupSodaSolver(model, verbose=verbose, **integrator_options)
     sim.run(param_values, y0, tspan, outdir, prefix)
     if sim.options.get('load_ydata'):
         yfull = sim.get_yfull()
