@@ -13,6 +13,7 @@ from matplotlib import gridspec, pyplot
 import numpy as np
 import pysb.integrate
 from pysb.bng import generate_equations
+matplotlib.rcParams['svg.fonttype'] = 'none'
 matplotlib.use('Agg')
 plt = matplotlib.pyplot
 
@@ -47,10 +48,8 @@ class InitialConcentrationSensitivityAnalysis:
         self.objective_function = objective_function
         self.observable = observable
         self.standard = None
-        self.sensitivity_matrix = None
-        self.sensitivity_list = None
-        self.p_prime_matrix = np.array([])
-        self.p_matrix = np.array([])
+        self.p_prime_matrix = np.zeros(self.size_of_matrix)
+        self.p_matrix = np.zeros(self.size_of_matrix)
 
     def _calculate_objective(self, species):
         """ Calculates fraction of change between standard value and newly obtained value
@@ -132,17 +131,14 @@ class InitialConcentrationSensitivityAnalysis:
 
         a_matrix = cartesian_product(self.values_to_sample,
                                      self.index_of_species_of_interest)
-        a_matrix = a_matrix.T.reshape(
-                np.shape(a_matrix)[0] * np.shape(a_matrix)[1], )
+        a_matrix = a_matrix.T.reshape(self.n_sam * self.n_proteins)
+
         a_prime = cartesian_product(np.ones(self.n_sam),
                                     self.index_of_species_of_interest)
-        a_prime = a_prime.T.reshape(
-                np.shape(a_prime)[0] * np.shape(a_prime)[1], )
-        self.b_matrix = cartesian_product(a_matrix, a_matrix)
+        a_prime = a_prime.T.reshape(self.n_sam * self.n_proteins)
 
+        self.b_matrix = cartesian_product(a_matrix, a_matrix)
         self.b_prime_matrix = cartesian_product(a_prime, a_matrix)
-        np.set_printoptions(linewidth=12000, threshold=np.inf)
-        # print(self.b_prime_matrix)
 
     def _g_function(self, matrix):
         """
@@ -153,7 +149,8 @@ class InitialConcentrationSensitivityAnalysis:
         counter = -1
         sampled_values_index = set()
         bij_unique = dict()
-        sampling_matrix = np.zeros((self.size_of_matrix, len(self.model.species)))
+        sampling_matrix = np.zeros(
+                (self.size_of_matrix, len(self.model.species)))
         sampling_matrix[:, :] = self.initial_conditions
         for j in range(len(matrix)):
             for i in matrix[j, :]:
@@ -167,7 +164,6 @@ class InitialConcentrationSensitivityAnalysis:
                 elif s_1 in bij_unique or s_2 in bij_unique:
                     continue
                 else:
-
                     x = self.index_of_species_of_interest[index_i]
                     y = self.index_of_species_of_interest[index_j]
                     sampling_matrix[counter, x] *= sigma_i
@@ -245,18 +241,15 @@ class InitialConcentrationSensitivityAnalysis:
         ax2 = fig.add_subplot(132)
         ax3 = fig.add_subplot(133)
         ax1.imshow(self.p_matrix, interpolation='nearest', origin='upper',
-                   cmap=plt.get_cmap(colors),
-                   vmin=v_min, vmax=v_max,
+                   cmap=plt.get_cmap(colors), vmin=v_min, vmax=v_max,
                    extent=[0, self.nm, 0, self.nm])
 
         ax2.imshow(self.p_prime_matrix, interpolation='nearest',
                    origin='upper', cmap=plt.get_cmap(colors),
-                   vmin=v_min, vmax=v_max,
-                   extent=[0, self.nm, 0, self.nm])
+                   vmin=v_min, vmax=v_max, extent=[0, self.nm, 0, self.nm])
 
         ax3.imshow(sens_matrix, interpolation='nearest', origin='upper',
-                   cmap=plt.get_cmap(colors), vmin=v_min,
-                   vmax=v_max)
+                   cmap=plt.get_cmap(colors), vmin=v_min, vmax=v_max)
 
         ax1.set_xticks([])
         ax1.set_yticks([])
@@ -273,10 +266,9 @@ class InitialConcentrationSensitivityAnalysis:
                     bbox_inches='tight')
         plt.close()
 
-        plt.figure(figsize=(len(self.proteins_of_interest) + 6,
-                            len(self.proteins_of_interest) + 6))
-        gs = gridspec.GridSpec(len(self.proteins_of_interest),
-                               len(self.proteins_of_interest))
+        plt.figure(figsize=(self.n_proteins + 6, self.n_proteins + 6))
+        gs = gridspec.GridSpec(self.n_proteins, self.n_proteins)
+
         for n, j in enumerate(range(0, self.nm, self.n_sam)):
             per_protein1 = []
             for m, i in enumerate(range(0, self.nm, self.n_sam)):
@@ -302,10 +294,8 @@ class InitialConcentrationSensitivityAnalysis:
                                vmax=v_max)
             sens_ij_nm.append(per_protein1)
         plt.tight_layout()
-        plt.savefig(
-                os.path.join(out_dir,
-                             '{}_subplots.png'.format(savename)),
-                bbox_inches='tight')
+        plt.savefig(os.path.join(out_dir, '{}_subplots.png'.format(savename)),
+                    bbox_inches='tight')
         plt.close()
 
         # Create heatmap and boxplot of data
@@ -329,9 +319,9 @@ class InitialConcentrationSensitivityAnalysis:
                    fontsize=12)
         plt.yticks(shape_label, reversed(self.proteins_of_interest),
                    fontsize=12)
-        xticks = ([i for i in range(0, self.nm, self.n_sam)])
-        ax1.set_xticks(xticks, minor=True)
-        ax1.set_yticks(xticks, minor=True)
+        x_ticks = ([i for i in range(0, self.nm, self.n_sam)])
+        ax1.set_xticks(x_ticks, minor=True)
+        ax1.set_yticks(x_ticks, minor=True)
         plt.grid(True, which='minor', linestyle='--')
         color_bar = plt.colorbar(im, cax=ax0, orientation='horizontal',
                                  use_gridspec=True)
