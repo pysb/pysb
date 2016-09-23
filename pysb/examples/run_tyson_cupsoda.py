@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from pysb.examples.tyson_oscillator import model
-from pysb.simulator.cupsoda import CupSodaSolver
+from pysb.simulator import CupSodaSolver
 
 tspan = np.linspace(0, 500, 501)
 
@@ -26,8 +26,7 @@ for i in range(len(y0)):
                 y0[i][j] = ic[1].value
                 break
 
-solver.run(param_values=param_values, y0=y0)
-yfull = solver.get_yfull()
+yfull = solver.run(param_values=param_values, y0=y0).all()
 
 # Plot the results of the first simulation
 plt.plot(tspan, yfull['YT'][0], lw=2, label='YT', color='b')

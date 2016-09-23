@@ -4,7 +4,7 @@ import numpy as np
 from nose.plugins.attrib import attr
 
 from pysb.examples.tyson_oscillator import model
-from pysb.simulator.cupsoda import CupSodaSolver
+from pysb.simulator import CupSodaSolver
 
 
 @attr('gpu')
@@ -38,13 +38,13 @@ def test_cupsoda_tyson():
                                           "were supplied.")
         solver.run(param_values=None, y0=None)
 
-    solver.run(y0=y0,
-               gpu=0,
-               max_steps=20000,
-               obs_species_only=True,
-               memory_usage='sharedconstant',
-               vol=vol)
-    print(solver.concs_observables())
+    simres = solver.run(y0=y0,
+                        gpu=0,
+                        max_steps=20000,
+                        obs_species_only=True,
+                        memory_usage='sharedconstant',
+                        vol=vol)
+    print(simres.observables)
     solver.run(param_values=None, y0=y0)
     solver.run(param_values=param_values, y0=y0)
 
@@ -98,4 +98,5 @@ def test_use_of_volumne():
                 y0[:, j] = ic[1].value
                 break
 
-    solver.run(y0=y0, gpu=0, memory_usage='sharedconstant', outdir='.', vol=vol)
+    solver.run(y0=y0, gpu=0, memory_usage='sharedconstant', outdir='.',
+               vol=vol)

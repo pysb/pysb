@@ -11,14 +11,14 @@ import pandas
 from scipy.constants import N_A
 
 from pysb.bng import generate_equations
-from pysb.simulator.base import Simulator
+from pysb.simulator.base import Simulator, SimulationResult
 
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
 
     use_pycuda = True
-except ImportError, e:
+except ImportError:
     use_pycuda = False
     pass
 
@@ -222,7 +222,7 @@ class CupSodaSolver(Simulator):
     def __init__(self, model, tspan=None, cleanup=True, verbose=False,
                  integrator='cupsoda', **integrator_options):
         super(CupSodaSolver, self).__init__(model, verbose, kwargs=tspan)
-        generate_equations(self.model, cleanup, self.verbose)
+        generate_equations(self._model, cleanup, self.verbose)
         self.tspan = tspan
         self.outdir = None
         self.out_species = None
@@ -239,11 +239,11 @@ class CupSodaSolver(Simulator):
         self.options.update(integrator_options)
 
         # private variables
-        self._len_rxns = len(self.model.reactions)
-        self._len_species = len(self.model.species)
-        self._model_rxns = self.model.reactions
+        self._len_rxns = len(self._model.reactions)
+        self._len_species = len(self._model.species)
+        self._model_rxns = self._model.reactions
         self._tspan_length = len(self.tspan)
-        self._model_parameter_rules = self.model.parameters_rules()
+        self._model_parameter_rules = self._model.parameters_rules()
 
     def run(self, tspan=None, param_values=None, y0=None, outdir=None,
             prefix=None, **integrator_options):
@@ -292,9 +292,9 @@ class CupSodaSolver(Simulator):
 
         if y0 is None:
             # Run simulation using same parameters, varying initial conditions
-            species_names = [str(s) for s in self.model.species]
+            species_names = [str(s) for s in self._model.species]
             y0 = np.zeros(len(species_names))
-            for ic in self.model.initial_conditions:
+            for ic in self._model.initial_conditions:
                 y0[species_names.index(str(ic[0]))] = ic[1].value
             y0 = np.repeat([y0],
                            1 if param_values is None else
@@ -303,7 +303,8 @@ class CupSodaSolver(Simulator):
 
         if param_values is None:
             # Run simulation using same initial conditions, varying parameters
-            param_values = np.repeat(np.array([[p.value for p in self.model.parameters]]),
+            param_values = np.repeat(np.array([[p.value for p in
+                                                self._model.parameters]]),
                                      y0.shape[0],
                                      axis=0)
 
@@ -326,19 +327,19 @@ class CupSodaSolver(Simulator):
                 len(param_values)) + ") and 'y0' (len=" + str(
                 len(y0)) + ") must be equal.")
         if len(param_values.shape) != 2 or param_values.shape[1] != len(
-                self.model.parameters):
+                self._model.parameters):
             raise Exception(
                 "'param_values' must be a 2D array with dimensions N_SIMS x "
                 "len(model.parameters): param_values.shape=" +
                 str(param_values.shape))
-        if len(y0.shape) != 2 or y0.shape[1] != len(self.model.species):
+        if len(y0.shape) != 2 or y0.shape[1] != len(self._model.species):
             raise Exception(
                 "'y0' must be a 2D array with dimensions N_SIMS x "
                 "len(model.species): y0.shape=" + str(y0.shape))
 
         # Default prefix is model name
         if not prefix:
-            prefix = self.model.name
+            prefix = self._model.name
 
         # Create outdir if it doesn't exist
         self.outdir = tempfile.mkdtemp(prefix=prefix, dir=outdir)
@@ -359,7 +360,7 @@ class CupSodaSolver(Simulator):
             gpu = 0
         if not n_blocks:
             default_threads_per_block = 16
-            n_species = len(self.model.species)
+            n_species = len(self._model.species)
             bytes_per_float = 4
             # +1 for time variable
             memory_per_thread = (n_species + 1) * bytes_per_float
@@ -386,7 +387,8 @@ class CupSodaSolver(Simulator):
         c_matrix = np.zeros((len(param_values), self._len_rxns))
         par_names = [p.name for p in self._model_parameter_rules]
         rate_params = self._model_parameter_rules
-        rate_mask = np.array([p in rate_params for p in self.model.parameters])
+        rate_mask = np.array([p in rate_params for p in
+                              self._model.parameters])
         par_dict = {par_names[i]: i for i in range(len(par_names))}
         rate_args = []
         param_values = param_values[:, rate_mask]
@@ -396,7 +398,7 @@ class CupSodaSolver(Simulator):
                               not re.match("_*s", str(arg))])
             reactants = 0
             for i in rxn['reactants']:
-                if not str(self.model.species[i]) == '__source()':
+                if not str(self._model.species[i]) == '__source()':
                     reactants += 1
             rate_order.append(reactants)
 #        output = 0.01 * len(param_values)
@@ -461,17 +463,20 @@ class CupSodaSolver(Simulator):
             print("Total - cupSODA = %4.4f" % (self._total_time - cupsoda_time))
 
         # Load concentration data if requested
-        if self.options.get('load_ydata'):
-            start_time = time.time()
-            self._get_y(prefix=prefix)
-            end_time = time.time()
-            if debug:
-                print("Get_y time = %4.4f " % (end_time - start_time))
-            start_time = time.time()
-            self._calc_yobs_yexpr(param_values)
-            end_time = time.time()
-            if debug:
-                print("Calc yopbs_yepr time = %4.4f " % (end_time - start_time))
+#        if self.options.get('load_ydata'):
+        start_time = time.time()
+        self._get_y(prefix=prefix)
+        end_time = time.time()
+        if debug:
+            print("Get_y time = %4.4f " % (end_time - start_time))
+
+        return SimulationResult(self, self._y)
+#            start_time = time.time()
+#            self._calc_yobs_yexpr(param_values)
+#            end_time = time.time()
+#            if debug:
+#                print("Calc yopbs_yepr time = %4.4f " % (end_time -
+            # start_time))
 
     @property
     def _memory_usage(self):
@@ -511,8 +516,8 @@ class CupSodaSolver(Simulator):
         with open(os.path.join(cupsoda_files, "cs_vector"), 'wb') as cs_vector:
             out_species = range(self._len_species)
             if self.options.get('obs_species_only'):
-                out_species = [False for sp in self.model.species]
-                for obs in self.model.observables:
+                out_species = [False for sp in self._model.species]
+                for obs in self._model.observables:
                     for i in obs.species:
                         out_species[i] = True
                 out_species = [i for i in range(len(out_species)) if
@@ -555,7 +560,7 @@ class CupSodaSolver(Simulator):
                 # populations by N_A*vol to get concentrations.
                 y0 /= (N_A * vol)
                 # Set the concentration of __source() to 1
-                for i, sp in enumerate(self.model.species):
+                for i, sp in enumerate(self._model.species):
                     if str(sp) == '__source()':
                         y0[:, i] = 1.
                         break
@@ -611,7 +616,7 @@ class CupSodaSolver(Simulator):
 
         indir = os.path.join(self.outdir, "Output")
         if prefix is None:
-            prefix = self.model.name
+            prefix = self._model.name
 
         files = [filename for filename in os.listdir(indir) if
                  re.match(prefix, filename)]
@@ -689,18 +694,3 @@ class CupSodaSolver(Simulator):
             self._y[index][:, self.out_species] = data[:, 1:] * self.options['vol'] * N_A
         else:
             self._y[index][:, self.out_species] = data[:, 1:]
-
-    def _calc_yobs_yexpr(self, param_values=None):
-        super(CupSodaSolver, self)._calc_yobs_yexpr()
-
-    def get_yfull(self):
-        return super(CupSodaSolver, self).concs_all()
-
-
-def run_cupsoda(model, tspan, param_values, y0, outdir=os.getcwd(),
-                prefix=None, verbose=False, **integrator_options):
-    sim = CupSodaSolver(model, tspan, verbose=verbose, **integrator_options)
-    sim.run(tspan, param_values, y0, outdir, prefix)
-    if sim.options.get('load_ydata'):
-        yfull = sim.get_yfull()
-        return sim.tout, yfull
