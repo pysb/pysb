@@ -26,11 +26,12 @@ for i in range(len(y0)):
                 y0[i][j] = ic[1].value
                 break
 
-yfull = solver.run(param_values=param_values, y0=y0).all()
+yfull = solver.run(param_values=param_values, y0=y0)
 
 # Plot the results of the first simulation
-plt.plot(tspan, yfull['YT'][0], lw=2, label='YT', color='b')
-plt.plot(tspan, yfull['M'][0], lw=2, label='M', color='g')
+plt.plot(tspan, np.array(yfull.observables)['YT'].T, lw=2, label='YT',
+         color='b')
+plt.plot(tspan, np.array(yfull.observables)['M'].T, lw=2, label='M', color='g')
 plt.legend(loc=0)
 plt.ylim(ymin=1)
 plt.ylabel('molecules')
