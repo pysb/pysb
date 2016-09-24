@@ -2,16 +2,18 @@
 """Simulate the bax_pore model and plot the results."""
 
 from __future__ import print_function
-from pylab import *
-from pysb.simulator.scipy import ScipyOdeSimulator
+import matplotlib.pyplot as plt
+from numpy import linspace
+from pysb.simulator import ScipyOdeSimulator
 
 from bax_pore import model
 
 
 t = linspace(0, 100)
 print("Simulating...")
-x = ScipyOdeSimulator.execute(model, tspan=t)
+x = ScipyOdeSimulator(model).run(tspan=t).all
 
-p = plot(t, c_[x['BAX4'], x['BAX4_inh']])
-figlegend(p, ['BAX4', 'BAX4_inh'], 'upper left')
-show()
+plt.plot(t, x['BAX4'])
+plt.plot(t, x['BAX4_inh'])
+plt.legend(['BAX4', 'BAX4_inh'], loc='upper left')
+plt.show()

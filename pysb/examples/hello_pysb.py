@@ -29,13 +29,14 @@ Rule('L_binds_R', L(s=None) + R(s=None) <> L(s=1) % R(s=1), kf, kr)
 Observable('LR', L(s=1) % R(s=1))
 
 if __name__ == '__main__':
-    from pylab import linspace, plot, xlabel, ylabel, show
+    from numpy import linspace
+    from matplotlib.pyplot import plot, xlabel, ylabel, show
     from pysb.simulator import ScipyOdeSimulator
     print(__doc__)
     # Simulate the model through 40 seconds
     time = linspace(0, 40, 100)
     print("Simulating...")
-    x = ScipyOdeSimulator.execute(model, tspan=time)
+    x = ScipyOdeSimulator(model).run(tspan=time).all
     # Plot the trajectory of LR
     plot(time, x['LR'])
     xlabel('Time (seconds)')

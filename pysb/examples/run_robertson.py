@@ -4,7 +4,8 @@ trajectories.
 """
 
 from __future__ import print_function
-from pylab import *
+from matplotlib.pyplot import *
+from numpy import linspace, array
 from pysb.simulator import ScipyOdeSimulator
 
 from robertson import model
@@ -13,11 +14,11 @@ from robertson import model
 t = linspace(0, 40)
 # Simulate the model
 print("Simulating...")
-y = ScipyOdeSimulator.execute(model, tspan=t, rtol=1e-4,
-                              atol=[1e-8, 1e-14, 1e-6])
+y = ScipyOdeSimulator(model, rtol=1e-4, atol=[1e-8, 1e-14, 1e-6]).run(
+    tspan=t).all
 # Gather the observables of interest into a matrix
 yobs = array([y[obs] for obs in ('A_total', 'B_total', 'C_total')]).T
 # Plot normalized trajectories
 plot(t, yobs / yobs.max(0))
-legend(['y1', 'y2', 'y3'], 'lower right')
+legend(['y1', 'y2', 'y3'], loc='lower right')
 show()
