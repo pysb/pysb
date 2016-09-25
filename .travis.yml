@@ -36,6 +36,13 @@ before_install:
 - make all
 - export KAPPAPATH=`pwd`
 - cd ../
+# Install StochKit
+- wget https://github.com/StochSS/StochKit/archive/master.zip -O StochKit.zip
+- unzip -q -d $HOME StochKit.zip
+- export STOCHKIT_HOME=$HOME/StochKit-master
+- cd $STOCHKIT_HOME
+- ./install.sh >/dev/null 2>&1
+- cd $TRAVIS_BUILD_DIR
 install:
   python setup.py build --build-lib=build/lib
 script:
