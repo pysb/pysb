@@ -136,7 +136,7 @@ SimulationResult = namedtuple('SimulationResult',
 
 def run_simulation(model, time=10000, points=200, cleanup=True,
                    output_prefix=None, output_dir=None, flux_map=False,
-                   perturbation=None, verbose=False):
+                   perturbation=None, seed=None, verbose=False):
     """Runs the given model using KaSim and returns the parsed results.
 
     Parameters
@@ -170,6 +170,10 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         Optional perturbation language syntax to be appended to the Kappa file.
         See KaSim manual for more details. Default value is None (no
         perturbation).
+    seed : integer
+        A seed integer for KaSim random number generator. Set to None to
+        allow KaSim to use a random seed (default) or supply a seed for
+        deterministic behaviour (e.g. for testing)
     verbose : boolean
         Whether to pass the output of KaSim through to stdout/stderr.
 
@@ -208,6 +212,9 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
 
     args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
             '-o', out_filename]
+
+    if seed:
+        args.extend(['-seed', str(seed)])
 
     # Generate the Kappa model code from the PySB model and write it to
     # the Kappa file:
