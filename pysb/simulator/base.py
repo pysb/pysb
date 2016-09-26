@@ -366,8 +366,11 @@ class SimulationResult(object):
             raise Exception('Please "pip install pandas" for this feature')
         sim_ids = (np.repeat(range(self.nsims), [len(t) for t in self.tout]))
         times = np.concatenate(self.tout)
-        idx = pd.MultiIndex.from_tuples(zip(sim_ids, times),
-                                        names=['simulation', 'time'])
+        if self.nsims == 1 and self.squeeze:
+            idx = pd.Index(times, name='time')
+        else:
+            idx = pd.MultiIndex.from_tuples(zip(sim_ids, times),
+                                            names=['simulation', 'time'])
         simdata = self.all
         if not isinstance(simdata, np.ndarray):
             simdata = np.concatenate(simdata)
