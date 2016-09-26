@@ -17,6 +17,9 @@ class SimulatorException(Exception):
 class Simulator(object):
     """An abstract base class for numerical simulation of models.
 
+    Please note that the interface for this class is considered
+    experimental and may change without warning as PySB is updated.
+
     Parameters
     ----------
     model : pysb.Model
@@ -208,8 +211,10 @@ class Simulator(object):
 
 class SimulationResult(object):
     """
-    Contains the results of a simulation, combined with properties and
-    methods to access them.
+    Results of a simulation with properties and methods to access them.
+
+    Please note that the interface for this class is considered
+    experimental and may change without warning as PySB is updated.
     """
     def __init__(self, simulator, trajectories):
         self.squeeze = True
