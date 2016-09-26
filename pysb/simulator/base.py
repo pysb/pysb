@@ -307,36 +307,6 @@ class SimulationResult(object):
 
     Please note that the interface for this class is considered
     experimental and may change without warning as PySB is updated.
-
-    Parameters
-    ----------
-    simulator : Simulator
-        The simulator object that generated the trajectories
-    trajectories : list or numpy.ndarray
-        A set of species trajectories from a simulation. Should either be a
-        list of 2D numpy arrays or a single 3D numpy array.
-
-    Attributes
-    ----------
-    In the descriptions below, a "trajectory set" is a 2D numpy array,
-    species on first axis and time on second axis, with each element
-    containing the concentration or count of the species at the specified time.
-
-    A list of trajectory sets contains a trajectory set for each simulation.
-
-    all : list
-        List of trajectory sets. The first dimension contains species,
-        observables and expressions (in that order)
-    species : list
-        List of trajectory sets. The first dimension contains species.
-    observables : list
-        List of trajectory sets. The first dimension contains observables.
-    expressions : list
-        List of trajectory sets. The first dimension contains expressions.
-    dataframe : :py:class:`pandas.DataFrame`
-        A conversion of the trajectory sets (species, observables and
-        expressions for all simulations) into a single
-        :py:class:`pandas.DataFrame`.
     """
     def __init__(self, simulator, trajectories):
         self.squeeze = True
