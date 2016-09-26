@@ -263,6 +263,17 @@ class SimulationResult(object):
                 func = sympy.lambdify(obs_names, expr_subs, "numpy")
                 self._yexpr_view[n][:, i] = func(**obs_dict)
 
+    def _squeeze_output(self, trajectories):
+        """
+        Reduces trajectories to a 2D matrix if only one simulation present
+
+        Can be disabled by setting self.squeeze to False
+        """
+        if self.nsims == 1 and self.squeeze:
+            return trajectories[0]
+        else:
+            return trajectories
+
     @property
     def all(self):
         """Aggregate species, observables, and expressions trajectories into
@@ -290,9 +301,7 @@ class SimulationResult(object):
                     self._yexpr_view[n]
             self._yfull = yfull
 
-        if self.nsims == 1 and self.squeeze:
-            return self._yfull[0]
-        return self._yfull
+        return self._squeeze_output(self._yfull)
 
     @property
     def dataframe(self):
@@ -309,21 +318,12 @@ class SimulationResult(object):
 
     @property
     def species(self):
-        if self.nsims == 1 and self.squeeze:
-            return self._y[0]
-        else:
-            return self._y
+        return self._squeeze_output(self._y)
 
     @property
     def observables(self):
-        if self.nsims == 1 and self.squeeze:
-            return self._yobs[0]
-        else:
-            return self._yobs
+        return self._squeeze_output(self._yobs)
 
     @property
     def expressions(self):
-        if self.nsims == 1 and self.squeeze:
-            return self._yexpr[0]
-        else:
-            return self._yexpr
+        return self._squeeze_output(self._yexpr)
