@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
 from pysb.examples.tyson_oscillator import model
-from pysb.simulator import CupSodaSolver
+from pysb.simulator.cupsoda import CupSodaSolver
 
 tspan = np.linspace(0, 500, 501)
 
@@ -36,4 +35,5 @@ plt.legend(loc=0)
 plt.ylim(ymin=1)
 plt.ylabel('molecules')
 plt.xlabel('time')
+
 plt.show()
