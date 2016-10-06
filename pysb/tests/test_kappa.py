@@ -6,6 +6,8 @@ import subprocess
 from re import split
 import pygraphviz as pgv
 
+_KAPPA_SEED = 123456
+
 @with_model
 def test_kappa_simulation_results():
     Monomer('A', ['b'])
@@ -18,7 +20,7 @@ def test_kappa_simulation_results():
          Parameter('kr', 1))
     Observable('AB', A(b=1) % B(b=1))
     npts = 200
-    kres = run_simulation(model, time=100, points=npts)
+    kres = run_simulation(model, time=100, points=npts, seed=_KAPPA_SEED)
     ok_(len(kres['time']) == npts + 1)
     ok_(len(kres['AB']) == npts + 1)
     ok_(kres['time'][0] == 0)
@@ -43,7 +45,7 @@ def test_kappa_expressions():
     Rule('degrade_dimer', A(site=('u', ANY)) >> None, kr)
     Observable('dimer', A(site=('u', ANY)))
     # Accommodates site with explicit state and arbitrary bond
-    run_simulation(model, time=0)
+    run_simulation(model, time=0, seed=_KAPPA_SEED)
 
 @with_model
 def test_flux_map():
@@ -59,7 +61,8 @@ def test_flux_map():
     Initial(B(a=None, c=None), Parameter('B_0', 100))
     Initial(C(b=None), Parameter('C_0', 100))
     res = run_simulation(model, time=10, points=100, flux_map=True,
-                                  output_dir='.', cleanup=True, verbose=False)
+                         output_dir='.', cleanup=True,
+                         seed=_KAPPA_SEED, verbose=False)
     simdata = res.timecourse
     ok_(len(simdata['time']) == 101)
     ok_(len(simdata['ABC']) == 101)
@@ -77,7 +80,7 @@ def test_kappa_wild():
     Initial(A(site=1) % B(site=1), Parameter('AB_0', 1000))
     Rule('deg_A', A(site=pysb.WILD) >> None, Parameter('k', 1))
     Observable('A_', A())
-    run_simulation(model, time=0)
+    run_simulation(model, time=0, seed=_KAPPA_SEED)
 
 @raises(ValueError)
 @with_model
