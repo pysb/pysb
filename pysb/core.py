@@ -240,10 +240,12 @@ class Monomer(Component):
         if site_states is None:
             site_states = {}
 
-        # ensure sites is some kind of list (presumably of strings) but not a string itself
-        if not isinstance(sites, collections.Iterable) or isinstance(sites, basestring):
+        # ensure sites is some kind of list (presumably of strings) but not a
+        # string itself
+        if not isinstance(sites, collections.Iterable) or \
+               isinstance(sites, basestring):
             raise ValueError("sites must be a list of strings")
-        
+
         # ensure no duplicate sites
         sites_seen = {}
         for site in sites:
@@ -256,11 +258,15 @@ class Monomer(Component):
         # ensure site_states keys are all known sites
         unknown_sites = [site for site in site_states if not site in sites_seen]
         if unknown_sites:
-            raise Exception("Unknown sites in site_states: " + str(unknown_sites))
+            raise Exception("Unknown sites in site_states: " +
+                            str(unknown_sites))
         # ensure site_states values are all strings
-        invalid_sites = [site for (site, states) in site_states.items() if not all([type(s) == str for s in states])]
+        invalid_sites = [site for (site, states) in site_states.items()
+                              if not all([isinstance(s, basestring)
+                                          for s in states])]
         if invalid_sites:
-            raise Exception("Non-string state values in site_states for sites: " + str(invalid_sites))
+            raise Exception("Non-string state values in site_states for "
+                            "sites: " + str(invalid_sites))
 
         self.sites = list(sites)
         self.site_states = site_states
@@ -279,7 +285,8 @@ class Monomer(Component):
             See MonomerPattern.site_conditions.
 
         """
-        return MonomerPattern(self, extract_site_conditions(conditions, **kwargs), None)
+        return MonomerPattern(self, extract_site_conditions(conditions,
+                                                            **kwargs), None)
 
     def __repr__(self):
         value = '%s(%s' % (self.__class__.__name__, repr(self.name))
@@ -332,9 +339,11 @@ class MonomerPattern(object):
 
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
-        unknown_sites = [site for site in site_conditions if site not in monomer.sites]
+        unknown_sites = [site for site in site_conditions
+                              if site not in monomer.sites]
         if unknown_sites:
-            raise Exception("MonomerPattern with unknown sites in " + str(monomer) + ": " + str(unknown_sites))
+            raise Exception("MonomerPattern with unknown sites in " +
+                            str(monomer) + ": " + str(unknown_sites))
 
         # ensure each value is one of: None, integer, list of integers, string,
         # (string,integer), (string,WILD), ANY, WILD
@@ -343,13 +352,17 @@ class MonomerPattern(object):
             # pass through to next iteration if state type is ok
             if state == None:
                 continue
-            elif type(state) == int:
+            elif isinstance(state, int):
                 continue
-            elif type(state) == list and all(isinstance(s, int) for s in state):
+            elif isinstance(state, list) and \
+                 all(isinstance(s, int) for s in state):
                 continue
-            elif type(state) == str:
+            elif isinstance(state, basestring):
                 continue
-            elif type(state) == tuple and type(state[0]) == str and (type(state[1]) == int or state[1] is WILD or state[1] is ANY):
+            elif isinstance(state, tuple) and \
+                 isinstance(state[0], basestring) and \
+                 (isinstance(state[1], int) or state[1] is WILD or \
+                  state[1] is ANY):
                 continue
             elif state is ANY:
                 continue
@@ -357,7 +370,9 @@ class MonomerPattern(object):
                 continue
             invalid_sites.append(site)
         if invalid_sites:
-            raise Exception("Invalid state value for sites: " + '; '.join(['%s=%s' % (s,str(site_conditions[s])) for s in invalid_sites]))
+            raise Exception("Invalid state value for sites: " +
+                            '; '.join(['%s=%s' % (s,str(site_conditions[s]))
+                                       for s in invalid_sites]))
 
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):

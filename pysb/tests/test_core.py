@@ -127,3 +127,10 @@ def test_complex_pattern_call():
     ok_(cp(r))
     ok_(cp(r).monomer_patterns[0].site_conditions['x'] == r['x'])
     assert_raises(RedundantSiteConditionsError, cp, {'x': 'f'}, z='h')
+
+@with_model
+def test_monomer_unicode():
+    Monomer(u'A', [u's'], {u's': [u's1', u's2']})
+
+if __name__ == '__main__':
+    test_monomer_unicode()
