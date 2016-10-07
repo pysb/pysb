@@ -3,9 +3,9 @@ from pysb.macros import catalyze_state
 
 Model()
 
-Parameter('vol', 1.) # volume (arbitrary units)
+VOL = 1. # volume (arbitrary units)
 
-Parameter('kf',   1./vol.value)
+Parameter('kf',   1./VOL)
 Parameter('kr',   1000)
 Parameter('kcat', 100)
 
@@ -19,8 +19,8 @@ Observable("S_free",     S(e=None, state='0'))
 Observable("ES_complex", E(s=1) % S(e=1))
 Observable("Product",    S(e=None, state='1'))
 
-Parameter("Etot", 1.*vol.value)
+Parameter("Etot", 1.*VOL)
 Initial(E(s=None), Etot)
 
-Parameter('S0', 10.*vol.value)
+Parameter('S0', 10.*VOL)
 Initial(S(e=None, state='0'), S0)
