@@ -579,7 +579,7 @@ def generate_equations(model, cleanup=True, verbose=False):
     #   or, use a separate "math model" object to contain ODEs
     if model.odes:
         return
-    lines = iter(generate_network(model,cleanup,verbose=verbose).split('\n'))
+    lines = iter(generate_network(model,cleanup=cleanup,verbose=verbose).split('\n'))
     _parse_netfile(model, lines)
 
 
