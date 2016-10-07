@@ -196,7 +196,6 @@ class CupSodaSimulator(Simulator):
             'gpu': 0,  # which GPU
             'vol': None,  # volume
             'obs_species_only': True,  # print only observable species
-            'load_ydata': True,  # load conc data after simulation
             'memory_usage': 'global'  # global memory (see _memory_options dict)
         },
     }
