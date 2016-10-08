@@ -27,7 +27,8 @@ PySB depends on the following:
   * Perl - http://www.perl.org/get.html
   * BioNetGen - http://bionetgen.org/
 
-For full instructions, see the Installation chapter of the manual.
+For full instructions, see the Installation chapter of the manual at
+http://docs.pysb.org/en/latest/installation.html
 
 Documentation
 -------------
