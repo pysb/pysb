@@ -51,7 +51,7 @@ copyright = u'2012, C. F. Lopez, J. L. Muhlich, J. A. Bachman'
 # -- Mock out some problematic modules-------------------------------------
 
 # Note that for sub-modules, all parent modules must be listed explicitly.
-MOCK_MODULES = [ 'pygraphviz', 'sympy', 'sympy.printing',
+MOCK_MODULES = [ 'pandas', 'pygraphviz', 'sympy', 'sympy.printing',
                  'sympy.printing.mathml', 'numpy', 'scipy', 'scipy.integrate' ]
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.MagicMock()
