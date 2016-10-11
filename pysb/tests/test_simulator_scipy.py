@@ -73,13 +73,13 @@ class TestScipySimulator(object):
     def test_y0_as_list(self):
         """Test y0 with list of initial conditions"""
         # Test the initials getter method before anything is changed
-        assert np.allclose(self.sim.initials[0:3],
+        assert np.allclose(self.sim.initials[0][0:3],
                            [ic[1].value for ic in
                             self.model.initial_conditions])
 
         initials = [10, 20, 0, 0]
         simres = self.sim.run(initials=initials)
-        assert np.allclose(self.sim.initials, initials)
+        assert np.allclose(self.sim.initials[0], initials)
         assert np.allclose(simres.observables['A_free'][0], 10)
 
     def test_y0_as_ndarray(self):
@@ -92,7 +92,7 @@ class TestScipySimulator(object):
         simres = self.sim.run(initials={self.mon('A')(a=None): 10,
                                self.mon('B')(b=1) % self.mon('A')(a=1): 0,
                                self.mon('B')(b=None): 0})
-        assert np.allclose(self.sim.initials_list, [10, 0, 1, 0])
+        assert np.allclose(self.sim.initials, [10, 0, 1, 0])
         assert np.allclose(simres.observables['A_free'][0], 10)
 
     def test_y0_as_dictionary_with_bound_species(self):

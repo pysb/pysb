@@ -24,6 +24,7 @@ def test_simres_dataframe():
     trajectories3 = sim.run(tspan=tspan3).species
 
     # Try a simulation result with two different tspan lengths
+    sim = ScipyOdeSimulator(model, param_values={'k6' : [1.,1.]}, integrator='lsoda')
     sim.tout = [tspan1, tspan2]
     simres = SimulationResult(sim, [trajectories1, trajectories2])
     df = simres.dataframe

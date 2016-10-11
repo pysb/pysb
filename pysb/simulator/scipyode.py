@@ -28,10 +28,8 @@ class ScipyOdeSimulator(Simulator):
             'with_jacobian': True,
             # Set nsteps as high as possible to give our users flexibility in
             # choosing their time step. (Let's be safe and assume vode was
-            # compiled
-            # with 32-bit ints. What would actually happen if it was and we
-            # passed
-            # 2**64-1 though?)
+            # compiled with 32-bit ints. What would actually happen if it was 
+            # and we passed 2**64-1 though?)
             'nsteps': 2 ** 31 - 1,
         },
         'cvode': {
@@ -241,7 +239,7 @@ class ScipyOdeSimulator(Simulator):
                     distutils.errors.CompileError, ImportError):
                 pass
 
-    def run(self, tspan=None, param_values=None, initials=None):
+    def run(self, tspan=None, initials=None, param_values=None):
         if tspan is not None:
             self.tspan = tspan
         if self.tspan is None:
@@ -253,8 +251,8 @@ class ScipyOdeSimulator(Simulator):
             self.param_values = param_values
         if initials is not None:
             self.initials = initials
-        y0 = self.initials_list
-        param_values = self.param_values
+        y0 = self.initials[0]
+        param_values = self.param_values[0]
         if self.integrator == 'lsoda':
             trajectories[0] = scipy.integrate.odeint(self.func,
                                                 y0,
@@ -285,5 +283,6 @@ class ScipyOdeSimulator(Simulator):
             if self.verbose: print("...Done.")
             if self.integrator.t < self.tspan[-1]:
                 trajectories[0, i:, :] = 'nan'
+                
         self.tout = [self.tspan, ]
         return SimulationResult(self, trajectories)
