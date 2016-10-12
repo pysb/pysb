@@ -23,6 +23,13 @@ try:
 except ImportError:
     pass
 
+# Python 2
+try:
+    basestring
+# Python 3
+except NameError:
+    basestring = str
+
 # Cached value of BNG path
 _bng_path = None
 
@@ -154,7 +161,7 @@ class BngBaseInterface(object):
         param :
             An argument to a BNG action call
         """
-        if isinstance(param, str):
+        if isinstance(param, basestring):
             return '"%s"' % param
         elif isinstance(param, bool):
             return 1 if param else 0

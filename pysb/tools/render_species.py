@@ -30,6 +30,13 @@ import re
 import pygraphviz
 import pysb.bng
 
+# Python 2
+try:
+    basestring
+# Python 3
+except NameError:
+    basestring = str
+
 def run(model):
     """
     Render the species from a model into the "dot" graph format.
@@ -72,7 +79,7 @@ def render_species_as_dot(species_list, graph_name=""):
             for site in mp.monomer.sites:
                 site_state = None
                 cond = mp.site_conditions[site]
-                if isinstance(cond, str):
+                if isinstance(cond, basestring):
                     site_state = cond
                 elif isinstance(cond, tuple):
                     site_state = cond[0]
