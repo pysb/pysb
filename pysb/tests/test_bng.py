@@ -106,6 +106,3 @@ def test_unicode_strs():
     Rule(u'rule1', A(b=u'y') >> B(), Parameter(u'k', 1))
     Initial(A(b=u'y'), Parameter(u'A_0', 100))
     generate_equations(model)
-
-if __name__ == '__main__':
-    test_unicode_strs()

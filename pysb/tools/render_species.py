@@ -30,10 +30,9 @@ import re
 import pygraphviz
 import pysb.bng
 
-# Python 2
+# Alias basestring under Python 3 for forwards compatibility
 try:
     basestring
-# Python 3
 except NameError:
     basestring = str
 

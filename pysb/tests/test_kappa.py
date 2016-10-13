@@ -182,7 +182,3 @@ def test_unicode_strs():
     Observable(u'B_', B())
     npts = 200
     kres = run_simulation(model, time=100, points=npts, seed=_KAPPA_SEED)
-
-if __name__ == '__main__':
-    test_unicode_strs()
-
