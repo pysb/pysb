@@ -3,6 +3,11 @@ import warnings
 import pysb
 import sympy
 
+# Alias basestring under Python 3 for forwards compatibility
+try:
+    basestring
+except NameError:
+    basestring = str
 
 class BngGenerator(object):
 
@@ -174,16 +179,16 @@ def format_site_condition(site, state):
     if state == None:
         state_code = ''
     # single bond
-    elif type(state) == int:
+    elif isinstance(state, int):
         state_code = '!' + str(state)
     # multiple bonds
-    elif type(state) == list and all(isinstance(s, int) for s in state):
+    elif isinstance(state, list) and all(isinstance(s, int) for s in state):
         state_code = ''.join('!%d' % s for s in state)
     # state
-    elif type(state) == str:
+    elif isinstance(state, basestring):
         state_code = '~' + state
     # state AND single bond
-    elif type(state) == tuple:
+    elif isinstance(state, tuple):
         # bond is wildcard (zero or more unspecified bonds)
         if state[1] == pysb.WILD:
             state = (state[0], '?')
