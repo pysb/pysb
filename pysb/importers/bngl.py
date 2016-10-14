@@ -314,7 +314,8 @@ def model_from_bngl(filename, force=False):
     """
     Convert a BioNetGen .bngl model file into a PySB Model.
 
-    **Limitations**
+    Notes
+    -----
 
     The following features are not supported in PySB and will cause an error
     if present in a .bngl file:

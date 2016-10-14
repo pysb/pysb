@@ -218,13 +218,13 @@ class SimulationResult(object):
         Please note that the interface for this class is considered
         experimental and may change without warning as PySB is updated.
 
-    .. note::
+    Notes
+    -----
+    In the attribute descriptions, a "trajectory set" is a 2D numpy array,
+    species on first axis and time on second axis, with each element
+    containing the concentration or count of the species at the specified time.
 
-        In the attribute descriptions, a "trajectory set" is a 2D numpy
-        array, species on first axis and time on second axis, with each element
-        containing the concentration or count of the species at the specified time.
-
-        A list of trajectory sets contains a trajectory set for each simulation.
+    A list of trajectory sets contains a trajectory set for each simulation.
 
     Parameters
     ----------

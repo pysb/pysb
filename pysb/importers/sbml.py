@@ -122,7 +122,8 @@ def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
     :class:`BnglBuilder` class converts the BioNetGen language model into a
     PySB Model.
 
-    **Limitations**
+    Notes
+    -----
 
     Read the `sbmlTranslator documentation
     <http://bionetgen.org/index.php/SBML2BNGL>`_ for further information on

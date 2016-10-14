@@ -81,10 +81,6 @@ Option 1: Install PySB natively on your computer
    appears, you have succeeded in installing PySB! You can now proceed to
    the :doc:`tutorial`.
 
-   Those from a programming background may choose to use Python from within
-   an Integrated Development Environment (IDE) such as `PyCharm`_,
-   `Eclipse`_ or `Emacs`_.
-
 Recommended additional software
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -95,7 +91,8 @@ provides extra capabilities and features when installed.
 
   This Python package allows you to plot the results of your simulations. It
   is not a hard requirement of PySB but many of the example scripts use it.
-  Installed with :command:`pip install matplotlib`.
+  `matplotlib`_ is included with `Anaconda`_. Otherwise, it can be installed
+  with :command:`pip install matplotlib`.
 
 * `pandas`_
 
@@ -103,12 +100,14 @@ provides extra capabilities and features when installed.
   numerical datasets, with statistical summaries and database-like
   manipulation capabilities. It is not a hard requirement of PySB, but it is a
   useful addition, particularly with large sets of simulation results.
-  Installed with :command:`pip install pandas`.
+  `pandas`_ is included with `Anaconda`_. Otherwise, it can be installed with
+  :command:`pip install pandas`.
 
 * `IPython`_
 
   An alternate interactive Python shell, much improved over the standard one.
-  Installed with :command:`pip install ipython`.
+  `IPython`_ is included with `Anaconda`_. Otherwise, it can be installed
+  with :command:`pip install ipython`.
 
 * `Kappa`_ 4.0
 
@@ -208,6 +207,3 @@ https://github.com/jupyter/docker-stacks/tree/master/scipy-notebook
 .. _matplotlib: http://matplotlib.org/
 .. _BioNetGen: http://www.bionetgen.org/
 .. _Perl: http://www.perl.org/
-.. _PyCharm: https://www.jetbrains.com/pycharm/
-.. _Eclipse: http://www.eclipse.org
-.. _Emacs: https://www.gnu.org/s/emacs
