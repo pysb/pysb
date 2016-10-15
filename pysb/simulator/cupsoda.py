@@ -1,3 +1,4 @@
+from __future__ import print_function as _
 from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
 import pysb.bng
 import numpy as np
@@ -506,7 +507,7 @@ class CupSodaSimulator(Simulator):
 
     def _get_cmatrix(self):
         if self.verbose:
-            print "Constructing the c_matrix:"
+            print("Constructing the c_matrix:")
         c_matrix = np.zeros((len(self.param_values), self._len_rxns))
         par_names = [p.name for p in self._model_parameters_rules]
         rate_mask = np.array([p in self._model_parameters_rules for p in
@@ -594,12 +595,12 @@ class CupSodaSimulator(Simulator):
         start = time.time()
         self._load_with_pandas(filename)
         end = time.time()
-        load_time_pandas = end_time - start_time
+        load_time_pandas = end - start
 
         start = time.time()
         data = self._load_with_openfile(filename)
         end = time.time()
-        load_time_openfile = end_time - start_time
+        load_time_openfile = end - start
 
         if load_time_pandas < load_time_openfile:
             return data, True
