@@ -555,14 +555,19 @@ class CupSodaSimulator(Simulator):
         files = [filename for filename in os.listdir(dir) if
                  re.match(self._prefix, filename)]
         if len(files) == 0:
-            raise Exception("Cannot find any output files to load data from.")
-        trajectories = len(files) * [None]
-        tout = len(files) * [None]
+            raise SimulatorException("Cannot find any output files to load data from.")
+        if len(files) != len(param_values):
+            raise SimulatorException("Number of input files (%d) does not match number "
+                                     "of requested simulations (%d)." % 
+                                     (len(files), len(self.param_values)))
+        n_sims = len(files)
+        trajectories = [None] * n_sims
+        tout = [None] * n_sims
         traj_n = np.ones((self._len_tspan, self._len_species)) * float('nan')
         tout_n = np.ones(self._len_tspan) * float('nan')
         # load the data
         indir_prefix = os.path.join(dir, self._prefix)
-        for n in range(len(self._y)):
+        for n in range(n_sims):
             trajectories[n] = traj_n.copy()
             tout[n] = tout_n.copy()
             filename = indir_prefix + "_" + str(n)
