@@ -556,7 +556,7 @@ class CupSodaSimulator(Simulator):
                  re.match(self._prefix, filename)]
         if len(files) == 0:
             raise SimulatorException("Cannot find any output files to load data from.")
-        if len(files) != len(param_values):
+        if len(files) != len(self.param_values):
             raise SimulatorException("Number of input files (%d) does not match number "
                                      "of requested simulations (%d)." % 
                                      (len(files), len(self.param_values)))
