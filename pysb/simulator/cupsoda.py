@@ -9,8 +9,11 @@ import subprocess
 import tempfile
 import time
 import warnings
-import pandas # try block here? so pandas isn't a required dependency?
 import shutil
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
@@ -595,24 +598,27 @@ class CupSodaSimulator(Simulator):
         If the file is large, pandas is generally significantly faster.
 
         :param filename:
-        :return: fastest method
+        :return: numpy.ndarray, bool
         """
-        start = time.time()
-        self._load_with_pandas(filename)
-        end = time.time()
-        load_time_pandas = end - start
-
+        # using open(filename,...)
         start = time.time()
         data = self._load_with_openfile(filename)
         end = time.time()
         load_time_openfile = end - start
-
-        if load_time_pandas < load_time_openfile:
-            return data, True
+        
+        # using pandas
+        if pd:
+            start = time.time()
+            self._load_with_pandas(filename)
+            end = time.time()
+            load_time_pandas = end - start
+            if load_time_pandas < load_time_openfile:
+                return data, True
+            
         return data, False
 
     def _load_with_pandas(self, filename):
-        data = pandas.read_csv(filename, sep='\t', skiprows=None, header=None).as_matrix()
+        data = pd.read_csv(filename, sep='\t', skiprows=None, header=None).as_matrix()
         return data
 
     def _load_with_openfile(self, filename):
