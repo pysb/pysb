@@ -57,7 +57,7 @@ def _get_cupsoda_path():
         'c:/Program Files/cupSODA',
     ]
 
-    def check_bin_dir(bin_dir):
+    def _check_bin_dir(bin_dir):
         # Return the full path to the cupSODA executable or False if it
         # can't be found in one of the expected places.
         bin_path = os.path.join(bin_dir, 'cupSODA')
@@ -68,7 +68,7 @@ def _get_cupsoda_path():
 
     # First check the environment variable, which has the highest precedence
     if path_var in os.environ:
-        bin_path = check_bin_dir(os.environ[path_var])
+        bin_path = _check_bin_dir(os.environ[path_var])
         if not bin_path:
             raise SimulatorException(
                             'Environment variable %s is set but the path could'
@@ -78,7 +78,7 @@ def _get_cupsoda_path():
     # Check the standard locations for the executable
     else:
         for b in bin_dirs:
-            bin_path = check_bin_dir(b)
+            bin_path = _check_bin_dir(b)
             if bin_path:
                 break
             else:
@@ -112,37 +112,25 @@ class CupSodaSimulator(Simulator):
         parameters.
     verbose : bool, optional
         Verbose output
-    cleanup : bool, optional
-        Delete all temporary files after the simulation is finished. 
-        Includes both BioNetGen and cupSODA files. Useful for debugging.
-    prefix : string, optional
-        Prefix for the temporary directory containing cupSODA input and
-        output files. Default is the model name.
-    base_dir : string, optional
-        Directory in which temporary directory with cupSODA input and 
-        output files are placed. Default is a system directory determined
-        by `tempfile.mkdtemp`.
-    integrator : string, optional
-        Name of the integrator to use, taken from the integrators listed in
-        `default_integrator_options`. Default is 'cupsoda'.
-    max_steps : int, optional
-        Maximum number of internal iterations (LSODA's MXSTEP).
-    atol : float, optional
-        Absolute integrator tolerance. Default is 1e-8.
-    rtol : float, optional
-        Relative integrator tolerance. Default is 1e-8.
-    n_blocks : int, optional
-        Number of GPU blocks. Default is determined by querying the 
-        GPU architecture.
-    gpu : int, optional
-        Index of the GPU to run on. Default is 0.
-    vol : float, optional
-        Volume of the reaction container.
-    obs_species_only : bool, optional
-        Output only for species in observables. Default is True.
-    memory_usage : string, optional
-        cupSODA memory usage mode. Allowed values are 'global', 'shared',
-        and 'sharedconstant'. Default is 'sharedconstant'.
+    **kwargs: dict
+        Extra keyword arguments, including:
+        * ``gpu``: Index of GPU to run on (default: 0)
+        * ``vol``: System volume; required if model encoded in extrinsic 
+          (number) units (default: None)
+        * ``obs_species_only``: Only output species contained in observables
+          (default: True) 
+        * ``cleanup``: Delete all temporary files after the simulation is 
+          finished. Includes both BioNetGen and cupSODA files. Useful for 
+          debugging. (default: True)
+        * ``prefix``: Prefix for the temporary directory containing cupSODA input 
+          and output files. (default: model name)
+        * ``base_dir``: Directory in which temporary directory with cupSODA input  
+          and output files are placed. (default: system directory determined by 
+          `tempfile.mkdtemp`)
+        * ``integrator``: Name of the integrator to use; see 
+          `default_integrator_options`. (default: 'cupsoda')
+        * ``integrator_options``: A dictionary of keyword arguments to
+          supply to the integrator; see `default_integrator_options`.
 
     Attributes
     ----------
@@ -161,15 +149,19 @@ class CupSodaSimulator(Simulator):
     param_values : numpy.ndarray
         Parameters for all simulations. Dimensions are number of simulations 
         x number of parameters.
+    gpu : int
+        Index of GPU being run on
+    vol : float or None
+        System volume
     tempfile_dir : string
         Temporary directory containing directories with cupSODA input and
         output files.
     opts: dict
         Dictionary of options for the integrator in use.
-    default_integrator_options : dict
-        Nested dictionary of default options for all supported integrators.
     integrator : string
         Name of the integrator in use.
+    default_integrator_options : dict
+        Nested dictionary of default options for all supported integrators.   
         
     Notes
     -----
@@ -193,10 +185,7 @@ class CupSodaSimulator(Simulator):
             'atol': 1e-8,  # absolute tolerance
             'rtol': 1e-8,  # relative tolerance
             'n_blocks': None,  # number of GPU blocks
-            'gpu': 0,  # which GPU
-            'vol': None,  # volume
-            'obs_species_only': True,  # print only observable species
-            'memory_usage': 'global'  # global memory (see _memory_options dict)
+            'memory_usage': 'sharedconstant'  # see _memory_options dict
         },
     }
     
@@ -208,6 +197,9 @@ class CupSodaSimulator(Simulator):
                                                param_values=param_values,
                                                verbose=verbose, 
                                                **kwargs)
+        self.gpu = kwargs.get('gpu', 0)
+        self.vol = kwargs.get('vol', None)
+        self._obs_species_only = kwargs.get('obs_species_only', True)
         self._cleanup = kwargs.get('cleanup', True)
         self._prefix = kwargs.get('prefix', self._model.name.replace('.','_'))
         self._base_dir = kwargs.get('base_dir', None)
@@ -329,11 +321,8 @@ class CupSodaSimulator(Simulator):
         # Path to cupSODA executable
         bin_path = _get_cupsoda_path()
 
-        # GPU parameters
-        gpu = self.opts.get('gpu')
-        if gpu is None:
-            gpu = 0
-        n_blocks = self._get_nblocks(gpu)
+        # Number of blocks
+        n_blocks = self._get_nblocks(self.gpu)
         
         # Create cupSODA input files
         self._create_input_files(self._cupsoda_infiles_dir)
@@ -346,7 +335,7 @@ class CupSodaSimulator(Simulator):
                    str(n_blocks),
                    self._cupsoda_outfiles_dir, 
                    self._prefix,
-                   str(gpu),
+                   str(self.gpu),
                    '0', 
                    self._memory_usage,
                    '1' if self.verbose else '0']
@@ -417,7 +406,7 @@ class CupSodaSimulator(Simulator):
         # cs_vector
         with open(os.path.join(dir, "cs_vector"), 'wb') as cs_vector:
             self._out_species = range(self._len_species) # species to output
-            if self.opts.get('obs_species_only'):
+            if self._obs_species_only:
                 self._out_species = [False for sp in self._model.species]
                 for obs in self._model.observables:
                     for i in obs.species:
@@ -463,9 +452,9 @@ class CupSodaSimulator(Simulator):
             # by N_A*vol to get concentration
             # (NOTE: act on a copy of self.initials, not
             # the original, which we don't want to modify)
-            if self.opts['vol']:
+            if self.vol:
                 mx0 = mx0.copy()
-                mx0 /= (N_A * self.opts['vol'])
+                mx0 /= (N_A * self.vol)
                 # Set the concentration of __source() to 1
                 for i,sp in enumerate(self._model.species):
                     if str(sp) == '__source()':
@@ -547,8 +536,8 @@ class CupSodaSimulator(Simulator):
                         # FIXME: need to detect non-numbers and throw an error
                         rate *= float(x)
                 # volume correction
-                if self.opts['vol']:
-                    rate *= (N_A * self.opts['vol']) ** (rate_order[j] - 1)
+                if self.vol:
+                    rate *= (N_A * self.vol) ** (rate_order[j] - 1)
                 c_matrix[i][j] = rate
         if self.verbose:
             print("100%")
@@ -588,8 +577,8 @@ class CupSodaSimulator(Simulator):
             tout[n] = data[:, 0]
             trajectories[n][:, self._out_species] = data[:, 1:]
             # volume correction
-            if self.opts['vol']:
-                trajectories[n][:, self._out_species] *= (N_A * self.opts['vol'])
+            if self.vol:
+                trajectories[n][:, self._out_species] *= (N_A * self.vol)
         return np.array(tout), np.array(trajectories)
 
     def _test_pandas(self, filename):
