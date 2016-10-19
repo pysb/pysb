@@ -121,14 +121,14 @@ class CupSodaSimulator(Simulator):
           (default: True) 
         * ``cleanup``: Delete all temporary files after the simulation is 
           finished. Includes both BioNetGen and cupSODA files. Useful for 
-          debugging. (default: True)
+          debugging (default: True)
         * ``prefix``: Prefix for the temporary directory containing cupSODA input 
-          and output files. (default: model name)
+          and output files (default: model name)
         * ``base_dir``: Directory in which temporary directory with cupSODA input  
-          and output files are placed. (default: system directory determined by 
+          and output files are placed (default: system directory determined by 
           `tempfile.mkdtemp`)
         * ``integrator``: Name of the integrator to use; see 
-          `default_integrator_options`. (default: 'cupsoda')
+          `default_integrator_options` (default: 'cupsoda')
         * ``integrator_options``: A dictionary of keyword arguments to
           supply to the integrator; see `default_integrator_options`.
 
@@ -153,9 +153,9 @@ class CupSodaSimulator(Simulator):
         Index of GPU being run on
     vol : float or None
         System volume
-    tempfile_dir : string
-        Temporary directory containing directories with cupSODA input and
-        output files.
+    outdir : string
+        Temporary directory where cupSODA output files are placed. Input
+        files are also placed here.
     opts: dict
         Dictionary of options for the integrator in use.
     integrator : string
@@ -244,8 +244,12 @@ class CupSodaSimulator(Simulator):
             Initial species concentrations for all simulations. Dimensions are
             number of simulation x number of species.    
         param_values : list-like, optional
-            Parameters for all simulations. Dimensions are number of simulations
-            x number of parameters.
+            Parameters for all simulations. Dimensions are number of simulations x
+            number of parameters.
+
+        Returns
+        -------
+        A :class:`SimulationResult` object
 
         Notes
         -----
@@ -253,69 +257,60 @@ class CupSodaSimulator(Simulator):
            or `run`.
            
         2. If neither `initials` nor `param_values` are defined in either 
-           `__init__` or `run` a warning is thrown and a single simulation is 
-           run with the initial concentrations and parameter values defined in 
-           the model.
+           `__init__` or `run` a single simulation is run with the initial 
+           concentrations and parameter values defined in the model.
         """
         if tspan is not None:
             self.tspan = tspan
         if self.tspan is None:
             raise SimulatorException("tspan must be defined before "
                                      "simulation can run")
-
-        if param_values is None and initials is None:
-            warnings.warn("Neither 'param_values' nor 'initials' were supplied. "
-                          "Running a single simulation with model defaults.")
-        if param_values is None:
+            
+        if param_values is not None:
+            self.param_values = param_values
+        if initials is not None:
+            self.initials = initials
+            
+        if len(self.param_values) == 1:
             # Run all simulations with the same parameters
-            param_values = np.array([p.value for p in self._model.parameters])
-            param_values = np.repeat([param_values],
-                                     1 if initials is None else
-                                     len(initials),
-                                     axis=0)
-        if initials is None:
+            self.param_values = np.repeat(self.param_values,
+                                          len(self.initials),
+                                          axis=0)        
+            
+        if len(self.initials) == 1:
             # Run all simulations with the same initial conditions
-            species_names = [str(s) for s in self._model.species]
-            initials = np.zeros(self._len_species)
-            for ic in self._model.initial_conditions:
-                initials[species_names.index(str(ic[0]))] = ic[1].value
-            initials = np.repeat([initials],
-                                 1 if param_values is None else
-                                 len(param_values),
-                                 axis=0)
+            self.initials = np.repeat(self.initials,
+                                      len(self.param_values),
+                                      axis=0)
 
         # Error checks on 'param_values' and 'initials'
-        if len(param_values) != len(initials):
+        if len(self.param_values) != len(self.initials):
             raise SimulatorException(
                     "'param_values' and 'initials' must be equal lengths."
-                    "\nlen(param_values): " + str(len(param_values)) + 
-                    "\nlen(initials): " + str(len(initials)))
-        elif len(np.array(param_values).shape) != 2 or \
-                np.array(param_values).shape[1] != self._len_params:
+                    "\nlen(param_values): " + str(len(self.param_values)) + 
+                    "\nlen(initials): " + str(len(self.initials)))
+        elif len(self.param_values.shape) != 2 or \
+                self.param_values.shape[1] != self._len_params:
             raise SimulatorException(
                     "'param_values' must be a 2D array of dimension N_SIMS x "
                     "len(model.parameters). "
-                    "\nparam_values.shape: " + str(np.array(param_values).shape) +
+                    "\nparam_values.shape: " + str(self.param_values.shape) +
                     "\nlen(model.parameters): " + str(self._len_params))
-        elif len(np.array(initials).shape) != 2 or \
-                np.array(initials).shape[1] != self._len_species:
+        elif len(self.initials.shape) != 2 or \
+                self.initials.shape[1] != self._len_species:
             raise SimulatorException(
                     "'initials' must be a 2D array of dimension N_SIMS x "
                     "len(model.species). "
-                    "\ninitials.shape: " + str(np.array(initials).shape) +
+                    "\ninitials.shape: " + str(self.initials.shape) +
                     "\nlen(model.species): " + str(self._len_species))
-        
-        # Set the parameter values and initial conditions
-        self.param_values = param_values
-        self.initials = initials
 
         # Create directories for cupSODA input and output files
-        self.tempfile_dir = tempfile.mkdtemp(prefix=self._prefix+'_', dir=self._base_dir)
+        self.outdir = tempfile.mkdtemp(prefix=self._prefix+'_', dir=self._base_dir)
         if self.verbose:
-            print("Output directory is %s" % self.tempfile_dir)
-        self._cupsoda_infiles_dir = os.path.join(self.tempfile_dir,"INPUT")
+            print("Output directory is %s" % self.outdir)
+        self._cupsoda_infiles_dir = os.path.join(self.outdir,"INPUT")
         os.mkdir(self._cupsoda_infiles_dir)
-        self._cupsoda_outfiles_dir = os.path.join(self.tempfile_dir,"OUTPUT")
+        self._cupsoda_outfiles_dir = os.path.join(self.outdir,"OUTPUT")
         os.mkdir(self._cupsoda_outfiles_dir)
 
         # Path to cupSODA executable
@@ -345,9 +340,17 @@ class CupSodaSimulator(Simulator):
         p = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT)
-        self.tout, trajectories = self._load_trajectories(self._cupsoda_outfiles_dir)
+        if self.verbose:
+            for line in iter(p.stdout.readline, b''):
+                print(line, end="")
+        (p_out, p_err) = p.communicate()
+        if p.returncode:
+            raise SimulatorException( p_out.rstrip("at line") +
+                                     "\n" + p_err.rstrip() )
+        self.tout, trajectories = self._load_trajectories(
+                                       self._cupsoda_outfiles_dir)
         if self._cleanup:
-            shutil.rmtree(self.tempfile_dir)
+            shutil.rmtree(self.outdir)
         
         return SimulationResult(self, trajectories)
 
@@ -611,3 +614,22 @@ class CupSodaSimulator(Simulator):
             data = [line.rstrip('\n').split() for line in f]
         data = np.array(data, dtype=np.float, copy=False)
         return data
+    
+def run_cupsoda(model, tspan, initials=None, param_values=None, integrator='cupsoda',
+         cleanup=True, verbose=False, **kwargs):
+    '''Wrapper method for running cupSODA simulations.
+    
+    Parameters
+    ----------
+    See ``CupSodaSimulator`` constructor.
+    
+    Returns
+    -------
+    SimulationResult.all : list of record arrays
+        List of trajectory sets. The first dimension contains species,
+        observables and expressions (in that order)
+    '''
+    sim = CupSodaSimulator(model, tspan=tspan, integrator=integrator, 
+                           cleanup=cleanup, verbose=verbose, **kwargs)    
+    simres = sim.run(initials=initials, param_values=param_values)
+    return simres.all

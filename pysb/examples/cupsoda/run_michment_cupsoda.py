@@ -1,24 +1,22 @@
 from pysb.examples.michment import model
-from pysb.simulator.cupsoda import CupSodaSimulator
+from pysb.simulator.cupsoda import run_cupsoda
 import numpy as np
 import matplotlib.pyplot as plt
+import itertools
+
+# Construct initials dict
+mult = np.linspace(0.8, 1.2, 11)
+matrix = [mult*ic[1].value for ic in model.initial_conditions]
+initials = {}
+for i,ic in enumerate(model.initial_conditions):
+    initials[ic[0]] = []
+    for tup in itertools.product(*matrix): # Cartesian product
+        initials[ic[0]].append(tup[i])
 
 tspan = np.linspace(0, 50, 501)
-sim = CupSodaSimulator(model, tspan, atol=1e-10, rtol=1e-4, 
-                       verbose=False)
-
-et_ref = model.parameters['Etot'].value
-s0_ref = model.parameters['S0'].value
-
-initials = []
-for Etot in np.linspace(0.8, 1.2, 21):
-    for S0 in np.linspace(0.8, 1.2, 21):
-        initials.append( [Etot*et_ref, S0*s0_ref] + 
-                         [0]*(len(model.species)-2) )
-
-trajectories = sim.run(initials=initials).observables
-
-x = np.array([tr[:]['Product'] for tr in trajectories]).T
+trajectories = run_cupsoda(model, tspan, initials=initials, 
+                           atol=1e-10, rtol=1e-4, verbose=True)
+x = np.array([tr['Product'] for tr in trajectories]).T
  
 plt.plot(tspan, x.mean(axis=1), 'b', lw=3, label="Product")
 plt.plot(tspan, x.max(axis=1), 'b--', lw=2, label="min/max")
