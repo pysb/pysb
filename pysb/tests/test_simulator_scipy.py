@@ -102,7 +102,7 @@ class TestScipySimulator(object):
                                self.mon('B')(b=None): 0})
         assert np.allclose(simres.observables['AB_complex'][0], 100)
 
-    @raises(TypeError)
+    @raises(TypeError, SimulatorException)
     def test_y0_non_numeric_value(self):
         """Test y0 with non-numeric value."""
         self.sim.run(initials={self.mon('A')(a=None): 'eggs'})
@@ -128,7 +128,7 @@ class TestScipySimulator(object):
         """Test param_values with invalid parameter name."""
         self.sim.run(param_values={'spam': 150})
 
-    @raises(ValueError, TypeError)
+    @raises(ValueError, TypeError, SimulatorException)
     def test_param_values_non_numeric_value(self):
         """Test param_values with non-numeric value."""
         self.sim.run(param_values={'ksynthA': 'eggs'})

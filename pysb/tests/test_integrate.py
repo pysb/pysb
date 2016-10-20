@@ -3,6 +3,7 @@ from pysb.integrate import odesolve, Solver
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.bng import run_ssa
+from pysb.simulator.base import SimulatorException
 
 from pysb.examples import robertson, earm_1_0
 
@@ -76,7 +77,7 @@ class TestSolver(object):
         """Test param_values with invalid parameter name."""
         self.solver.run(param_values={'spam': 150})
 
-    @raises(ValueError, TypeError)
+    @raises(ValueError, TypeError, SimulatorException)
     def test_param_values_non_numeric_value(self):
         """Test param_values with non-numeric value."""
         self.solver.run(param_values={'ksynthA': 'eggs'})
