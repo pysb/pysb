@@ -180,6 +180,9 @@ class CupSodaSimulator(Simulator):
        to 'nan'.
     """
 
+    _supports = { 'multi_initials' : True,
+                  'multi_param_values' : True }
+
     _memory_options = {'global': '0', 'shared': '1', 'sharedconstant': '2'}
 
     default_integrator_options = {
