@@ -21,6 +21,10 @@ def _exec(code, locals):
 
 
 class ScipyOdeSimulator(Simulator):
+    
+    _supports = { 'multi_initials' : False,
+                  'multi_param_values' : False }
+    
     # some sane default options for a few well-known integrators
     default_integrator_options = {
         'vode': {
@@ -43,9 +47,6 @@ class ScipyOdeSimulator(Simulator):
     
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
-        
-        self._supports['multi_initials'] = False
-        self._supports['multi_param_values'] = False
         
         super(ScipyOdeSimulator, self).__init__(model,
                                                 tspan=tspan,
