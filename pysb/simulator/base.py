@@ -122,14 +122,19 @@ class Simulator(object):
             else:
                 if not isinstance(new_initials, np.ndarray):
                     new_initials = np.array(new_initials, copy=False)
-                # accept n-dimensional array of species amounts as an argument
+                # if new_initials is a 1D array, convert to a 2D array of length 1
                 if len(new_initials.shape) == 1:
                     new_initials = np.resize(new_initials, (1,len(new_initials)))
+                # check whether simulator supports multiple initial values
+                elif not self._supports['multi_initials']:
+                    raise SimulatorException(self.__class__.__name__ + 
+                                    " does not support multiple initial"
+                                    " values at this time.")
+                # make sure number of initials values equals len(model.species)
                 if new_initials.shape[1] != len(self._model.species):
                     raise ValueError("new_initials must be the same length as "
                                      "model.species")
-                else:
-                    self._initials = new_initials
+                self._initials = new_initials
 
 #     @property
     def _get_initials(self):
@@ -144,23 +149,14 @@ class Simulator(object):
         # specified in the self._initials dictionary
         n_sims = 1
         if isinstance(self._initials, dict):
-            # check if dict values are numbers or iterables.
-            # if numbers, convert them to 1-element lists.
-            # also record the length of the arrays and make 
+            # record the length of the arrays and make 
             # sure they're all the same.
             for key,val in self._initials.items():                    
-                if isinstance(val, collections.Iterable):
-                    if n_sims == 1:
-                        n_sims = len(val)
-                    elif n_sims != len(val):
-                        raise Exception("all arrays in new_initials dictionary "
-                                        "must be equal length")
-                else:
-                    # convert number to 1-element list
-                    if n_sims != 1:
-                        raise Exception("new_initials dictionary cannot have "
-                                        "both numbers and arrays")
-                    self._initials[key] = [val]
+                if n_sims == 1:
+                    n_sims = len(val)
+                elif len(val) != n_sims:
+                    raise Exception("all arrays in new_initials dictionary "
+                                    "must be equal length")
         else:
             self._initials = {}
         y0 = np.zeros((len(self._model.species),))
@@ -228,29 +224,18 @@ class Simulator(object):
             return self._params
         else:
             # create parameter vector from the values in the model
+            n_sims = 1
             if isinstance(self._params, dict):
                 param_values_dict = self._params
-                # check if dict values are numbers or iterables.
-                # if numbers, convert them to 1-element lists.
-                # also record the length of the arrays and make 
+                # record the length of the arrays and make 
                 # sure they're all the same.
-                n_sims = None
                 for key,val in param_values_dict.items():                    
-                    if isinstance(val, collections.Iterable):
-                        if n_sims is None:
-                            n_sims = len(val)
-                        elif n_sims != len(val):
-                            raise Exception("all arrays in new_params dictionary "
-                                            "must be equal length")
-                    else:
-                        if n_sims is None:
-                            n_sims = 1
-                        elif n_sims != 1:
-                            raise Exception("new_params dictionary cannot have "
-                                            "both numbers and arrays")
-                        param_values_dict[key] = [val]
+                    if n_sims == 1:
+                        n_sims = len(val)
+                    elif len(val) != n_sims:
+                        raise Exception("all arrays in new_params dictionary "
+                                        "must be equal length")
             else:
-                n_sims = 1
                 param_values_dict = {}
             param_values = np.array([p.value for p in self._model.parameters])
             param_values = np.repeat([param_values], n_sims, axis=0)
@@ -293,9 +278,15 @@ class Simulator(object):
         else:
             if not isinstance(new_params, np.ndarray):
                 new_params = np.array(new_params)
-            # accept n-dimensional array of parameter values as an argument
+            # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
                 new_params = np.resize(new_params, (1,len(new_params)))
+            # check whether simulator supports multiple parameter values
+            elif not self._supports['multi_param_values']:
+                raise SimulatorException(self.__class__.__name__ + 
+                                " does not support multiple parameter"
+                                " values at this time.")
+            # make sure number of param values equals len(model.parameters)
             if new_params.shape[1] != len(self._model.parameters):
                 raise ValueError("new_params must be the same length as "
                                  "model.parameters")
