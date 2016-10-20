@@ -2,20 +2,25 @@ from pysb.examples.michment import model
 from pysb.simulator import ScipyOdeSimulator
 import numpy as np
 import matplotlib.pyplot as plt
+import itertools
+
+# Construct initials dict
+mult = np.linspace(0.8, 1.2, 11)
+matrix = [mult*ic[1].value for ic in model.initial_conditions]
+initials = {}
+for i,ic in enumerate(model.initial_conditions):
+    initials[ic[0]] = []
+    for tup in itertools.product(*matrix): # Cartesian product
+        initials[ic[0]].append(tup[i])
 
 tspan = np.linspace(0, 50, 501)
-
 sim = ScipyOdeSimulator(model, tspan, verbose=False)
 
-etot_ref = model.parameters['Etot'].value
-s0_ref = model.parameters['S0'].value
-
+n_sims = len(initials.values()[0])
 trajectories = []
-for Etot in np.linspace(0.8, 1.2, 21):
-    for S0 in np.linspace(0.8, 1.2, 21):
-        model.parameters['Etot'].value = Etot*etot_ref
-        model.parameters['S0'].value = S0*s0_ref
-        trajectories.append( sim.run().all )
+for n in range(n_sims):
+    trajectories.append( sim.run( initials=
+        {key : val[n] for key,val in initials.items()} ).all )
 
 x = np.array([tr['Product'] for tr in trajectories]).T
 
