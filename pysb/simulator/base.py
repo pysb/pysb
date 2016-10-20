@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 import sympy
 import collections
+import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
                       Component
 try:
@@ -181,7 +182,7 @@ class Simulator(object):
                     
                     def _get_value(sim):
                         if isinstance(value_obj, collections.Iterable) and \
-                           isinstance(value_obj[sim], (int, float)):
+                           isinstance(value_obj[sim], numbers.Number):
                             value = value_obj[sim]
                         elif isinstance(value_obj, Component):
                             if value_obj in self._model.parameters:
