@@ -346,7 +346,7 @@ class CupSodaSimulator(Simulator):
         # Run simulation and return trajectories
         p = subprocess.Popen(command,
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT)
+                             stderr=subprocess.PIPE)
         if self.verbose:
             for line in iter(p.stdout.readline, b''):
                 print(line, end="")
