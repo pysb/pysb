@@ -299,6 +299,52 @@ class Simulator(object):
 
         Implementations should return a :class:`.SimulationResult` object.
         """
+        if tspan is not None:
+            self.tspan = tspan
+        if self.tspan is None:
+            raise SimulatorException("tspan must be defined before "
+                                     "simulation can run")
+        if param_values is not None:
+            self.param_values = param_values
+        if initials is not None:
+            self.initials = initials
+        # If only one set of param_values, run all simulations 
+        # with the same parameters
+        if len(self.param_values) == 1:
+            self.param_values = np.repeat(self.param_values,
+                                          len(self.initials),
+                                          axis=0)        
+        # If only one set of initials, run all simulations 
+        # with the same initial conditions   
+        if len(self.initials) == 1:
+            self.initials = np.repeat(self.initials,
+                                      len(self.param_values),
+                                      axis=0)
+        # Error checks on 'param_values' and 'initials'
+        if len(self.param_values) != len(self.initials):
+            raise SimulatorException(
+                    "'param_values' and 'initials' must be equal lengths.\n"
+                    "len(param_values): %d\n"
+                    "len(initials): %d" % 
+                    (len(self.param_values), len(self.initials)))
+        elif len(self.param_values.shape) != 2 or \
+                self.param_values.shape[1] != len(self._model.parameters):
+            raise SimulatorException(
+                    "'param_values' must be a 2D array of dimension N_SIMS x "
+                    "len(model.parameters).\n"
+                    "param_values.shape: " + str(self.param_values.shape) +
+                    "\nlen(model.parameters): %d" % len(self._model.parameters))
+        elif len(self.initials.shape) != 2 or \
+                self.initials.shape[1] != len(self._model.species):
+            raise SimulatorException(
+                    "'initials' must be a 2D array of dimension N_SIMS x "
+                    "len(model.species).\n"
+                    "initials.shape: " + str(self.initials.shape) +
+                    "\nlen(model.species): %d" % len(self._model.species))
+            # NOTE: Not sure if the check on 'initials' should be here or not. 
+            # Network-free simulators don't have species, but we will want to
+            # allow users to supply initials. Right now, that will raise an
+            # exception. Need to think about this. --LAH
         return None
 
 
