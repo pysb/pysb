@@ -15,12 +15,7 @@ for i,ic in enumerate(model.initial_conditions):
 
 tspan = np.linspace(0, 50, 501)
 sim = ScipyOdeSimulator(model, tspan, verbose=False)
-
-n_sims = len(initials.values()[0])
-trajectories = []
-for n in range(n_sims):
-    trajectories.append( sim.run( initials=
-        {key : val[n] for key,val in initials.items()} ).all )
+trajectories = sim.run(initials=initials).all
 
 x = np.array([tr['Product'] for tr in trajectories]).T
 

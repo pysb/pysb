@@ -22,8 +22,8 @@ def _exec(code, locals):
 
 class ScipyOdeSimulator(Simulator):
     
-    _supports = { 'multi_initials' : False,
-                  'multi_param_values' : False }
+    _supports = { 'multi_initials' : True,
+                  'multi_param_values' : True }
     
     # some sane default options for a few well-known integrators
     default_integrator_options = {
@@ -245,49 +245,42 @@ class ScipyOdeSimulator(Simulator):
                 pass
 
     def run(self, tspan=None, initials=None, param_values=None):
-        if tspan is not None:
-            self.tspan = tspan
-        if self.tspan is None:
-            raise SimulatorException("tspan must be defined before "
-                                     "simulation can run")
-        trajectories = np.ndarray((1, len(self.tspan),
+        super(ScipyOdeSimulator, self).run(tspan=tspan,
+                                           initials=initials,
+                                           param_values=param_values)
+        n_sims = len(self.param_values)
+        trajectories = np.ndarray((n_sims, len(self.tspan),
                                   len(self._model.species)))
-        if param_values is not None:
-            self.param_values = param_values
-        if initials is not None:
-            self.initials = initials
-        y0 = self.initials[0]
-        param_values = self.param_values[0]
-        if self.integrator == 'lsoda':
-            trajectories[0] = scipy.integrate.odeint(self.func,
-                                                y0,
-                                                self.tspan,
-                                                Dfun=self.jac_fn,
-                                                args=(param_values,),
-                                                **self.opts)
-        else:
-            # perform the actual integration
-            self.integrator.set_initial_value(y0, self.tspan[0])
-            # Set parameter vectors
-            # for RHS func and Jacobian
-            self.integrator.set_f_params(param_values)
-            if self._use_analytic_jacobian:
-                self.integrator.set_jac_params(param_values)
-            trajectories[0][0] = y0
-            i = 1
-            if self.verbose:
-                print("Integrating...")
-                print("\tTime")
-                print("\t----")
-                print("\t%g" % self.integrator.t)
-            while self.integrator.successful() and self.integrator.t < \
-                    self.tspan[-1]:
-                trajectories[0][i] = self.integrator.integrate(self.tspan[i])
-                i += 1
-                if self.verbose: print("\t%g" % self.integrator.t)
-            if self.verbose: print("...Done.")
-            if self.integrator.t < self.tspan[-1]:
-                trajectories[0, i:, :] = 'nan'
+        for n in range(n_sims):
+            if self.integrator == 'lsoda':
+                trajectories[n] = scipy.integrate.odeint(self.func,
+                                                    self.initials[n],
+                                                    self.tspan,
+                                                    Dfun=self.jac_fn,
+                                                    args=(self.param_values[n],),
+                                                    **self.opts)
+            else:
+                self.integrator.set_initial_value(self.initials[n], 
+                                                  self.tspan[0])
+                # Set parameter vectors for RHS func and Jacobian
+                self.integrator.set_f_params(self.param_values[n])
+                if self._use_analytic_jacobian:
+                    self.integrator.set_jac_params(self.param_values[n])
+                trajectories[n][0] = self.initials[n]
+                i = 1
+                if self.verbose:
+                    print("Integrating...")
+                    print("\tTime")
+                    print("\t----")
+                    print("\t%g" % self.integrator.t)
+                while self.integrator.successful() and self.integrator.t < \
+                        self.tspan[-1]:
+                    trajectories[n][i] = self.integrator.integrate(self.tspan[i])
+                    i += 1
+                    if self.verbose: print("\t%g" % self.integrator.t)
+                if self.verbose: print("...Done.")
+                if self.integrator.t < self.tspan[-1]:
+                    trajectories[n, i:, :] = 'nan'
                 
-        self.tout = [self.tspan, ]
+        self.tout = np.array([self.tspan]*n_sims)
         return SimulationResult(self, trajectories)
