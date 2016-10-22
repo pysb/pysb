@@ -267,49 +267,9 @@ class CupSodaSimulator(Simulator):
            `__init__` or `run` a single simulation is run with the initial 
            concentrations and parameter values defined in the model.
         """
-        if tspan is not None:
-            self.tspan = tspan
-        if self.tspan is None:
-            raise SimulatorException("tspan must be defined before "
-                                     "simulation can run")
-            
-        if param_values is not None:
-            self.param_values = param_values
-        if initials is not None:
-            self.initials = initials
-            
-        if len(self.param_values) == 1:
-            # Run all simulations with the same parameters
-            self.param_values = np.repeat(self.param_values,
-                                          len(self.initials),
-                                          axis=0)        
-            
-        if len(self.initials) == 1:
-            # Run all simulations with the same initial conditions
-            self.initials = np.repeat(self.initials,
-                                      len(self.param_values),
-                                      axis=0)
-
-        # Error checks on 'param_values' and 'initials'
-        if len(self.param_values) != len(self.initials):
-            raise SimulatorException(
-                    "'param_values' and 'initials' must be equal lengths."
-                    "\nlen(param_values): " + str(len(self.param_values)) + 
-                    "\nlen(initials): " + str(len(self.initials)))
-        elif len(self.param_values.shape) != 2 or \
-                self.param_values.shape[1] != self._len_params:
-            raise SimulatorException(
-                    "'param_values' must be a 2D array of dimension N_SIMS x "
-                    "len(model.parameters). "
-                    "\nparam_values.shape: " + str(self.param_values.shape) +
-                    "\nlen(model.parameters): " + str(self._len_params))
-        elif len(self.initials.shape) != 2 or \
-                self.initials.shape[1] != self._len_species:
-            raise SimulatorException(
-                    "'initials' must be a 2D array of dimension N_SIMS x "
-                    "len(model.species). "
-                    "\ninitials.shape: " + str(self.initials.shape) +
-                    "\nlen(model.species): " + str(self._len_species))
+        super(CupSodaSimulator, self).run(tspan=tspan,
+                                           initials=initials,
+                                           param_values=param_values)
 
         # Create directories for cupSODA input and output files
         self.outdir = tempfile.mkdtemp(prefix=self._prefix+'_', dir=self._base_dir)
