@@ -144,9 +144,6 @@ class CupSodaSimulator(Simulator):
         Model passed to the constructor.
     tspan : numpy.ndarray
         Time values passed to the constructor.
-    tout: numpy.ndarray
-        Time points returned by the simulator (may be different from ``tspan``
-        if simulation is interrupted for some reason).
     initials : numpy.ndarray
         Initial species concentrations for all simulations. Dimensions are 
         number of simulations x number of species.
@@ -314,12 +311,12 @@ class CupSodaSimulator(Simulator):
         if p.returncode:
             raise SimulatorException( p_out.rstrip("at line") +
                                      "\n" + p_err.rstrip() )
-        self.tout, trajectories = self._load_trajectories(
+        tout, trajectories = self._load_trajectories(
                                        self._cupsoda_outfiles_dir)
         if self._cleanup:
             shutil.rmtree(self.outdir)
         
-        return SimulationResult(self, trajectories)
+        return SimulationResult(self, tout, trajectories)
 
     @property
     def _memory_usage(self):
