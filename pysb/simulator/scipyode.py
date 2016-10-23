@@ -282,5 +282,5 @@ class ScipyOdeSimulator(Simulator):
                 if self.integrator.t < self.tspan[-1]:
                     trajectories[n, i:, :] = 'nan'
                 
-        self.tout = np.array([self.tspan]*n_sims)
-        return SimulationResult(self, trajectories)
+        tout = np.array([self.tspan]*n_sims)
+        return SimulationResult(self, tout, trajectories)
