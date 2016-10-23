@@ -55,9 +55,6 @@ class Simulator(object):
         Model passed to the constructor.
     tspan : vector-like
         Time values passed to the constructor.
-    tout: numpy.ndarray
-        Time points returned by the simulator (may be different from ``tspan``
-        if simulation is interrupted for some reason).
 
     Notes
     -----
@@ -359,9 +356,15 @@ class SimulationResult(object):
     ----------
     simulator : Simulator
         The simulator object that generated the trajectories
+    tout: list-like
+        Time points returned by the simulator (may be different from ``tspan``
+        if simulation is interrupted for some reason).
     trajectories : list or numpy.ndarray
         A set of species trajectories from a simulation. Should either be a
         list of 2D numpy arrays or a single 3D numpy array.
+    squeeze : bool, optional (default: True)
+        Return trajectories as a 2D array, rather than a 3d array, if only 
+        a single simulation was performed.
 
     Attributes
     ----------
@@ -371,6 +374,11 @@ class SimulationResult(object):
 
     A list of trajectory sets contains a trajectory set for each simulation.
 
+    squeeze : bool
+        Squeeze output flag
+    tout: numpy.ndarray
+        Time points returned by the simulator (may be different from ``tspan``
+        if simulation is interrupted for some reason).
     all : list
         List of trajectory sets. The first dimension contains species,
         observables and expressions (in that order)
@@ -385,10 +393,9 @@ class SimulationResult(object):
         expressions for all simulations) into a single
         :py:class:`pandas.DataFrame`.
     """
-    def __init__(self, simulator, trajectories):
-        self.squeeze = True
-        self.simulator = type(simulator).__name__
-        self.tout = simulator.tout
+    def __init__(self, simulator, tout, trajectories, squeeze=True):
+        self.squeeze = squeeze
+        self.tout = tout
         self._yfull = None
         self._model = simulator._model
 
@@ -407,11 +414,11 @@ class SimulationResult(object):
                                  "of 2D arrays")
             self._y = trajectories
         
-        self.nsims = len(self._y)
-        if len(self.tout) != self.nsims:
+        self._nsims = len(self._y)
+        if len(self.tout) != self._nsims:
             raise ValueError("Simulator tout should be the same length as "
                              "trajectories")
-        for i in range(self.nsims):
+        for i in range(self._nsims):
             if len(self.tout[i]) != self._y[i].shape[0]:
                 raise ValueError("The number of time points in tout[{0}] "
                                  "should match the trajectories array for "
@@ -432,19 +439,19 @@ class SimulationResult(object):
             else float
 
         self._yobs = [np.ndarray((len(self.tout[n]),),
-                                 dtype=yobs_dtype) for n in range(self.nsims)]
+                                 dtype=yobs_dtype) for n in range(self._nsims)]
         self._yobs_view = [self._yobs[n].view(float).
                            reshape(len(self._yobs[n]), -1) for n in range(
-            self.nsims)]
+            self._nsims)]
         self._yexpr = [np.ndarray((len(self.tout[n]),),
                                   dtype=yexpr_dtype) for n in range(
-            self.nsims)]
+            self._nsims)]
         self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
-            self._yexpr[n]), -1) for n in range(self.nsims)]
+            self._yexpr[n]), -1) for n in range(self._nsims)]
         param_values = simulator.param_values
 
         # loop over simulations
-        for n in range(self.nsims):
+        for n in range(self._nsims):
             # observables
             for i, obs in enumerate(model_obs):
                 self._yobs_view[n][:, i] = (
@@ -465,7 +472,7 @@ class SimulationResult(object):
 
         Can be disabled by setting self.squeeze to False
         """
-        if self.nsims == 1 and self.squeeze:
+        if self._nsims == 1 and self.squeeze:
             return trajectories[0]
         else:
             return trajectories
@@ -485,7 +492,7 @@ class SimulationResult(object):
                                    itertools.repeat(float))
             yfull = len(self._y) * [None]
             # loop over simulations
-            for n in range(self.nsims):
+            for n in range(self._nsims):
                 yfull[n] = np.ndarray(len(self.tout[n]), yfull_dtype)
                 yfull_view = yfull[n].view(float).reshape((len(yfull[n]), -1))
                 n_sp = self._y[n].shape[1]
@@ -503,9 +510,9 @@ class SimulationResult(object):
     def dataframe(self):
         if pd is None:
             raise Exception('Please "pip install pandas" for this feature')
-        sim_ids = (np.repeat(range(self.nsims), [len(t) for t in self.tout]))
+        sim_ids = (np.repeat(range(self._nsims), [len(t) for t in self.tout]))
         times = np.concatenate(self.tout)
-        if self.nsims == 1 and self.squeeze:
+        if self._nsims == 1 and self.squeeze:
             idx = pd.Index(times, name='time')
         else:
             idx = pd.MultiIndex.from_tuples(zip(sim_ids, times),
