@@ -48,7 +48,7 @@ class TestScipySimulator(object):
     def test_vode_solver_run(self):
         """Test vode."""
         simres = self.sim.run()
-        assert simres.nsims == 1
+        assert simres._nsims == 1
 
     def test_vode_jac_solver_run(self):
         """Test vode and analytic jacobian."""
