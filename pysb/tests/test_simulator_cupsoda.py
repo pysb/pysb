@@ -4,7 +4,7 @@ import numpy as np
 from nose.plugins.attrib import attr
 
 from pysb.examples.tyson_oscillator import model
-from pysb.simulator import CupSodaSolver
+from pysb.simulator import CupSodaSimulator
 
 
 @attr('gpu')
