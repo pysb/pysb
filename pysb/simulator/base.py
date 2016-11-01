@@ -17,8 +17,9 @@ class SimulatorException(Exception):
 class Simulator(object):
     """An abstract base class for numerical simulation of models.
 
-    Please note that the interface for this class is considered
-    experimental and may change without warning as PySB is updated.
+    .. warning::
+        The interface for this class is considered experimental and may
+        change without warning as PySB is updated.
 
     Parameters
     ----------
@@ -213,8 +214,17 @@ class SimulationResult(object):
     """
     Results of a simulation with properties and methods to access them.
 
-    Please note that the interface for this class is considered
-    experimental and may change without warning as PySB is updated.
+    .. warning::
+        Please note that the interface for this class is considered
+        experimental and may change without warning as PySB is updated.
+
+    Notes
+    -----
+    In the attribute descriptions, a "trajectory set" is a 2D numpy array,
+    species on first axis and time on second axis, with each element
+    containing the concentration or count of the species at the specified time.
+
+    A list of trajectory sets contains a trajectory set for each simulation.
 
     Parameters
     ----------
@@ -224,27 +234,72 @@ class SimulationResult(object):
         A set of species trajectories from a simulation. Should either be a
         list of 2D numpy arrays or a single 3D numpy array.
 
-    Attributes
-    ----------
-    In the descriptions below, a "trajectory set" is a 2D numpy array,
-    species on first axis and time on second axis, with each element
-    containing the concentration or count of the species at the specified time.
+    Examples
+    --------
+    The following examples use a simple model with three observables and one
+    expression, with a single simulation.
 
-    A list of trajectory sets contains a trajectory set for each simulation.
+    >>> from pysb.examples.expression_observables import model
+    >>> from pysb.simulator import ScipyOdeSimulator
+    >>> import numpy as np
+    >>> np.set_printoptions(precision=4)
+    >>> sim = ScipyOdeSimulator(model, tspan=np.linspace(0, 40, 10))
+    >>> simulation_result = sim.run()
 
-    all : list
-        List of trajectory sets. The first dimension contains species,
-        observables and expressions (in that order)
-    species : list
-        List of trajectory sets. The first dimension contains species.
-    observables : list
-        List of trajectory sets. The first dimension contains observables.
-    expressions : list
-        List of trajectory sets. The first dimension contains expressions.
-    dataframe : :py:class:`pandas.DataFrame`
-        A conversion of the trajectory sets (species, observables and
-        expressions for all simulations) into a single
-        :py:class:`pandas.DataFrame`.
+    ``simulation_result`` is a :class:`SimulationResult` object. An
+    observable can be accessed like so:
+
+    >>> print(simulation_result.observables['Bax_c0']) \
+        #doctest: +NORMALIZE_WHITESPACE
+    [  1.0000e+00   1.1744e-02   1.3791e-04   1.6196e-06   1.9021e-08
+       2.2344e-10   2.6394e-12   4.8067e-14  -6.2097e-14  -7.5308e-15]
+
+    It is also possible to retrieve the value of all observables at a
+    particular time point, e.g. the final concentrations:
+
+    >>> print(simulation_result.observables[-1]) #doctest: +ELLIPSIS
+    (-7.5308...e-15, -1.6809...e-13, 1.0000...)
+
+    Expressions are read in the same way as observables:
+
+    >>> print(simulation_result.expressions['NBD_signal']) \
+        #doctest: +NORMALIZE_WHITESPACE
+    [ 0.   4.7847  4.9956  4.9999  5.   5.   5.   5.   5.   5. ]
+
+    The species trajectories can be accessed as a numpy ndarray:
+
+    >>> print(simulation_result.species)
+    [[  1.0000e+00   0.0000e+00   0.0000e+00]
+     [  1.1744e-02   5.2194e-02   9.3606e-01]
+     [  1.3791e-04   1.2259e-03   9.9864e-01]
+     [  1.6196e-06   2.1595e-05   9.9998e-01]
+     [  1.9021e-08   3.3814e-07   1.0000e+00]
+     [  2.2344e-10   4.9648e-09   1.0000e+00]
+     [  2.6394e-12   7.0287e-11   1.0000e+00]
+     [  4.8067e-14   1.3515e-12   1.0000e+00]
+     [ -6.2097e-14  -1.3652e-12   1.0000e+00]
+     [ -7.5308e-15  -1.6809e-13   1.0000e+00]]
+
+    Species, observables and expressions can be combined into a single numpy
+    ndarray and accessed similarly. Here, the initial concentrations of all
+    these entities are examined:
+
+    >>> print(simulation_result.all[0])
+    (1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+
+    The ``all`` array can be accessed as a pandas DataFrame object,
+    which allows for more convenient indexing and access to pandas advanced
+    functionality, such as indexing and slicing. Here, the concentrations of
+    the observable ``Bax_c0`` and the expression ``NBD_signal`` are read at
+    time points between 5 and 15 seconds:
+
+    >>> df = simulation_result.dataframe
+    >>> print(df.loc[5:15, ['Bax_c0', 'NBD_signal']]) \
+        #doctest: +NORMALIZE_WHITESPACE
+                 Bax_c0  NBD_signal
+    time
+    8.888889   0.000138    4.995633
+    13.333333  0.000002    4.999927
     """
     def __init__(self, simulator, trajectories):
         self.squeeze = True
@@ -333,8 +388,10 @@ class SimulationResult(object):
 
     @property
     def all(self):
-        """Aggregate species, observables, and expressions trajectories into
-        a numpy.ndarray with record-style data-type for return to the user."""
+        """
+        Aggregate species, observables, and expressions trajectories into
+        a numpy.ndarray with record-style data-type for return to the user.
+        """
         if self._yfull is None:
             sp_names = ['__s%d' % i for i in range(len(self._model.species))]
             yfull_dtype = zip(sp_names, itertools.repeat(float))
@@ -362,6 +419,11 @@ class SimulationResult(object):
 
     @property
     def dataframe(self):
+        """
+        A conversion of the trajectory sets (species, observables and
+        expressions for all simulations) into a single
+        :py:class:`pandas.DataFrame`.
+        """
         if pd is None:
             raise Exception('Please "pip install pandas" for this feature')
         sim_ids = (np.repeat(range(self.nsims), [len(t) for t in self.tout]))
@@ -378,12 +440,21 @@ class SimulationResult(object):
 
     @property
     def species(self):
+        """
+        List of trajectory sets. The first dimension contains species.
+        """
         return self._squeeze_output(self._y)
 
     @property
     def observables(self):
+        """
+        List of trajectory sets. The first dimension contains observables.
+        """
         return self._squeeze_output(self._yobs)
 
     @property
     def expressions(self):
+        """
+        List of trajectory sets. The first dimension contains expressions.
+        """
         return self._squeeze_output(self._yexpr)
