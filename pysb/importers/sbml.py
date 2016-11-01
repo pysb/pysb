@@ -21,9 +21,18 @@ def sbml_translator(input_file,
                     pathway_commons=False,
                     verbose=False):
     """
-    Runs the BioNetGen sbmlTranslator binary.
+    Run the BioNetGen sbmlTranslator binary to convert SBML to BNGL
 
-    For more descriptions of the arguments, see the `sbmlTranslator
+    This function runs the external program sbmlTranslator, included with
+    BioNetGen, which converts SBML files to BioNetGen language (BNGL).
+
+    Generally, PySB users don't need to run this function directly; an SBML
+    model can be imported to PySB in a single step with
+    :func:`model_from_sbml`. However, users may wish to note the parameters
+    for this function, which alter the way the SBML file is processed. These
+    parameters can be supplied as ``**kwargs`` to :func:`model_from_sbml`.
+
+    For more detailed descriptions of the arguments, see the `sbmlTranslator
     documentation <http://bionetgen.org/index.php/SBML2BNGL>`_.
 
     Parameters
@@ -113,8 +122,8 @@ def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
     :class:`BnglBuilder` class converts the BioNetGen language model into a
     PySB Model.
 
-    Limitations
-    -----------
+    Notes
+    -----
 
     Read the `sbmlTranslator documentation
     <http://bionetgen.org/index.php/SBML2BNGL>`_ for further information on
@@ -134,7 +143,7 @@ def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
         Delete temporary directory on completion if True. Set to False for
         debugging purposes.
     **kwargs: kwargs
-        Keyword arguments to pass on to :func:`SbmlBuilder.sbml_translator`
+        Keyword arguments to pass on to :func:`sbml_translator`
     """
     tmpdir = tempfile.mkdtemp()
     verbose = kwargs.get('verbose', False)
