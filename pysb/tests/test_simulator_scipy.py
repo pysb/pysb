@@ -5,7 +5,7 @@ from pysb.simulator import ScipyOdeSimulator, SimulatorException
 from pysb.examples import robertson, earm_1_0
 
 
-class TestScipySimulator(object):
+class TestScipySimulatorSingle(object):
     @with_model
     def setUp(self):
         Monomer('A', ['a'])
@@ -102,7 +102,7 @@ class TestScipySimulator(object):
                                self.mon('B')(b=None): 0})
         assert np.allclose(simres.observables['AB_complex'][0], 100)
 
-    @raises(TypeError, SimulatorException)
+    @raises(TypeError)
     def test_y0_non_numeric_value(self):
         """Test y0 with non-numeric value."""
         self.sim.run(initials={self.mon('A')(a=None): 'eggs'})
@@ -128,13 +128,37 @@ class TestScipySimulator(object):
         """Test param_values with invalid parameter name."""
         self.sim.run(param_values={'spam': 150})
 
-    @raises(ValueError, TypeError, SimulatorException)
+    @raises(ValueError, TypeError)
     def test_param_values_non_numeric_value(self):
         """Test param_values with non-numeric value."""
         self.sim.run(param_values={'ksynthA': 'eggs'})
 
     def test_result_dataframe(self):
         df = self.sim.run().dataframe
+
+
+class TestScipySimulatorMultiple(TestScipySimulatorSingle):
+    def test_initials_and_param_values_two_lists(self):
+        initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
+        param_values = [[55, 65, 75, 0, 0, 1],
+                        [90, 100, 110, 5, 6, 7]]
+        simres = self.sim.run(initials=initials, param_values=param_values)
+        assert np.allclose(simres.species[0][0], initials[0])
+        assert np.allclose(simres.species[1][0], initials[1])
+        assert np.allclose(self.sim.param_values[0], param_values[0])
+        assert np.allclose(self.sim.param_values[1], param_values[1])
+
+        # Check the methods underlying these properties work
+        df = simres.dataframe
+        all = simres.all
+
+    @raises(SimulatorException)
+    def test_initials_and_param_values_differing_lengths(self):
+        initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
+        param_values = [[55, 65, 75, 0, 0, 1],
+                        [90, 100, 110, 5, 6, 7],
+                        [90, 100, 110, 5, 6, 7]]
+        self.sim.run(initials=initials, param_values=param_values)
 
 
 @with_model
