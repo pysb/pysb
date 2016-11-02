@@ -6,6 +6,9 @@ import collections
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
                       Component
+from pysb.logging import get_logger
+import logging
+
 try:
     import pandas as pd
 except ImportError:
@@ -78,6 +81,11 @@ class Simulator(object):
     @abstractmethod
     def __init__(self, model, tspan=None, initials=None,
                  param_values=None, verbose=False, **kwargs):
+        # Get or create base PySB logger exists
+        self._logger = get_logger(self.__module__)
+        if verbose:
+            self._logger.setLevel(logging.DEBUG)
+        self._logger.debug('[%s] Simulator created', model.name)
         self._model = model
         self.verbose = verbose
         self.tout = None
@@ -297,6 +305,7 @@ class Simulator(object):
 
         Implementations should return a :class:`.SimulationResult` object.
         """
+        self._logger.info('[%s] Simulation(s) started', self._model.name)
         if tspan is not None:
             self.tspan = tspan
         if self.tspan is None:
@@ -444,6 +453,8 @@ class SimulationResult(object):
     13.333333  0.000002    4.999927
     """
     def __init__(self, simulator, tout, trajectories, squeeze=True):
+        simulator._logger.debug('[%s] SimulationResult constructor started',
+                                simulator._model.name)
         self.squeeze = squeeze
         self.tout = tout
         self._yfull = None
@@ -515,6 +526,9 @@ class SimulationResult(object):
                 expr_subs = expr.expand_expr().subs(subs)
                 func = sympy.lambdify(obs_names, expr_subs, "numpy")
                 self._yexpr_view[n][:, i] = func(**obs_dict)
+
+        simulator._logger.debug('[%s] SimulationResult constructor finished',
+                                simulator._model.name)
 
     def _squeeze_output(self, trajectories):
         """
