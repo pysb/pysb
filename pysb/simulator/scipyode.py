@@ -12,6 +12,7 @@ import sympy
 import re
 import numpy as np
 import warnings
+import os
 
 
 def _exec(code, locals):
@@ -301,12 +302,22 @@ class ScipyOdeSimulator(Simulator):
 
     @classmethod
     def _test_inline(cls):
-        """Detect whether scipy.weave.inline is functional."""
+        """
+        Detect whether scipy.weave.inline is functional.
+
+        Produces compile warnings, which we suppress by capturing STDERR.
+        """
         if not hasattr(cls, '_use_inline'):
             cls._use_inline = False
             try:
                 if weave_inline is not None:
-                    weave_inline('int i=0; i=i;', force=1)
+                    extra_compile_args = None
+                    if os.name == 'posix':
+                        extra_compile_args = ['2>/dev/null']
+                    elif os.name == 'nt':
+                        extra_compile_args = ['2>NUL']
+                    weave_inline('int i=0; i=i;', force=1,
+                                 extra_compile_args=extra_compile_args)
                     cls._use_inline = True
             except (scipy.weave.build_tools.CompileError,
                     distutils.errors.CompileError, ImportError):
