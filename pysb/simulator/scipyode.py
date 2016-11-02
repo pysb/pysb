@@ -349,6 +349,8 @@ class ScipyOdeSimulator(Simulator):
         trajectories = np.ndarray((n_sims, len(self.tspan),
                               len(self._model.species)))
         for n in range(n_sims):
+            self._logger.info('[%s] Running simulation %d of %d',
+                              self._model.name, n + 1, n_sims)
             if self.integrator == 'lsoda':
                 trajectories[n] = scipy.integrate.odeint(self.func,
                                                     self.initials[n],
@@ -357,7 +359,7 @@ class ScipyOdeSimulator(Simulator):
                                                     args=(self.param_values[n],),
                                                     **self.opts)
             else:
-                self.integrator.set_initial_value(self.initials[n], 
+                self.integrator.set_initial_value(self.initials[n],
                                                   self.tspan[0])
                 # Set parameter vectors for RHS func and Jacobian
                 self.integrator.set_f_params(self.param_values[n])
@@ -365,19 +367,17 @@ class ScipyOdeSimulator(Simulator):
                     self.integrator.set_jac_params(self.param_values[n])
                 trajectories[n][0] = self.initials[n]
                 i = 1
-                if self.verbose:
-                    print("Integrating...")
-                    print("\tTime")
-                    print("\t----")
-                    print("\t%g" % self.integrator.t)
                 while self.integrator.successful() and self.integrator.t < \
                         self.tspan[-1]:
+                    self._logger.debug('[%s] Simulation %d/%d '
+                                       'Integrating t=%g',
+                                       self._model.name, n + 1, n_sims,
+                                       self.integrator.t)
                     trajectories[n][i] = self.integrator.integrate(self.tspan[i])
                     i += 1
-                    if self.verbose: print("\t%g" % self.integrator.t)
-                if self.verbose: print("...Done.")
                 if self.integrator.t < self.tspan[-1]:
                     trajectories[n, i:, :] = 'nan'
-                
+
         tout = np.array([self.tspan]*n_sims)
+        self._logger.info('[%s] All simulation(s) complete', self._model.name)
         return SimulationResult(self, tout, trajectories)
