@@ -1,11 +1,11 @@
 from __future__ import absolute_import
 import logging
-import versioneer
 import platform
 import socket
 import time
 import os
 import warnings
+import pysb
 
 SECONDS_IN_HOUR = 3600
 DEBUG_ENV_VAR = 'PYSB_DEBUG'
@@ -90,7 +90,7 @@ def setup_logger(level=logging.INFO, console_output=True, file_output=False,
         file_handler.setFormatter(log_fmt)
         log.addHandler(file_handler)
 
-    log.info('Logging started on PySB version %s', versioneer.get_version())
+    log.info('Logging started on PySB version %s', pysb.__version__)
     if time_utc:
         log.info('Log entry times are in UTC')
     else:
