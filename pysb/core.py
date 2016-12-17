@@ -172,6 +172,20 @@ class Component(object):
         if self._export:
             self._do_export()
 
+        # Try to find calling module by walking the stack
+        modules = []
+        # We assume we're dealing with Component subclasses here
+        frame = inspect.currentframe().f_back.f_back
+        while frame is not None:
+            mod_name = frame.f_globals['__name__']
+            if mod_name in ['IPython.core.interactiveshell', '__main__']:
+                break
+            if mod_name not in ['pysb.core', 'pysb.macros']:
+                modules.append(mod_name)
+            frame = frame.f_back
+
+        self._modules = tuple(reversed(modules))
+
     def __getstate__(self):
         # clear the weakref to parent model (restored in Model.__setstate__)
         state = self.__dict__.copy()
@@ -1535,6 +1549,21 @@ class Model(object):
         # return self for "model = model.reload()" idiom, until a better solution can be found
         return SelfExporter.default_model
 
+    @property
+    def modules(self):
+        """
+        Return the set of Python modules where Components are defined
+
+        Returns
+        -------
+        list
+            List of module names where model Components are defined
+        """
+        all_components = self.components
+        if not all_components:
+            return []
+        return sorted(set.union(*[set(c._modules) for c in all_components]))
+
     def all_component_sets(self):
         """Return a list of all ComponentSet objects."""
         set_names = [t.__name__.lower() + 's' for t in Model._component_types]
@@ -1923,6 +1952,179 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             return self[key]
         except KeyError:
             return default
+
+    @staticmethod
+    def _test_attribute_equal(tester, test_attr):
+        if callable(tester):
+            return tester(test_attr)
+        else:
+            return test_attr == tester
+
+    def filter(self, name=None, pattern=None, module_name=None, value=None,
+               fwd_rate=None, rev_rate=None):
+        """
+        Filter a ComponentSet using supplied arguments
+
+        All arguments default to None, which means "do not filter". Thus,
+        calling this function with no arguments will return a ComponentSet
+        with the same Components as the original. All filters are applied to
+        match components (logical AND).
+
+        Parameters
+        ----------
+        name: str, optional
+            A regular expression pattern used to match Components' names
+        pattern: Monomer or MonomerPattern or ComplexPattern
+            A pattern to filter components (works on ComponentSets
+            containing Monomers, MonomerPatterns, or ComplexPatterns)
+        module_name: str, optional
+            A module name, which corresponds to the function or module (
+            file) name in which the component was defined
+        value: float or callable, optional
+            A numeric value or callable to match against Parameter values.
+            If callable, the function should take a single numeric argument
+            and return a boolean (True where match occurred).
+        fwd_rate: float or callable, optional
+            A numeric value or callable to match against Rule forward rates.
+            If callable, the function should take a single numeric argument
+            and return a boolean (True where match occurred).
+        rev_rate: float or callable, optional
+            Defined analogously to fwd_rate, but for Rule reverse rates.
+
+        Returns
+        -------
+        ComponentSet
+            A ComponentSet containing Components matching all of the
+            supplied filters
+
+        Examples
+        --------
+
+        >>> from pysb.examples.earm_1_0 import model
+        >>> m = model.monomers
+
+        Find parameters exactly equal to 10000:
+        >>> model.parameters.filter(value=1e4)  # doctest:+NORMALIZE_WHITESPACE
+        ComponentSet([
+         Parameter('pC3_0', 10000.0),
+         Parameter('pC6_0', 10000.0),
+        ])
+
+        Find rules with a forward rate < 1e-8:
+        >>> model.rules.filter(fwd_rate=lambda rate: rate < 1e-8) \
+            # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('bind_pC3_Apop', Apop(b=None) + pC3(b=None) | Apop(b=1) %
+                pC3(b=1), kf25, kr25),
+        ])
+
+        Find rules with a name beginning with "inhibit" that contain cSmac:
+        >>> model.rules.filter(name='^inhibit', pattern=m.cSmac()) \
+            # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
+                cSmac(b=1) % XIAP(b=1), kf28, kr28),
+        ])
+        """
+        from pysb.pattern import match_complex_pattern
+        new_cset = []
+        for c in self:
+            if name is not None and not re.search(name, c.name):
+                continue
+            if module_name is not None and module_name not in c._modules:
+                continue
+            if value is not None and \
+                    not self._test_attribute_equal(value, c.value):
+                continue
+            if fwd_rate is not None and \
+                    not self._test_attribute_equal(fwd_rate,
+                                                   c.rate_forward.value):
+                continue
+            if rev_rate is not None and \
+                    not (self._test_attribute_equal(rev_rate,
+                                                    c.rate_reverse.value)
+                    if c.rate_reverse is not None else False):
+                continue
+            if pattern is not None:
+                test_pat = as_complex_pattern(pattern)
+                if isinstance(c, (Monomer, MonomerPattern, ComplexPattern)):
+                    if not match_complex_pattern(test_pat,
+                                                 as_complex_pattern(c)):
+                        continue
+                elif isinstance(c, Rule):
+                    if not isinstance(test_pat, ComplexPattern):
+                        raise ValueError(
+                            'Cannot currently compare {} to rules'.format(
+                                pattern.__class__.__name__))
+
+                    if not any(match_complex_pattern(test_pat, cp) for cp in
+                               (c.reactant_pattern.complex_patterns +
+                                       c.product_pattern.complex_patterns)):
+                        continue
+                else:
+                    raise ValueError('Cannot apply pattern to {}'.format(
+                        c.__class__.__name__))
+
+            new_cset.append(c)
+
+        return ComponentSet(new_cset)
+
+    def apply(self, *args, **kwargs):
+        """
+        Update a set of Components using a callable or arguments
+
+        Either supply a single callable, which is called with each component as
+        a single argument, or a list of keyword arguments to update on each
+        component (whose values can be numerical or callable). Note that
+        Components are updated in place - they are not copied.
+
+        Returns
+        -------
+        ComponentSet
+            Returns the original ComponentSet (self), after the updates are
+            applied
+
+        Examples
+        --------
+
+        >>> from pysb.examples.earm_1_0 import model
+
+        Double the values of parameters kc1, kc3 and kc5:
+
+        >>> model.parameters.filter(name='^kc(1|3|5)$').apply(        \
+                value=lambda val: val* 2)  # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+            Parameter('kc1', 2e-05),
+            Parameter('kc3', 2.0),
+            Parameter('kc5', 2.0),
+        ])
+        """
+        if len(args) > 1 or \
+                (len(args) == 1 and len(kwargs) > 0) or \
+                (len(args) == 0 and len(kwargs) == 0):
+            raise ValueError('Either supply a single callable positional '
+                             'argument, or keyword arguments.')
+
+        if len(args) == 1:
+            if not callable(args[0]):
+                raise ValueError('Positional argument must be callable')
+
+            for c in self:
+                args[0](c)
+
+        # We have a list of kwargs to update properties
+        for c in self:
+            for attr_name, attr_val in kwargs.items():
+                if not hasattr(c, attr_name):
+                    raise ValueError('Component {} has no attribute {}'
+                                     .format(c.name, attr_name))
+                if callable(attr_val):
+                    new_val = attr_val(getattr(c, attr_name))
+                else:
+                    new_val = attr_val
+                setattr(c, attr_name, new_val)
+
+        return self
 
     def iterkeys(self):
         for c in self:
