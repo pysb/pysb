@@ -10,6 +10,8 @@ import copy
 import itertools
 import sympy
 import scipy.sparse
+import networkx as nx
+
 try:
     reload
 except NameError:
@@ -382,6 +384,7 @@ class MonomerPattern(object):
         self.monomer = monomer
         self.site_conditions = site_conditions
         self.compartment = compartment
+        self._graph = None
 
     def is_concrete(self):
         """
@@ -406,6 +409,12 @@ class MonomerPattern(object):
         'Site-concrete' means all sites have specified conditions."""
         # assume __init__ did a thorough enough job of error checking that this is is all we need to do
         return len(self.site_conditions) == len(self.monomer.sites)
+
+    def as_graph(self):
+        if self._graph is None:
+            self._graph = as_complex_pattern(self).as_graph()
+
+        return self._graph
 
     def __call__(self, conditions=None, **kwargs):
         """Build a new MonomerPattern with updated site conditions. Can be used
@@ -499,6 +508,7 @@ class ComplexPattern(object):
         self.monomer_patterns = monomer_patterns
         self.compartment = compartment
         self.match_once = match_once
+        self._graph = None
 
     def is_concrete(self):
         """
@@ -515,6 +525,112 @@ class ComplexPattern(object):
             all(mp.is_site_concrete() for mp in self.monomer_patterns)
         return mp_concrete_ok or compartment_ok
 
+    def as_graph(self):
+        """
+        Return the ComplexPattern represented as a networkx graph
+        """
+        if self._graph is not None:
+            return self._graph
+
+        NO_BOND = 'NoBond'
+
+        def autoinc():
+            i = 0
+            while True:
+                yield i
+                i += 1
+        node_count = autoinc()
+
+        class WildTester(object):
+            def __eq__(self, other):
+                return other != NO_BOND
+        wild_tester = WildTester()
+
+        bond_edges = collections.defaultdict(list)
+        g = nx.Graph()
+        _cpt_nodes = {}
+
+        def add_or_get_compartment_node(cpt):
+            try:
+                return _cpt_nodes[cpt]
+            except KeyError:
+                cpt_node_id = next(node_count)
+                _cpt_nodes[cpt] = cpt_node_id
+                g.add_node(cpt_node_id, id=cpt)
+                return cpt_node_id
+
+        species_cpt_node_id = None
+        if self.compartment:
+            species_cpt_node_id = add_or_get_compartment_node(self.compartment)
+
+        for mp in self.monomer_patterns:
+            mon_node_id = next(node_count)
+            g.add_node(mon_node_id, id=mp.monomer)
+            if mp.compartment or self.compartment:
+                cpt_node_id = add_or_get_compartment_node(mp.compartment or
+                                                          self.compartment)
+                g.add_edge(mon_node_id, cpt_node_id)
+
+            for site, state_or_bond in mp.site_conditions.items():
+                mon_site_id = next(node_count)
+                g.add_node(mon_site_id, id=site)
+                g.add_edge(mon_node_id, mon_site_id)
+                state = None
+                bond_num = None
+                if state_or_bond is ANY:
+                    continue
+                elif isinstance(state_or_bond, (str, unicode)):
+                    state = state_or_bond
+                elif isinstance(state_or_bond, collections.Iterable) and len(
+                        state_or_bond) == 2:
+                    state = state_or_bond[0]
+                    bond_num = state_or_bond[1]
+                elif isinstance(state_or_bond, int):
+                    bond_num = state_or_bond
+
+                if state_or_bond is WILD or bond_num is WILD:
+                    bond_num = wild_tester
+                    wild_tester_id = next(node_count)
+                    g.add_node(wild_tester_id, id=wild_tester)
+                    g.add_edge(mon_site_id, wild_tester_id)
+
+                if state is not None:
+                    mon_site_state_id = next(node_count)
+                    g.add_node(mon_site_state_id, id=state)
+                    g.add_edge(mon_site_id, mon_site_state_id)
+
+                if bond_num is None:
+                    bond_edges[NO_BOND].append(mon_site_id)
+                elif isinstance(bond_num, int):
+                    bond_edges[bond_num].append(mon_site_id)
+
+        # Unbound edges
+        unbound_sites = bond_edges.pop(NO_BOND, None)
+        if unbound_sites is not None:
+            no_bond_id = next(node_count)
+            g.add_node(no_bond_id, id=NO_BOND)
+            for unbound_site in unbound_sites:
+                g.add_edge(unbound_site, no_bond_id)
+
+        # Add bond edges
+        for site_nodes in bond_edges.values():
+            if len(site_nodes) == 1:
+                # Treat dangling bond as WILD
+                wild_tester_id = next(node_count)
+                g.add_node(wild_tester_id, id=wild_tester)
+                g.add_edge(site_nodes[0], wild_tester_id)
+            for n1, n2 in itertools.combinations(site_nodes, 2):
+                g.add_edge(n1, n2)
+
+        # Remove the species compartment if all monomer nodes have a
+        # compartment
+        if species_cpt_node_id is not None and \
+                        g.degree(species_cpt_node_id) == 0:
+            g.remove_node(species_cpt_node_id)
+
+        self._graph = g
+        return self._graph
+
     def is_equivalent_to(self, other):
         """
         Test a concrete ComplexPattern for equality with another.
@@ -522,28 +638,19 @@ class ComplexPattern(object):
         Use of this method on non-concrete ComplexPatterns was previously
         allowed, but is now deprecated.
         """
-
+        from pysb.pattern import SimplePatternMatcher
         # Didn't implement __eq__ to avoid confusion with __ne__ operator used
         # for Rule building
 
         # Check both patterns are concrete
+        exact = True
         if not self.is_concrete() or not other.is_concrete():
             warnings.warn("is_equivalent_to() will only work with concrete "
                           "patterns in a future version", DeprecationWarning)
+            exact = False
 
-        # FIXME the literal site_conditions comparison requires bond numbering
-        # to be identical, so some sort of canonicalization of that
-        # numbering is necessary.
-        if not isinstance(other, ComplexPattern):
-            raise Exception("Can only compare ComplexPattern to another "
-                            "ComplexPattern")
-        mp_order = lambda mp: (mp[0], mp[1].keys(), mp[2])
-        return (sorted([(repr(mp.monomer), mp.site_conditions,
-                         mp.compartment or self.compartment)
-                       for mp in self.monomer_patterns], key=mp_order) ==
-                sorted([(repr(mp.monomer), mp.site_conditions,
-                         mp.compartment or other.compartment)
-                       for mp in other.monomer_patterns], key=mp_order))
+        return SimplePatternMatcher.match_complex_pattern(self, other,
+                                                          exact=exact)
 
     def copy(self):
         """
