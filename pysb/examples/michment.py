@@ -3,7 +3,7 @@ from pysb.macros import catalyze_state
 
 Model()
 
-Parameter('vol', 1.) # volume (arbitrary units)
+Parameter('vol', 10.) # volume (arbitrary units)
 
 Parameter('kf',   1./vol.value)
 Parameter('kr',   1000)
