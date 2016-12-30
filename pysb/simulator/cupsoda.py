@@ -228,7 +228,6 @@ class CupSodaSimulator(Simulator):
         self._out_species = None
         
         # private variables (to reduce the number of function calls)
-        self._len_tspan = len(self.tspan)
         self._len_rxns = len(self._model.reactions)
         self._len_species = len(self._model.species)
         self._len_params = len(self._model.parameters)
@@ -526,8 +525,8 @@ class CupSodaSimulator(Simulator):
         n_sims = len(files)
         trajectories = [None] * n_sims
         tout = [None] * n_sims
-        traj_n = np.ones((self._len_tspan, self._len_species)) * float('nan')
-        tout_n = np.ones(self._len_tspan) * float('nan')
+        traj_n = np.ones((len(self.tspan), self._len_species)) * float('nan')
+        tout_n = np.ones(len(self.tspan)) * float('nan')
         # load the data
         indir_prefix = os.path.join(dir, self._prefix)
         for n in range(n_sims):
