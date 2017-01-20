@@ -110,7 +110,13 @@ def test_integrate_with_expression():
     Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
     time = np.linspace(0, 40)
-    x = odesolve(model, time)
+
+    solver = Solver(model, time)
+    solver.run()
+
+    assert solver.yexpr_view.shape == (len(time),
+                                       len(model.expressions_dynamic()))
+    assert solver.yobs_view.shape == (len(time), len(model.observables))
 
 
 def test_robertson_integration():

@@ -97,6 +97,10 @@ class Simulator(object):
         self.param_values = param_values
 
     @property
+    def model(self):
+        return self._model
+
+    @property
     def initials(self):
         return self._initials if isinstance(self._initials, np.ndarray) \
                else self._get_initials()
