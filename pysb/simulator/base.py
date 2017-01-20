@@ -121,7 +121,7 @@ class Simulator(object):
                                                  'ComplexPattern' %
                                                  repr(cplx_pat))
                     # if val is a number, convert it to a single-element array
-                    if not isinstance(val, collections.Iterable):
+                    if not isinstance(val, collections.Sequence):
                         new_initials[cplx_pat] = np.array([val])
                     # otherwise, check whether simulator supports multiple 
                     # initial values
@@ -191,7 +191,7 @@ class Simulator(object):
                         continue
                     
                     def _get_value(sim):
-                        if isinstance(value_obj, collections.Iterable) and \
+                        if isinstance(value_obj, collections.Sequence) and \
                            isinstance(value_obj[sim], numbers.Number):
                             value = value_obj[sim]
                         elif isinstance(value_obj, Component):
@@ -275,7 +275,7 @@ class Simulator(object):
                     raise IndexError("new_params dictionary has unknown "
                                      "parameter name (%s)" % key)
                 # if val is a number, convert it to a single-element array
-                if not isinstance(val, collections.Iterable):
+                if not isinstance(val, collections.Sequence):
                     new_params[key] = np.array([val])
                 # otherwise, check whether simulator supports multiple 
                 # param_values
