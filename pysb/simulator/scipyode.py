@@ -349,8 +349,7 @@ class ScipyOdeSimulator(Simulator):
         trajectories = np.ndarray((n_sims, len(self.tspan),
                               len(self._model.species)))
         for n in range(n_sims):
-            self._logger.info('[%s] Running simulation %d of %d',
-                              self._model.name, n + 1, n_sims)
+            self._logger.info('Running simulation %d of %d', n + 1, n_sims)
             if self.integrator == 'lsoda':
                 trajectories[n] = scipy.integrate.odeint(self.func,
                                                     self.initials[n],
@@ -369,15 +368,13 @@ class ScipyOdeSimulator(Simulator):
                 i = 1
                 while self.integrator.successful() and self.integrator.t < \
                         self.tspan[-1]:
-                    self._logger.debug('[%s] Simulation %d/%d '
-                                       'Integrating t=%g',
-                                       self._model.name, n + 1, n_sims,
-                                       self.integrator.t)
+                    self._logger.debug('Simulation %d/%d Integrating t=%g',
+                                       n + 1, n_sims, self.integrator.t)
                     trajectories[n][i] = self.integrator.integrate(self.tspan[i])
                     i += 1
                 if self.integrator.t < self.tspan[-1]:
                     trajectories[n, i:, :] = 'nan'
 
         tout = np.array([self.tspan]*n_sims)
-        self._logger.info('[%s] All simulation(s) complete', self._model.name)
+        self._logger.info('All simulation(s) complete')
         return SimulationResult(self, tout, trajectories)
