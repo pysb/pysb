@@ -101,7 +101,7 @@ class ScipyOdeSimulator(Simulator):
             'with_jacobian': True,
             # Set nsteps as high as possible to give our users flexibility in
             # choosing their time step. (Let's be safe and assume vode was
-            # compiled with 32-bit ints. What would actually happen if it was 
+            # compiled with 32-bit ints. What would actually happen if it was
             # and we passed 2**64-1 though?)
             'nsteps': 2 ** 31 - 1,
         },
@@ -113,10 +113,10 @@ class ScipyOdeSimulator(Simulator):
             'mxstep': 2**31-1,
         }
     }
-    
+
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
-        
+
         super(ScipyOdeSimulator, self).__init__(model,
                                                 tspan=tspan,
                                                 initials=initials,

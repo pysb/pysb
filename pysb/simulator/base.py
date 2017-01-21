@@ -123,10 +123,10 @@ class Simulator(object):
                     # if val is a number, convert it to a single-element array
                     if not isinstance(val, collections.Sequence):
                         new_initials[cplx_pat] = np.array([val])
-                    # otherwise, check whether simulator supports multiple 
+                    # otherwise, check whether simulator supports multiple
                     # initial values
                     elif len(val) > 1 and not self._supports['multi_initials']:
-                        raise SimulatorException(self.__class__.__name__ + 
+                        raise SimulatorException(self.__class__.__name__ +
                                         " does not support multiple initial"
                                         " values at this time.")
                 self._initials = new_initials
@@ -138,7 +138,7 @@ class Simulator(object):
                     new_initials = np.resize(new_initials, (1,len(new_initials)))
                 # check whether simulator supports multiple initial values
                 elif not self._supports['multi_initials']:
-                    raise SimulatorException(self.__class__.__name__ + 
+                    raise SimulatorException(self.__class__.__name__ +
                                     " does not support multiple initial"
                                     " values at this time.")
                 # make sure number of initials values equals len(model.species)
@@ -160,9 +160,9 @@ class Simulator(object):
         # specified in the self._initials dictionary
         n_sims = 1
         if isinstance(self._initials, dict):
-            # record the length of the arrays and make 
+            # record the length of the arrays and make
             # sure they're all the same.
-            for key,val in self._initials.items():                    
+            for key,val in self._initials.items():
                 if n_sims == 1:
                     n_sims = len(val)
                 elif len(val) != n_sims:
@@ -189,7 +189,7 @@ class Simulator(object):
                     # (i.e., an override)
                     if y0[sim][si] != 0:
                         continue
-                    
+
                     def _get_value(sim):
                         if isinstance(value_obj, collections.Sequence) and \
                            isinstance(value_obj[sim], numbers.Number):
@@ -203,7 +203,7 @@ class Simulator(object):
                         else:
                             raise TypeError("Unexpected initial condition value type")
                         return value
-                        
+
                     # initials from the model
                     if isinstance(initials_source, np.ndarray):
                         if len(initials_source.shape) == 1:
@@ -220,7 +220,7 @@ class Simulator(object):
                     else:
                          value = _get_value(sim)
                     y0[sim][si] = value
-                            
+
         # Process any overrides
         if isinstance(self._initials, dict):
             _set_initials(self._initials.items())
@@ -238,9 +238,9 @@ class Simulator(object):
             n_sims = 1
             if isinstance(self._params, dict):
                 param_values_dict = self._params
-                # record the length of the arrays and make 
+                # record the length of the arrays and make
                 # sure they're all the same.
-                for key,val in param_values_dict.items():                    
+                for key,val in param_values_dict.items():
                     if n_sims == 1:
                         n_sims = len(val)
                     elif len(val) != n_sims:
@@ -277,10 +277,10 @@ class Simulator(object):
                 # if val is a number, convert it to a single-element array
                 if not isinstance(val, collections.Sequence):
                     new_params[key] = np.array([val])
-                # otherwise, check whether simulator supports multiple 
+                # otherwise, check whether simulator supports multiple
                 # param_values
                 elif len(val) > 1 and not self._supports['multi_param_values']:
-                    raise SimulatorException(self.__class__.__name__ + 
+                    raise SimulatorException(self.__class__.__name__ +
                                     " does not support multiple parameter"
                                     " values at this time.")
                     # NOTE: Strings are iterables, so they fall here
@@ -294,7 +294,7 @@ class Simulator(object):
                 new_params = np.resize(new_params, (1,len(new_params)))
             # check whether simulator supports multiple parameter values
             elif not self._supports['multi_param_values']:
-                raise SimulatorException(self.__class__.__name__ + 
+                raise SimulatorException(self.__class__.__name__ +
                                 " does not support multiple parameter"
                                 " values at this time.")
             # make sure number of param values equals len(model.parameters)
@@ -319,14 +319,14 @@ class Simulator(object):
             self.param_values = param_values
         if initials is not None:
             self.initials = initials
-        # If only one set of param_values, run all simulations 
+        # If only one set of param_values, run all simulations
         # with the same parameters
         if len(self.param_values) == 1:
             self.param_values = np.repeat(self.param_values,
                                           len(self.initials),
-                                          axis=0)        
-        # If only one set of initials, run all simulations 
-        # with the same initial conditions   
+                                          axis=0)
+        # If only one set of initials, run all simulations
+        # with the same initial conditions
         if len(self.initials) == 1:
             self.initials = np.repeat(self.initials,
                                       len(self.param_values),
@@ -336,7 +336,7 @@ class Simulator(object):
             raise SimulatorException(
                     "'param_values' and 'initials' must be equal lengths.\n"
                     "len(param_values): %d\n"
-                    "len(initials): %d" % 
+                    "len(initials): %d" %
                     (len(self.param_values), len(self.initials)))
         elif len(self.param_values.shape) != 2 or \
                 self.param_values.shape[1] != len(self._model.parameters):
@@ -352,7 +352,7 @@ class Simulator(object):
                     "len(model.species).\n"
                     "initials.shape: " + str(self.initials.shape) +
                     "\nlen(model.species): %d" % len(self._model.species))
-            # NOTE: Not sure if the check on 'initials' should be here or not. 
+            # NOTE: Not sure if the check on 'initials' should be here or not.
             # Network-free simulators don't have species, but we will want to
             # allow users to supply initials. Right now, that will raise an
             # exception. Need to think about this. --LAH
@@ -386,7 +386,7 @@ class SimulationResult(object):
         A set of species trajectories from a simulation. Should either be a
         list of 2D numpy arrays or a single 3D numpy array.
     squeeze : bool, optional (default: True)
-        Return trajectories as a 2D array, rather than a 3d array, if only 
+        Return trajectories as a 2D array, rather than a 3d array, if only
         a single simulation was performed.
 
     Examples
@@ -477,7 +477,7 @@ class SimulationResult(object):
                 raise ValueError("trajectories should be a 3D array or a list "
                                  "of 2D arrays")
             self._y = trajectories
-        
+
         self._nsims = len(self._y)
         if len(self.tout) != self._nsims:
             raise ValueError("Simulator tout should be the same length as "

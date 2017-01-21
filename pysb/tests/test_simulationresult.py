@@ -25,7 +25,7 @@ def test_simres_dataframe():
     sim = ScipyOdeSimulator(model, param_values={'k6' : [1.,1.]}, integrator='lsoda')
     simres = SimulationResult(sim, [tspan1, tspan2], [trajectories1, trajectories2])
     df = simres.dataframe
- 
+
     assert df.shape == (len(tspan1) + len(tspan2),
                         len(model.species) + len(model.observables))
 
@@ -34,6 +34,6 @@ def test_simres_dataframe():
     simres2 = SimulationResult(sim, [tspan1, tspan3],
                                np.stack([trajectories1, trajectories3]))
     df2 = simres2.dataframe
- 
+
     assert df2.shape == (len(tspan1) + len(tspan3),
                          len(model.species) + len(model.observables))
