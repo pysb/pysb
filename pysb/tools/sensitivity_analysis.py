@@ -13,8 +13,6 @@ from matplotlib import gridspec, pyplot
 import numpy as np
 import pysb.integrate
 from pysb.bng import generate_equations
-matplotlib.rcParams['svg.fonttype'] = 'none'
-matplotlib.use('Agg')
 plt = matplotlib.pyplot
 
 
