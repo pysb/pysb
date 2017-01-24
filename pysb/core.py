@@ -474,7 +474,7 @@ class ComplexPattern(object):
     ----------
     monomer_patterns : list of MonomerPatterns
         MonomerPatterns that make up the complex.
-    compartment : Compartment
+    compartment : Compartment or None
         Location restriction. None means don't care.
     match_once : bool, optional
         If True, the pattern will only count once against a species in which the
