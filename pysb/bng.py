@@ -363,7 +363,7 @@ class BngFileInterface(BngBaseInterface):
                     bng_commands = bng_commands.replace('begin actions\n',
                                          'begin actions\n\treadFile({'
                                          'file=>"%s"});\n' % self.net_filename)
-                else:
+                elif self.model:
                     bng_file.write(self.generator.get_content())
                 bng_file.write(bng_commands)
 
