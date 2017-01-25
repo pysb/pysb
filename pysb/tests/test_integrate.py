@@ -3,6 +3,7 @@ from pysb.integrate import odesolve, Solver
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.bng import run_ssa
+from pysb.simulator.base import SimulatorException
 
 from pysb.examples import robertson, earm_1_0
 
@@ -76,7 +77,7 @@ class TestSolver(object):
         """Test param_values with invalid parameter name."""
         self.solver.run(param_values={'spam': 150})
 
-    @raises(ValueError, TypeError)
+    @raises(ValueError, TypeError, SimulatorException)
     def test_param_values_non_numeric_value(self):
         """Test param_values with non-numeric value."""
         self.solver.run(param_values={'ksynthA': 'eggs'})
@@ -109,7 +110,13 @@ def test_integrate_with_expression():
     Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
     time = np.linspace(0, 40)
-    x = odesolve(model, time)
+
+    solver = Solver(model, time)
+    solver.run()
+
+    assert solver.yexpr_view.shape == (len(time),
+                                       len(model.expressions_dynamic()))
+    assert solver.yobs_view.shape == (len(time), len(model.observables))
 
 
 def test_robertson_integration():

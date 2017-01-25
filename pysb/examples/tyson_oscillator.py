@@ -4,8 +4,9 @@ from scipy.constants import N_A
 
 Model()
 
-VOL = 1e-20
-NA_V = N_A*VOL
+Parameter('vol', 1e-20)
+
+NA_V = N_A*vol.value
 
 Parameter('k1', 0.015*NA_V)
 # Parameter('k1', 0.015)

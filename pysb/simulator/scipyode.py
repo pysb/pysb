@@ -12,6 +12,7 @@ import sympy
 import re
 import numpy as np
 import warnings
+import os
 
 
 def _exec(code, locals):
@@ -90,6 +91,9 @@ class ScipyOdeSimulator(Simulator):
     :class:`SimulationResult` class.
     """
 
+    _supports = {'multi_initials': True,
+                 'multi_param_values': True}
+
     # some sane default options for a few well-known integrators
     default_integrator_options = {
         'vode': {
@@ -97,10 +101,8 @@ class ScipyOdeSimulator(Simulator):
             'with_jacobian': True,
             # Set nsteps as high as possible to give our users flexibility in
             # choosing their time step. (Let's be safe and assume vode was
-            # compiled
-            # with 32-bit ints. What would actually happen if it was and we
-            # passed
-            # 2**64-1 though?)
+            # compiled with 32-bit ints. What would actually happen if it was
+            # and we passed 2**64-1 though?)
             'nsteps': 2 ** 31 - 1,
         },
         'cvode': {
@@ -114,6 +116,7 @@ class ScipyOdeSimulator(Simulator):
 
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
+
         super(ScipyOdeSimulator, self).__init__(model,
                                                 tspan=tspan,
                                                 initials=initials,
@@ -299,78 +302,79 @@ class ScipyOdeSimulator(Simulator):
 
     @classmethod
     def _test_inline(cls):
-        """Detect whether scipy.weave.inline is functional."""
+        """
+        Detect whether scipy.weave.inline is functional.
+
+        Produces compile warnings, which we suppress by capturing STDERR.
+        """
         if not hasattr(cls, '_use_inline'):
             cls._use_inline = False
             try:
                 if weave_inline is not None:
-                    weave_inline('int i=0; i=i;', force=1)
+                    extra_compile_args = None
+                    if os.name == 'posix':
+                        extra_compile_args = ['2>/dev/null']
+                    elif os.name == 'nt':
+                        extra_compile_args = ['2>NUL']
+                    weave_inline('int i=0; i=i;', force=1,
+                                 extra_compile_args=extra_compile_args)
                     cls._use_inline = True
             except (scipy.weave.build_tools.CompileError,
                     distutils.errors.CompileError, ImportError):
                 pass
 
-    def run(self, tspan=None, param_values=None, initials=None):
+    def run(self, tspan=None, initials=None, param_values=None):
         """
         Run a simulation and returns the result (trajectories)
 
         .. note::
-            ``tspan``, ``param_values`` and ``initials`` values supplied to
+            ``tspan``, ``initials`` and ``param_values`` values supplied to
             this method will persist to future :func:`run` calls.
 
         Parameters
         ----------
         tspan
-        param_values
         initials
+        param_values
             See parameter definitions in :class:`ScipyOdeSimulator`.
 
         Returns
         -------
         A :class:`SimulationResult` object
         """
-        if tspan is not None:
-            self.tspan = tspan
-        if self.tspan is None:
-            raise SimulatorException("tspan must be defined before "
-                                     "simulation can run")
-        trajectories = np.ndarray((1, len(self.tspan),
-                                  len(self._model.species)))
-        if param_values is not None:
-            self.param_values = param_values
-        if initials is not None:
-            self.initials = initials
-        y0 = self.initials_list
-        param_values = self.param_values
-        if self.integrator == 'lsoda':
-            trajectories[0] = scipy.integrate.odeint(self.func,
-                                                y0,
-                                                self.tspan,
-                                                Dfun=self.jac_fn,
-                                                args=(param_values,),
-                                                **self.opts)
-        else:
-            # perform the actual integration
-            self.integrator.set_initial_value(y0, self.tspan[0])
-            # Set parameter vectors
-            # for RHS func and Jacobian
-            self.integrator.set_f_params(param_values)
-            if self._use_analytic_jacobian:
-                self.integrator.set_jac_params(param_values)
-            trajectories[0][0] = y0
-            i = 1
-            if self.verbose:
-                print("Integrating...")
-                print("\tTime")
-                print("\t----")
-                print("\t%g" % self.integrator.t)
-            while self.integrator.successful() and self.integrator.t < \
-                    self.tspan[-1]:
-                trajectories[0][i] = self.integrator.integrate(self.tspan[i])
-                i += 1
-                if self.verbose: print("\t%g" % self.integrator.t)
-            if self.verbose: print("...Done.")
-            if self.integrator.t < self.tspan[-1]:
-                trajectories[0, i:, :] = 'nan'
-        self.tout = [self.tspan, ]
-        return SimulationResult(self, trajectories)
+        super(ScipyOdeSimulator, self).run(tspan=tspan,
+                                           initials=initials,
+                                           param_values=param_values)
+        n_sims = len(self.param_values)
+        trajectories = np.ndarray((n_sims, len(self.tspan),
+                              len(self._model.species)))
+        for n in range(n_sims):
+            self._logger.info('Running simulation %d of %d', n + 1, n_sims)
+            if self.integrator == 'lsoda':
+                trajectories[n] = scipy.integrate.odeint(self.func,
+                                                    self.initials[n],
+                                                    self.tspan,
+                                                    Dfun=self.jac_fn,
+                                                    args=(self.param_values[n],),
+                                                    **self.opts)
+            else:
+                self.integrator.set_initial_value(self.initials[n],
+                                                  self.tspan[0])
+                # Set parameter vectors for RHS func and Jacobian
+                self.integrator.set_f_params(self.param_values[n])
+                if self._use_analytic_jacobian:
+                    self.integrator.set_jac_params(self.param_values[n])
+                trajectories[n][0] = self.initials[n]
+                i = 1
+                while self.integrator.successful() and self.integrator.t < \
+                        self.tspan[-1]:
+                    self._logger.debug('Simulation %d/%d Integrating t=%g',
+                                       n + 1, n_sims, self.integrator.t)
+                    trajectories[n][i] = self.integrator.integrate(self.tspan[i])
+                    i += 1
+                if self.integrator.t < self.tspan[-1]:
+                    trajectories[n, i:, :] = 'nan'
+
+        tout = np.array([self.tspan]*n_sims)
+        self._logger.info('All simulation(s) complete')
+        return SimulationResult(self, tout, trajectories)

@@ -1,6 +1,6 @@
 from pysb.examples.tyson_oscillator import model
-import numpy as np
 from pysb.simulator import ScipyOdeSimulator
+import numpy as np
 import matplotlib.pyplot as plt
 
 t = np.linspace(0, 100, 10001)
