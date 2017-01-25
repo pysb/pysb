@@ -4,10 +4,11 @@ Wrapper functions for running the Kappa programs *KaSim* and *KaSa*.
 The path to the directory containing the KaSim and KaSa executables can be
 specified in one of three ways:
 
-- setting the KAPPAPATH environment variable to the KaSim directory
-- setting the path using the :py:func:`set_kappa_path` function at runtime
-- adding the path to the KaSim directory to the system PATH environment variable
-
+- set the KAPPAPATH environment variable to the KaSim directory
+- move Kappa to /usr/local/share/KaSim (macOS, Linux) or
+  c:\Program Files\KaSim (Windows)
+- set the path using the :py:func:`pysb.pathfinder.set_path` function at
+  runtime
 """
 
 from __future__ import print_function as _
@@ -16,9 +17,7 @@ import pysb.pathfinder as pf
 from pysb.generator.kappa import KappaGenerator
 import os
 import subprocess
-import random
 import re
-import sympy
 import numpy as np
 import tempfile
 import shutil
@@ -41,6 +40,10 @@ def set_kappa_path(path):
     path: string
         Directory containing KaSim and KaSa executables.
     """
+    warnings.warn("Function %s() is deprecated; use "
+                  "pysb.pathfinder.set_path() instead" %
+                  set_kappa_path.__name__, category=DeprecationWarning,
+                  stacklevel=2)
     pf.set_path('kasim', path)
     pf.set_path('kasa', path)
 

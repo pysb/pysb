@@ -33,6 +33,9 @@ except NameError:
 
 def set_bng_path(dir):
     """ Deprecated. Use pysb.pathfinder.set_path() instead. """
+    warn("Function %s() is deprecated; use pysb.pathfinder.set_path() "
+         "instead" % set_bng_path.__name__, category=DeprecationWarning,
+         stacklevel=2)
     pf.set_path('bng', dir)
 
 
