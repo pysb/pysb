@@ -154,7 +154,7 @@ class BnglBuilder(Builder):
             cplx_pats = []
             for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
                 match_once = mp.get('matchOnce')
-                match_once = 1 if match_once == "1" else 0
+                match_once = True if match_once == "1" else False
                 cplx_pats.append(ComplexPattern(self._parse_species(mp),
                                                 compartment=None,
                                                 match_once=match_once))
