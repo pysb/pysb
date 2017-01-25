@@ -4,20 +4,20 @@ Wrapper functions for running the Kappa programs *KaSim* and *KaSa*.
 The path to the directory containing the KaSim and KaSa executables can be
 specified in one of three ways:
 
-- setting the KAPPAPATH environment variable to the KaSim directory
-- setting the path using the :py:func:`set_kappa_path` function at runtime
-- adding the path to the KaSim directory to the system PATH environment variable
-
+- set the KAPPAPATH environment variable to the KaSim directory
+- move Kappa to /usr/local/share/KaSim (macOS, Linux) or
+  c:\Program Files\KaSim (Windows)
+- set the path using the :py:func:`pysb.pathfinder.set_path` function at
+  runtime
 """
 
 from __future__ import print_function as _
 import pysb
+import pysb.pathfinder as pf
 from pysb.generator.kappa import KappaGenerator
 import os
 import subprocess
-import random
 import re
-import sympy
 import numpy as np
 import tempfile
 import shutil
@@ -29,95 +29,23 @@ try:
 except ImportError:
     pass
 
-# Cached value of Kappa program paths
-_kasim_path = None
-_kasa_path = None
-
-def _check_dist_dir(kappa_prog, dist_dir):
-    kappa_prog_path = os.path.join(dist_dir, kappa_prog)
-    if os.access(kappa_prog_path, os.F_OK):
-        return kappa_prog_path
-    else:
-        return None
 
 def set_kappa_path(path):
     """Set the path to the KaSim and KaSa executables.
 
+    Deprecated. Use pysb.pathfinder.set_path() instead.
+
     Parameters
     ----------
     path: string
-        Directory containing KaSim and Kasa executables.
+        Directory containing KaSim and KaSa executables.
     """
-
-    global _kasim_path
-    global _kasa_path
-    # Check locations of both KaSim and KaSa
-    kasim_path = _check_dist_dir('KaSim', path)
-    kasa_path = _check_dist_dir('KaSa', path)
-    # KaSim is required, so raise if we didn't find it.
-    if kasim_path is None:
-        raise Exception('Could not find KaSim in %s.' % os.path.abspath(path))
-    # KaSa is optional, so only warn if we didn't find it.
-    if kasa_path is None:
-        warnings.warn('Could not find KaSa in %s; install KaSa for static '
-                      'analysis features.' % os.path.abspath(path))
-    _kasim_path = kasim_path
-    _kasa_path = kasa_path
-
-def _get_kappa_path(kappa_prog):
-    """
-    Return the path to the KaSim or KaSa executable.
-
-    Looks for a KaSim/KaSa distribution at the path stored in the KAPPAPATH
-    environment variable if that's set, or else in a few hard-coded standard
-    locations.
-    """
-
-    if kappa_prog not in ['KaSim', 'KaSa']:
-        raise ValueError("kappa_prog must be one of 'KaSim', 'KaSa'.")
-
-    global _kasim_path
-    global _kasa_path
-
-    # Just return cached value if it's available
-    if kappa_prog == 'KaSim' and _kasim_path is not None:
-        return _kasim_path
-    elif kappa_prog == 'KaSa' and _kasa_path is not None:
-        return _kasa_path
-
-    path_var = 'KAPPAPATH'
-    dist_dirs = [
-        '/usr/local/share/KaSim',
-        'c:/Program Files/KaSim',
-        ]
-
-    # First check the environment variable, which has the highest precedence
-    if path_var in os.environ:
-        kappapath = os.environ[path_var]
-        kappa_prog_path = _check_dist_dir(kappa_prog, kappapath)
-        if not kappa_prog_path:
-            raise Exception('Environment variable %s is set to "%s" but %s '
-                            'could not be found there.' %
-                            (path_var, kappapath, kappa_prog))
-    # If the environment variable isn't set, check the standard locations
-    else:
-        for dist_dir in dist_dirs:
-            kappa_prog_path = _check_dist_dir(kappa_prog, dist_dir)
-            if kappa_prog_path:
-                break
-        else:
-            raise Exception('Could not find %s installed in one of the '
-                            'following locations:' % kappa_prog +
-                            ''.join('\n    ' + d for d in dist_dirs) +
-                            '\nSet the environment variable %s to the '
-                            'directory containing KaSim and KaSa.' % path_var)
-    # Cache path for future use
-    if kappa_prog == 'KaSim':
-        _kasim_path = kappa_prog_path
-    elif kappa_prog == 'KaSa':
-        _kasa_path = kappa_prog_path
-
-    return kappa_prog_path
+    warnings.warn("Function %s() is deprecated; use "
+                  "pysb.pathfinder.set_path() instead" %
+                  set_kappa_path.__name__, category=DeprecationWarning,
+                  stacklevel=2)
+    pf.set_path('kasim', path)
+    pf.set_path('kasa', path)
 
 
 class KasimInterfaceError(RuntimeError):
@@ -231,7 +159,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
             kappa_file.write('\n%s\n' % perturbation)
 
     # Run KaSim
-    kasim_path = _get_kappa_path('KaSim')
+    kasim_path = pf.get_path('kasim')
     p = subprocess.Popen([kasim_path] + args,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if verbose:
@@ -358,7 +286,7 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         kappa_file.write(gen.get_content())
 
     # Run KaSa using the given args
-    kasa_path = _get_kappa_path('KaSa')
+    kasa_path = pf.get_path('kasa')
     p = subprocess.Popen([kasa_path] + args,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if verbose:

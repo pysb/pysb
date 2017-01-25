@@ -13,6 +13,7 @@ import abc
 from warnings import warn
 import shutil
 import collections
+import pysb.pathfinder as pf
 
 try:
     from cStringIO import StringIO
@@ -29,73 +30,13 @@ try:
 except NameError:
     basestring = str
 
-# Cached value of BNG path
-_bng_path = None
 
 def set_bng_path(dir):
-    global _bng_path
-    _bng_path = os.path.join(dir,'BNG2.pl')
-    # Make sure file exists and that it is not a directory
-    if not os.access(_bng_path, os.F_OK) or not os.path.isfile(_bng_path):
-        raise Exception('Could not find BNG2.pl in ' + os.path.abspath(dir) + '.')
-    # Make sure file has executable permissions
-    elif not os.access(_bng_path, os.X_OK):
-        raise Exception("BNG2.pl in " + os.path.abspath(dir) + " does not have executable permissions.")
-
-def _get_bng_path():
-    """
-    Return the path to BioNetGen's BNG2.pl.
-
-    Looks for a BNG distribution at the path stored in the BNGPATH environment
-    variable if that's set, or else in a few hard-coded standard locations.
-
-    """
-
-    global _bng_path
-
-    # Just return cached value if it's available
-    if _bng_path:
-        return _bng_path
-
-    path_var = 'BNGPATH'
-    dist_dirs = [
-        '/usr/local/share/BioNetGen',
-        'c:/Program Files/BioNetGen',
-        ]
-    # BNG 2.1.8 moved BNG2.pl up out of the Perl2 subdirectory, so to be more
-    # compatible we check both the old and new locations.
-    script_subdirs = ['', 'Perl2']
-
-    def check_dist_dir(dist_dir):
-        # Return the full path to BNG2.pl inside a BioNetGen distribution
-        # directory, or False if directory does not contain a BNG2.pl in one of
-        # the expected places.
-        for subdir in script_subdirs:
-            script_path = os.path.join(dist_dir, subdir, 'BNG2.pl')
-            if os.access(script_path, os.F_OK):
-                return script_path
-        else:
-            return False
-
-    # First check the environment variable, which has the highest precedence
-    if path_var in os.environ:
-        script_path = check_dist_dir(os.environ[path_var])
-        if not script_path:
-            raise Exception('Environment variable %s is set but BNG2.pl could'
-                            ' not be found there' % path_var)
-    # If the environment variable isn't set, check the standard locations
-    else:
-        for dist_dir in dist_dirs:
-            script_path = check_dist_dir(dist_dir)
-            if script_path:
-                break
-        else:
-            raise Exception('Could not find BioNetGen installed in one of the '
-                            'following locations:' +
-                            ''.join('\n    ' + d for d in dist_dirs))
-    # Cache path for future use
-    _bng_path = script_path
-    return script_path
+    """ Deprecated. Use pysb.pathfinder.set_path() instead. """
+    warn("Function %s() is deprecated; use pysb.pathfinder.set_path() "
+         "instead" % set_bng_path.__name__, category=DeprecationWarning,
+         stacklevel=2)
+    pf.set_path('bng', dir)
 
 
 class BngInterfaceError(RuntimeError):
@@ -288,7 +229,8 @@ class BngConsole(BngBaseInterface):
                     bng_file.write(self.generator.get_content())
 
             # Start BNG Console and load BNGL
-            self.console = pexpect.spawn('perl %s --console' % _get_bng_path(),
+            self.console = pexpect.spawn('perl %s --console' %
+                                         pf.get_path('bng'),
                                          cwd=self.base_directory,
                                          timeout=timeout)
             self._console_wait()
@@ -429,7 +371,8 @@ class BngFileInterface(BngBaseInterface):
             self.command_queue.close()
             self._init_command_queue()
 
-            p = subprocess.Popen(['perl', _get_bng_path(), self.bng_filename],
+            p = subprocess.Popen(['perl', pf.get_path('bng'),
+                                  self.bng_filename],
                                  cwd=self.base_directory,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
