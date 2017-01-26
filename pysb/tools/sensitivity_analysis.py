@@ -251,7 +251,7 @@ class InitialConcentrationSensitivityAnalysis:
         print("Number of simulations to run = %s" % len(simulations))
         return simulations
 
-    def create_plot_p_h_pprime(self, save_name=None, out_dir=None, show=True):
+    def create_plot_p_h_pprime(self, save_name=None, out_dir=None, show=False):
         """ creates a plot of P, H(B), and P'
 
         Parameters
@@ -308,7 +308,7 @@ class InitialConcentrationSensitivityAnalysis:
         plt.close()
 
     def create_individual_pairwise_plots(self, save_name=None, out_dir=None,
-                                         show=True):
+                                         show=False):
         """ creates a single plot containing heat plot of each specie pair
 
         Parameters
@@ -368,7 +368,7 @@ class InitialConcentrationSensitivityAnalysis:
         plt.close()
 
     def create_boxplot_and_heatplot(self, x_axis_label=None, save_name=None,
-                                    out_dir=None, show=True):
+                                    out_dir=None, show=False):
         """ Creates heat map and box plot of sensitivities
 
 
