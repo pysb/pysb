@@ -28,7 +28,6 @@ class BnglBuilder(Builder):
     def __init__(self, filename, force=False):
         super(BnglBuilder, self).__init__()
         with BngFileInterface(model=None) as con:
-            #con.load_bngl(filename)
             con.action('readFile', file=filename, skip_actions=1)
             con.action('writeXML', evaluate_expressions=0)
             con.execute()

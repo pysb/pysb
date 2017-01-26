@@ -1,7 +1,7 @@
 import pysb
 import os
 import pysb.pathfinder as pf
-from pysb.bng import BngConsole
+from pysb.bng import BngFileInterface
 from pysb.importers.bngl import model_from_bngl, BnglImportError
 from pysb.importers.sbml import model_from_sbml
 import numpy
@@ -18,16 +18,18 @@ def bngl_import_compare_simulations(bng_file, force=False,
     m = model_from_bngl(bng_file, force=force)
 
     # Simulate using the BNGL file directly
-    with BngConsole(model=None, suppress_warnings=True) as bng:
-        bng.load_bngl(bng_file)
-        bng.generate_network()
+    with BngFileInterface(model=None) as bng:
+        bng.action('readFile', file=bng_file, skip_actions=1)
+        bng.action('generate_network')
         bng.action('simulate', method='ode', sample_times=sim_times)
+        bng.execute()
         yfull1 = bng.read_simulation_results()
 
     # Convert to a PySB model, then simulate using BNG
-    with BngConsole(m, suppress_warnings=True) as bng:
-        bng.generate_network()
+    with BngFileInterface(model=m) as bng:
+        bng.action('generate_network')
         bng.action('simulate', method='ode', sample_times=sim_times)
+        bng.execute()
         yfull2 = bng.read_simulation_results()
 
     # Check all species trajectories are equal (within numerical tolerance)
