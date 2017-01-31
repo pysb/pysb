@@ -10,6 +10,7 @@ import tempfile
 import time
 import warnings
 import shutil
+
 try:
     import pandas as pd
 except ImportError:
@@ -17,6 +18,7 @@ except ImportError:
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
+
     use_pycuda = True
 except ImportError:
     use_pycuda = False
@@ -24,20 +26,20 @@ except ImportError:
 
 _cupsoda_path = None
 
+
 def set_cupsoda_path(directory):
     global _cupsoda_path
     _cupsoda_path = os.path.join(directory, 'cupSODA')
     # Make sure file exists and that it is not a directory
-    if not os.access(_cupsoda_path, os.F_OK) or not \
-            os.path.isfile(_cupsoda_path):
+    if not os.access(_cupsoda_path, os.F_OK) or not os.path.isfile(
+        _cupsoda_path):
         raise SimulatorException(
-                        'Could not find cupSODA binary in ' +
-                        os.path.abspath(directory) + '.')
+            'Could not find cupSODA binary in ' + os.path.abspath(
+                directory) + '.')
     # Make sure file has executable permissions
     elif not os.access(_cupsoda_path, os.X_OK):
-        raise SimulatorException(
-                        "cupSODA binary in " + os.path.abspath(directory) +
-                        " does not have executable permissions.")
+        raise SimulatorException("cupSODA binary in " + os.path.abspath(
+            directory) + " does not have executable permissions.")
 
 
 def _get_cupsoda_path():
@@ -56,17 +58,17 @@ def _get_cupsoda_path():
         return _cupsoda_path
 
     path_var = 'CUPSODAPATH'
-    bin_dirs = [
-        '/usr/local/share/cupSODA',
-        'c:/Program Files/cupSODA',
-    ]
+    bin_dirs = ['/usr/local/share/cupSODA', 'c:/Program Files/cupSODA', ]
 
     def _check_bin_dir(bin_dir):
         # Return the full path to the cupSODA executable or False if it
         # can't be found in one of the expected places.
         bin_path = os.path.join(bin_dir, 'cupSODA')
+        bin_path_nt = os.path.join(bin_dir, 'cupSODA.exe')
         if os.access(bin_path, os.F_OK):
             return bin_path
+        elif os.access(bin_path_nt, os.F_OK):
+            return bin_path_nt
         else:
             return False
 
@@ -75,24 +77,25 @@ def _get_cupsoda_path():
         bin_path = _check_bin_dir(os.environ[path_var])
         if not bin_path:
             raise SimulatorException(
-                            'Environment variable %s is set but the path could'
-                            ' not be found, is not accessible or does not '
-                            'contain a cupSODA executable file.' % path_var)
+                'Environment variable %s is set but the path could'
+                ' not be found, is not accessible or does not '
+                'contain a cupSODA executable file.' % path_var)
     # If the environment variable isn't set, check the standard locations
     # Check the standard locations for the executable
     else:
+        found = False
         for b in bin_dirs:
             bin_path = _check_bin_dir(b)
             if bin_path:
+                found = True
                 break
-            else:
-                raise SimulatorException(
-                            'Could not find cupSODA installed in one of '
-                            'the following locations:' +
-                            ''.join('\n    ' + x for x in bin_dirs) +
-                            '\nPlease put the executable (or a link to '
-                            'it) in one of these locations or set the '
-                            'path using set_cupsoda_path().')
+        if not found:
+            raise SimulatorException(
+                'Could not find cupSODA installed in one of the '
+                'following locations: {} \n Please put the executable '
+                '(or a link to it) in one of these locations or '
+                'set the path using set_cupsoda_path()'.format(
+                    ''.join('\n    ' + x for x in bin_dirs)))
 
     # Cache path for future use
     _cupsoda_path = bin_path
@@ -154,12 +157,12 @@ class CupSodaSimulator(Simulator):
         Index of GPU being run on
     vol : float or None
         System volume
-    outdir : string
+    outdir : str
         Temporary directory where cupSODA output files are placed. Input
         files are also placed here.
     opts: dict
         Dictionary of options for the integrator in use.
-    integrator : string
+    integrator : str
         Name of the integrator in use.
     default_integrator_options : dict
         Nested dictionary of default options for all supported integrators.   
@@ -177,62 +180,56 @@ class CupSodaSimulator(Simulator):
        to 'nan'.
     """
 
-    _supports = { 'multi_initials' : True,
-                  'multi_param_values' : True }
+    _supports = {'multi_initials': True, 'multi_param_values': True}
 
     _memory_options = {'global': '0', 'shared': '1', 'sharedconstant': '2'}
 
     default_integrator_options = {
-    # some sane default options for a few well-known integrators
+        # some sane default options for a few well-known integrators
         'cupsoda': {
-            'max_steps': 20000,  # max no. of internal iterations (LSODA's MXSTEP)
+            'max_steps': 20000, # max # of internal iterations (LSODA's MXSTEP)
             'atol': 1e-8,  # absolute tolerance
             'rtol': 1e-8,  # relative tolerance
             'n_blocks': None,  # number of GPU blocks
-            'memory_usage': 'sharedconstant'  # see _memory_options dict
-        },
-    }
-    
+            'memory_usage': 'sharedconstant'}}  # see _memory_options dict
+
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
-        super(CupSodaSimulator, self).__init__(model, 
-                                               tspan=tspan,
+        super(CupSodaSimulator, self).__init__(model, tspan=tspan,
                                                initials=initials,
                                                param_values=param_values,
-                                               verbose=verbose, 
-                                               **kwargs)
+                                               verbose=verbose, **kwargs)
         self.gpu = kwargs.get('gpu', 0)
-        self.vol = kwargs.get('vol', None)
         self._obs_species_only = kwargs.get('obs_species_only', True)
         self._cleanup = kwargs.get('cleanup', True)
-        self._prefix = kwargs.get('prefix', self._model.name.replace('.','_'))
+        self._prefix = kwargs.get('prefix', self._model.name.replace('.', '_'))
         self._base_dir = kwargs.get('base_dir', None)
         self.integrator = kwargs.get('integrator', 'cupsoda')
-        
+
         # generate the equations for the model
         pysb.bng.generate_equations(self._model, self._cleanup, self.verbose)
-                
+
         # build integrator options list from our defaults and any kwargs
         # passed to this function
         options = {}
         if self.default_integrator_options.get(self.integrator):
-            options.update(
-                self.default_integrator_options[self.integrator])  # default options
+            options.update(self.default_integrator_options[
+                self.integrator])  # default options
         else:
             raise SimulatorException(
-                "Integrator type '" + integrator + "' not recognized.")
+                "Integrator type '" + self.integrator + "' not recognized.")
         options.update(kwargs.get('integrator_options', {}))  # overwrite
-        
+
         # defaults
         self.opts = options
         self._out_species = None
-        
+
         # private variables (to reduce the number of function calls)
         self._len_rxns = len(self._model.reactions)
         self._len_species = len(self._model.species)
         self._len_params = len(self._model.parameters)
         self._model_parameters_rules = self._model.parameters_rules()
-        
+
     def run(self, tspan=None, initials=None, param_values=None):
         """Perform a set of integrations.
 
@@ -263,58 +260,50 @@ class CupSodaSimulator(Simulator):
            `__init__` or `run` a single simulation is run with the initial 
            concentrations and parameter values defined in the model.
         """
-        super(CupSodaSimulator, self).run(tspan=tspan,
-                                           initials=initials,
-                                           param_values=param_values)
+        super(CupSodaSimulator, self).run(tspan=tspan, initials=initials,
+                                          param_values=param_values)
 
         # Create directories for cupSODA input and output files
-        self.outdir = tempfile.mkdtemp(prefix=self._prefix+'_', dir=self._base_dir)
+        self.outdir = tempfile.mkdtemp(prefix=self._prefix + '_',
+                                       dir=self._base_dir)
+
         if self.verbose:
             print("Output directory is %s" % self.outdir)
-        self._cupsoda_infiles_dir = os.path.join(self.outdir,"INPUT")
+
+        self._cupsoda_infiles_dir = os.path.join(self.outdir, "INPUT")
         os.mkdir(self._cupsoda_infiles_dir)
-        self._cupsoda_outfiles_dir = os.path.join(self.outdir,"OUTPUT")
+        self._cupsoda_outfiles_dir = os.path.join(self.outdir, "OUTPUT")
         os.mkdir(self._cupsoda_outfiles_dir)
 
         # Path to cupSODA executable
         bin_path = _get_cupsoda_path()
 
-        # Number of blocks
-        n_blocks = self._get_nblocks(self.gpu)
-        
         # Create cupSODA input files
         self._create_input_files(self._cupsoda_infiles_dir)
 
         # Build command
         # ./cupSODA input_model_folder blocks output_folder simulation_
         # file_prefix gpu_number fitness_calculation memory_use dump
-        command = [bin_path, 
-                   self._cupsoda_infiles_dir, 
-                   str(n_blocks),
-                   self._cupsoda_outfiles_dir, 
-                   self._prefix,
-                   str(self.gpu),
-                   '0', 
-                   self._memory_usage,
-                   '1' if self.verbose else '0']
+        command = [bin_path, self._cupsoda_infiles_dir, str(self.n_blocks),
+                   self._cupsoda_outfiles_dir, self._prefix, str(self.gpu),
+                   '0', self._memory_usage, '1' if self.verbose else '0']
         print("Running cupSODA: " + ' '.join(command))
 
         # Run simulation and return trajectories
-        p = subprocess.Popen(command,
-                             stdout=subprocess.PIPE,
+        p = subprocess.Popen(command, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         if self.verbose:
             for line in iter(p.stdout.readline, b''):
                 print(line, end="")
         (p_out, p_err) = p.communicate()
         if p.returncode:
-            raise SimulatorException( p_out.rstrip("at line") +
-                                     "\n" + p_err.rstrip() )
+            raise SimulatorException(
+                p_out.rstrip("at line") + "\n" + p_err.rstrip())
         tout, trajectories = self._load_trajectories(
-                                       self._cupsoda_outfiles_dir)
+            self._cupsoda_outfiles_dir)
         if self._cleanup:
             shutil.rmtree(self.outdir)
-        
+
         return SimulationResult(self, tout, trajectories)
 
     @property
@@ -325,7 +314,17 @@ class CupSodaSimulator(Simulator):
             raise Exception('memory_usage must be one of %s',
                             self._memory_options.keys())
 
-    def _get_nblocks(self, gpu):
+    @property
+    def vol(self):
+        vol = self.opts.get('vol', None)
+        return vol
+
+    @vol.setter
+    def vol(self, volumne):
+        self.opts['vol'] = volumne
+
+    @property
+    def n_blocks(self):
         n_blocks = self.opts.get('n_blocks')
         if n_blocks is None:
             default_threads_per_block = 32
@@ -334,30 +333,42 @@ class CupSodaSimulator(Simulator):
             if not use_pycuda:
                 threads_per_block = default_threads_per_block
             else:
-                device = cuda.Device(gpu)
+                device = cuda.Device(self.gpu)
                 attrs = device.get_attributes()
-                shared_memory_per_block = attrs[pycuda.driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
-                upper_limit_threads_per_block = attrs[pycuda.driver.device_attribute.MAX_THREADS_PER_BLOCK]
-                max_threads_per_block = min(shared_memory_per_block / memory_per_thread,
-                                            upper_limit_threads_per_block)
-                threads_per_block = min(max_threads_per_block, default_threads_per_block)
-            n_blocks = int(np.ceil(1. * len(self.param_values) / threads_per_block))
+                shared_memory_per_block = attrs[
+                    pycuda.driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
+                upper_limit_threads_per_block = attrs[
+                    pycuda.driver.device_attribute.MAX_THREADS_PER_BLOCK]
+                max_threads_per_block = min(
+                    shared_memory_per_block / memory_per_thread,
+                    upper_limit_threads_per_block)
+                threads_per_block = min(max_threads_per_block,
+                                        default_threads_per_block)
+            n_blocks = int(
+                np.ceil(1. * len(self.param_values) / threads_per_block))
         return n_blocks
 
-    def _create_input_files(self, dir):
+    @n_blocks.setter
+    def n_blocks(self, n_blocks):
+        if not isinstance(n_blocks, int):
+            raise ValueError("n_blocks must be an integer")
+        if n_blocks <= 0:
+            raise ValueError("n_blocks must be greater than 0")
+        self.opts['n_blocks'] = n_blocks
+
+    def _create_input_files(self, directory):
 
         n_sims = len(self.param_values)
 
         # atol_vector
-        with open(os.path.join(dir, "atol_vector"),
-                  'wb') as atol_vector:
+        with open(os.path.join(directory, "atol_vector"), 'wb') as atol_vector:
             for i in range(self._len_species):
                 atol_vector.write(str(self.opts.get('atol')))
                 if i < self._len_species - 1:
                     atol_vector.write("\n")
 
         # c_matrix
-        with open(os.path.join(dir, "c_matrix"), 'wb') as c_matrix:
+        with open(os.path.join(directory, "c_matrix"), 'wb') as c_matrix:
             cmtx = self._get_cmatrix()
             for i in range(n_sims):
                 line = ""
@@ -370,22 +381,22 @@ class CupSodaSimulator(Simulator):
                     c_matrix.write("\n")
 
         # cs_vector
-        with open(os.path.join(dir, "cs_vector"), 'wb') as cs_vector:
-            self._out_species = range(self._len_species) # species to output
+        with open(os.path.join(directory, "cs_vector"), 'wb') as cs_vector:
+            self._out_species = range(self._len_species)  # species to output
             if self._obs_species_only:
                 self._out_species = [False for sp in self._model.species]
                 for obs in self._model.observables:
                     for i in obs.species:
                         self._out_species[i] = True
                 self._out_species = [i for i in range(self._len_species) if
-                               self._out_species[i] is True]
+                                     self._out_species[i] is True]
             for i in range(len(self._out_species)):
                 if i > 0:
                     cs_vector.write("\n")
                 cs_vector.write(str(self._out_species[i]))
 
         # left_side
-        with open(os.path.join(dir, "left_side"), 'wb') as left_side:
+        with open(os.path.join(directory, "left_side"), 'wb') as left_side:
             for i in range(self._len_rxns):
                 line = ""
                 for j in range(self._len_species):
@@ -402,17 +413,16 @@ class CupSodaSimulator(Simulator):
                     left_side.write(line)
 
         # max_steps
-        with open(os.path.join(dir, "max_steps"), 'wb') as mxsteps:
+        with open(os.path.join(directory, "max_steps"), 'wb') as mxsteps:
             mxsteps.write(str(self.opts['max_steps']))
 
         # model_kind
-        with open(os.path.join(dir, "modelkind"),
-                  'wb') as model_kind:
+        with open(os.path.join(directory, "modelkind"), 'wb') as model_kind:
             # always set modelkind to 'deterministic'
             model_kind.write("deterministic")
 
         # MX_0
-        with open(os.path.join(dir, "MX_0"), 'wb') as MX_0:
+        with open(os.path.join(directory, "MX_0"), 'wb') as MX_0:
             mx0 = self.initials
             # if a volume has been defined, rescale populations
             # by N_A*vol to get concentration
@@ -422,7 +432,7 @@ class CupSodaSimulator(Simulator):
                 mx0 = mx0.copy()
                 mx0 /= (N_A * self.vol)
                 # Set the concentration of __source() to 1
-                for i,sp in enumerate(self._model.species):
+                for i, sp in enumerate(self._model.species):
                     if str(sp) == '__source()':
                         mx0[:, i] = 1.
                         break
@@ -437,8 +447,7 @@ class CupSodaSimulator(Simulator):
                     MX_0.write("\n")
 
         # right_side
-        with open(os.path.join(dir, "right_side"),
-                  'wb') as right_side:
+        with open(os.path.join(directory, "right_side"), 'wb') as right_side:
             for i in range(self._len_rxns):
                 line = ""
                 for j in range(self._len_species):
@@ -455,16 +464,16 @@ class CupSodaSimulator(Simulator):
                     right_side.write(line)
 
         # rtol
-        with open(os.path.join(dir, "rtol"), 'wb') as rtol:
+        with open(os.path.join(directory, "rtol"), 'wb') as rtol:
             rtol.write(str(self.opts.get('rtol')))
 
         # t_vector
-        with open(os.path.join(dir, "t_vector"), 'wb') as t_vector:
+        with open(os.path.join(directory, "t_vector"), 'wb') as t_vector:
             for t in self.tspan:
                 t_vector.write(str(float(t)) + "\n")
 
         # time_max
-        with open(os.path.join(dir, "time_max"), 'wb') as time_max:
+        with open(os.path.join(directory, "time_max"), 'wb') as time_max:
             time_max.write(str(float(self.tspan[-1])))
 
     def _get_cmatrix(self):
@@ -509,26 +518,28 @@ class CupSodaSimulator(Simulator):
             print("100%")
         return c_matrix
 
-    def _load_trajectories(self, dir):
+    def _load_trajectories(self, directory):
         """Read simulation results from output files.
 
         Returns `tout` and `trajectories` arrays.
         """
-        files = [filename for filename in os.listdir(dir) if
+        files = [filename for filename in os.listdir(directory) if
                  re.match(self._prefix, filename)]
         if len(files) == 0:
-            raise SimulatorException("Cannot find any output files to load data from.")
+            raise SimulatorException(
+                "Cannot find any output files to load data from.")
         if len(files) != len(self.param_values):
-            raise SimulatorException("Number of input files (%d) does not match number "
-                                     "of requested simulations (%d)." % 
-                                     (len(files), len(self.param_values)))
+            raise SimulatorException(
+                "Number of input files (%d) does not match number "
+                "of requested simulations (%d)." % (
+                len(files), len(self.param_values)))
         n_sims = len(files)
         trajectories = [None] * n_sims
         tout = [None] * n_sims
         traj_n = np.ones((len(self.tspan), self._len_species)) * float('nan')
         tout_n = np.ones(len(self.tspan)) * float('nan')
         # load the data
-        indir_prefix = os.path.join(dir, self._prefix)
+        indir_prefix = os.path.join(directory, self._prefix)
         for n in range(n_sims):
             trajectories[n] = traj_n.copy()
             tout[n] = tout_n.copy()
@@ -554,17 +565,23 @@ class CupSodaSimulator(Simulator):
 
     def _test_pandas(self, filename):
         """ calculates the fastest method to load in data
-        If the file is large, pandas is generally significantly faster.
 
-        :param filename:
-        :return: numpy.ndarray, bool
+        Parameters
+        ----------
+        filename : str
+            filename to laod in
+
+        Returns
+        -------
+        np.array, bool
+
         """
         # using open(filename,...)
         start = time.time()
         data = self._load_with_openfile(filename)
         end = time.time()
         load_time_openfile = end - start
-        
+
         # using pandas
         if pd:
             start = time.time()
@@ -573,22 +590,26 @@ class CupSodaSimulator(Simulator):
             load_time_pandas = end - start
             if load_time_pandas < load_time_openfile:
                 return data, True
-            
+
         return data, False
 
-    def _load_with_pandas(self, filename):
-        data = pd.read_csv(filename, sep='\t', skiprows=None, header=None).as_matrix()
+    @staticmethod
+    def _load_with_pandas(filename):
+        data = pd.read_csv(filename, sep='\t', skiprows=None,
+                           header=None).as_matrix()
         return data
 
-    def _load_with_openfile(self, filename):
+    @staticmethod
+    def _load_with_openfile(filename):
         with open(filename, 'rb') as f:
             data = [line.rstrip('\n').split() for line in f]
         data = np.array(data, dtype=np.float, copy=False)
         return data
-    
-def run_cupsoda(model, tspan, initials=None, param_values=None, integrator='cupsoda',
-         cleanup=True, verbose=False, **kwargs):
-    '''Wrapper method for running cupSODA simulations.
+
+
+def run_cupsoda(model, tspan, initials=None, param_values=None,
+                integrator='cupsoda', cleanup=True, verbose=False, **kwargs):
+    """Wrapper method for running cupSODA simulations.
     
     Parameters
     ----------
@@ -599,8 +620,8 @@ def run_cupsoda(model, tspan, initials=None, param_values=None, integrator='cups
     SimulationResult.all : list of record arrays
         List of trajectory sets. The first dimension contains species,
         observables and expressions (in that order)
-    '''
-    sim = CupSodaSimulator(model, tspan=tspan, integrator=integrator, 
-                           cleanup=cleanup, verbose=verbose, **kwargs)    
+    """
+    sim = CupSodaSimulator(model, tspan=tspan, integrator=integrator,
+                           cleanup=cleanup, verbose=verbose, **kwargs)
     simres = sim.run(initials=initials, param_values=param_values)
     return simres.all
