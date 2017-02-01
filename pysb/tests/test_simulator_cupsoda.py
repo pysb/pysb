@@ -2,9 +2,9 @@ import warnings
 import numpy as np
 from nose.plugins.attrib import attr
 from pysb.examples.tyson_oscillator import model
-from pysb.simulator.cupsoda import CupSodaSimulator, set_cupsoda_path
+from pysb.simulator.cupsoda import CupSodaSimulator
 from nose.tools import raises
-
+import os
 
 @attr('gpu')
 class TestCupSODASimulatorSingle(object):
@@ -76,3 +76,7 @@ class TestCupSODASimulatorSingle(object):
         print(simres.observables)
         self.solver.run(param_values=None, initials=self.y0)
         self.solver.run(param_values=param_values, initials=self.y0)
+
+    def test_log_file(self):
+        self.solver.run(logfile='test_log')
+        assert os.path.exists('test_log')

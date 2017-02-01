@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import time
 import warnings
+import logging
 import shutil
 
 try:
@@ -29,7 +30,10 @@ _cupsoda_path = None
 
 def set_cupsoda_path(directory):
     global _cupsoda_path
-    _cupsoda_path = os.path.join(directory, 'cupSODA')
+    if os.name == 'nt':
+        _cupsoda_path = os.path.join(directory, 'cupSODA.exe')
+    else:
+        _cupsoda_path = os.path.join(directory, 'cupSODA')
     # Make sure file exists and that it is not a directory
     if not os.access(_cupsoda_path, os.F_OK) or not os.path.isfile(
         _cupsoda_path):
@@ -63,12 +67,12 @@ def _get_cupsoda_path():
     def _check_bin_dir(bin_dir):
         # Return the full path to the cupSODA executable or False if it
         # can't be found in one of the expected places.
-        bin_path = os.path.join(bin_dir, 'cupSODA')
-        bin_path_nt = os.path.join(bin_dir, 'cupSODA.exe')
+        if os.name == 'nt':
+            bin_path = os.path.join(bin_dir, 'cupSODA.exe')
+        else:
+            bin_path = os.path.join(bin_dir, 'cupSODA')
         if os.access(bin_path, os.F_OK):
             return bin_path
-        elif os.access(bin_path_nt, os.F_OK):
-            return bin_path_nt
         else:
             return False
 
@@ -230,7 +234,7 @@ class CupSodaSimulator(Simulator):
         self._len_params = len(self._model.parameters)
         self._model_parameters_rules = self._model.parameters_rules()
 
-    def run(self, tspan=None, initials=None, param_values=None):
+    def run(self, tspan=None, initials=None, param_values=None, logfile=None):
         """Perform a set of integrations.
 
         Returns a :class:`.SimulationResult` object.
@@ -238,14 +242,16 @@ class CupSodaSimulator(Simulator):
         Parameters
         ----------
         tspan : list-like, optional
-            Time values at which the integrations are sampled. The first and last
-            values define the time range.
+            Time values at which the integrations are sampled. The first and
+            last values define the time range.
         initials : list-like, optional
             Initial species concentrations for all simulations. Dimensions are
             number of simulation x number of species.    
         param_values : list-like, optional
-            Parameters for all simulations. Dimensions are number of simulations x
-            number of parameters.
+            Parameters for all simulations. Dimensions are number of
+            simulations x number of parameters.
+        logfile : str, optional
+            path to write log file, only used if provided
 
         Returns
         -------
@@ -253,8 +259,8 @@ class CupSodaSimulator(Simulator):
 
         Notes
         -----
-        1. An exception is thrown if `tspan` is not defined in either `__init__`
-           or `run`.
+        1. An exception is thrown if `tspan` is not defined in either
+           `__init__`or `run`.
            
         2. If neither `initials` nor `param_values` are defined in either 
            `__init__` or `run` a single simulation is run with the initial 
@@ -269,9 +275,8 @@ class CupSodaSimulator(Simulator):
 
         if self.verbose:
             print("Output directory is %s" % self.outdir)
-
-        self._cupsoda_infiles_dir = os.path.join(self.outdir, "INPUT")
-        os.mkdir(self._cupsoda_infiles_dir)
+        _cupsoda_infiles_dir = os.path.join(self.outdir, "INPUT")
+        os.mkdir(_cupsoda_infiles_dir)
         self._cupsoda_outfiles_dir = os.path.join(self.outdir, "OUTPUT")
         os.mkdir(self._cupsoda_outfiles_dir)
 
@@ -279,19 +284,31 @@ class CupSodaSimulator(Simulator):
         bin_path = _get_cupsoda_path()
 
         # Create cupSODA input files
-        self._create_input_files(self._cupsoda_infiles_dir)
+        self._create_input_files(_cupsoda_infiles_dir)
 
         # Build command
         # ./cupSODA input_model_folder blocks output_folder simulation_
         # file_prefix gpu_number fitness_calculation memory_use dump
-        command = [bin_path, self._cupsoda_infiles_dir, str(self.n_blocks),
+        command = [bin_path, _cupsoda_infiles_dir, str(self.n_blocks),
                    self._cupsoda_outfiles_dir, self._prefix, str(self.gpu),
                    '0', self._memory_usage, '1' if self.verbose else '0']
-        print("Running cupSODA: " + ' '.join(command))
+        if logfile is not None:
+            log = logging.getLogger()
+            log.setLevel(logging.INFO)
+            log.handlers = []
+            file_handler = logging.FileHandler(logfile)
+            file_handler.setLevel(logging.INFO)
+            log.addHandler(file_handler)
 
+        print("Running cupSODA: " + ' '.join(command))
+        start_time = time.time()
         # Run simulation and return trajectories
         p = subprocess.Popen(command, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
+        if logfile is not None:
+            for line in iter(p.stdout.readline, b''):
+                if 'Running time' in line:
+                    log.info(line[:-1])
         if self.verbose:
             for line in iter(p.stdout.readline, b''):
                 print(line, end="")
@@ -303,7 +320,9 @@ class CupSodaSimulator(Simulator):
             self._cupsoda_outfiles_dir)
         if self._cleanup:
             shutil.rmtree(self.outdir)
-
+        end_time = time.time()
+        if logfile is not None:
+            log.info("Total time = {}".format(end_time - start_time))
         return SimulationResult(self, tout, trajectories)
 
     @property
