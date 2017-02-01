@@ -2,8 +2,10 @@ import warnings
 import numpy as np
 from nose.plugins.attrib import attr
 from pysb.examples.tyson_oscillator import model
-from pysb.simulator.cupsoda import CupSodaSimulator
+from pysb.simulator.cupsoda import CupSodaSimulator, set_cupsoda_path, \
+    _get_cupsoda_path, run_cupsoda
 from nose.tools import raises
+from pysb.simulator.base import SimulatorException
 import os
 
 @attr('gpu')
@@ -24,6 +26,11 @@ class TestCupSODASimulatorSingle(object):
                     y0[:, j] = ic[1].value
                     break
         self.y0 = y0
+        _get_cupsoda_path()
+        if os.name == 'nt':
+            set_cupsoda_path('c:/Program Files/cupSODA')
+        else:
+            set_cupsoda_path('/usr/local/share/cupSODA')
 
     def test_use_of_volume(self):
         # Initial concentrations
@@ -58,13 +65,13 @@ class TestCupSODASimulatorSingle(object):
         assert self.solver.n_blocks == 128
         self.solver.run(initials=self.y0)
 
-        @raises(ValueError)
-        def set_nblocks_str():
-            self.solver.n_blocks = 'fail'
+    @raises(ValueError)
+    def test_set_nblocks_str(self):
+        self.solver.n_blocks = 'fail'
 
-        @raises(ValueError)
-        def set_nblocks_0():
-            self.solver.n_blocks = 0
+    @raises(ValueError)
+    def test_set_nblocks_0(self):
+        self.solver.n_blocks = 0
 
     def test_run_tyson(self):
         # Rate constants
@@ -76,7 +83,23 @@ class TestCupSODASimulatorSingle(object):
         print(simres.observables)
         self.solver.run(param_values=None, initials=self.y0)
         self.solver.run(param_values=param_values, initials=self.y0)
+        self.solver.run(param_values=param_values, initials=self.y0)
 
     def test_log_file(self):
         self.solver.run(logfile='test_log')
         assert os.path.exists('test_log')
+
+    @raises(SimulatorException)
+    def test_cant_find_cupsoda(self):
+        set_cupsoda_path('DoesNotExist')
+
+    def test_verbose(self):
+        solver = CupSodaSimulator(model, tspan=self.tspan, verbose=True,
+                                  vol=1e-5,
+                                  integrator_options={'atol': 1e-12,
+                                                      'rtol': 1e-12,
+                                                      'max_steps': 20000})
+        solver.run()
+
+    def test_run_cupsoda_instance(self):
+        run_cupsoda(model, tspan=self.tspan)
