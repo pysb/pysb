@@ -11,18 +11,92 @@ import collections
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
-from pysb.simulator.scipyode import ScipyOdeSimulator
 from pysb.bng import generate_equations
 plt = matplotlib.pyplot
 
 
-class InitialConcentrationSensitivityAnalysis:
+class InitialConcentrationSensitivityAnalysis(object):
+
     """ Performs pairwise sensitivity analysis of initial conditions
+
+
+
+    Uses :func:`scipy.integrate.odeint` for the ``lsoda`` integrator,
+    :func:`scipy.integrate.ode` for all other integrators.
+
+    .. warning::
+        The interface for this class is considered experimental and may
+        change without warning as PySB is updated.
+
+
+
+        Parameters
+        ----------
+        model : pysb.Model
+            Model to simulate.
+        time_span : vector-like, optional
+            Time values over which to simulate. The first and last values define
+            the time range. Returned trajectories are sampled at every value unless
+            the simulation is interrupted for some reason, e.g., due to
+            satisfaction of a logical stopping criterion (see 'tout' below).
+        solver : pysb.simulator.Simulator
+            the simulator to perform simulations
+        values_to_sample : vector_like
+            values to sample for each initial concentration of the
+            model.parameters values
+        objective_function : function
+            A function that returns a scalar value. Used to calculate fraction
+            of changed that is used for calculating sensitivity.
+            Refer to pysb.examples.tools.tyson_sens_example.py for example
+        observable : str
+            the observable that is used in the objective_function
+
+    Examples
+    --------
+    Person sensitivity analysis on the tyson cell cycle model
+
+    >>> from pysb.examples.tyson_oscillator import model
+    >>> import numpy as np
+    >>> np.set_printoptions(precision=4)
+    >>> tspan=np.linspace(0, 40, 10)
+    >>> observable = 'Y3'
+    >>> values_to_sample = [90, 110]
+    >>> def obj_func_cell_cycle(out):
+    ...     timestep = tspan[:-1]
+    ...     y = out[:-1] - out[1:]
+    ...     freq = 0
+    ...     local_times = []
+    ...     prev = y[0]
+    ...     for n in range(1, len(y)):
+    ...         if y[n] > 0 > prev:
+    ...             local_times.append(timestep[n])
+    ...             freq += 1
+    ...         prev = y[n]
+    ...     local_times = np.array(local_times)
+    ...     local_freq = np.average(local_times)/len(local_times)*2
+    ...     return local_freq
+    >>> sens = InitialConcentrationSensitivityAnalysis(model, time_span=tspan,\
+                values_to_sample=values_to_sample, \
+                objective_function=obj_func_cell_cycle, observable=observable)
+    Number of simulations to run = 8
+    >>> print(sens.b_matrix)
+    [[((90, 'cdc0'), (90, 'cdc0')) ((90, 'cdc0'), (110, 'cdc0'))
+      ((90, 'cdc0'), (90, 'cyc0')) ((90, 'cdc0'), (110, 'cyc0'))]
+     [((110, 'cdc0'), (90, 'cdc0')) ((110, 'cdc0'), (110, 'cdc0'))
+      ((110, 'cdc0'), (90, 'cyc0')) ((110, 'cdc0'), (110, 'cyc0'))]
+     [((90, 'cyc0'), (90, 'cdc0')) ((90, 'cyc0'), (110, 'cdc0'))
+      ((90, 'cyc0'), (90, 'cyc0')) ((90, 'cyc0'), (110, 'cyc0'))]
+     [((110, 'cyc0'), (90, 'cdc0')) ((110, 'cyc0'), (110, 'cdc0'))
+      ((110, 'cyc0'), (90, 'cyc0')) ((110, 'cyc0'), (110, 'cyc0'))]]
 
     """
 
     def __init__(self, model, time_span, values_to_sample, objective_function,
-                 observable):
+                 observable, solver=None):
+        """
+
+
+        """
         self.model = model
         self.sim_time = time_span
         generate_equations(self.model)
@@ -48,6 +122,7 @@ class InitialConcentrationSensitivityAnalysis:
         self.standard = None
         self.p_prime_matrix = np.zeros(self.size_of_matrix)
         self.p_matrix = np.zeros(self.size_of_matrix)
+        self.solver = solver
 
     def _calculate_objective(self, function_value):
         """ Calculates fraction of change for obj value and standard
@@ -64,13 +139,13 @@ class InitialConcentrationSensitivityAnalysis:
         return (self.objective_function(function_value)
                 - self.standard) / self.standard * 100.
 
-    def run(self, run_solver, save_name=None, out_dir=None):
+    def run(self, solver=None, save_name=None, out_dir=None,):
         """ Run function to perform sensitivity analysis
 
         Parameters
         ----------
-        run_solver : function
-            A solver function that returns the sensitivity analysis matrix
+        solver : pysb.simulator.base.Simulator
+            pysb.simulator to perform simulations
         save_name : str, optional
             prefix of
         out_dir : str, optional
@@ -83,17 +158,20 @@ class InitialConcentrationSensitivityAnalysis:
         if out_dir is not None:
             if not os.path.exists(out_dir):
                 os.mkdir(out_dir)
-
-        solver = ScipyOdeSimulator(self.model, tspan=self.sim_time,
-                                   integrator='lsoda',
-                                   integrator_options={'rtol': 1e-8,
-                                                       'atol': 1e-8,
-                                                       'mxstep': 20000})
-        sim_results = solver.run()
+        if solver is None:
+            if self.solver is None:
+                raise(TypeError, "Must provide a pysb.simulator to run "
+                                 "function or when initializing the class")
+            else:
+                solver = self.solver
+        solver.initials = None
+        solver.param_values = None
+        sim_results = solver.run(param_values=None, initials=None)
         self.standard = self.objective_function(
             np.array(sim_results.observables[self.observable]))
-        sensitivity_output = run_solver(self.simulations)
 
+        traj = solver.run(initials=self.simulations)
+        sensitivity_output = np.array(traj.observables)[self.observable].T
         p_matrix = np.zeros(self.size_of_matrix)
         p_prime_matrix = np.zeros(self.size_of_matrix)
         counter = 0
@@ -167,6 +245,7 @@ class InitialConcentrationSensitivityAnalysis:
                 s_1 = str(i[0]) + str(i[1])
                 s_2 = str(i[1]) + str(i[0])
                 counter += 1
+
                 if index_i == index_j:
                     continue
                 elif s_1 in bij_unique or s_2 in bij_unique:
@@ -300,6 +379,8 @@ class InitialConcentrationSensitivityAnalysis:
         if save_name is not None:
             if out_dir is None:
                 out_dir = '.'
+            if not os.path.exists(out_dir):
+                os.mkdir(out_dir)
             fig.savefig(os.path.join(out_dir,
                                      '{}_P_H_P_prime.png'.format(save_name)),
                         bbox_inches='tight')
@@ -360,6 +441,8 @@ class InitialConcentrationSensitivityAnalysis:
         if save_name is not None:
             if out_dir is None:
                 out_dir = '.'
+            if not os.path.exists(out_dir):
+                os.mkdir(out_dir)
             plt.savefig(os.path.join(out_dir,
                                      '{}_subplots.png'.format(save_name)),
                         bbox_inches='tight')
@@ -459,6 +542,8 @@ class InitialConcentrationSensitivityAnalysis:
         if save_name is not None:
             if out_dir is None:
                 out_dir = '.'
+            if not os.path.exists(out_dir):
+                os.mkdir(out_dir)
             plt.savefig(os.path.join(out_dir, save_name + '.png'),
                         bbox_inches='tight')
             plt.savefig(os.path.join(out_dir, save_name + '.eps'),

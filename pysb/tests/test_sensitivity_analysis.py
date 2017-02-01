@@ -2,21 +2,28 @@ from pysb.tools.sensitivity_analysis import \
     InitialConcentrationSensitivityAnalysis
 from pysb.examples.tyson_oscillator import model
 import numpy as np
-from pysb.simulator.scipyode import ScipyOdeSimulator
 import numpy.testing as npt
 import os
-
+from pysb.simulator.scipyode import ScipyOdeSimulator
 
 class TestSensitivityAnalysis(object):
+
     def setUp(self):
         self.tspan = np.linspace(0, 200, 5001)
         self.observable = 'Y3'
         self.savename = 'sens_out_test'
         self.output_dir = 'sens_out'
         self.vals = np.linspace(.8, 1.2, 5)
+        self.vals = [.8, .9, 1., 1.1, 1.2]
+        self.model = model
+        self.solver = ScipyOdeSimulator(self.model, tspan=self.tspan,
+                                        integrator='lsoda',
+                                        integrator_options={'rtol': 1e-8,
+                                                            'atol': 1e-8,
+                                                            'mxstep': 20000})
         self.sens = InitialConcentrationSensitivityAnalysis(
-            model, self.tspan, self.vals, self.obj_func_cell_cycle,
-            self.observable, )
+            self.model, self.tspan, self.vals, self.obj_func_cell_cycle,
+            self.observable, solver=self.solver)
 
         self.p_simulated = np.array(
             [[0., 0., 0., 0., 0., 5.0301, 2.6027, 0., -2.5118, -4.5758],
@@ -30,8 +37,14 @@ class TestSensitivityAnalysis(object):
              [-2.5118, -2.5313, -2.5313, -2.5313, -2.5313, 0., 0., 0., 0., 0.],
              [-4.5758, -4.5823, -4.5953, -4.6082, -4.6082, 0., 0., 0., 0.,
               0.]])
-        self.sens.run(self.run_solver, save_name=self.savename,
-                      out_dir=self.output_dir)
+
+        self.sens.run()
+
+    @classmethod
+    def teardown_class(cls):
+        if os.path.exists('sens_out'):
+            os.removedirs('sens_out')
+
 
     def obj_func_cell_cycle(self, out):
         timestep = self.tspan[:-1]
@@ -49,17 +62,15 @@ class TestSensitivityAnalysis(object):
         local_freq = np.average(local_times) / len(local_times) * 2
         return local_freq
 
-    def run_solver(self, matrix):
-        size_of_matrix = len(matrix)
-        solver = ScipyOdeSimulator(model, self.tspan, integrator='lsoda',
+    def test_vode_run(self):
+        solver = ScipyOdeSimulator(self.model, tspan=self.tspan,
+                                   integrator='vode',
                                    integrator_options={'rtol': 1e-8,
                                                        'atol': 1e-8,
-                                                       'mxstep': 20000})
-        sensitivity_matrix = np.zeros((len(self.tspan), size_of_matrix))
-        for k in range(size_of_matrix):
-            traj = solver.run(initials=matrix[k, :])
-            sensitivity_matrix[:, k] = traj.observables[self.observable]
-        return sensitivity_matrix
+                                                       'nsteps': 20000})
+        self.sens.run(solver)
+        npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
+                                decimal=3)
 
     def test_p_matrix_shape(self):
         assert self.sens.p_matrix.shape == (10, 10)
@@ -72,11 +83,56 @@ class TestSensitivityAnalysis(object):
         assert len(self.sens.simulations) == 25
 
     def test_pmatrix_outfile_exists(self):
-        outfile = os.path.join(self.output_dir,
-                               '{}_p_matrix.csv'.format(self.savename))
-        assert os.path.exists(outfile)
+        self.sens.run(self.solver, save_name=self.savename,
+                      out_dir=self.output_dir,)
+        test_file = os.path.join(self.output_dir,
+                                 '{}_p_matrix.csv'.format(self.savename))
+        assert os.path.exists(test_file)
+        os.remove(test_file)
+        test_file = os.path.join(self.output_dir,
+                                 '{}_p_prime_matrix.csv'.format(self.savename))
+        assert os.path.exists(test_file)
+        os.remove(test_file)
 
     def test_create_png(self):
         self.sens.create_boxplot_and_heatplot(save_name='test',
                                               out_dir=self.output_dir)
-        assert os.path.exists(os.path.join(self.output_dir, 'test.png'))
+
+        outfile = os.path.join(self.output_dir, 'test.png')
+        assert os.path.exists(outfile)
+        os.remove(outfile)
+
+        outfile = os.path.join(self.output_dir, 'test.eps')
+        assert os.path.exists(outfile)
+        os.remove(outfile)
+
+        outfile = os.path.join(self.output_dir, 'test.svg')
+        assert os.path.exists(outfile)
+        os.remove(outfile)
+        self.sens.create_individual_pairwise_plots(save_name='test2',
+                                                   out_dir=self.output_dir)
+        test_file = os.path.join(self.output_dir, 'test2_subplots.png')
+        assert os.path.exists(test_file)
+        os.remove(test_file)
+
+        self.sens.create_plot_p_h_pprime(save_name='test3')
+        test_file = 'test3_P_H_P_prime.png'
+        assert os.path.exists(test_file)
+        os.remove(test_file)
+
+    def test_unique_simulations_only(self):
+        vals = [.8, .9, 1.1, 1.2, 1.3]
+        sens = InitialConcentrationSensitivityAnalysis(model, self.tspan,
+                                                       vals,
+                                                       self.obj_func_cell_cycle,
+                                                       self.observable, )
+        solver = ScipyOdeSimulator(self.model, tspan=self.tspan,
+                                   integrator='lsoda',
+                                   integrator_options={'rtol': 1e-8,
+                                                       'atol': 1e-8,
+                                                       'mxstep': 20000})
+        sens.run(solver)
+        self.sens.create_plot_p_h_pprime(save_name='test4')
+        assert os.path.exists('test4_P_H_P_prime.png')
+        os.remove('test4_P_H_P_prime.png')
+
