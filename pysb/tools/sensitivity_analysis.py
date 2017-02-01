@@ -57,10 +57,11 @@ class InitialConcentrationSensitivityAnalysis(object):
 
     >>> from pysb.examples.tyson_oscillator import model
     >>> import numpy as np
+    >>> from pysb.simulator.scipyode import ScipyOdeSimulator
     >>> np.set_printoptions(precision=4)
-    >>> tspan=np.linspace(0, 40, 10)
+    >>> tspan=np.linspace(0, 200, 201)
     >>> observable = 'Y3'
-    >>> values_to_sample = [90, 110]
+    >>> values_to_sample = [.8, 1.2]
     >>> def obj_func_cell_cycle(out):
     ...     timestep = tspan[:-1]
     ...     y = out[:-1] - out[1:]
@@ -75,20 +76,40 @@ class InitialConcentrationSensitivityAnalysis(object):
     ...     local_times = np.array(local_times)
     ...     local_freq = np.average(local_times)/len(local_times)*2
     ...     return local_freq
-    >>> sens = InitialConcentrationSensitivityAnalysis(model, time_span=tspan,\
-                values_to_sample=values_to_sample, \
-                objective_function=obj_func_cell_cycle, observable=observable)
+    >>> solver = ScipyOdeSimulator(model, tspan)
+    >>> sens = InitialConcentrationSensitivityAnalysis(model, tspan, \
+                                                   values_to_sample=values_to_sample,\
+                                                   observable=observable,\
+                                                   objective_function=obj_func_cell_cycle,\
+                                                   solver=solver)
     Number of simulations to run = 8
     >>> print(sens.b_matrix)
-    [[((90, 'cdc0'), (90, 'cdc0')) ((90, 'cdc0'), (110, 'cdc0'))
-      ((90, 'cdc0'), (90, 'cyc0')) ((90, 'cdc0'), (110, 'cyc0'))]
-     [((110, 'cdc0'), (90, 'cdc0')) ((110, 'cdc0'), (110, 'cdc0'))
-      ((110, 'cdc0'), (90, 'cyc0')) ((110, 'cdc0'), (110, 'cyc0'))]
-     [((90, 'cyc0'), (90, 'cdc0')) ((90, 'cyc0'), (110, 'cdc0'))
-      ((90, 'cyc0'), (90, 'cyc0')) ((90, 'cyc0'), (110, 'cyc0'))]
-     [((110, 'cyc0'), (90, 'cdc0')) ((110, 'cyc0'), (110, 'cdc0'))
-      ((110, 'cyc0'), (90, 'cyc0')) ((110, 'cyc0'), (110, 'cyc0'))]]
+    [[((0.8, 'cdc0'), (0.8, 'cdc0')) ((0.8, 'cdc0'), (1.2, 'cdc0'))
+      ((0.8, 'cdc0'), (0.8, 'cyc0')) ((0.8, 'cdc0'), (1.2, 'cyc0'))]
+     [((1.2, 'cdc0'), (0.8, 'cdc0')) ((1.2, 'cdc0'), (1.2, 'cdc0'))
+      ((1.2, 'cdc0'), (0.8, 'cyc0')) ((1.2, 'cdc0'), (1.2, 'cyc0'))]
+     [((0.8, 'cyc0'), (0.8, 'cdc0')) ((0.8, 'cyc0'), (1.2, 'cdc0'))
+      ((0.8, 'cyc0'), (0.8, 'cyc0')) ((0.8, 'cyc0'), (1.2, 'cyc0'))]
+     [((1.2, 'cyc0'), (0.8, 'cdc0')) ((1.2, 'cyc0'), (1.2, 'cdc0'))
+      ((1.2, 'cyc0'), (0.8, 'cyc0')) ((1.2, 'cyc0'), (1.2, 'cyc0'))]]
+    >>> sens.run()
+    >>> print(sens.p_matrix)#doctest: +NORMALIZE_WHITESPACE
+    [[ 0.      0.      5.0243 -4.5381]
+     [ 0.      0.      5.0243 -4.5381]
+     [ 5.0243  5.0243  0.      0.    ]
+     [-4.5381 -4.5381  0.      0.    ]]
 
+    >>> print(sens.p_prime_matrix) #doctest: +NORMALIZE_WHITESPACE
+     [[ 0.      0.      5.0243 -4.5381]
+      [ 0.      0.      5.0243 -4.5381]
+      [ 0.      0.      0.      0.    ]
+      [ 0.      0.      0.      0.    ]]
+    >>> print(sens.p_matrix - sens.p_prime_matrix) #doctest: +NORMALIZE_WHITESPACE
+     [[ 0.      0.      0.      0.    ]
+      [ 0.      0.      0.      0.    ]
+      [ 5.0243  5.0243  0.      0.    ]
+      [-4.5381 -4.5381  0.      0.    ]]
+    >>> sens.create_boxplot_and_heatplot(save_name='example')
     """
 
     def __init__(self, model, time_span, values_to_sample, objective_function,
