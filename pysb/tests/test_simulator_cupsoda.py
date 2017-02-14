@@ -2,15 +2,13 @@ import warnings
 import numpy as np
 from nose.plugins.attrib import attr
 from pysb.examples.tyson_oscillator import model
-from pysb.simulator.cupsoda import CupSodaSimulator, set_cupsoda_path, \
-    _get_cupsoda_path, run_cupsoda
+from pysb.simulator.cupsoda import CupSodaSimulator, run_cupsoda
 from nose.tools import raises
-from pysb.simulator.base import SimulatorException
 import os
+
 
 @attr('gpu')
 class TestCupSODASimulatorSingle(object):
-
     def setUp(self):
         self.n_sims = 50
         self.tspan = np.linspace(0, 500, 101)
@@ -26,11 +24,6 @@ class TestCupSODASimulatorSingle(object):
                     y0[:, j] = ic[1].value
                     break
         self.y0 = y0
-        _get_cupsoda_path()
-        if os.name == 'nt':
-            set_cupsoda_path('c:/Program Files/cupSODA')
-        else:
-            set_cupsoda_path('/usr/local/share/cupSODA')
 
     def test_use_of_volume(self):
         # Initial concentrations
@@ -89,10 +82,6 @@ class TestCupSODASimulatorSingle(object):
         self.solver.run(logfile='test_log')
         assert os.path.exists('test_log')
         os.unlink('test_log')
-
-    @raises(SimulatorException)
-    def test_cant_find_cupsoda(self):
-        set_cupsoda_path('DoesNotExist')
 
     def test_verbose(self):
         solver = CupSodaSimulator(model, tspan=self.tspan, verbose=True,

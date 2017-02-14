@@ -27,6 +27,15 @@ _path_config = {
             'posix': ('/usr/local/share/KaSim',),
             'nt': ('c:/Program Files/KaSim',)
         }
+    },
+    'cupsoda': {
+        'name': 'cupSODA',
+        'executable': 'cupsoda',
+        'env_var': 'CUPSODAPATH',
+        'search_paths': {
+            'posix': ('/usr/local/share/cupSODA',),
+            'nt': ('c:/Program Files/cupSODA',)
+        }
     }
 }
 _path_cache = {}

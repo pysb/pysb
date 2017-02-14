@@ -8,9 +8,9 @@ import re
 import subprocess
 import tempfile
 import time
-import warnings
 import logging
 import shutil
+from pysb.pathfinder import get_path
 
 try:
     import pandas as pd
@@ -25,89 +25,10 @@ except ImportError:
     use_pycuda = False
     pass
 
-_cupsoda_path = None
-
-
-def set_cupsoda_path(directory):
-    global _cupsoda_path
-    if os.name == 'nt':
-        _cupsoda_path = os.path.join(directory, 'cupSODA.exe')
-    else:
-        _cupsoda_path = os.path.join(directory, 'cupSODA')
-    # Make sure file exists and that it is not a directory
-    if not os.access(_cupsoda_path, os.F_OK) or not os.path.isfile(
-        _cupsoda_path):
-        raise SimulatorException(
-            'Could not find cupSODA binary in ' + os.path.abspath(
-                directory) + '.')
-    # Make sure file has executable permissions
-    elif not os.access(_cupsoda_path, os.X_OK):
-        raise SimulatorException("cupSODA binary in " + os.path.abspath(
-            directory) + " does not have executable permissions.")
-
-
-def _get_cupsoda_path():
-    """
-    Return the path to the cupSODA executable.
-
-    Looks for the cupSODA executable in a user-defined location set via
-    ``set_cupsoda_path``, the environment variable CUPSODAPATH or in a few
-    hard-coded standard locations.
-    """
-
-    global _cupsoda_path
-
-    # Just return cached value if it's available
-    if _cupsoda_path:
-        return _cupsoda_path
-
-    path_var = 'CUPSODAPATH'
-    bin_dirs = ['/usr/local/share/cupSODA', 'c:/Program Files/cupSODA', ]
-
-    def _check_bin_dir(bin_dir):
-        # Return the full path to the cupSODA executable or False if it
-        # can't be found in one of the expected places.
-        if os.name == 'nt':
-            bin_path = os.path.join(bin_dir, 'cupSODA.exe')
-        else:
-            bin_path = os.path.join(bin_dir, 'cupSODA')
-        if os.access(bin_path, os.F_OK):
-            return bin_path
-        else:
-            return False
-
-    # First check the environment variable, which has the highest precedence
-    if path_var in os.environ:
-        bin_path = _check_bin_dir(os.environ[path_var])
-        if not bin_path:
-            raise SimulatorException(
-                'Environment variable %s is set but the path could'
-                ' not be found, is not accessible or does not '
-                'contain a cupSODA executable file.' % path_var)
-    # If the environment variable isn't set, check the standard locations
-    # Check the standard locations for the executable
-    else:
-        found = False
-        for b in bin_dirs:
-            bin_path = _check_bin_dir(b)
-            if bin_path:
-                found = True
-                break
-        if not found:
-            raise SimulatorException(
-                'Could not find cupSODA installed in one of the '
-                'following locations: {} \n Please put the executable '
-                '(or a link to it) in one of these locations or '
-                'set the path using set_cupsoda_path()'.format(
-                    ''.join('\n    ' + x for x in bin_dirs)))
-
-    # Cache path for future use
-    _cupsoda_path = bin_path
-    return bin_path
-
 
 class CupSodaSimulator(Simulator):
     """An interface for running cupSODA, a CUDA implementation of LSODA.
+
     Parameters
     ----------
     model : pysb.Model
@@ -273,15 +194,14 @@ class CupSodaSimulator(Simulator):
         self.outdir = tempfile.mkdtemp(prefix=self._prefix + '_',
                                        dir=self._base_dir)
 
-        if self.verbose:
-            print("Output directory is %s" % self.outdir)
+        self._logger.debug("Output directory is %s" % self.outdir)
         _cupsoda_infiles_dir = os.path.join(self.outdir, "INPUT")
         os.mkdir(_cupsoda_infiles_dir)
         self._cupsoda_outfiles_dir = os.path.join(self.outdir, "OUTPUT")
         os.mkdir(self._cupsoda_outfiles_dir)
 
         # Path to cupSODA executable
-        bin_path = _get_cupsoda_path()
+        bin_path = get_path('cupsoda')
 
         # Create cupSODA input files
         self._create_input_files(_cupsoda_infiles_dir)
@@ -300,7 +220,7 @@ class CupSodaSimulator(Simulator):
             file_handler.setLevel(logging.INFO)
             log.addHandler(file_handler)
 
-        print("Running cupSODA: " + ' '.join(command))
+        self._logger.info("Running cupSODA: " + ' '.join(command))
         start_time = time.time()
         # Run simulation and return trajectories
         p = subprocess.Popen(command, stdout=subprocess.PIPE,
@@ -309,9 +229,8 @@ class CupSodaSimulator(Simulator):
             for line in iter(p.stdout.readline, b''):
                 if 'Running time' in line:
                     log.info(line[:-1])
-        if self.verbose:
-            for line in iter(p.stdout.readline, b''):
-                print(line, end="")
+        for line in iter(p.stdout.readline, b''):
+            self._logger.debug(line)
         (p_out, p_err) = p.communicate()
         if p.returncode:
             raise SimulatorException(
@@ -496,8 +415,7 @@ class CupSodaSimulator(Simulator):
             time_max.write(str(float(self.tspan[-1])))
 
     def _get_cmatrix(self):
-        if self.verbose:
-            print("Constructing the c_matrix:")
+        self._logger.debug("Constructing the c_matrix:")
         c_matrix = np.zeros((len(self.param_values), self._len_rxns))
         par_names = [p.name for p in self._model_parameters_rules]
         rate_mask = np.array([p in self._model_parameters_rules for p in
@@ -514,12 +432,12 @@ class CupSodaSimulator(Simulator):
                 if not str(self._model.species[i]) == '__source()':
                     reactants += 1
             rate_order.append(reactants)
-        if self.verbose:
-            output = 0.01 * len(par_vals)
-            output = int(output) if output > 1 else 1
+        output = 0.01 * len(par_vals)
+        output = int(output) if output > 1 else 1
         for i in range(len(par_vals)):
-            if self.verbose and i % output == 0:
-                print(str(int(round(100. * i / len(par_vals)))) + "%")
+            if i % output == 0:
+                self._logger.debug(str(int(round(100. * i / len(par_vals)))) +
+                                   "%")
             for j in range(self._len_rxns):
                 rate = 1.0
                 for r in rate_args[j]:
@@ -533,8 +451,7 @@ class CupSodaSimulator(Simulator):
                 if self.vol:
                     rate *= (N_A * self.vol) ** (rate_order[j] - 1)
                 c_matrix[i][j] = rate
-        if self.verbose:
-            print("100%")
+        self._logger.debug("100%")
         return c_matrix
 
     def _load_trajectories(self, directory):
