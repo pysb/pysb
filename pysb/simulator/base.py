@@ -84,6 +84,8 @@ class Simulator(object):
         # Get or create base a PySB logger for this module and model
         self._logger = get_logger(self.__module__, model=model)
         if verbose:
+            # _logger is actually a LoggerAdapter, so we need to set the level
+            # on the underlying logger
             self._logger.logger.setLevel(logging.DEBUG)
         self._logger.debug('Simulator created')
         self._model = model
