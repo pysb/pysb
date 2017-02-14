@@ -1,7 +1,7 @@
 from pysb.core import MonomerPattern, ComplexPattern, RuleExpression, \
     ReactionPattern, ANY, WILD
 from pysb.builder import Builder
-from pysb.bng import BngConsole
+from pysb.bng import BngFileInterface
 import xml.etree.ElementTree
 import re
 from sympy.parsing.sympy_parser import parse_expr
@@ -27,9 +27,10 @@ class BnglBuilder(Builder):
     """
     def __init__(self, filename, force=False):
         super(BnglBuilder, self).__init__()
-        with BngConsole(model=None) as con:
-            con.load_bngl(filename)
+        with BngFileInterface(model=None) as con:
+            con.action('readFile', file=filename, skip_actions=1)
             con.action('writeXML', evaluate_expressions=0)
+            con.execute()
             self._force = force
             self._x = xml.etree.ElementTree.parse('%s.xml' %
                                                   con.base_filename)\
@@ -154,7 +155,7 @@ class BnglBuilder(Builder):
             cplx_pats = []
             for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
                 match_once = mp.get('matchOnce')
-                match_once = 1 if match_once == "1" else 0
+                match_once = True if match_once == "1" else False
                 cplx_pats.append(ComplexPattern(self._parse_species(mp),
                                                 compartment=None,
                                                 match_once=match_once))

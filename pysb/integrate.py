@@ -64,6 +64,8 @@ class Solver(object):
                                      integrator=integrator, cleanup=cleanup,
                                      **integrator_options)
         self.result = None
+        self._yexpr_view = None
+        self._yobs_view = None
 
     @property
     def _use_inline(self):
@@ -82,8 +84,21 @@ class Solver(object):
         return self.result.observables if self.result is not None else None
 
     @property
+    def yobs_view(self):
+        if self._yobs_view is None:
+            self._yobs_view = self.yobs.view(float).reshape(len(self.yobs), -1)
+        return self._yobs_view
+
+    @property
     def yexpr(self):
         return self.result.expressions if self.result is not None else None
+
+    @property
+    def yexpr_view(self):
+        if self._yexpr_view is None:
+            self._yexpr_view = self.yexpr.view(float).reshape(len(self.yexpr),
+                                                              -1)
+        return self._yexpr_view
 
     def run(self, param_values=None, y0=None):
         """Perform an integration.
@@ -106,6 +121,8 @@ class Solver(object):
             initial condition parameter values taken from `param_values` if
             specified).
         """
+        self._yobs_view = None
+        self._yexpr_view = None
         self.result = self._sim.run(param_values=param_values, initials=y0)
 
 

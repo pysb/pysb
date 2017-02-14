@@ -1,6 +1,7 @@
 import pysb
 import os
-from pysb.bng import BngConsole
+import pysb.pathfinder as pf
+from pysb.bng import BngFileInterface
 from pysb.importers.bngl import model_from_bngl, BnglImportError
 from pysb.importers.sbml import model_from_sbml
 import numpy
@@ -17,16 +18,18 @@ def bngl_import_compare_simulations(bng_file, force=False,
     m = model_from_bngl(bng_file, force=force)
 
     # Simulate using the BNGL file directly
-    with BngConsole(model=None, suppress_warnings=True) as bng:
-        bng.load_bngl(bng_file)
-        bng.generate_network()
+    with BngFileInterface(model=None) as bng:
+        bng.action('readFile', file=bng_file, skip_actions=1)
+        bng.action('generate_network')
         bng.action('simulate', method='ode', sample_times=sim_times)
+        bng.execute()
         yfull1 = bng.read_simulation_results()
 
     # Convert to a PySB model, then simulate using BNG
-    with BngConsole(m, suppress_warnings=True) as bng:
-        bng.generate_network()
+    with BngFileInterface(model=m) as bng:
+        bng.action('generate_network')
         bng.action('simulate', method='ode', sample_times=sim_times)
+        bng.execute()
         yfull2 = bng.read_simulation_results()
 
     # Check all species trajectories are equal (within numerical tolerance)
@@ -45,7 +48,7 @@ def _bngl_location(filename):
     Gets the location of one of BioNetGen's validation model files in BNG's
     Validate directory.
     """
-    bng_dir = os.path.dirname(pysb.bng._get_bng_path())
+    bng_dir = os.path.dirname(pf.get_path('bng'))
     bngl_file = os.path.join(bng_dir, 'Validate', filename + '.bngl')
     return bngl_file
 
@@ -55,7 +58,7 @@ def _sbml_location(filename):
     Gets the location of one of BioNetGen's validation SBML files in BNG's
     Validate/INPUT_FILES directory.
     """
-    bng_dir = os.path.dirname(pysb.bng._get_bng_path())
+    bng_dir = os.path.dirname(pf.get_path('bng'))
     sbml_file = os.path.join(bng_dir, 'Validate/INPUT_FILES', filename +
                              '.xml')
     return sbml_file

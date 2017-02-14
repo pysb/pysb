@@ -1,6 +1,6 @@
 from __future__ import print_function as _
 from pysb.importers.bngl import model_from_bngl
-from pysb.bng import _get_bng_path
+import pysb.pathfinder as pf
 import subprocess
 import os
 import tempfile
@@ -66,7 +66,7 @@ def sbml_translator(input_file,
     string
         BNGL output filename
     """
-    sbmltrans_bin = os.path.join(os.path.dirname(_get_bng_path()),
+    sbmltrans_bin = os.path.join(os.path.dirname(pf.get_path('bng')),
                                  'bin/sbmlTranslator')
     sbmltrans_args = [sbmltrans_bin, '-i', input_file]
     if output_file is None:

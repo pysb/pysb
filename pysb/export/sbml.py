@@ -128,8 +128,8 @@ class SbmlExporter(Exporter):
             ics[self.model.get_species_index(cp)][1] = ic_param.value
         output.write("        <listOfSpecies>\n")
         for i, (cp, value) in enumerate(ics):
-            id = 's%d' % i
-            metaid = 'metaid_%s' % id
+            id = '__s%d' % i
+            metaid = 'metaid_%d' % i
             name = str(cp).replace('% ', '._br_')  # CellDesigner does something weird with % in names
             output.write('            <species id="%s" metaid="%s" name="%s" compartment="default" initialAmount="%.17g">\n'
                          % (id, metaid, name, value));
@@ -150,11 +150,11 @@ class SbmlExporter(Exporter):
                          % (i, i, i, reversible));
             output.write('                <listOfReactants>\n');
             for species in reaction['reactants']:
-                output.write('                    <speciesReference species="s%d"/>\n' % species)
+                output.write('                    <speciesReference species="__s%d"/>\n' % species)
             output.write('                </listOfReactants>\n');
             output.write('                <listOfProducts>\n');
             for species in reaction['products']:
-                output.write('                    <speciesReference species="s%d"/>\n' % species)
+                output.write('                    <speciesReference species="__s%d"/>\n' % species)
             output.write('                </listOfProducts>\n');
             mathml = '<math xmlns="http://www.w3.org/1998/Math/MathML">' \
                 + print_mathml(reaction['rate']) + '</math>'

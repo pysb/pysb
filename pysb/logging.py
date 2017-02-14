@@ -8,8 +8,9 @@ import warnings
 import pysb
 
 SECONDS_IN_HOUR = 3600
-DEBUG_ENV_VAR = 'PYSB_DEBUG'
+LOG_LEVEL_ENV_VAR = 'PYSB_LOG'
 BASE_LOGGER_NAME = 'pysb'
+NAMED_LOG_LEVELS = ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
 
 
 def formatter(time_utc=False):
@@ -20,7 +21,7 @@ def formatter(time_utc=False):
     ----------
     time_utc : bool, optional (default: False)
         Use local time stamps in log messages if False, or Universal
-        Coordinated Time (UTC), also known as Greenwich Mean Time (GMT) if True
+        Coordinated Time (UTC) if True
 
     Returns
     -------
@@ -35,7 +36,7 @@ def formatter(time_utc=False):
     return log_fmt
 
 
-def setup_logger(level=logging.INFO, console_output=True, file_output=False,
+def setup_logger(level=logging.WARNING, console_output=True, file_output=False,
                  time_utc=False, capture_warnings=True):
     """
     Set up a new logging.Logger for PySB logging
@@ -71,8 +72,23 @@ def setup_logger(level=logging.INFO, console_output=True, file_output=False,
     log = logging.getLogger(BASE_LOGGER_NAME)
 
     # Logging level can be overridden with environment variable
-    if DEBUG_ENV_VAR in os.environ:
-        level = logging.DEBUG
+    if LOG_LEVEL_ENV_VAR in os.environ:
+        try:
+            level = int(os.environ[LOG_LEVEL_ENV_VAR])
+        except ValueError:
+            # Try parsing as a name
+            level_name = os.environ[LOG_LEVEL_ENV_VAR]
+            if level_name in NAMED_LOG_LEVELS:
+                level = logging.__dict__[level_name]
+            else:
+                raise ValueError('Environment variable {} contains an '
+                                 'invalid value "{}". If set, its value must '
+                                 'be one of {} (case-sensitive) or an '
+                                 'integer log level.'.format(
+                    LOG_LEVEL_ENV_VAR, level_name, ", ".join(NAMED_LOG_LEVELS)
+                                 ))
+
+
     log.setLevel(level)
 
     # Remove default logging handler
@@ -108,7 +124,7 @@ def setup_logger(level=logging.INFO, console_output=True, file_output=False,
     return log
 
 
-def get_logger(logger_name=BASE_LOGGER_NAME, **kwargs):
+def get_logger(logger_name=BASE_LOGGER_NAME, model=None, **kwargs):
     """
     Returns (if extant) or creates a PySB logger
 
@@ -121,6 +137,10 @@ def get_logger(logger_name=BASE_LOGGER_NAME, **kwargs):
     logger_name : string
         Get a logger for a specific namespace, typically __name__ for code
         outside of classes or self.__module__ inside a class
+    model : pysb.Model
+        If this logger is related to a specific model instance, pass the
+        model object as an argument to have the model's name prepended to
+        log entries
     **kwargs : kwargs
         Keyword arguments to supply to :func:`setup_logger`. Only used when
         the PySB logger hasn't been set up yet (i.e. there have been no
@@ -143,4 +163,14 @@ def get_logger(logger_name=BASE_LOGGER_NAME, **kwargs):
         warnings.warn('PySB logger already exists, ignoring keyword '
                       'arguments to setup_logger')
 
-    return logging.getLogger(logger_name)
+    logger = logging.getLogger(logger_name)
+    if model is None:
+        return logger
+    else:
+        return PySBModelLoggerAdapter(logger, {'model': model})
+
+
+class PySBModelLoggerAdapter(logging.LoggerAdapter):
+    """ A logging adapter to prepend a model's name to log entries """
+    def process(self, msg, kwargs):
+        return '[%s] %s' % (self.extra['model'].name, msg), kwargs

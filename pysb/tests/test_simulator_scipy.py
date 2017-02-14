@@ -5,7 +5,7 @@ from pysb.simulator import ScipyOdeSimulator, SimulatorException
 from pysb.examples import robertson, earm_1_0
 
 
-class TestScipySimulatorSingle(object):
+class TestScipySimulatorBase(object):
     @with_model
     def setUp(self):
         Monomer('A', ['a'])
@@ -45,6 +45,8 @@ class TestScipySimulatorSingle(object):
         self.time = None
         self.sim = None
 
+
+class TestScipySimulatorSingle(TestScipySimulatorBase):
     def test_vode_solver_run(self):
         """Test vode."""
         simres = self.sim.run()
@@ -137,7 +139,22 @@ class TestScipySimulatorSingle(object):
         df = self.sim.run().dataframe
 
 
-class TestScipySimulatorMultiple(TestScipySimulatorSingle):
+class TestScipySimulatorSequential(TestScipySimulatorBase):
+    def test_sequential_runs(self):
+        simres = self.sim.run()
+
+        new_initials = [10, 20, 30, 40]
+        simres = self.sim.run(initials=new_initials)
+        assert np.allclose(simres.species[0], new_initials)
+
+        new_param_values = {'kbindAB': 0}
+        simres = self.sim.run(param_values=new_param_values)
+        # No new AB_complex should be formed
+        assert np.allclose(simres.observables['AB_complex'], 40)
+        assert simres.nsims == 1
+
+
+class TestScipySimulatorMultiple(TestScipySimulatorBase):
     def test_initials_and_param_values_two_lists(self):
         initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
         param_values = [[55, 65, 75, 0, 0, 1],
@@ -147,6 +164,8 @@ class TestScipySimulatorMultiple(TestScipySimulatorSingle):
         assert np.allclose(simres.species[1][0], initials[1])
         assert np.allclose(self.sim.param_values[0], param_values[0])
         assert np.allclose(self.sim.param_values[1], param_values[1])
+
+        assert simres.nsims == 2
 
         # Check the methods underlying these properties work
         df = simres.dataframe
