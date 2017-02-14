@@ -88,6 +88,7 @@ class TestCupSODASimulatorSingle(object):
     def test_log_file(self):
         self.solver.run(logfile='test_log')
         assert os.path.exists('test_log')
+        os.unlink('test_log')
 
     @raises(SimulatorException)
     def test_cant_find_cupsoda(self):
