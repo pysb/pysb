@@ -29,6 +29,16 @@ except ImportError:
 class CupSodaSimulator(Simulator):
     """An interface for running cupSODA, a CUDA implementation of LSODA.
 
+    cupSODA is a graphics processing unit (GPU)-based implementation of the
+    LSODA simulation algorithm (see references). It requires an NVIDIA GPU
+    card with support for the CUDA framework version 7 or above. Further
+    details of cupSODA and software can be found on github:
+    https://github.com/aresio/cupSODA
+
+    The simplest way to install cupSODA is to use a pre-compiled version,
+    which can be downloaded from here:
+    https://github.com/aresio/cupSODA/releases
+
     Parameters
     ----------
     model : pysb.Model
@@ -42,9 +52,10 @@ class CupSodaSimulator(Simulator):
     param_values : list-like, optional
         Parameters for all simulations. Dimensions are N_SIMS x number of 
         parameters.
-    verbose : bool, optional
-        Verbose output
-    **kwargs: dict
+    verbose : bool or int, optional
+        Verbosity level, see :class:`pysb.simulator.base.Simulator` for
+        further details.
+    **kwargs: dict, optional
         Extra keyword arguments, including:
         * ``gpu``: Index of GPU to run on (default: 0)
         * ``vol``: System volume; required if model encoded in extrinsic 
@@ -54,11 +65,11 @@ class CupSodaSimulator(Simulator):
         * ``cleanup``: Delete all temporary files after the simulation is 
           finished. Includes both BioNetGen and cupSODA files. Useful for 
           debugging (default: True)
-        * ``prefix``: Prefix for the temporary directory containing cupSODA input 
-          and output files (default: model name)
-        * ``base_dir``: Directory in which temporary directory with cupSODA input  
-          and output files are placed (default: system directory determined by 
-          `tempfile.mkdtemp`)
+        * ``prefix``: Prefix for the temporary directory containing cupSODA
+          input and output files (default: model name)
+        * ``base_dir``: Directory in which temporary directory with cupSODA
+          input and output files are placed (default: system directory
+          determined by `tempfile.mkdtemp`)
         * ``integrator``: Name of the integrator to use; see 
           `default_integrator_options` (default: 'cupsoda')
         * ``integrator_options``: A dictionary of keyword arguments to
@@ -66,8 +77,6 @@ class CupSodaSimulator(Simulator):
 
     Attributes
     ----------
-    verbose: bool
-        Verbosity setting.
     model : pysb.Model
         Model passed to the constructor.
     tspan : numpy.ndarray
@@ -78,20 +87,25 @@ class CupSodaSimulator(Simulator):
     param_values : numpy.ndarray
         Parameters for all simulations. Dimensions are number of simulations 
         x number of parameters.
+    verbose: bool or int
+        Verbosity setting. See the base class
+        :class:`pysb.simulator.base.Simulator` for further details.
     gpu : int
         Index of GPU being run on
     vol : float or None
         System volume
+    n_blocks: int
+        Number of GPU blocks used by the simulator.
     outdir : str
-        Temporary directory where cupSODA output files are placed. Input
-        files are also placed here.
+        Directory where cupSODA output files are placed. Input files are
+        also placed here.
     opts: dict
         Dictionary of options for the integrator in use.
     integrator : str
         Name of the integrator in use.
     default_integrator_options : dict
-        Nested dictionary of default options for all supported integrators.   
-        
+        Nested dictionary of default options for all supported integrators.
+
     Notes
     -----
     1. If `vol` is defined, species amounts and rate constants are assumed
@@ -103,6 +117,16 @@ class CupSodaSimulator(Simulator):
     2. If `obs_species_only` is True, only the species contained within 
        observables are output by cupSODA. All other concentrations are set 
        to 'nan'.
+
+    References
+    ----------
+
+    1. Nobile M.S., Cazzaniga P., Besozzi D., Mauri G., 2014. GPU-accelerated
+       simulations of mass-action kinetics models with cupSODA, Journal of
+       Supercomputing, 69(1), pp.17-24.
+    2. Petzold, L., 1983. Automatic selection of methods for solving stiff and
+       nonstiff systems of ordinary differential equations. SIAM journal on
+       scientific and statistical computing, 4(1), pp.136-148.
     """
 
     _supports = {'multi_initials': True, 'multi_param_values': True}
