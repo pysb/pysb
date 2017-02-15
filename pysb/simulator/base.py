@@ -410,7 +410,8 @@ class SimulationResult(object):
     >>> from pysb.simulator import ScipyOdeSimulator
     >>> import numpy as np
     >>> np.set_printoptions(precision=4)
-    >>> sim = ScipyOdeSimulator(model, tspan=np.linspace(0, 40, 10))
+    >>> sim = ScipyOdeSimulator(model, tspan=np.linspace(0, 40, 10), \
+                                integrator_options={'atol': 1e-20})
     >>> simulation_result = sim.run()
 
     ``simulation_result`` is a :class:`SimulationResult` object. An
@@ -418,14 +419,13 @@ class SimulationResult(object):
 
     >>> print(simulation_result.observables['Bax_c0']) \
         #doctest: +NORMALIZE_WHITESPACE
-    [  1.0000e+00   1.1744e-02   1.3791e-04   1.6196e-06   1.9021e-08
-       2.2344e-10   2.6394e-12   4.8067e-14  -6.2097e-14  -7.5308e-15]
+    [  1.0000e+00   1.1744e-02   1.3791e-04   1.6196e-06   1.9020e-08
+       2.2337e-10   2.6232e-12   3.0806e-14   3.6178e-16   4.2492e-18]
 
     It is also possible to retrieve the value of all observables at a
     particular time point, e.g. the final concentrations:
 
-    >>> print(simulation_result.observables[-1]) #doctest: +ELLIPSIS
-    (...-7.5308...e-15, -1.6809...e-13, 1...)
+    >>> obs_last_timepoint = simulation_result.observables[-1]
 
     Expressions are read in the same way as observables:
 
@@ -440,19 +440,18 @@ class SimulationResult(object):
      [  1.1744e-02   5.2194e-02   9.3606e-01]
      [  1.3791e-04   1.2259e-03   9.9864e-01]
      [  1.6196e-06   2.1595e-05   9.9998e-01]
-     [  1.9021e-08   3.3814e-07   1.0000e+00]
-     [  2.2344e-10   4.9648e-09   1.0000e+00]
-     [  2.6394e-12   7.0287e-11   1.0000e+00]
-     [  4.8067e-14   1.3515e-12   1.0000e+00]
-     [ -6.2097e-14  -1.3652e-12   1.0000e+00]
-     [ -7.5308e-15  -1.6809e-13   1.0000e+00]]
+     [  1.9020e-08   3.3814e-07   1.0000e+00]
+     [  2.2337e-10   4.9637e-09   1.0000e+00]
+     [  2.6232e-12   6.9951e-11   1.0000e+00]
+     [  3.0806e-14   9.5840e-13   1.0000e+00]
+     [  3.6178e-16   1.2863e-14   1.0000e+00]
+     [  4.2492e-18   1.6996e-16   1.0000e+00]]
 
     Species, observables and expressions can be combined into a single numpy
     ndarray and accessed similarly. Here, the initial concentrations of all
     these entities are examined:
 
-    >>> print(simulation_result.all[0]) #doctest: +ELLIPSIS
-    (...)
+    >>> init_concs = simulation_result.all[0]
 
     The ``all`` array can be accessed as a pandas DataFrame object,
     which allows for more convenient indexing and access to pandas advanced
