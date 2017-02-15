@@ -48,8 +48,11 @@ class Simulator(object):
         If passed as a dictionary, keys must be parameter names.
         If not specified, parameter values will be taken directly from
         model.parameters.
-    verbose : bool, optional (default: False)
-        Verbose output.
+    verbose : bool or int, optional (default: False)
+        Sets the verbosity level of the logger. See the logging levels and
+        constants from Python's logging module for interpretation of integer
+        values. False is equal to the PySB default level (currently WARNING),
+        True is equal to DEBUG.
 
     Attributes
     ----------
@@ -491,7 +494,7 @@ class SimulationResult(object):
         if len(self.tout) != self.nsims:
             raise ValueError("Simulator tout should be the same length as "
                              "trajectories")
-        for i in range(self._nsims):
+        for i in range(self.nsims):
             if len(self.tout[i]) != self._y[i].shape[0]:
                 raise ValueError("The number of time points in tout[{0}] "
                                  "should match the trajectories array for "
@@ -512,19 +515,19 @@ class SimulationResult(object):
             else float
 
         self._yobs = [np.ndarray((len(self.tout[n]),),
-                                 dtype=yobs_dtype) for n in range(self._nsims)]
+                                 dtype=yobs_dtype) for n in range(self.nsims)]
         self._yobs_view = [self._yobs[n].view(float).
                            reshape(len(self._yobs[n]), -1) for n in range(
-            self._nsims)]
+            self.nsims)]
         self._yexpr = [np.ndarray((len(self.tout[n]),),
                                   dtype=yexpr_dtype) for n in range(
-            self._nsims)]
+            self.nsims)]
         self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
-            self._yexpr[n]), -1) for n in range(self._nsims)]
+            self._yexpr[n]), -1) for n in range(self.nsims)]
         param_values = simulator.param_values
 
         # loop over simulations
-        for n in range(self._nsims):
+        for n in range(self.nsims):
             # observables
             for i, obs in enumerate(model_obs):
                 self._yobs_view[n][:, i] = (
@@ -547,7 +550,7 @@ class SimulationResult(object):
 
         Can be disabled by setting self.squeeze to False
         """
-        if self._nsims == 1 and self.squeeze:
+        if self.nsims == 1 and self.squeeze:
             return trajectories[0]
         else:
             return trajectories
@@ -574,7 +577,7 @@ class SimulationResult(object):
                                    itertools.repeat(float))
             yfull = len(self._y) * [None]
             # loop over simulations
-            for n in range(self._nsims):
+            for n in range(self.nsims):
                 yfull[n] = np.ndarray(len(self.tout[n]), yfull_dtype)
                 yfull_view = yfull[n].view(float).reshape((len(yfull[n]), -1))
                 n_sp = self._y[n].shape[1]
@@ -597,9 +600,9 @@ class SimulationResult(object):
         """
         if pd is None:
             raise Exception('Please "pip install pandas" for this feature')
-        sim_ids = (np.repeat(range(self._nsims), [len(t) for t in self.tout]))
+        sim_ids = (np.repeat(range(self.nsims), [len(t) for t in self.tout]))
         times = np.concatenate(self.tout)
-        if self._nsims == 1 and self.squeeze:
+        if self.nsims == 1 and self.squeeze:
             idx = pd.Index(times, name='time')
         else:
             idx = pd.MultiIndex.from_tuples(zip(sim_ids, times),

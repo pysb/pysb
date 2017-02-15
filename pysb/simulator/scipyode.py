@@ -113,9 +113,10 @@ class ScipyOdeSimulator(Simulator):
             'mxstep': 2**31-1,
         }
     }
-    
+
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
+
         super(ScipyOdeSimulator, self).__init__(model,
                                                 tspan=tspan,
                                                 initials=initials,
