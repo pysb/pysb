@@ -155,7 +155,19 @@ class CupSodaSimulator(Simulator):
         self._len_params = len(self._model.parameters)
         self._model_parameters_rules = self._model.parameters_rules()
 
-    def run(self, tspan=None, initials=None, param_values=None, logfile=None):
+        # Set cupsoda verbosity level
+        logger_level = self._logger.logger.getEffectiveLevel()
+        if logger_level > logging.DEBUG:
+            self._cupsoda_verbose = 0
+        elif logger_level <= 5:
+            self._cupsoda_verbose = 2
+        else:
+            self._cupsoda_verbose = 1
+
+        # regex for extracting cupSODA reported running time
+        self._running_time_regex = re.compile(r'Running time:\s+(\d+\.\d+)')
+
+    def run(self, tspan=None, initials=None, param_values=None):
         """Perform a set of integrations.
 
         Returns a :class:`.SimulationResult` object.
@@ -171,8 +183,6 @@ class CupSodaSimulator(Simulator):
         param_values : list-like, optional
             Parameters for all simulations. Dimensions are number of
             simulations x number of parameters.
-        logfile : str, optional
-            path to write log file, only used if provided
 
         Returns
         -------
@@ -198,7 +208,6 @@ class CupSodaSimulator(Simulator):
         _cupsoda_infiles_dir = os.path.join(self.outdir, "INPUT")
         os.mkdir(_cupsoda_infiles_dir)
         self._cupsoda_outfiles_dir = os.path.join(self.outdir, "OUTPUT")
-        os.mkdir(self._cupsoda_outfiles_dir)
 
         # Path to cupSODA executable
         bin_path = get_path('cupsoda')
@@ -211,27 +220,26 @@ class CupSodaSimulator(Simulator):
         # file_prefix gpu_number fitness_calculation memory_use dump
         command = [bin_path, _cupsoda_infiles_dir, str(self.n_blocks),
                    self._cupsoda_outfiles_dir, self._prefix, str(self.gpu),
-                   '0', self._memory_usage, '1' if self.verbose else '0']
-        if logfile is not None:
-            log = logging.getLogger()
-            log.setLevel(logging.INFO)
-            log.handlers = []
-            file_handler = logging.FileHandler(logfile)
-            file_handler.setLevel(logging.INFO)
-            log.addHandler(file_handler)
+                   '0', self._memory_usage, str(self._cupsoda_verbose)]
 
         self._logger.info("Running cupSODA: " + ' '.join(command))
         start_time = time.time()
         # Run simulation and return trajectories
         p = subprocess.Popen(command, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
-        if logfile is not None:
-            for line in iter(p.stdout.readline, b''):
-                if 'Running time' in line:
-                    log.info(line[:-1])
-        for line in iter(p.stdout.readline, b''):
-            self._logger.debug(line)
+        # for line in iter(p.stdout.readline, b''):
+        #     if 'Running time' in line:
+        #         self._logger.info(line[:-1])
         (p_out, p_err) = p.communicate()
+        logger_level = self._logger.logger.getEffectiveLevel()
+        if logger_level <= logging.INFO:
+            run_time_match = self._running_time_regex.search(p_out)
+            if run_time_match:
+                self._logger.info('cupSODA reported time: {} '
+                                  'seconds'.format(run_time_match.group(1)))
+        self._logger.debug('cupSODA stdout:\n' + p_out)
+        if p_err:
+            self._logger.error('cupsoda strerr:\n' + p_err)
         if p.returncode:
             raise SimulatorException(
                 p_out.rstrip("at line") + "\n" + p_err.rstrip())
@@ -240,8 +248,8 @@ class CupSodaSimulator(Simulator):
         if self._cleanup:
             shutil.rmtree(self.outdir)
         end_time = time.time()
-        if logfile is not None:
-            log.info("Total time = {}".format(end_time - start_time))
+        self._logger.info("cupSODA + I/O time: {} seconds".format(end_time -
+                                                                  start_time))
         return SimulationResult(self, tout, trajectories)
 
     @property

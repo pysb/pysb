@@ -83,10 +83,15 @@ class Simulator(object):
                  param_values=None, verbose=False, **kwargs):
         # Get or create base a PySB logger for this module and model
         self._logger = get_logger(self.__module__, model=model)
-        if verbose:
-            # _logger is actually a LoggerAdapter, so we need to set the level
-            # on the underlying logger
-            self._logger.logger.setLevel(logging.DEBUG)
+        if isinstance(verbose, bool):
+            if verbose:
+                # _logger is actually a LoggerAdapter, so we need to set the level
+                # on the underlying logger
+                self._logger.logger.setLevel(logging.DEBUG)
+        elif isinstance(verbose, int):
+            self._logger.logger.setLevel(verbose)
+        else:
+            raise ValueError('verbose must be boolean or integer log level')
         self._logger.debug('Simulator created')
         self._model = model
         self.verbose = verbose

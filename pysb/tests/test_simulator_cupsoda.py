@@ -78,11 +78,6 @@ class TestCupSODASimulatorSingle(object):
         self.solver.run(param_values=param_values, initials=self.y0)
         self.solver.run(param_values=param_values, initials=self.y0)
 
-    def test_log_file(self):
-        self.solver.run(logfile='test_log')
-        assert os.path.exists('test_log')
-        os.unlink('test_log')
-
     def test_verbose(self):
         solver = CupSodaSimulator(model, tspan=self.tspan, verbose=True,
                                   vol=1e-5,
