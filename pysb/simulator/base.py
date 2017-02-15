@@ -425,7 +425,7 @@ class SimulationResult(object):
     particular time point, e.g. the final concentrations:
 
     >>> print(simulation_result.observables[-1]) #doctest: +ELLIPSIS
-    (-7.5308...e-15, -1.6809...e-13, 1.0000...)
+    (...-7.5308...e-15, -1.6809...e-13, 1...)
 
     Expressions are read in the same way as observables:
 
@@ -451,8 +451,8 @@ class SimulationResult(object):
     ndarray and accessed similarly. Here, the initial concentrations of all
     these entities are examined:
 
-    >>> print(simulation_result.all[0])
-    (1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+    >>> print(simulation_result.all[0]) #doctest: +ELLIPSIS
+    (...)
 
     The ``all`` array can be accessed as a pandas DataFrame object,
     which allows for more convenient indexing and access to pandas advanced
