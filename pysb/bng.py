@@ -7,6 +7,7 @@ import re
 import itertools
 import sympy
 import numpy
+import scipy.sparse
 import tempfile
 from pkg_resources import parse_version
 import abc
@@ -529,7 +530,7 @@ def generate_equations(model, cleanup=True, verbose=False):
 
     This fills in the following pieces of the model:
 
-    * odes
+    * stoichiometry_matrix
     * species
     * reactions
     * reactions_bidirectional
@@ -539,7 +540,7 @@ def generate_equations(model, cleanup=True, verbose=False):
     # only need to do this once
     # TODO track "dirty" state, i.e. "has model been modified?"
     #   or, use a separate "math model" object to contain ODEs
-    if model.odes:
+    if model.stoichiometry_matrix is not None:
         return
     lines = iter(generate_network(model,cleanup=cleanup,verbose=verbose).split('\n'))
     _parse_netfile(model, lines)
@@ -565,7 +566,6 @@ def _parse_netfile(model, lines):
 
         while 'begin reactions' not in next(lines):
             pass
-        model.odes = [sympy.numbers.Zero()] * len(model.species)
         global reaction_cache
         reaction_cache = {}
         while True:
@@ -579,6 +579,7 @@ def _parse_netfile(model, lines):
                 r['rate'] *= -1
             # now the 'reverse' value is no longer needed
             del r['reverse']
+        _build_stoichiometry_matrix(model)
 
         while 'begin groups' not in next(lines):
             pass
@@ -683,13 +684,8 @@ def _parse_reaction(model, line):
         reaction_bd['reversible'] = False
         reaction_cache[key] = reaction_bd
         model.reactions_bidirectional.append(reaction_bd)
-    # odes
-    for p in products:
-        model.odes[p] += combined_rate
-    for r in reactants:
-        model.odes[r] -= combined_rate
-            
-            
+
+
 def _parse_group(model, line):
     """Parse a 'group' line from a BNGL net file."""
     # values are number (which we ignore), name, and species list
@@ -705,6 +701,17 @@ def _parse_group(model, line):
             obs.coefficients.append(int(terms[0]))
             # -1 to change to 0-based indexing
             obs.species.append(int(terms[1]) - 1)
+
+
+def _build_stoichiometry_matrix(model):
+    sm = scipy.sparse.lil_matrix((len(model.species), len(model.reactions)),
+                                 dtype='int')
+    for i, reaction in enumerate(model.reactions):
+        for r in reaction['reactants']:
+            sm[r, i] -= 1
+        for p in reaction['products']:
+            sm[p, i] += 1
+    model.stoichiometry_matrix = sm.tocsr()
 
 
 class NoInitialConditionsError(RuntimeError):
