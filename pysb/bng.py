@@ -434,7 +434,10 @@ class BngFileInterface(BngBaseInterface):
         action_args = self._format_action_args(**kwargs)
 
         # Add the command to the queue
-        self.command_queue.write('\t%s({%s})\n' % (action, action_args))
+        if action_args == '':
+            self.command_queue.write('\t%s()\n' % (action))
+        else:
+            self.command_queue.write('\t%s({%s})\n' % (action, action_args))
 
         return
 
