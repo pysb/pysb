@@ -2,8 +2,11 @@ from pysb.testing import *
 from pysb import *
 from pysb.kappa import *
 import pygraphviz as pgv
+import unittest
+import os
 
 _KAPPA_SEED = 123456
+
 
 @with_model
 def test_kappa_simulation_results():
@@ -22,6 +25,7 @@ def test_kappa_simulation_results():
     ok_(len(kres['AB']) == npts + 1)
     ok_(kres['time'][0] == 0)
     ok_(sorted(kres['time'])[-1] == 100)
+
 
 @with_model
 def test_kappa_expressions():
@@ -46,6 +50,7 @@ def test_kappa_expressions():
     # Accommodates site with explicit state and arbitrary bond
     run_simulation(model, time=0, seed=_KAPPA_SEED)
 
+
 @with_model
 def test_flux_map():
     """Test kappa simulation with flux map (returns tuple with graph)"""
@@ -69,6 +74,7 @@ def test_flux_map():
     fluxmap = res.flux_map
     ok_(isinstance(fluxmap, pgv.AGraph))
 
+
 @with_model
 def test_kappa_wild():
     Monomer('A',['site'])
@@ -80,6 +86,8 @@ def test_kappa_wild():
     Observable('A_', A())
     run_simulation(model, time=0, seed=_KAPPA_SEED)
 
+
+@unittest.skipIf(os.name == 'nt', 'KaSa binary not available for Windows')
 @raises(ValueError)
 @with_model
 def test_run_static_analysis_valueerror():
@@ -91,6 +99,8 @@ def test_run_static_analysis_valueerror():
     res = run_static_analysis(model, contact_map=False, influence_map=False)
 
 
+
+@unittest.skipIf(os.name == 'nt', 'KaSa binary not available for Windows')
 @with_model
 def test_run_static_analysis_cmap():
     """Test generation of contact map by run_static_analysis"""
@@ -103,6 +113,8 @@ def test_run_static_analysis_cmap():
     ok_(isinstance(res.contact_map, pgv.AGraph))
     ok_(res.influence_map is None)
 
+
+@unittest.skipIf(os.name == 'nt', 'KaSa binary not available for Windows')
 @with_model
 def test_run_static_analysis_imap():
     """Test generation of influence map by run_static_analysis"""
@@ -122,6 +134,8 @@ def test_run_static_analysis_imap():
     ok_(isinstance(res.influence_map, pgv.AGraph))
     ok_(res.contact_map is None)
 
+
+@unittest.skipIf(os.name == 'nt', 'KaSa binary not available for Windows')
 @with_model
 def test_run_static_analysis_both():
     """Test generation of both influence and contact map by run_static_analysis"""
@@ -141,6 +155,8 @@ def test_run_static_analysis_both():
     ok_(isinstance(res.influence_map, pgv.AGraph))
     ok_(isinstance(res.contact_map, pgv.AGraph))
 
+
+@unittest.skipIf(os.name == 'nt', 'KaSa binary not available for Windows')
 @with_model
 def test_contact_map():
     Monomer('A', ['b'])
@@ -151,6 +167,8 @@ def test_contact_map():
     res = contact_map(model, cleanup=True)
     ok_(isinstance(res, pgv.AGraph))
 
+
+@unittest.skipIf(os.name == 'nt', 'KaSa binary not available for Windows')
 @with_model
 def test_influence_map_kasa():
     Monomer('A', [])
@@ -167,6 +185,7 @@ def test_influence_map_kasa():
          Parameter('k_B_activates_C', 1))
     res = influence_map(model, cleanup=True)
     ok_(isinstance(res, pgv.AGraph))
+
 
 @with_model
 def test_unicode_strs():

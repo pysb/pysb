@@ -488,7 +488,7 @@ class SimulationResult(object):
     particular time point, e.g. the final concentrations:
 
     >>> print(simulation_result.observables[-1]) \
-        #doctest: +NORMALIZE_WHITESPACE
+        #doctest: +SKIP
     (  4.2492e-18,   1.6996e-16,  1.)
 
     Expressions are read in the same way as observables:
@@ -515,7 +515,7 @@ class SimulationResult(object):
     ndarray and accessed similarly. Here, the initial concentrations of all
     these entities are examined:
 
-    >>> print(simulation_result.all[0]) #doctest: +NORMALIZE_WHITESPACE
+    >>> print(simulation_result.all[0]) #doctest: +SKIP
     ( 1.,  0.,  0.,  1.,  0.,  0.,  0.)
 
     The ``all`` array can be accessed as a pandas DataFrame object,
