@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function as _
 import pysb.core
-from pysb.generator.bng import BngGenerator
+from pysb.generator.bng import BngGenerator, format_complexpattern
 import os
 import subprocess
 import re
@@ -386,6 +386,7 @@ class BngFileInterface(BngBaseInterface):
         """
         self.command_queue.write('end actions\n')
         bng_commands = self.command_queue.getvalue()
+
         try:
             # Generate BNGL file
             with open(self.bng_filename, 'w') as bng_file:
@@ -438,6 +439,47 @@ class BngFileInterface(BngBaseInterface):
             self.command_queue.write('\t%s()\n' % (action))
         else:
             self.command_queue.write('\t%s({%s})\n' % (action, action_args))
+
+        return
+
+    def set_parameter(self, action, name, value):
+        """
+        Generates a BNG action command and adds it to the command queue
+
+        Parameters
+        ----------
+        action : string
+            The name of the BNG action function (setParameter, setConcentration)
+        name: string
+            The name of the parameter or initial concentration to set
+        value: float_like
+            Value of parameter or initial concentration
+
+        """
+        # Add the command to the queue
+
+        self.command_queue.write('\t%s("%s", %f)\n' % (action, name, value))
+
+        return
+
+    def set_concentration(self, action, name, value):
+        """
+        Generates a BNG action command and adds it to the command queue
+
+        Parameters
+        ----------
+        action : string
+            The name of the BNG action function (setParameter, setConcentration)
+        name: string
+            The name of the parameter or initial concentration to set
+        value: float_like
+            Value of parameter or initial concentration
+
+        """
+        # Add the command to the queue
+        formatted_name = format_complexpattern(name)
+
+        self.command_queue.write('\t%s("%s", %f)\n' % (action, formatted_name, value))
 
         return
 
