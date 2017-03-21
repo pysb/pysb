@@ -131,7 +131,8 @@ class Simulator(object):
                                                  'ComplexPattern' %
                                                  repr(cplx_pat))
                     # if val is a number, convert it to a single-element array
-                    if not isinstance(val, collections.Sequence):
+                    if not isinstance(val, (collections.Sequence, np.ndarray)):
+
                         new_initials[cplx_pat] = np.array([val])
                     # otherwise, check whether simulator supports multiple
                     # initial values
