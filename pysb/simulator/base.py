@@ -511,7 +511,22 @@ class SimulationResult(object):
         exprs = self._model.expressions_dynamic()
         expr_names = [expr.name for expr in exprs]
         model_obs = self._model.observables
-        obs_names = model_obs.keys()
+        obs_names = list(model_obs.keys())
+
+        if not _allow_unicode_recarray():
+            for i, expr_name in enumerate(expr_names):
+                try:
+                    expr_names[i] = expr_name.encode('ascii')
+                except UnicodeEncodeError:
+                    raise ValueError('Non-ASCII compatible expression '
+                                     'names not allowed')
+            for i, obs_name in enumerate(obs_names):
+                try:
+                    obs_names[i] = obs_name.encode('ascii')
+                except UnicodeEncodeError:
+                    raise ValueError('Non-ASCII compatible observable '
+                                     'names not allowed')
+
         yobs_dtype = zip(obs_names, itertools.repeat(float)) if obs_names \
             else float
         yexpr_dtype = zip(expr_names, itertools.repeat(float)) if expr_names \
@@ -635,3 +650,15 @@ class SimulationResult(object):
         List of trajectory sets. The first dimension contains expressions.
         """
         return self._squeeze_output(self._yexpr)
+
+def _allow_unicode_recarray():
+    """Return True if numpy recarray can take unicode data type.
+
+    In python 2, numpy doesn't allow unicode strings are names in arrays even
+    if they are ascii encodeable. This function tests this directly.
+    """
+    try:
+        np.ndarray((1,), dtype=[(u'X', float)])
+    except TypeError:
+        return False
+    return True
