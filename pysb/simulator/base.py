@@ -426,7 +426,9 @@ class SimulationResult(object):
     It is also possible to retrieve the value of all observables at a
     particular time point, e.g. the final concentrations:
 
-    >>> obs_last_timepoint = simulation_result.observables[-1]
+    >>> print(simulation_result.observables[-1]) \
+        #doctest: +NORMALIZE_WHITESPACE
+    (  4.2492e-18,   1.6996e-16,  1.)
 
     Expressions are read in the same way as observables:
 
@@ -452,7 +454,8 @@ class SimulationResult(object):
     ndarray and accessed similarly. Here, the initial concentrations of all
     these entities are examined:
 
-    >>> init_concs = simulation_result.all[0]
+    >>> print(simulation_result.all[0]) #doctest: +NORMALIZE_WHITESPACE
+    ( 1.,  0.,  0.,  1.,  0.,  0.,  0.)
 
     The ``all`` array can be accessed as a pandas DataFrame object,
     which allows for more convenient indexing and access to pandas advanced
