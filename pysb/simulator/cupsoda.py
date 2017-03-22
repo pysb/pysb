@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import time
 import logging
+from pysb.logging import NAMED_LOG_LEVELS
 import shutil
 from pysb.pathfinder import get_path
 
@@ -183,7 +184,7 @@ class CupSodaSimulator(Simulator):
         logger_level = self._logger.logger.getEffectiveLevel()
         if logger_level > logging.DEBUG:
             self._cupsoda_verbose = 0
-        elif logger_level <= 5:
+        elif logger_level <= NAMED_LOG_LEVELS['EXTENDED_DEBUG']:
             self._cupsoda_verbose = 2
         else:
             self._cupsoda_verbose = 1
