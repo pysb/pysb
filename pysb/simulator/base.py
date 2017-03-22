@@ -514,18 +514,15 @@ class SimulationResult(object):
         obs_names = list(model_obs.keys())
 
         if not _allow_unicode_recarray():
-            for i, expr_name in enumerate(expr_names):
-                try:
-                    expr_names[i] = expr_name.encode('ascii')
-                except UnicodeEncodeError:
-                    raise ValueError('Non-ASCII compatible expression '
-                                     'names not allowed')
-            for i, obs_name in enumerate(obs_names):
-                try:
-                    obs_names[i] = obs_name.encode('ascii')
-                except UnicodeEncodeError:
-                    raise ValueError('Non-ASCII compatible observable '
-                                     'names not allowed')
+            for name_list, name_type in zip((expr_names, obs_names),
+                                            ('Expression', 'Observable')):
+                for i, name in enumerate(name_list):
+                    try:
+                        name_list[i] = name.encode('ascii')
+                    except UnicodeEncodeError:
+                        error_msg = 'Non-ASCII compatible' + \
+                                    '%s names not allowed' % name_type
+                        raise ValueError(error_msg)
 
         yobs_dtype = zip(obs_names, itertools.repeat(float)) if obs_names \
             else float
@@ -654,7 +651,7 @@ class SimulationResult(object):
 def _allow_unicode_recarray():
     """Return True if numpy recarray can take unicode data type.
 
-    In python 2, numpy doesn't allow unicode strings are names in arrays even
+    In python 2, numpy doesn't allow unicode strings as names in arrays even
     if they are ascii encodeable. This function tests this directly.
     """
     try:
