@@ -290,8 +290,8 @@ class CupSodaSimulator(Simulator):
         return vol
 
     @vol.setter
-    def vol(self, volumne):
-        self.opts['vol'] = volumne
+    def vol(self, volume):
+        self.opts['vol'] = volume
 
     @property
     def n_blocks(self):
