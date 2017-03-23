@@ -6,8 +6,8 @@ import numpy.testing as npt
 import os
 from pysb.simulator.scipyode import ScipyOdeSimulator
 
-class TestSensitivityAnalysis(object):
 
+class TestSensitivityAnalysis(object):
     def setUp(self):
         self.tspan = np.linspace(0, 200, 5001)
         self.observable = 'Y3'
@@ -44,7 +44,6 @@ class TestSensitivityAnalysis(object):
     def teardown_class(cls):
         if os.path.exists('sens_out'):
             os.removedirs('sens_out')
-
 
     def obj_func_cell_cycle(self, out):
         timestep = self.tspan[:-1]
@@ -122,10 +121,13 @@ class TestSensitivityAnalysis(object):
 
     def test_unique_simulations_only(self):
         vals = [.8, .9, 1.1, 1.2, 1.3]
-        sens = InitialConcentrationSensitivityAnalysis(model, self.tspan,
-                                                       vals,
-                                                       self.obj_func_cell_cycle,
-                                                       self.observable, )
+        sens = InitialConcentrationSensitivityAnalysis(
+            model,
+            self.tspan,
+            vals,
+            self.obj_func_cell_cycle,
+            self.observable,
+        )
         solver = ScipyOdeSimulator(self.model, tspan=self.tspan,
                                    integrator='lsoda',
                                    integrator_options={'rtol': 1e-8,

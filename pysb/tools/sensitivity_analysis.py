@@ -12,14 +12,10 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
 from pysb.bng import generate_equations
-plt = matplotlib.pyplot
 
 
 class InitialConcentrationSensitivityAnalysis(object):
-
     """ Performs pairwise sensitivity analysis of initial conditions
-
-
 
     Uses :func:`scipy.integrate.odeint` for the ``lsoda`` integrator,
     :func:`scipy.integrate.ode` for all other integrators.
@@ -28,28 +24,26 @@ class InitialConcentrationSensitivityAnalysis(object):
         The interface for this class is considered experimental and may
         change without warning as PySB is updated.
 
-
-
-        Parameters
-        ----------
-        model : pysb.Model
-            Model to simulate.
-        time_span : vector-like, optional
-            Time values over which to simulate. The first and last values define
-            the time range. Returned trajectories are sampled at every value unless
-            the simulation is interrupted for some reason, e.g., due to
-            satisfaction of a logical stopping criterion (see 'tout' below).
-        solver : pysb.simulator.Simulator
-            the simulator to perform simulations
-        values_to_sample : vector_like
-            values to sample for each initial concentration of the
-            model.parameters values
-        objective_function : function
-            A function that returns a scalar value. Used to calculate fraction
-            of changed that is used for calculating sensitivity.
-            Refer to pysb.examples.tools.tyson_sens_example.py for example
-        observable : str
-            the observable that is used in the objective_function
+    Parameters
+    ----------
+    model : pysb.Model
+        Model to simulate.
+    time_span : vector-like, optional
+        Time values over which to simulate. The first and last values define
+        the time range. Returned trajectories are sampled at every value unless
+        the simulation is interrupted for some reason, e.g., due to
+        satisfaction of a logical stopping criterion (see 'tout' below).
+    solver : pysb.simulator.Simulator
+        the simulator to perform simulations
+    values_to_sample : vector_like
+        values to sample for each initial concentration of the
+        model.parameters values
+    objective_function : function
+        A function that returns a scalar value. Used to calculate fraction
+        of changed that is used for calculating sensitivity.
+        Refer to pysb.examples.tools.tyson_sens_example.py for example
+    observable : str
+        the observable that is used in the objective_function
 
     Examples
     --------
@@ -77,11 +71,14 @@ class InitialConcentrationSensitivityAnalysis(object):
     ...     local_freq = np.average(local_times)/len(local_times)*2
     ...     return local_freq
     >>> solver = ScipyOdeSimulator(model, tspan)
-    >>> sens = InitialConcentrationSensitivityAnalysis(model, tspan, \
-                                                   values_to_sample=values_to_sample,\
-                                                   observable=observable,\
-                                                   objective_function=obj_func_cell_cycle,\
-                                                   solver=solver)
+    >>> sens = InitialConcentrationSensitivityAnalysis(
+            model,
+            tspan,
+            values_to_sample=values_to_sample,
+            observable=observable,
+            objective_function=obj_func_cell_cycle,
+            solver=solver
+        )
     Number of simulations to run = 8
     >>> print(sens.b_matrix)
     [[((0.8, 'cdc0'), (0.8, 'cdc0')) ((0.8, 'cdc0'), (1.2, 'cdc0'))
@@ -104,7 +101,8 @@ class InitialConcentrationSensitivityAnalysis(object):
       [ 0.      0.      5.0243 -4.5381]
       [ 0.      0.      0.      0.    ]
       [ 0.      0.      0.      0.    ]]
-    >>> print(sens.p_matrix - sens.p_prime_matrix) #doctest: +NORMALIZE_WHITESPACE
+    >>> print(sens.p_matrix - sens.p_prime_matrix) \
+            #doctest: +NORMALIZE_WHITESPACE
      [[ 0.      0.      0.      0.    ]
       [ 0.      0.      0.      0.    ]
       [ 5.0243  5.0243  0.      0.    ]
@@ -515,7 +513,7 @@ class InitialConcentrationSensitivityAnalysis(object):
         plt.subplots_adjust(hspace=0.1)
 
         # use gridspec to scale colorbar nicely
-        outer = gridspec.GridSpec(2, 1, width_ratios=[0.4, 1.],
+        outer = gridspec.GridSpec(2, 2, width_ratios=[0.4, 1.],
                                   height_ratios=[0.03, 1])
 
         gs1 = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=outer[0])
