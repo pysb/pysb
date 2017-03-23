@@ -1,4 +1,6 @@
 from pysb.testing import *
+import sys
+import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator import ScipyOdeSimulator, SimulatorException
@@ -253,3 +255,48 @@ def test_nonexistent_integrator():
     """Ensure nonexistent integrator raises."""
     ScipyOdeSimulator(robertson.model, tspan=np.linspace(0, 1, 2),
                       integrator='does_not_exist')
+
+
+def test_unicode_obsname_ascii():
+    """Ensure ascii-convetible unicode observable names are handled."""
+    t = np.linspace(0, 100)
+    rob_copy = copy.deepcopy(robertson.model)
+    rob_copy.observables[0].name = u'A_total'
+    sim = ScipyOdeSimulator(rob_copy)
+    simres = sim.run(tspan=t)
+
+
+if sys.version_info[0] < 3:
+    @raises(ValueError)
+    def test_unicode_obsname_nonascii():
+        """Ensure non-ascii unicode observable names error in python 2."""
+        t = np.linspace(0, 100)
+        rob_copy = copy.deepcopy(robertson.model)
+        rob_copy.observables[0].name = u'A_total\u1234'
+        sim = ScipyOdeSimulator(rob_copy)
+        simres = sim.run(tspan=t)
+
+
+def test_unicode_exprname_ascii():
+    """Ensure ascii-convetible unicode expression names are handled."""
+    t = np.linspace(0, 100)
+    rob_copy = copy.deepcopy(robertson.model)
+    ab = rob_copy.observables['A_total'] + rob_copy.observables['B_total']
+    expr = Expression(u'A_plus_B', ab, _export=False)
+    rob_copy.add_component(expr)
+    sim = ScipyOdeSimulator(rob_copy)
+    simres = sim.run(tspan=t)
+
+
+if sys.version_info[0] < 3:
+    @raises(ValueError)
+    def test_unicode_exprname_nonascii():
+        """Ensure non-ascii unicode expression names error in python 2."""
+        t = np.linspace(0, 100)
+        rob_copy = copy.deepcopy(robertson.model)
+        ab = rob_copy.observables['A_total'] + rob_copy.observables['B_total']
+        expr = Expression(u'A_plus_B\u1234', ab, _export=False)
+        rob_copy.add_component(expr)
+        sim = ScipyOdeSimulator(rob_copy)
+        simres = sim.run(tspan=t)
+
