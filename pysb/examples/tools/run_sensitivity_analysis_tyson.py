@@ -1,6 +1,7 @@
 import numpy as np
 from pysb.simulator.scipyode import ScipyOdeSimulator
-from pysb.tools.sensitivity_analysis import InitialConcentrationSensitivityAnalysis
+from pysb.tools.sensitivity_analysis import \
+    InitialConcentrationSensitivityAnalysis
 from pysb.examples.tyson_oscillator import model
 
 
@@ -8,12 +9,13 @@ tspan = np.linspace(0, 200, 5001)
 
 
 def obj_func_cell_cycle(trajectory):
-    """ calculates the frequency of the Y3
+    """
+    Calculate the frequency of the Y3
 
     Parameters
     ----------
     trajectory : vector_like
-        observable from pysb.
+        Simulation trajectory for the Y3 observable
 
     Returns
     -------
@@ -39,7 +41,7 @@ def obj_func_cell_cycle(trajectory):
 
 
 def run():
-    # The obeservable of the model
+    # The observable of the model
     observable = 'Y3'
     # The values of each initial concentration to samples
     # These values will be per initial concentration
@@ -49,21 +51,29 @@ def run():
     solver = ScipyOdeSimulator(model, tspan)
 
     # initialize the sensitivity class
-    sens = InitialConcentrationSensitivityAnalysis(model, tspan,
-                                                   values_to_sample=vals,
-                                                   observable=observable,
-                                                   objective_function=obj_func_cell_cycle,
-                                                   solver=solver)
+    sens = InitialConcentrationSensitivityAnalysis(
+        model,
+        tspan,
+        values_to_sample=vals,
+        observable=observable,
+        objective_function=obj_func_cell_cycle,
+        solver=solver
+    )
 
     # runs the function, can pass save_name and out_dir to save sens matrices
     sens.run()
 
-    # some sample plotting commands to help view the sensitivites
-    sens.create_individual_pairwise_plots(save_name='test2')
-    sens.create_plot_p_h_pprime('test3')
+    # some sample plotting commands to help view the sensitivities
+    sens.create_individual_pairwise_plots(save_name='pairwise_individual',
+                                          out_dir='tyson_sensitivity')
+    sens.create_plot_p_h_pprime(save_name='matrices',
+                                out_dir='tyson_sensitivity')
     # creates a heatplot of all initial concentration in a mirrored grid
     # also decomposed heatplot into single initial concentration species
-    sens.create_boxplot_and_heatplot(save_name='tyson_sensitivity', show=False)
+    sens.create_boxplot_and_heatplot(save_name='tyson_sensitivity',
+                                     out_dir='tyson_sensitivity',
+                                     show=False)
+    print("Results saved in tyson_sensitivity directory")
 
 
 if __name__ == '__main__':
