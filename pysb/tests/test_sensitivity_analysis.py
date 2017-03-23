@@ -5,6 +5,8 @@ import numpy as np
 import numpy.testing as npt
 import os
 from pysb.simulator.scipyode import ScipyOdeSimulator
+import tempfile
+import shutil
 
 
 class TestSensitivityAnalysis(object):
@@ -12,11 +14,12 @@ class TestSensitivityAnalysis(object):
         self.tspan = np.linspace(0, 200, 5001)
         self.observable = 'Y3'
         self.savename = 'sens_out_test'
-        self.output_dir = 'sens_out'
+        self.output_dir = tempfile.mkdtemp()
         self.vals = np.linspace(.8, 1.2, 5)
         self.vals = [.8, .9, 1., 1.1, 1.2]
         self.model = model
-        self.solver = ScipyOdeSimulator(self.model, tspan=self.tspan,
+        self.solver = ScipyOdeSimulator(self.model,
+                                        tspan=self.tspan,
                                         integrator='lsoda',
                                         integrator_options={'rtol': 1e-8,
                                                             'atol': 1e-8,
@@ -40,10 +43,8 @@ class TestSensitivityAnalysis(object):
 
         self.sens.run()
 
-    @classmethod
-    def teardown_class(cls):
-        if os.path.exists('sens_out'):
-            os.removedirs('sens_out')
+    def tearDown(self):
+        shutil.rmtree(self.output_dir)
 
     def obj_func_cell_cycle(self, out):
         timestep = self.tspan[:-1]
@@ -62,7 +63,8 @@ class TestSensitivityAnalysis(object):
         return local_freq
 
     def test_vode_run(self):
-        solver = ScipyOdeSimulator(self.model, tspan=self.tspan,
+        solver = ScipyOdeSimulator(self.model,
+                                   tspan=self.tspan,
                                    integrator='vode',
                                    integrator_options={'rtol': 1e-8,
                                                        'atol': 1e-8,
@@ -82,42 +84,33 @@ class TestSensitivityAnalysis(object):
         assert len(self.sens.simulations) == 25
 
     def test_pmatrix_outfile_exists(self):
-        self.sens.run(self.solver, save_name=self.savename,
-                      out_dir=self.output_dir,)
-        test_file = os.path.join(self.output_dir,
-                                 '{}_p_matrix.csv'.format(self.savename))
-        assert os.path.exists(test_file)
-        os.remove(test_file)
-        test_file = os.path.join(self.output_dir,
-                                 '{}_p_prime_matrix.csv'.format(self.savename))
-        assert os.path.exists(test_file)
-        os.remove(test_file)
+        self.sens.run(self.solver,
+                      save_name=self.savename,
+                      out_dir=self.output_dir)
+        assert os.path.exists(os.path.join(
+            self.output_dir, '{}_p_matrix.csv'.format(self.savename)
+        ))
+        assert os.path.exists(os.path.join(
+            self.output_dir, '{}_p_prime_matrix.csv'.format(self.savename)
+        ))
 
     def test_create_png(self):
         self.sens.create_boxplot_and_heatplot(save_name='test',
                                               out_dir=self.output_dir)
 
-        outfile = os.path.join(self.output_dir, 'test.png')
-        assert os.path.exists(outfile)
-        os.remove(outfile)
+        assert os.path.exists(os.path.join(self.output_dir, 'test.png'))
+        assert os.path.exists(os.path.join(self.output_dir, 'test.eps'))
+        assert os.path.exists(os.path.join(self.output_dir, 'test.svg'))
 
-        outfile = os.path.join(self.output_dir, 'test.eps')
-        assert os.path.exists(outfile)
-        os.remove(outfile)
-
-        outfile = os.path.join(self.output_dir, 'test.svg')
-        assert os.path.exists(outfile)
-        os.remove(outfile)
         self.sens.create_individual_pairwise_plots(save_name='test2',
                                                    out_dir=self.output_dir)
-        test_file = os.path.join(self.output_dir, 'test2_subplots.png')
-        assert os.path.exists(test_file)
-        os.remove(test_file)
+        assert os.path.exists(os.path.join(self.output_dir,
+                                           'test2_subplots.png'))
 
-        self.sens.create_plot_p_h_pprime(save_name='test3')
-        test_file = 'test3_P_H_P_prime.png'
-        assert os.path.exists(test_file)
-        os.remove(test_file)
+        self.sens.create_plot_p_h_pprime(save_name='test3',
+                                         out_dir=self.output_dir)
+        assert os.path.exists(os.path.join(self.output_dir,
+                                           'test3_P_H_P_prime.png'))
 
     def test_unique_simulations_only(self):
         vals = [.8, .9, 1.1, 1.2, 1.3]
@@ -128,13 +121,14 @@ class TestSensitivityAnalysis(object):
             self.obj_func_cell_cycle,
             self.observable,
         )
-        solver = ScipyOdeSimulator(self.model, tspan=self.tspan,
+        solver = ScipyOdeSimulator(self.model,
+                                   tspan=self.tspan,
                                    integrator='lsoda',
                                    integrator_options={'rtol': 1e-8,
                                                        'atol': 1e-8,
                                                        'mxstep': 20000})
         sens.run(solver)
-        self.sens.create_plot_p_h_pprime(save_name='test4')
-        assert os.path.exists('test4_P_H_P_prime.png')
-        os.remove('test4_P_H_P_prime.png')
-
+        self.sens.create_plot_p_h_pprime(save_name='test4',
+                                         out_dir=self.output_dir)
+        assert os.path.exists(os.path.join(self.output_dir,
+                                           'test4_P_H_P_prime.png'))
