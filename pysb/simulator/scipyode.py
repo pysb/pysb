@@ -13,6 +13,7 @@ import re
 import numpy as np
 import warnings
 import os
+from pysb.logging import EXTENDED_DEBUG
 
 
 def _exec(code, locals):
@@ -368,8 +369,9 @@ class ScipyOdeSimulator(Simulator):
                 i = 1
                 while self.integrator.successful() and self.integrator.t < \
                         self.tspan[-1]:
-                    self._logger.debug('Simulation %d/%d Integrating t=%g',
-                                       n + 1, n_sims, self.integrator.t)
+                    self._logger.log(EXTENDED_DEBUG,
+                                     'Simulation %d/%d Integrating t=%g',
+                                     n + 1, n_sims, self.integrator.t)
                     trajectories[n][i] = self.integrator.integrate(self.tspan[i])
                     i += 1
                 if self.integrator.t < self.tspan[-1]:
