@@ -10,8 +10,9 @@ import pysb
 SECONDS_IN_HOUR = 3600
 LOG_LEVEL_ENV_VAR = 'PYSB_LOG'
 BASE_LOGGER_NAME = 'pysb'
+EXTENDED_DEBUG = 5
 NAMED_LOG_LEVELS = {'NOTSET': logging.NOTSET,
-                    'EXTENDED_DEBUG': 5,
+                    'EXTENDED_DEBUG': EXTENDED_DEBUG,
                     'DEBUG': logging.DEBUG,
                     'INFO': logging.INFO,
                     'WARNING': logging.WARNING,

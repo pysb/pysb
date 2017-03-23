@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import time
 import logging
-from pysb.logging import NAMED_LOG_LEVELS
+from pysb.logging import EXTENDED_DEBUG
 import shutil
 from pysb.pathfinder import get_path
 
@@ -182,12 +182,12 @@ class CupSodaSimulator(Simulator):
 
         # Set cupsoda verbosity level
         logger_level = self._logger.logger.getEffectiveLevel()
-        if logger_level > logging.DEBUG:
-            self._cupsoda_verbose = 0
-        elif logger_level <= NAMED_LOG_LEVELS['EXTENDED_DEBUG']:
+        if logger_level <= EXTENDED_DEBUG:
             self._cupsoda_verbose = 2
-        else:
+        elif logger_level <= logging.DEBUG:
             self._cupsoda_verbose = 1
+        else:
+            self._cupsoda_verbose = 0
 
         # regex for extracting cupSODA reported running time
         self._running_time_regex = re.compile(r'Running time:\s+(\d+\.\d+)')
