@@ -10,7 +10,14 @@ import pysb
 SECONDS_IN_HOUR = 3600
 LOG_LEVEL_ENV_VAR = 'PYSB_LOG'
 BASE_LOGGER_NAME = 'pysb'
-NAMED_LOG_LEVELS = ['NOTSET', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+EXTENDED_DEBUG = 5
+NAMED_LOG_LEVELS = {'NOTSET': logging.NOTSET,
+                    'EXTENDED_DEBUG': EXTENDED_DEBUG,
+                    'DEBUG': logging.DEBUG,
+                    'INFO': logging.INFO,
+                    'WARNING': logging.WARNING,
+                    'ERROR': logging.ERROR,
+                    'CRITICAL': logging.CRITICAL}
 
 
 def formatter(time_utc=False):
@@ -78,14 +85,15 @@ def setup_logger(level=logging.WARNING, console_output=True, file_output=False,
         except ValueError:
             # Try parsing as a name
             level_name = os.environ[LOG_LEVEL_ENV_VAR]
-            if level_name in NAMED_LOG_LEVELS:
-                level = logging.__dict__[level_name]
+            if level_name in NAMED_LOG_LEVELS.keys():
+                level = NAMED_LOG_LEVELS[level_name]
             else:
                 raise ValueError('Environment variable {} contains an '
                                  'invalid value "{}". If set, its value must '
                                  'be one of {} (case-sensitive) or an '
                                  'integer log level.'.format(
-                    LOG_LEVEL_ENV_VAR, level_name, ", ".join(NAMED_LOG_LEVELS)
+                    LOG_LEVEL_ENV_VAR, level_name,
+                    ", ".join(NAMED_LOG_LEVELS.keys())
                                  ))
 
 

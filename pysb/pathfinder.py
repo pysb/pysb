@@ -27,6 +27,18 @@ _path_config = {
             'posix': ('/usr/local/share/KaSim',),
             'nt': ('c:/Program Files/KaSim',)
         }
+    },
+    'cupsoda': {
+        'name': 'cupSODA',
+        'executable': {
+            'posix': 'cupsoda',
+            'nt': 'cupsoda.exe'
+        },
+        'env_var': 'CUPSODAPATH',
+        'search_paths': {
+            'posix': ('/usr/local/share/cupSODA',),
+            'nt': ('c:/Program Files/cupSODA',)
+        }
     }
 }
 _path_cache = {}
@@ -77,7 +89,7 @@ def get_path(prog_name):
                                 path_conf['env_var'],
                                 env_var_val,
                                 path_conf['name'],
-                                path_conf['executable']))
+                                _get_executable(prog_name)))
 
     # Check default paths for this operating system
     if os.name not in path_conf['search_paths'].keys():
@@ -85,10 +97,10 @@ def get_path(prog_name):
                         'operating system "%s". Set the path using the '
                         'environment variable %s or by calling the function '
                         '%s.%s()' % (path_conf['name'],
-                                    os.name,
-                                    path_conf['env_var'],
-                                    set_path.__module__,
-                                    set_path.__name__))
+                                     os.name,
+                                     path_conf['env_var'],
+                                     set_path.__module__,
+                                     set_path.__name__))
 
     search_paths = path_conf['search_paths'][os.name]
     for search_path in search_paths:
@@ -130,6 +142,20 @@ def set_path(prog_name, full_path):
     _path_cache[prog_name] = _validate_path(prog_name, full_path)
 
 
+def _get_executable(prog_name):
+    executable = _path_config[prog_name]['executable']
+    if isinstance(executable, str):
+        return executable
+    else:
+        try:
+            return executable[os.name]
+        except KeyError:
+            raise Exception('No executable for "%s" is available for your '
+                            'operating system: "%s"' %
+                            (_path_config[prog_name]['name'],
+                             os.name))
+
+
 def _validate_path(prog_name, full_path):
     if not os.access(full_path, os.F_OK):
         raise ValueError('Unable to access path %s. Check the file exists '
@@ -138,8 +164,9 @@ def _validate_path(prog_name, full_path):
 
     if not os.path.isfile(full_path):
         # It's a directory, try appending the executable name
-        return _validate_path(prog_name, os.path.join(full_path, _path_config[
-            prog_name]['executable']))
+        return _validate_path(prog_name, os.path.join(full_path,
+                                                      _get_executable(
+                                                          prog_name)))
 
     if not os.access(full_path, os.X_OK):
         raise ValueError('The file %s does not have executable permissions.' %
