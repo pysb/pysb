@@ -52,8 +52,6 @@ def run():
 
     # initialize the sensitivity class
     sens = InitialConcentrationSensitivityAnalysis(
-        model,
-        tspan,
         values_to_sample=vals,
         observable=observable,
         objective_function=obj_func_cell_cycle,

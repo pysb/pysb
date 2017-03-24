@@ -25,8 +25,11 @@ class TestSensitivityAnalysis(object):
                                                             'atol': 1e-8,
                                                             'mxstep': 20000})
         self.sens = InitialConcentrationSensitivityAnalysis(
-            self.model, self.tspan, self.vals, self.obj_func_cell_cycle,
-            self.observable, solver=self.solver)
+            solver=self.solver,
+            values_to_sample=self.vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable
+        )
 
         self.p_simulated = np.array(
             [[0., 0., 0., 0., 0., 5.0301, 2.6027, 0., -2.5118, -4.5758],
@@ -114,20 +117,19 @@ class TestSensitivityAnalysis(object):
 
     def test_unique_simulations_only(self):
         vals = [.8, .9, 1.1, 1.2, 1.3]
-        sens = InitialConcentrationSensitivityAnalysis(
-            model,
-            self.tspan,
-            vals,
-            self.obj_func_cell_cycle,
-            self.observable,
-        )
         solver = ScipyOdeSimulator(self.model,
                                    tspan=self.tspan,
                                    integrator='lsoda',
                                    integrator_options={'rtol': 1e-8,
                                                        'atol': 1e-8,
                                                        'mxstep': 20000})
-        sens.run(solver)
+        sens = InitialConcentrationSensitivityAnalysis(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=solver
+        )
+        sens.run()
         self.sens.create_plot_p_h_pprime(save_name='test4',
                                          out_dir=self.output_dir)
         assert os.path.exists(os.path.join(self.output_dir,
