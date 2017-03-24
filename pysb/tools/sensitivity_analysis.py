@@ -1,10 +1,3 @@
-"""
-Sensitivity analysis tools created to demonstrate GPU powered
-analysis of PySB models.
-Information can be found in Harris et. al, Bioinformatics.
-Code written by James C. Pino
-
-"""
 import os
 from itertools import product
 import collections
@@ -14,9 +7,13 @@ import numpy as np
 from pysb.bng import generate_equations
 
 
-class InitialConcentrationSensitivityAnalysis(object):
+class InitialsSensitivity(object):
     """
     Pairwise sensitivity analysis of initial conditions
+
+    This class calculates the sensitivity of a specified model Observable to
+    changes in pairs of initial species concentrations. The results are
+    stored in matrices described in Attributes.
 
     .. warning::
         The interface for this class is considered experimental and may
@@ -35,6 +32,23 @@ class InitialConcentrationSensitivityAnalysis(object):
         of changed that is used for calculating sensitivity. See Example.
     observable : str
         Observable used in the objective_function.
+
+    Attributes
+    ----------
+    b_matrix: numpy.ndarray
+        Matrix of 2-tuples containing (perturbation, species index)
+    b_prime_matrix: numpy.ndarray
+        Same as b_matrix, only where one of the species concentrations is
+        unchanged (i.e. with the single variable contribution removed)
+    p_matrix: numpy.ndarray
+        Pairwise sensitivity matrix
+    p_prime_matrix: numpy.ndarray
+        Normalized pairwise sensitivity matrix (in the sense that it
+        contains changes from the baseline, unperturbed case)
+
+    References
+    ----------
+    Harris et al. Bioinformatics (2017), under review.
 
     Examples
     --------
@@ -62,7 +76,7 @@ class InitialConcentrationSensitivityAnalysis(object):
     ...     local_freq = np.average(local_times)/len(local_times)*2
     ...     return local_freq
     >>> solver = ScipyOdeSimulator(model, tspan)
-    >>> sens = InitialConcentrationSensitivityAnalysis(\
+    >>> sens = InitialsSensitivity(\
             values_to_sample=values_to_sample,\
             observable=observable,\
             objective_function=obj_func_cell_cycle,\
@@ -103,77 +117,100 @@ class InitialConcentrationSensitivityAnalysis(object):
                  observable):
         self._model = solver.model
         generate_equations(self._model)
-        self._proteins_of_interest = None
+        self._proteins_of_interest_cache = None
         self._values_to_sample = values_to_sample
         self._solver = solver
+        self.objective_function = objective_function
+        self.observable = observable
 
         # Outputs
         self.b_matrix = []
         self.b_prime_matrix = []
-        self.p_prime_matrix = np.zeros(self.size_of_matrix)
-        self.p_matrix = np.zeros(self.size_of_matrix)
+        self.p_prime_matrix = np.zeros(self._size_of_matrix)
+        self.p_matrix = np.zeros(self._size_of_matrix)
 
-        self.initial_conditions = np.zeros(len(self._model.species))
-        self.index_of_species_of_interest = self._create_index_of_species()
-        self.simulations = self._setup_simulations()
-        self.objective_function = objective_function
-        self.observable = observable
-        self.standard = None
+        self._original_initial_conditions = np.zeros(len(self._model.species))
+        self._index_of_species_of_interest = self._create_index_of_species()
+        self.simulation_initials = self._setup_simulations()
+        # Stores the objective function value for the original unperturbed
+        # model
+        self._objective_fn_standard = None
 
     @property
-    def proteins_of_interest(self):
-        if self._proteins_of_interest is None:
-            self._proteins_of_interest = list(
+    def _proteins_of_interest(self):
+        if self._proteins_of_interest_cache is None:
+            self._proteins_of_interest_cache = list(
                 (i[1].name for i in self._model.initial_conditions))
             # remove source species
-            if '__source_0' in self._proteins_of_interest:
-                self._proteins_of_interest.remove('__source_0')
-            self._proteins_of_interest = sorted(self._proteins_of_interest)
+            if '__source_0' in self._proteins_of_interest_cache:
+                self._proteins_of_interest_cache.remove('__source_0')
+            self._proteins_of_interest_cache = sorted(self._proteins_of_interest_cache)
 
-        return self._proteins_of_interest
-
-    @property
-    def n_proteins(self):
-        return len(self.proteins_of_interest)
+        return self._proteins_of_interest_cache
 
     @property
-    def n_sam(self):
+    def _n_proteins(self):
+        return len(self._proteins_of_interest)
+
+    @property
+    def _n_sam(self):
         return len(self._values_to_sample)
 
     @property
     def _nm(self):
-        return self.n_proteins * self.n_sam
+        return self._n_proteins * self._n_sam
 
     @property
-    def size_of_matrix(self):
+    def _size_of_matrix(self):
         return self._nm ** 2
 
     @property
-    def shape_of_matrix(self):
+    def _shape_of_matrix(self):
         return self._nm, self._nm
 
+    @property
+    def sensitivity_multiset(self):
+        """
+        Sensitivity analysis multiset (also called "Q" matrix)
+
+        Returns
+        -------
+        list
+            List of lists containing the sensitivity analysis multiset
+        """
+        sens_ij_nm = []
+        sens_matrix = self.p_matrix - self.p_prime_matrix
+
+        # separate each species sensitivity
+        for j in range(0, self._nm, self._n_sam):
+            per_protein1 = []
+            for i in range(0, self._nm, self._n_sam):
+                if i != j:
+                    tmp = sens_matrix[j:j + self._n_sam,
+                          i:i + self._n_sam].copy()
+                    per_protein1.append(tmp)
+            sens_ij_nm.append(per_protein1)
+        return sens_ij_nm
+
     def _calculate_objective(self, function_value):
-        """ Calculates fraction of change for obj value and standard
+        """
+        Calculate fraction of change for obj value and standard
 
         Parameters
         ----------
         function_value : scalar
             scalar value provided by objective function
-
-        Returns
-        -------
-
         """
         return (self.objective_function(function_value)
-                - self.standard) / self.standard * 100.
+                - self._objective_fn_standard) / \
+               self._objective_fn_standard * 100.
 
-    def run(self, solver=None, save_name=None, out_dir=None,):
-        """ Run function to perform sensitivity analysis
+    def run(self, save_name=None, out_dir=None):
+        """
+        Run sensitivity analysis
 
         Parameters
         ----------
-        solver : pysb.simulator.base.Simulator
-            pysb.simulator to perform simulations
         save_name : str, optional
             prefix of saved files
         out_dir : str, optional
@@ -182,22 +219,19 @@ class InitialConcentrationSensitivityAnalysis(object):
         if out_dir is not None:
             if not os.path.exists(out_dir):
                 os.mkdir(out_dir)
-        if solver is None:
-            if self._solver is None:
-                raise(TypeError, "Must provide a pysb.simulator to run "
-                                 "function or when initializing the class")
-            else:
-                solver = self._solver
-        solver.initials = None
-        solver.param_values = None
-        sim_results = solver.run(param_values=None, initials=None)
-        self.standard = self.objective_function(
+        if self._solver is None:
+            raise(TypeError, "Must provide a pysb.simulator to run "
+                             "function or when initializing the class")
+        self._solver.initials = None
+        self._solver.param_values = None
+        sim_results = self._solver.run(param_values=None, initials=None)
+        self._objective_fn_standard = self.objective_function(
             np.array(sim_results.observables[self.observable]))
 
-        traj = solver.run(initials=self.simulations)
+        traj = self._solver.run(initials=self.simulation_initials)
         sensitivity_output = np.array(traj.observables)[self.observable].T
-        p_matrix = np.zeros(self.size_of_matrix)
-        p_prime_matrix = np.zeros(self.size_of_matrix)
+        p_matrix = np.zeros(self._size_of_matrix)
+        p_prime_matrix = np.zeros(self._size_of_matrix)
         counter = 0
         # places values in p matrix that are unique
         for i in range(len(p_matrix)):
@@ -214,10 +248,10 @@ class InitialConcentrationSensitivityAnalysis(object):
             elif i in self.b_prime_in_b:
                 p_prime_matrix[i] = p_matrix[self.b_prime_in_b[i]]
         # Reshape
-        p_matrix = p_matrix.reshape(self.shape_of_matrix)
+        p_matrix = p_matrix.reshape(self._shape_of_matrix)
         # Project the mirrored image
         self.p_matrix = p_matrix + p_matrix.T
-        self.p_prime_matrix = p_prime_matrix.reshape(self.shape_of_matrix)
+        self.p_prime_matrix = p_prime_matrix.reshape(self._shape_of_matrix)
 
         # save output if desired
         if save_name is not None:
@@ -240,9 +274,9 @@ class InitialConcentrationSensitivityAnalysis(object):
                 if str(self._model.initial_conditions[i][0]) \
                         == str(self._model.species[j]):
                     x = self._model.initial_conditions[i][1].value
-                    self.initial_conditions[j] = x
+                    self._original_initial_conditions[j] = x
                     if self._model.initial_conditions[i][1].name \
-                            in self.proteins_of_interest:
+                            in self._proteins_of_interest:
                         index_of_init_condition[
                             self._model.initial_conditions[i][1].name] = j
         index_of_species_of_interest = collections.OrderedDict(
@@ -255,8 +289,8 @@ class InitialConcentrationSensitivityAnalysis(object):
         sampled_values_index = set()
         bij_unique = dict()
         sampling_matrix = np.zeros(
-            (self.size_of_matrix, len(self._model.species)))
-        sampling_matrix[:, :] = self.initial_conditions
+            (self._size_of_matrix, len(self._model.species)))
+        sampling_matrix[:, :] = self._original_initial_conditions
         matrix = self.b_matrix
         for j in range(len(matrix)):
             for i in matrix[j, :]:
@@ -271,8 +305,8 @@ class InitialConcentrationSensitivityAnalysis(object):
                 elif s_1 in bij_unique or s_2 in bij_unique:
                     continue
                 else:
-                    x = self.index_of_species_of_interest[index_i]
-                    y = self.index_of_species_of_interest[index_j]
+                    x = self._index_of_species_of_interest[index_i]
+                    y = self._index_of_species_of_interest[index_j]
                     sampling_matrix[counter, x] *= sigma_i
                     sampling_matrix[counter, y] *= sigma_j
                     bij_unique[s_1] = counter
@@ -287,20 +321,21 @@ class InitialConcentrationSensitivityAnalysis(object):
 
         Returns
         -------
-
+        numpy.ndarray
+            Matrix of initial conditions
         """
         # create matrix (cartesian product of sample vals vs index of species
         a_matrix = cartesian_product(self._values_to_sample,
-                                     self.index_of_species_of_interest)
+                                     self._index_of_species_of_interest)
         # reshape to flatten
-        a_matrix = a_matrix.T.reshape(self.n_sam * self.n_proteins)
+        a_matrix = a_matrix.T.reshape(self._n_sam * self._n_proteins)
         # creates matrix b
         self.b_matrix = cartesian_product(a_matrix, a_matrix)
 
         # create matrix a'
-        a_prime = cartesian_product(np.ones(self.n_sam),
-                                    self.index_of_species_of_interest)
-        a_prime = a_prime.T.reshape(self.n_sam * self.n_proteins)
+        a_prime = cartesian_product(np.ones(self._n_sam),
+                                    self._index_of_species_of_interest)
+        a_prime = a_prime.T.reshape(self._n_sam * self._n_proteins)
 
         # creates matrix b prime
         self.b_prime_matrix = cartesian_product(a_prime, a_matrix)
@@ -309,8 +344,8 @@ class InitialConcentrationSensitivityAnalysis(object):
 
         n_b_index = len(self.b_index)
 
-        b_prime = np.zeros((self.size_of_matrix, len(self._model.species)))
-        b_prime[:, :] = self.initial_conditions
+        b_prime = np.zeros((self._size_of_matrix, len(self._model.species)))
+        b_prime[:, :] = self._original_initial_conditions
         counter = -1
 
         bp_not_in_b_raw = set()
@@ -335,8 +370,8 @@ class InitialConcentrationSensitivityAnalysis(object):
                     bp_not_in_b_dict[counter] = bp_not_in_b_visited[s_1]
                 else:
                     new_sim_counter += 1
-                    x = self.index_of_species_of_interest[index_i]
-                    y = self.index_of_species_of_interest[index_j]
+                    x = self._index_of_species_of_interest[index_i]
+                    y = self._index_of_species_of_interest[index_j]
                     b_prime[new_sim_counter, x] *= sigma_i
                     b_prime[new_sim_counter, y] *= sigma_j
                     bp_not_in_b_visited[s_1] = new_sim_counter + n_b_index
@@ -354,6 +389,8 @@ class InitialConcentrationSensitivityAnalysis(object):
     def create_plot_p_h_pprime(self, save_name=None, out_dir=None, show=False):
         """
         Plot of P, H(B), and P'
+
+        See :class:`InitialsSensitivity` for descriptions of these matrices
 
         Parameters
         ----------
@@ -384,12 +421,10 @@ class InitialConcentrationSensitivityAnalysis(object):
         ax3.imshow(sens_matrix, interpolation='nearest', origin='upper',
                    cmap=plt.get_cmap(colors), vmin=v_min, vmax=v_max)
 
-        ax1.set_xticks([])
-        ax1.set_yticks([])
-        ax2.set_xticks([])
-        ax2.set_yticks([])
-        ax3.set_xticks([])
-        ax3.set_yticks([])
+        for ax in (ax1, ax2, ax3):
+            ax.set_xticks([])
+            ax.set_yticks([])
+
         ax1.set_title('P', fontsize=22)
         ax2.set_title('H(B\')', fontsize=22)
         ax3.set_title('P\' = P - H(B\')', fontsize=22)
@@ -421,38 +456,34 @@ class InitialConcentrationSensitivityAnalysis(object):
             show figure
         """
         colors = 'seismic'
-        sens_ij_nm = []
         sens_matrix = self.p_matrix - self.p_prime_matrix
         v_max = max(np.abs(self.p_matrix.min()), self.p_matrix.max())
         v_min = -1 * v_max
-        plt.figure(figsize=(self.n_proteins + 6, self.n_proteins + 6))
-        gs = gridspec.GridSpec(self.n_proteins, self.n_proteins)
+        plt.figure(figsize=(self._n_proteins + 6, self._n_proteins + 6))
+        gs = gridspec.GridSpec(self._n_proteins, self._n_proteins)
         # creates a plot of each species vs each species
         # adds space between plots so you can zoom in on output pairs
-        for n, j in enumerate(range(0, self._nm, self.n_sam)):
-            per_protein1 = []
-            for m, i in enumerate(range(0, self._nm, self.n_sam)):
+        for n, j in enumerate(range(0, self._nm, self._n_sam)):
+            for m, i in enumerate(range(0, self._nm, self._n_sam)):
                 ax2 = plt.subplot(gs[n, m])
                 if n == 0:
-                    ax2.set_xlabel(self.proteins_of_interest[m], fontsize=20)
+                    ax2.set_xlabel(self._proteins_of_interest[m], fontsize=20)
                     ax2.xaxis.set_label_position('top')
                 if m == 0:
-                    ax2.set_ylabel(self.proteins_of_interest[n], fontsize=20)
+                    ax2.set_ylabel(self._proteins_of_interest[n], fontsize=20)
                 plt.xticks([])
                 plt.yticks([])
                 if i != j:
-                    tmp = sens_matrix[j:j + self.n_sam,
-                                      i:i + self.n_sam].copy()
+                    tmp = sens_matrix[j:j + self._n_sam,
+                          i:i + self._n_sam].copy()
                     ax2.imshow(tmp, interpolation='nearest', origin='upper',
                                cmap=plt.get_cmap(colors), vmin=v_min,
                                vmax=v_max)
-                    per_protein1.append(tmp)
                 else:
-                    ax2.imshow(np.zeros((self.n_sam, self.n_sam)),
+                    ax2.imshow(np.zeros((self._n_sam, self._n_sam)),
                                interpolation='nearest', origin='upper',
                                cmap=plt.get_cmap(colors), vmin=v_min,
                                vmax=v_max)
-            sens_ij_nm.append(per_protein1)
         plt.tight_layout()
 
         if save_name is not None:
@@ -485,18 +516,7 @@ class InitialConcentrationSensitivityAnalysis(object):
         """
 
         colors = 'seismic'
-        sens_ij_nm = []
-        sens_matrix = self.p_matrix - self.p_prime_matrix
-
-        # separate each species sensitivity
-        for j in range(0, self._nm, self.n_sam):
-            per_protein1 = []
-            for i in range(0, self._nm, self.n_sam):
-                if i != j:
-                    tmp = sens_matrix[j:j + self.n_sam,
-                                      i:i + self.n_sam].copy()
-                    per_protein1.append(tmp)
-            sens_ij_nm.append(per_protein1)
+        sens_ij_nm = self.sensitivity_multiset
 
         # Create heatmap and boxplot of data
         plt.figure(figsize=(14, 10))
@@ -521,12 +541,12 @@ class InitialConcentrationSensitivityAnalysis(object):
                         cmap=plt.get_cmap(colors), vmin=v_min,
                         vmax=v_max, extent=[0, self._nm, 0, self._nm])
 
-        shape_label = np.arange(self.n_sam / 2, self._nm, self.n_sam)
-        plt.xticks(shape_label, self.proteins_of_interest, rotation='vertical',
+        shape_label = np.arange(self._n_sam / 2, self._nm, self._n_sam)
+        plt.xticks(shape_label, self._proteins_of_interest, rotation='vertical',
                    fontsize=12)
-        plt.yticks(shape_label, reversed(self.proteins_of_interest),
+        plt.yticks(shape_label, reversed(self._proteins_of_interest),
                    fontsize=12)
-        x_ticks = ([i for i in range(0, self._nm, self.n_sam)])
+        x_ticks = ([i for i in range(0, self._nm, self._n_sam)])
         ax1.set_xticks(x_ticks, minor=True)
         ax1.set_yticks(x_ticks, minor=True)
         plt.grid(True, which='minor', linestyle='--')
@@ -545,7 +565,7 @@ class InitialConcentrationSensitivityAnalysis(object):
         ax2.set_xlim(v_min - 2, v_max + 2)
         if x_axis_label is not None:
             ax2.set_xlabel(x_axis_label, fontsize=12)
-        plt.setp(ax2, yticklabels=reversed(self.proteins_of_interest))
+        plt.setp(ax2, yticklabels=reversed(self._proteins_of_interest))
         ax2.yaxis.tick_left()
         ax2.set_aspect(1. / ax2.get_data_ratio(), adjustable='box', )
         if save_name is not None:

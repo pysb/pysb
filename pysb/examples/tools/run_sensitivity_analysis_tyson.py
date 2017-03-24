@@ -1,7 +1,7 @@
 import numpy as np
 from pysb.simulator.scipyode import ScipyOdeSimulator
 from pysb.tools.sensitivity_analysis import \
-    InitialConcentrationSensitivityAnalysis
+    InitialsSensitivity
 from pysb.examples.tyson_oscillator import model
 
 
@@ -51,7 +51,7 @@ def run():
     solver = ScipyOdeSimulator(model, tspan)
 
     # initialize the sensitivity class
-    sens = InitialConcentrationSensitivityAnalysis(
+    sens = InitialsSensitivity(
         values_to_sample=vals,
         observable=observable,
         objective_function=obj_func_cell_cycle,
