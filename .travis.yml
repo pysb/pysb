@@ -22,6 +22,8 @@ before_install:
     nose h5py pexpect pandas
 - pip install -i https://pypi.binstar.org/pypi/simple pygraphviz==1.3rc1
 - pip install python-coveralls
+- mkdir -p ~/.config/matplotlib
+- echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
 - wget "http://www.csb.pitt.edu/Faculty/Faeder/?smd_process_download=1&download_id=142"
     -O BioNetGen-2.2.6-stable.tar.gz
 - tar xzf BioNetGen-2.2.6-stable.tar.gz
