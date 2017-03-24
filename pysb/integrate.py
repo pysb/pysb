@@ -41,9 +41,15 @@ class Solver(object):
     yobs : numpy.ndarray with record-style data-type
         Observable trajectories. Length is ``len(tspan)`` and record names
         follow ``model.observables`` names.
+    yobs_view : numpy.ndarray
+        An array view (sharing the same data buffer) on ``yobs``.
+        Dimensionality is ``(len(tspan), len(model.observables))``.
     yexpr : numpy.ndarray with record-style data-type
         Expression trajectories. Length is ``len(tspan)`` and record names
         follow ``model.expressions_dynamic()`` names.
+    yexpr_view : numpy.ndarray
+        An array view (sharing the same data buffer) on ``yexpr``.
+        Dimensionality is ``(len(tspan), len(model.expressions_dynamic()))``.
     integrator : scipy.integrate.ode
         Integrator object.
 
