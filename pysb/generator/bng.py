@@ -2,6 +2,8 @@ import inspect
 import warnings
 import pysb
 import sympy
+from sympy.printing import StrPrinter
+from sympy.logic.boolalg import BooleanTrue
 
 # Alias basestring under Python 3 for forwards compatibility
 try:
@@ -249,14 +251,31 @@ def warn_caller(message):
         module = inspect.getmodule(caller_frame)
     warnings.warn(message, stacklevel=stacklevel)
 
+
+class BngPrinter(StrPrinter):
+    def __init__(self, **settings):
+        super(BngPrinter, self).__init__(settings)
+
+    def _print_Piecewise(self, expr):
+        if type(expr.args[-1][1]) != BooleanTrue:
+            raise NotImplementedError('Piecewise statements are only '
+                                      'supported if convertible to BNG if '
+                                      'statements')
+
+        if_stmt = expr.args[-1][0]
+        for pos in range(len(expr.args) - 2, -1, -1):
+            if_stmt = 'if({},{},{})'.format(expr.args[pos][1],
+                                            expr.args[pos][0],
+                                            if_stmt)
+
+        return if_stmt
+
+    def _print_Pow(self, expr, rational=False):
+        return super(BngPrinter, self)._print_Pow(expr, rational)\
+            .replace('**', '^')
+
+
 def expression_to_muparser(expression):
     """Render the Expression as a muparser-compatible string."""
 
-    # sympy.printing.sstr is the preferred way to render an Expression as a
-    # string (rather than, e.g., str(Expression.expr) or repr(Expression.expr).
-    # Note: "For large expressions where speed is a concern, use the setting
-    # order='none'"
-    code = sympy.printing.sstr(expression.expr, order='none')
-    code = code.replace('\n     @', '')
-    code = code.replace('**', '^')
-    return code
+    return BngPrinter(order='none').doprint(expression.expr)
