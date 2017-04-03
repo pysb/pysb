@@ -117,7 +117,7 @@ class InitialsSensitivity(object):
                  observable):
         self._model = solver.model
         generate_equations(self._model)
-        self._proteins_of_interest_cache = None
+        self._species_of_interest_cache = None
         self._values_to_sample = values_to_sample
         self._solver = solver
         self.objective_function = objective_function
@@ -137,20 +137,21 @@ class InitialsSensitivity(object):
         self._objective_fn_standard = None
 
     @property
-    def _proteins_of_interest(self):
-        if self._proteins_of_interest_cache is None:
-            self._proteins_of_interest_cache = list(
+    def _species_of_interest(self):
+        if self._species_of_interest_cache is None:
+            self._species_of_interest_cache = list(
                 (i[1].name for i in self._model.initial_conditions))
             # remove source species
-            if '__source_0' in self._proteins_of_interest_cache:
-                self._proteins_of_interest_cache.remove('__source_0')
-            self._proteins_of_interest_cache = sorted(self._proteins_of_interest_cache)
+            if '__source_0' in self._species_of_interest_cache:
+                self._species_of_interest_cache.remove('__source_0')
+            self._species_of_interest_cache = \
+                sorted(self._species_of_interest_cache)
 
-        return self._proteins_of_interest_cache
+        return self._species_of_interest_cache
 
     @property
-    def _n_proteins(self):
-        return len(self._proteins_of_interest)
+    def _n_species(self):
+        return len(self._species_of_interest)
 
     @property
     def _n_sam(self):
@@ -158,7 +159,7 @@ class InitialsSensitivity(object):
 
     @property
     def _nm(self):
-        return self._n_proteins * self._n_sam
+        return self._n_species * self._n_sam
 
     @property
     def _size_of_matrix(self):
@@ -183,13 +184,13 @@ class InitialsSensitivity(object):
 
         # separate each species sensitivity
         for j in range(0, self._nm, self._n_sam):
-            per_protein1 = []
+            per_species1 = []
             for i in range(0, self._nm, self._n_sam):
                 if i != j:
                     tmp = sens_matrix[j:j + self._n_sam,
                           i:i + self._n_sam].copy()
-                    per_protein1.append(tmp)
-            sens_ij_nm.append(per_protein1)
+                    per_species1.append(tmp)
+            sens_ij_nm.append(per_species1)
         return sens_ij_nm
 
     def _calculate_objective(self, function_value):
@@ -276,7 +277,7 @@ class InitialsSensitivity(object):
                     x = self._model.initial_conditions[i][1].value
                     self._original_initial_conditions[j] = x
                     if self._model.initial_conditions[i][1].name \
-                            in self._proteins_of_interest:
+                            in self._species_of_interest:
                         index_of_init_condition[
                             self._model.initial_conditions[i][1].name] = j
         index_of_species_of_interest = collections.OrderedDict(
@@ -328,14 +329,14 @@ class InitialsSensitivity(object):
         a_matrix = cartesian_product(self._values_to_sample,
                                      self._index_of_species_of_interest)
         # reshape to flatten
-        a_matrix = a_matrix.T.reshape(self._n_sam * self._n_proteins)
+        a_matrix = a_matrix.T.reshape(self._n_sam * self._n_species)
         # creates matrix b
         self.b_matrix = cartesian_product(a_matrix, a_matrix)
 
         # create matrix a'
         a_prime = cartesian_product(np.ones(self._n_sam),
                                     self._index_of_species_of_interest)
-        a_prime = a_prime.T.reshape(self._n_sam * self._n_proteins)
+        a_prime = a_prime.T.reshape(self._n_sam * self._n_species)
 
         # creates matrix b prime
         self.b_prime_matrix = cartesian_product(a_prime, a_matrix)
@@ -459,18 +460,18 @@ class InitialsSensitivity(object):
         sens_matrix = self.p_matrix - self.p_prime_matrix
         v_max = max(np.abs(self.p_matrix.min()), self.p_matrix.max())
         v_min = -1 * v_max
-        plt.figure(figsize=(self._n_proteins + 6, self._n_proteins + 6))
-        gs = gridspec.GridSpec(self._n_proteins, self._n_proteins)
+        plt.figure(figsize=(self._n_species + 6, self._n_species + 6))
+        gs = gridspec.GridSpec(self._n_species, self._n_species)
         # creates a plot of each species vs each species
         # adds space between plots so you can zoom in on output pairs
         for n, j in enumerate(range(0, self._nm, self._n_sam)):
             for m, i in enumerate(range(0, self._nm, self._n_sam)):
                 ax2 = plt.subplot(gs[n, m])
                 if n == 0:
-                    ax2.set_xlabel(self._proteins_of_interest[m], fontsize=20)
+                    ax2.set_xlabel(self._species_of_interest[m], fontsize=20)
                     ax2.xaxis.set_label_position('top')
                 if m == 0:
-                    ax2.set_ylabel(self._proteins_of_interest[n], fontsize=20)
+                    ax2.set_ylabel(self._species_of_interest[n], fontsize=20)
                 plt.xticks([])
                 plt.yticks([])
                 if i != j:
@@ -542,9 +543,9 @@ class InitialsSensitivity(object):
                         vmax=v_max, extent=[0, self._nm, 0, self._nm])
 
         shape_label = np.arange(self._n_sam / 2, self._nm, self._n_sam)
-        plt.xticks(shape_label, self._proteins_of_interest, rotation='vertical',
+        plt.xticks(shape_label, self._species_of_interest, rotation='vertical',
                    fontsize=12)
-        plt.yticks(shape_label, reversed(self._proteins_of_interest),
+        plt.yticks(shape_label, reversed(self._species_of_interest),
                    fontsize=12)
         x_ticks = ([i for i in range(0, self._nm, self._n_sam)])
         ax1.set_xticks(x_ticks, minor=True)
@@ -565,7 +566,7 @@ class InitialsSensitivity(object):
         ax2.set_xlim(v_min - 2, v_max + 2)
         if x_axis_label is not None:
             ax2.set_xlabel(x_axis_label, fontsize=12)
-        plt.setp(ax2, yticklabels=reversed(self._proteins_of_interest))
+        plt.setp(ax2, yticklabels=reversed(self._species_of_interest))
         ax2.yaxis.tick_left()
         ax2.set_aspect(1. / ax2.get_data_ratio(), adjustable='box', )
         if save_name is not None:
