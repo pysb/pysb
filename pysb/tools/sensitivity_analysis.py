@@ -6,6 +6,7 @@ from matplotlib import gridspec
 import numpy as np
 from pysb.bng import generate_equations
 import pysb.simulator.base
+from pysb.logging import get_logger
 
 
 class InitialsSensitivity(object):
@@ -83,7 +84,6 @@ class InitialsSensitivity(object):
             objective_function=obj_func_cell_cycle,\
             solver=solver\
         )
-    Number of simulations to run = 8
     >>> print(sens.b_matrix)
     [[((0.8, 'cdc0'), (0.8, 'cdc0')) ((0.8, 'cdc0'), (1.2, 'cdc0'))
       ((0.8, 'cdc0'), (0.8, 'cyc0')) ((0.8, 'cdc0'), (1.2, 'cyc0'))]
@@ -117,6 +117,9 @@ class InitialsSensitivity(object):
     def __init__(self, solver, values_to_sample, objective_function,
                  observable):
         self._model = solver.model
+        self._logger = get_logger(__name__, model=self._model)
+        self._logger.info('%s created for observable %s' % (
+            self.__class__.__name__, observable))
         generate_equations(self._model)
         self._species_of_interest_cache = None
         self._values_to_sample = values_to_sample
@@ -262,8 +265,8 @@ class InitialsSensitivity(object):
             p_name = os.path.join(out_dir, '{}_p_matrix.csv'.format(save_name))
             p_prime_name = os.path.join(
                 out_dir, '{}_p_prime_matrix.csv'.format(save_name))
-            print("Saving p matrix and p' matrix to {} and {}".format(
-                p_name, p_prime_name))
+            self._logger.debug("Saving p matrix and p' matrix to {} and {}".
+                               format(p_name, p_prime_name))
 
             np.savetxt(p_name, self.p_matrix)
             np.savetxt(p_prime_name, self.p_prime_matrix)
@@ -385,7 +388,8 @@ class InitialsSensitivity(object):
         x = b_to_run[list(self.b_index)]
         y = b_prime[list(bp_not_in_b_raw)]
         simulations = np.vstack((x, y))
-        print("Number of simulations to run = %s" % len(simulations))
+        self._logger.debug("Number of simulations to run = %s" % len(
+                           simulations))
         return simulations
 
     def create_plot_p_h_pprime(self, save_name=None, out_dir=None, show=False):
