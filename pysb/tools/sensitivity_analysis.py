@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
 from pysb.bng import generate_equations
+import pysb.simulator.base
 
 
 class InitialsSensitivity(object):
@@ -119,6 +120,9 @@ class InitialsSensitivity(object):
         generate_equations(self._model)
         self._species_of_interest_cache = None
         self._values_to_sample = values_to_sample
+        if solver is None or not isinstance(solver,
+                                            pysb.simulator.base.Simulator):
+            raise(TypeError, "solver must be a pysb.simulator object")
         self._solver = solver
         self.objective_function = objective_function
         self.observable = observable
@@ -220,9 +224,6 @@ class InitialsSensitivity(object):
         if out_dir is not None:
             if not os.path.exists(out_dir):
                 os.mkdir(out_dir)
-        if self._solver is None:
-            raise(TypeError, "Must provide a pysb.simulator to run "
-                             "function or when initializing the class")
         self._solver.initials = None
         self._solver.param_values = None
         sim_results = self._solver.run(param_values=None, initials=None)
@@ -600,5 +601,5 @@ def cartesian_product(array_1, array_2):
         array of shape (len(array_1) x len(array_2))
     """
     a = list(product(array_1, array_2))
-    a = np.asarray(a, dtype=','.join('object' for _ in range(len(a[0]))))
+    a = np.asarray(a, dtype=','.join(['object'] * len(a[0])))
     return a.reshape(len(array_1), len(array_2))
