@@ -274,16 +274,12 @@ class InitialsSensitivity(object):
     def _create_index_of_species(self):
         """ create dictionary of initial conditions by index """
         index_of_init_condition = {}
-        for i in range(len(self._model.initial_conditions)):
-            for j in range(len(self._model.species)):
-                if str(self._model.initial_conditions[i][0]) \
-                        == str(self._model.species[j]):
-                    x = self._model.initial_conditions[i][1].value
-                    self._original_initial_conditions[j] = x
-                    if self._model.initial_conditions[i][1].name \
-                            in self._species_of_interest:
-                        index_of_init_condition[
-                            self._model.initial_conditions[i][1].name] = j
+        for ic_sp, ic_param in self._model.initial_conditions:
+            for sp_idx, sp in enumerate(self._model.species):
+                if ic_sp.is_equivalent_to(sp):
+                    self._original_initial_conditions[sp_idx] = ic_param.value
+                    if ic_param.name in self._species_of_interest:
+                        index_of_init_condition[ic_param.name] = sp_idx
         index_of_species_of_interest = collections.OrderedDict(
             sorted(index_of_init_condition.items()))
         return index_of_species_of_interest
