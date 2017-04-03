@@ -111,7 +111,8 @@ class InitialsSensitivity(object):
       [ 0.      0.      0.      0.    ]
       [ 5.0243  5.0243  0.      0.    ]
       [-4.5381 -4.5381  0.      0.    ]]
-    >>> sens.create_boxplot_and_heatplot()
+    >>> sens.create_boxplot_and_heatplot() #doctest: +ELLIPSIS
+    <matplotlib.figure.Figure object ...>
     """
 
     def __init__(self, solver, values_to_sample, objective_function,
@@ -402,6 +403,11 @@ class InitialsSensitivity(object):
             location to save figure
         show : bool
             show the plot if True
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The matplotlib figure object for further adjustments, if required
         """
         colors = 'seismic'
         sens_matrix = self.p_matrix - self.p_prime_matrix
@@ -443,6 +449,8 @@ class InitialsSensitivity(object):
             plt.show()
         plt.close()
 
+        return fig
+
     def create_individual_pairwise_plots(self, save_name=None, out_dir=None,
                                          show=False):
         """
@@ -456,12 +464,17 @@ class InitialsSensitivity(object):
             output directory
         show : bool
             show figure
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The matplotlib figure object for further adjustments, if required
         """
         colors = 'seismic'
         sens_matrix = self.p_matrix - self.p_prime_matrix
         v_max = max(np.abs(self.p_matrix.min()), self.p_matrix.max())
         v_min = -1 * v_max
-        plt.figure(figsize=(self._n_species + 6, self._n_species + 6))
+        fig = plt.figure(figsize=(self._n_species + 6, self._n_species + 6))
         gs = gridspec.GridSpec(self._n_species, self._n_species)
         # creates a plot of each species vs each species
         # adds space between plots so you can zoom in on output pairs
@@ -500,6 +513,8 @@ class InitialsSensitivity(object):
             plt.show()
         plt.close()
 
+        return fig
+
     def create_boxplot_and_heatplot(self, x_axis_label=None, save_name=None,
                                     out_dir=None, show=False):
         """
@@ -515,13 +530,18 @@ class InitialsSensitivity(object):
             output directory to save figures
         show : bool
             Show plot if True
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The matplotlib figure object for further adjustments, if required
         """
 
         colors = 'seismic'
         sens_ij_nm = self.sensitivity_multiset
 
         # Create heatmap and boxplot of data
-        plt.figure(figsize=(14, 10))
+        fig = plt.figure(figsize=(14, 10))
         plt.subplots_adjust(hspace=0.1)
 
         # use gridspec to scale colorbar nicely
@@ -584,6 +604,8 @@ class InitialsSensitivity(object):
         if show:
             plt.show()
         plt.close()
+
+        return fig
 
 
 def cartesian_product(array_1, array_2):
