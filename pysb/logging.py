@@ -96,7 +96,6 @@ def setup_logger(level=logging.WARNING, console_output=True, file_output=False,
                     ", ".join(NAMED_LOG_LEVELS.keys())
                                  ))
 
-
     log.setLevel(level)
 
     # Remove default logging handler
@@ -132,7 +131,8 @@ def setup_logger(level=logging.WARNING, console_output=True, file_output=False,
     return log
 
 
-def get_logger(logger_name=BASE_LOGGER_NAME, model=None, **kwargs):
+def get_logger(logger_name=BASE_LOGGER_NAME, model=None, log_level=None,
+               **kwargs):
     """
     Returns (if extant) or creates a PySB logger
 
@@ -149,6 +149,10 @@ def get_logger(logger_name=BASE_LOGGER_NAME, model=None, **kwargs):
         If this logger is related to a specific model instance, pass the
         model object as an argument to have the model's name prepended to
         log entries
+    log_level : bool or int
+        Override the default or preset log level for the requested logger.
+        None or False uses the default or preset value. True evaluates to
+        logging.DEBUG. Any integer is used directly.
     **kwargs : kwargs
         Keyword arguments to supply to :func:`setup_logger`. Only used when
         the PySB logger hasn't been set up yet (i.e. there have been no
@@ -172,6 +176,18 @@ def get_logger(logger_name=BASE_LOGGER_NAME, model=None, **kwargs):
                       'arguments to setup_logger')
 
     logger = logging.getLogger(logger_name)
+
+    if log_level is not None and log_level is not False:
+        if isinstance(log_level, bool):
+            log_level = logging.DEBUG
+        elif not isinstance(log_level, int):
+            raise ValueError('log_level must be a boolean, integer or None')
+
+        if logger.getEffectiveLevel() != log_level:
+            logger.debug('Changing log_level from %d to %d' % (
+                logger.getEffectiveLevel(), log_level))
+            logger.setLevel(log_level)
+
     if model is None:
         return logger
     else:
