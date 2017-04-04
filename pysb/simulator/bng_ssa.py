@@ -15,9 +15,6 @@ class BngSimulator(Simulator):
                                            verbose=verbose)
         self.cleanup = cleanup
         self._outdir = None
-        generate_equations(self._model,
-                           cleanup=self.cleanup,
-                           verbose=self.verbose)
 
     def run(self, tspan=None, initials=None, param_values=None, n_sim=1,
             method='ssa', output_dir=None, output_file_basename=None,
@@ -65,19 +62,23 @@ class BngSimulator(Simulator):
                                       )
 
         if method not in ['ssa', 'nf', 'pla', 'ode']:
-            print("Method must be one of ['ssa', 'nf', 'pla', 'ode']")
-            quit()
+            raise ValueError("Method must be one of ['ssa', 'nf', 'pla', "
+                             "'ode']")
         additional_args['method'] = method
         additional_args['t_end'] = np.max(self.tspan)
         additional_args['n_steps'] = len(self.tspan)
         additional_args['verbose'] = verbose
         params_names = [g.name for g in self._model.parameters]
 
+        self._logger.info('Running %d BNG %s simulations' % (n_sim, method))
+
         with BngFileInterface(self._model, verbose=verbose,
                               output_dir=output_dir,
                               output_prefix=output_file_basename,
                               cleanup=cleanup) as bngfile:
-            bngfile.action('generate_network', overwrite=True, verbose=verbose)
+            if method != 'nf':
+                bngfile.action('generate_network', overwrite=True,
+                               verbose=verbose)
             bngfile.action('saveConcentrations')
             if output_file_basename is None:
                 prefix = 'pysb'
@@ -88,11 +89,10 @@ class BngSimulator(Simulator):
                 tmp = additional_args.copy()
                 tmp['prefix'] = prefix + str(i)
                 for n, p_val in enumerate(self.param_values[i]):
-                    bngfile.set_parameter('setParameter', params_names[n],
+                    bngfile.set_parameter(params_names[n],
                                           self.param_values[i][n])
                 for n, p_val in enumerate(self.initials[i]):
-                    bngfile.set_concentration('setConcentration',
-                                              self._model.species[n],
+                    bngfile.set_concentration(self._model.species[n],
                                               self.initials[i][n])
                 bngfile.action('simulate', **tmp)
             bngfile.execute()
