@@ -4,6 +4,7 @@ from pysb import Monomer, Parameter, Initial, Observable, Rule
 from pysb.simulator.bng_ssa import BngSimulator
 from pysb.bng import generate_equations
 
+
 class TestBngSimulator(object):
     @with_model
     def setUp(self):
@@ -39,7 +40,7 @@ class TestBngSimulator(object):
         self.time = np.linspace(0, 1)
         self.sim = BngSimulator(self.model, tspan=self.time)
 
-    def test_1_simulations(self):
+    def test_1_simulation(self):
         x = self.sim.run()
         assert x.all.shape == (51,)
 
@@ -48,13 +49,13 @@ class TestBngSimulator(object):
         assert np.shape(x.observables) == (10, 51)
 
     def test_change_parameters(self):
-        x = self.sim.run(n_sim=10, param_values={'ksynthA':200},
+        x = self.sim.run(n_sim=10, param_values={'ksynthA': 200},
                          initials={self.model.species[0]: 100})
         species = np.array(x.all)
         assert species[0][0][0] == 100.
 
     def test_nfsim(self):
-        x = self.sim.run(n_sim=2, simulation='nf')
+        x = self.sim.run(n_sim=2, method='nf')
         observables = np.array(x.observables)
         assert np.shape(observables) == (2, 51)
 
