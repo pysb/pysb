@@ -442,34 +442,30 @@ class BngFileInterface(BngBaseInterface):
 
         return
 
-    def set_parameter(self, action, name, value):
+    def set_parameter(self, name, value):
         """
         Generates a BNG action command and adds it to the command queue
 
         Parameters
         ----------
-        action : string
-            The name of the BNG action function (setParameter, setConcentration)
         name: string
-            The name of the parameter or initial concentration to set
+            The name of the parameter to set
         value: float_like
-            Value of parameter or initial concentration
+            Value of parameter
 
         """
         # Add the command to the queue
 
-        self.command_queue.write('\t%s("%s", %f)\n' % (action, name, value))
+        self.command_queue.write('\tsetParameter("%s", %f)\n' % (name, value))
 
         return
 
-    def set_concentration(self, action, name, value):
+    def set_concentration(self, name, value):
         """
         Generates a BNG action command and adds it to the command queue
 
         Parameters
         ----------
-        action : string
-            The name of the BNG action function (setParameter, setConcentration)
         name: string
             The name of the parameter or initial concentration to set
         value: float_like
@@ -479,7 +475,8 @@ class BngFileInterface(BngBaseInterface):
         # Add the command to the queue
         formatted_name = format_complexpattern(name)
 
-        self.command_queue.write('\t%s("%s", %f)\n' % (action, formatted_name, value))
+        self.command_queue.write('\tsetConcentration("%s", %f)\n' % (
+            formatted_name, value))
 
         return
 
