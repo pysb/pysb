@@ -5,6 +5,17 @@ import subprocess
 import os
 import tempfile
 import shutil
+import re
+try:
+    # Python 3
+    from urllib.request import urlretrieve
+except ImportError:
+    # Python 2
+    from urllib import urlretrieve
+from pysb.logging import get_logger, EXTENDED_DEBUG
+
+BIOMODELS_REGEX = re.compile(r'BIOMD[0-9]{10}')
+BIOMODELS_URL = 'http://www.ebi.ac.uk/biomodels-main/download?mid={}'
 
 
 class SbmlTranslationError(Exception):
@@ -58,14 +69,18 @@ def sbml_translator(input_file,
         Use pathway commons to infer molecule binding. This
         setting requires an internet connection and will query the pathway
         commons web service.
-    verbose : bool, optional
-        Print the SBML conversion output to the console if True
+    verbose : bool or int, optional (default: False)
+        Sets the verbosity level of the logger. See the logging levels and
+        constants from Python's logging module for interpretation of integer
+        values. False leaves the logging verbosity unchanged, True is equal
+        to DEBUG.
 
     Returns
     -------
     string
         BNGL output filename
     """
+    logger = get_logger(__name__, log_level=verbose)
     sbmltrans_bin = os.path.join(os.path.dirname(pf.get_path('bng')),
                                  'bin/sbmlTranslator')
     sbmltrans_args = [sbmltrans_bin, '-i', input_file]
@@ -91,18 +106,17 @@ def sbml_translator(input_file,
     if pathway_commons:
         sbmltrans_args.append('-p')
 
-    if verbose:
-        print("sbmlTranslator command:")
-        print(" ".join(sbmltrans_args))
+    logger.debug("sbmlTranslator command: " + " ".join(sbmltrans_args))
 
     p = subprocess.Popen(sbmltrans_args,
                          cwd=os.getcwd(),
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
 
-    if verbose:
-        for line in iter(p.stdout.readline, b''):
-            print(line, end="")
+    if logger.getEffectiveLevel() <= EXTENDED_DEBUG:
+        output = "\n".join([line for line in iter(p.stdout.readline, b'')])
+        if output:
+            logger.log(EXTENDED_DEBUG, "sbmlTranslator output:\n\n" + output)
     (p_out, p_err) = p.communicate()
     if p.returncode:
         raise SbmlTranslationError(p_out.decode('utf-8') + "\n" +
@@ -145,15 +159,76 @@ def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
     **kwargs: kwargs
         Keyword arguments to pass on to :func:`sbml_translator`
     """
+    logger = get_logger(__name__, log_level=kwargs.get('verbose'))
     tmpdir = tempfile.mkdtemp()
-    verbose = kwargs.get('verbose', False)
-    if verbose:
-        print("Performing SBML to BNGL translation in temporary "
-              "directory %s" % tmpdir)
+    logger.debug("Performing SBML to BNGL translation in temporary "
+                 "directory %s" % tmpdir)
     try:
         bngl_file = os.path.join(tmpdir, 'model.bngl')
         sbml_translator(filename, bngl_file, **kwargs)
-        return model_from_bngl(bngl_file, force=force)
+        return model_from_bngl(bngl_file, force=force, cleanup=cleanup)
     finally:
         if cleanup:
             shutil.rmtree(tmpdir)
+
+
+def model_from_biomodels(accession_no, force=False, cleanup=True, **kwargs):
+    """
+    Create a PySB Model based on a BioModels SBML model
+
+    Downloads file from BioModels (https://www.ebi.ac.uk/biomodels-main/)
+    and runs it through :func:`model_from_sbml`. See that function for
+    further details on additional arguments and implementation details.
+    Utilizes BioNetGen's SBMLTranslator.
+
+    Notes
+    -----
+
+    Read the `sbmlTranslator documentation
+    <http://bionetgen.org/index.php/SBML2BNGL>`_ for further information on
+    sbmlTranslator's limitations.
+
+    Parameters
+    ----------
+    accession_no : str
+        A BioModels accession number - the string 'BIOMD' followed by 10
+        digits, e.g. 'BIOMD0000000001'. For brevity, just the last digits will
+        be accepted as a string, e.g. '1' is equivalent the accession number
+        in the previous sentence.
+    force : bool, optional
+        The default, False, will raise an Exception if there are any errors
+        importing the model to PySB, e.g. due to unsupported features.
+        Setting to True will attempt to ignore any import errors, which may
+        lead to a model that only poorly represents the original. Use at own
+        risk!
+    cleanup : bool
+        Delete temporary directory on completion if True. Set to False for
+        debugging purposes.
+    **kwargs: kwargs
+        Keyword arguments to pass on to :func:`sbml_translator`
+
+    Examples
+    --------
+
+    >>> from pysb.importers.sbml import model_from_biomodels
+    >>> model = model_from_biomodels('1')
+    >>> print(model) #doctest: +ELLIPSIS
+    <Model 'pysb' (monomers: 12, rules: 17, parameters: 37, expressions: 0, ...
+    """
+    logger = get_logger(__name__, log_level=kwargs.get('verbose'))
+    if not BIOMODELS_REGEX.match(accession_no):
+        try:
+            accession_no = 'BIOMD{:010d}'.format(int(accession_no))
+        except ValueError:
+            raise ValueError('accession_no must be an integer or a BioModels '
+                             'accession number (BIOMDxxxxxxxxxx)')
+    logger.info('Importing model {} to PySB'.format(accession_no))
+    filename, headers = urlretrieve(BIOMODELS_URL.format(accession_no))
+    try:
+        return model_from_sbml(filename, force=force, cleanup=cleanup,
+                               **kwargs)
+    finally:
+        try:
+            os.remove(filename)
+        except OSError:
+            pass
