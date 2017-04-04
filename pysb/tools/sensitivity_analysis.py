@@ -122,7 +122,7 @@ class InitialsSensitivity(object):
         self._logger.info('%s created for observable %s' % (
             self.__class__.__name__, observable))
         generate_equations(self._model)
-        self._species_of_interest_cache = None
+        self._ic_params_of_interest_cache = None
         self._values_to_sample = values_to_sample
         if solver is None or not isinstance(solver,
                                             pysb.simulator.base.Simulator):
@@ -145,21 +145,21 @@ class InitialsSensitivity(object):
         self._objective_fn_standard = None
 
     @property
-    def _species_of_interest(self):
-        if self._species_of_interest_cache is None:
-            self._species_of_interest_cache = list(
+    def _ic_params_of_interest(self):
+        if self._ic_params_of_interest_cache is None:
+            self._ic_params_of_interest_cache = list(
                 (i[1].name for i in self._model.initial_conditions))
             # remove source species
-            if '__source_0' in self._species_of_interest_cache:
-                self._species_of_interest_cache.remove('__source_0')
-            self._species_of_interest_cache = \
-                sorted(self._species_of_interest_cache)
+            if '__source_0' in self._ic_params_of_interest_cache:
+                self._ic_params_of_interest_cache.remove('__source_0')
+            self._ic_params_of_interest_cache = \
+                sorted(self._ic_params_of_interest_cache)
 
-        return self._species_of_interest_cache
+        return self._ic_params_of_interest_cache
 
     @property
     def _n_species(self):
-        return len(self._species_of_interest)
+        return len(self._ic_params_of_interest)
 
     @property
     def _n_sam(self):
@@ -279,7 +279,7 @@ class InitialsSensitivity(object):
             for sp_idx, sp in enumerate(self._model.species):
                 if ic_sp.is_equivalent_to(sp):
                     self._original_initial_conditions[sp_idx] = ic_param.value
-                    if ic_param.name in self._species_of_interest:
+                    if ic_param.name in self._ic_params_of_interest:
                         index_of_init_condition[ic_param.name] = sp_idx
         index_of_species_of_interest = collections.OrderedDict(
             sorted(index_of_init_condition.items()))
@@ -482,10 +482,10 @@ class InitialsSensitivity(object):
             for m, i in enumerate(range(0, self._nm, self._n_sam)):
                 ax2 = plt.subplot(gs[n, m])
                 if n == 0:
-                    ax2.set_xlabel(self._species_of_interest[m], fontsize=20)
+                    ax2.set_xlabel(self._ic_params_of_interest[m], fontsize=20)
                     ax2.xaxis.set_label_position('top')
                 if m == 0:
-                    ax2.set_ylabel(self._species_of_interest[n], fontsize=20)
+                    ax2.set_ylabel(self._ic_params_of_interest[n], fontsize=20)
                 plt.xticks([])
                 plt.yticks([])
                 if i != j:
@@ -564,9 +564,9 @@ class InitialsSensitivity(object):
                         vmax=v_max, extent=[0, self._nm, 0, self._nm])
 
         shape_label = np.arange(self._n_sam / 2, self._nm, self._n_sam)
-        plt.xticks(shape_label, self._species_of_interest, rotation='vertical',
-                   fontsize=12)
-        plt.yticks(shape_label, reversed(self._species_of_interest),
+        plt.xticks(shape_label, self._ic_params_of_interest,
+                   rotation='vertical', fontsize=12)
+        plt.yticks(shape_label, reversed(self._ic_params_of_interest),
                    fontsize=12)
         x_ticks = ([i for i in range(0, self._nm, self._n_sam)])
         ax1.set_xticks(x_ticks, minor=True)
@@ -587,9 +587,9 @@ class InitialsSensitivity(object):
         ax2.set_xlim(v_min - 2, v_max + 2)
         if x_axis_label is not None:
             ax2.set_xlabel(x_axis_label, fontsize=12)
-        plt.setp(ax2, yticklabels=reversed(self._species_of_interest))
+        plt.setp(ax2, yticklabels=reversed(self._ic_params_of_interest))
         ax2.yaxis.tick_left()
-        ax2.set_aspect(1. / ax2.get_data_ratio(), adjustable='box', )
+        ax2.set_aspect(1. / ax2.get_data_ratio(), adjustable='box')
         if save_name is not None:
             if out_dir is None:
                 out_dir = '.'
