@@ -6,7 +6,7 @@ import collections
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
                       Component
-from pysb.logging import get_logger
+from pysb.logging import get_logger, EXTENDED_DEBUG
 import logging
 
 try:
@@ -534,20 +534,24 @@ class SimulationResult(object):
         param_values = simulator.param_values
 
         # loop over simulations
+        sym_names = obs_names + [p.name for p in self._model.parameters]
+        expanded_exprs = [sympy.lambdify(sym_names, expr.expand_expr(),
+                                         "numpy") for expr in exprs]
         for n in range(self.nsims):
+            simulator._logger.log(EXTENDED_DEBUG, 'Evaluating exprs/obs %d/%d'
+                                  % (n + 1, self.nsims))
+
             # observables
             for i, obs in enumerate(model_obs):
                 self._yobs_view[n][:, i] = (
                     self._y[n][:, obs.species] * obs.coefficients).sum(axis=1)
 
             # expressions
-            obs_dict = dict((k, self._yobs[n][k]) for k in obs_names)
-            subs = dict((p, param_values[n][i]) for i, p in
-                        enumerate(self._model.parameters))
+            sym_dict = dict((k, self._yobs[n][k]) for k in obs_names)
+            sym_dict.update(dict((p.name, param_values[n][i]) for i, p in
+                            enumerate(self._model.parameters)))
             for i, expr in enumerate(exprs):
-                expr_subs = expr.expand_expr().subs(subs)
-                func = sympy.lambdify(obs_names, expr_subs, "numpy")
-                self._yexpr_view[n][:, i] = func(**obs_dict)
+                self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)
 
         simulator._logger.debug('SimulationResult constructor finished')
 
