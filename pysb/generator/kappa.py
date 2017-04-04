@@ -3,6 +3,12 @@ import sympy
 from re import sub
 import warnings
 
+# Alias basestring under Python 3 for forwards compatibility
+try:
+    basestring
+except NameError:
+    basestring = str
+
 class KappaGenerator(object):
 
     # Dialect can be either 'complx' or 'kasim' (default)
@@ -176,17 +182,17 @@ def format_site_condition(site, state):
     if state == None:
         state_code = ''
     # If there is a bond number
-    elif type(state) == int:
+    elif isinstance(state, int):
         state_code = '!' + str(state)
     # If there is a lists of bonds to the site (not supported by Kappa)
-    elif type(state) == list:
+    elif isinstance(state, list):
         raise KappaException("Kappa generator does not support multiple bonds "
                               "to a single site.")
     # Site with state
-    elif type(state) == str:
+    elif isinstance(state, basestring):
         state_code = '~' + state
     # Site with state and a bond
-    elif type(state) == tuple:
+    elif isinstance(state, tuple):
         # If the bond is ANY
         if state[1] == pysb.ANY:
             state_code = '~%s!_' % state[0]

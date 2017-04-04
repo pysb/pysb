@@ -12,6 +12,8 @@ from pkg_resources import parse_version
 import abc
 from warnings import warn
 import shutil
+import collections
+import pysb.pathfinder as pf
 
 try:
     from cStringIO import StringIO
@@ -22,73 +24,19 @@ try:
 except ImportError:
     pass
 
-# Cached value of BNG path
-_bng_path = None
+# Alias basestring under Python 3 for forwards compatibility
+try:
+    basestring
+except NameError:
+    basestring = str
+
 
 def set_bng_path(dir):
-    global _bng_path
-    _bng_path = os.path.join(dir,'BNG2.pl')
-    # Make sure file exists and that it is not a directory
-    if not os.access(_bng_path, os.F_OK) or not os.path.isfile(_bng_path):
-        raise Exception('Could not find BNG2.pl in ' + os.path.abspath(dir) + '.')
-    # Make sure file has executable permissions
-    elif not os.access(_bng_path, os.X_OK):
-        raise Exception("BNG2.pl in " + os.path.abspath(dir) + " does not have executable permissions.")
-
-def _get_bng_path():
-    """
-    Return the path to BioNetGen's BNG2.pl.
-
-    Looks for a BNG distribution at the path stored in the BNGPATH environment
-    variable if that's set, or else in a few hard-coded standard locations.
-
-    """
-
-    global _bng_path
-
-    # Just return cached value if it's available
-    if _bng_path:
-        return _bng_path
-
-    path_var = 'BNGPATH'
-    dist_dirs = [
-        '/usr/local/share/BioNetGen',
-        'c:/Program Files/BioNetGen',
-        ]
-    # BNG 2.1.8 moved BNG2.pl up out of the Perl2 subdirectory, so to be more
-    # compatible we check both the old and new locations.
-    script_subdirs = ['', 'Perl2']
-
-    def check_dist_dir(dist_dir):
-        # Return the full path to BNG2.pl inside a BioNetGen distribution
-        # directory, or False if directory does not contain a BNG2.pl in one of
-        # the expected places.
-        for subdir in script_subdirs:
-            script_path = os.path.join(dist_dir, subdir, 'BNG2.pl')
-            if os.access(script_path, os.F_OK):
-                return script_path
-        else:
-            return False
-
-    # First check the environment variable, which has the highest precedence
-    if path_var in os.environ:
-        script_path = check_dist_dir(os.environ[path_var])
-        if not script_path:
-            raise Exception('Environment variable %s is set but BNG2.pl could'
-                            ' not be found there' % path_var)
-    # If the environment variable isn't set, check the standard locations
-    else:
-        for dist_dir in dist_dirs:
-            script_path = check_dist_dir(dist_dir)
-            if script_path:
-                break
-        else:
-            raise Exception('Could not find BioNetGen installed in one of the '
-                            'following locations:' +
-                            ''.join('\n    ' + d for d in dist_dirs))
-    # Cache path for future use
-    _bng_path = script_path
-    return script_path
+    """ Deprecated. Use pysb.pathfinder.set_path() instead. """
+    warn("Function %s() is deprecated; use pysb.pathfinder.set_path() "
+         "instead" % set_bng_path.__name__, category=DeprecationWarning,
+         stacklevel=2)
+    pf.set_path('bng', dir)
 
 
 class BngInterfaceError(RuntimeError):
@@ -101,14 +49,20 @@ class BngBaseInterface(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def __init__(self, model, verbose=False, cleanup=False,
+    def __init__(self, model=None, verbose=False, cleanup=False,
                  output_prefix=None, output_dir=None):
+        self._base_file_stem = 'pysb'
         self.verbose = verbose
         self.cleanup = cleanup
         self.output_prefix = 'tmpBNG' if output_prefix is None else \
             output_prefix
-        self.generator = BngGenerator(model)
-        self._check_model()
+        if model:
+            self.generator = BngGenerator(model)
+            self.model = self.generator.model
+            self._check_model()
+        else:
+            self.generator = None
+            self.model = None
 
         self.base_directory = tempfile.mkdtemp(prefix=self.output_prefix,
                                                dir=output_dir)
@@ -147,10 +101,12 @@ class BngBaseInterface(object):
         param :
             An argument to a BNG action call
         """
-        if isinstance(param, str):
+        if isinstance(param, basestring):
             return '"%s"' % param
-        if isinstance(param, bool):
+        elif isinstance(param, bool):
             return 1 if param else 0
+        elif isinstance(param, (collections.Sequence, numpy.ndarray)):
+            return list(param)
         return param
 
     @abc.abstractmethod
@@ -185,20 +141,11 @@ class BngBaseInterface(object):
         return action_args
 
     @property
-    def model(self):
-        """
-        Convenience method to get the PySB model itself
-
-        :return: PySB model used in BNG interface constructor
-        """
-        return self.generator.model
-
-    @property
     def base_filename(self):
         """
         Returns the base filename (without extension) for BNG output files
         """
-        return os.path.join(self.base_directory, 'pysb')
+        return os.path.join(self.base_directory, self._base_file_stem)
 
     @property
     def bng_filename(self):
@@ -236,7 +183,7 @@ class BngBaseInterface(object):
         # Read concentrations data
         cdat_arr = numpy.loadtxt(self.base_filename + '.cdat', skiprows=1)
         # Read groups data
-        if len(self.model.observables):
+        if self.model and len(self.model.observables):
             # Exclude first column (time)
             gdat_arr = numpy.loadtxt(self.base_filename + '.gdat',
                                      skiprows=1)[:,1:]
@@ -246,7 +193,7 @@ class BngBaseInterface(object):
         # -1 for time column
         names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)]
         yfull_dtype = list(zip(names, itertools.repeat(float)))
-        if len(self.model.observables):
+        if self.model and len(self.model.observables):
             yfull_dtype += list(zip(self.model.observables.keys(),
                                     itertools.repeat(float)))
         yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
@@ -260,7 +207,7 @@ class BngBaseInterface(object):
 
 class BngConsole(BngBaseInterface):
     """ Interact with BioNetGen through BNG Console """
-    def __init__(self, model, verbose=False, cleanup=True,
+    def __init__(self, model=None, verbose=False, cleanup=True,
                  output_dir=None, output_prefix=None, timeout=30,
                  suppress_warnings=False):
         super(BngConsole, self).__init__(model, verbose, cleanup,
@@ -277,16 +224,19 @@ class BngConsole(BngBaseInterface):
 
         try:
             # Generate BNGL file
-            with open(self.bng_filename, mode='w') as bng_file:
-                bng_file.write(self.generator.get_content())
+            if self.model:
+                with open(self.bng_filename, mode='w') as bng_file:
+                    bng_file.write(self.generator.get_content())
 
             # Start BNG Console and load BNGL
-            self.console = pexpect.spawn('perl %s --console' % _get_bng_path(),
+            self.console = pexpect.spawn('perl %s --console' %
+                                         pf.get_path('bng'),
                                          cwd=self.base_directory,
                                          timeout=timeout)
             self._console_wait()
-            self.console.sendline('load %s' % self.bng_filename)
-            self._console_wait()
+            if self.model:
+                self.console.sendline('load %s' % self.bng_filename)
+                self._console_wait()
         except Exception as e:
             raise BngInterfaceError(e)
 
@@ -306,11 +256,15 @@ class BngConsole(BngBaseInterface):
         :return: BNG console output from the previous command
         """
         self.console.expect('BNG>')
-        if self.verbose:
-            print(self.console.before)
-        elif not self.suppress_warnings and "WARNING:" in self.console.before:
-            warn(self.console.before)
-        return self.console.before
+        # Python 3 requires explicit conversion of 'bytes' to 'str'
+        console_msg = self.console.before.decode('utf-8')
+        if "ERROR:" in console_msg:
+            raise BngInterfaceError(console_msg)
+        elif not self.suppress_warnings and "WARNING:" in console_msg:
+            warn(console_msg)
+        elif self.verbose:
+            print(console_msg)
+        return console_msg
 
     def generate_network(self, overwrite=False):
         """
@@ -350,9 +304,22 @@ class BngConsole(BngBaseInterface):
         # Wait for the command to execute and return the result
         return self._console_wait()
 
+    def load_bngl(self, bngl_file):
+        """
+        Loads a BNGL file in the BNG console
+
+        Parameters
+        ----------
+        bngl_file : string
+            The filename of a .bngl file
+        """
+        self.console.sendline('load %s' % bngl_file)
+        self._console_wait()
+        self._base_file_stem = os.path.splitext(os.path.basename(bngl_file))[0]
+
 
 class BngFileInterface(BngBaseInterface):
-    def __init__(self, model, verbose=False, output_dir=None,
+    def __init__(self, model=None, verbose=False, output_dir=None,
                  output_prefix=None, cleanup=True):
         super(BngFileInterface, self).__init__(model, verbose, cleanup,
                                                output_prefix, output_dir)
@@ -396,7 +363,7 @@ class BngFileInterface(BngBaseInterface):
                     bng_commands = bng_commands.replace('begin actions\n',
                                          'begin actions\n\treadFile({'
                                          'file=>"%s"});\n' % self.net_filename)
-                else:
+                elif self.model:
                     bng_file.write(self.generator.get_content())
                 bng_file.write(bng_commands)
 
@@ -404,7 +371,8 @@ class BngFileInterface(BngBaseInterface):
             self.command_queue.close()
             self._init_command_queue()
 
-            p = subprocess.Popen(['perl', _get_bng_path(), self.bng_filename],
+            p = subprocess.Popen(['perl', pf.get_path('bng'),
+                                  self.bng_filename],
                                  cwd=self.base_directory,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
@@ -528,7 +496,6 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         If True, print output from BNG to stdout.
     """
     with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as bngfile:
-        net_filename = bngfile.base_filename + '.net'
         bngfile.action('generate_network', overwrite=True, verbose=verbose)
         bngfile.execute()
 
@@ -555,7 +522,7 @@ def generate_equations(model, cleanup=True, verbose=False):
     #   or, use a separate "math model" object to contain ODEs
     if model.odes:
         return
-    lines = iter(generate_network(model,cleanup,verbose=verbose).split('\n'))
+    lines = iter(generate_network(model,cleanup=cleanup,verbose=verbose).split('\n'))
     _parse_netfile(model, lines)
 
 

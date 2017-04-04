@@ -1,11 +1,13 @@
 from pysb.testing import *
+import sys
+import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator import ScipyOdeSimulator, SimulatorException
 from pysb.examples import robertson, earm_1_0
 
 
-class TestScipySimulator(object):
+class TestScipySimulatorBase(object):
     @with_model
     def setUp(self):
         Monomer('A', ['a'])
@@ -45,10 +47,12 @@ class TestScipySimulator(object):
         self.time = None
         self.sim = None
 
+
+class TestScipySimulatorSingle(TestScipySimulatorBase):
     def test_vode_solver_run(self):
         """Test vode."""
         simres = self.sim.run()
-        assert simres.nsims == 1
+        assert simres._nsims == 1
 
     def test_vode_jac_solver_run(self):
         """Test vode and analytic jacobian."""
@@ -73,13 +77,13 @@ class TestScipySimulator(object):
     def test_y0_as_list(self):
         """Test y0 with list of initial conditions"""
         # Test the initials getter method before anything is changed
-        assert np.allclose(self.sim.initials[0:3],
+        assert np.allclose(self.sim.initials[0][0:3],
                            [ic[1].value for ic in
                             self.model.initial_conditions])
 
         initials = [10, 20, 0, 0]
         simres = self.sim.run(initials=initials)
-        assert np.allclose(self.sim.initials, initials)
+        assert np.allclose(self.sim.initials[0], initials)
         assert np.allclose(simres.observables['A_free'][0], 10)
 
     def test_y0_as_ndarray(self):
@@ -92,7 +96,7 @@ class TestScipySimulator(object):
         simres = self.sim.run(initials={self.mon('A')(a=None): 10,
                                self.mon('B')(b=1) % self.mon('A')(a=1): 0,
                                self.mon('B')(b=None): 0})
-        assert np.allclose(self.sim.initials_list, [10, 0, 1, 0])
+        assert np.allclose(self.sim.initials, [10, 0, 1, 0])
         assert np.allclose(simres.observables['A_free'][0], 10)
 
     def test_y0_as_dictionary_with_bound_species(self):
@@ -135,6 +139,47 @@ class TestScipySimulator(object):
 
     def test_result_dataframe(self):
         df = self.sim.run().dataframe
+
+
+class TestScipySimulatorSequential(TestScipySimulatorBase):
+    def test_sequential_runs(self):
+        simres = self.sim.run()
+
+        new_initials = [10, 20, 30, 40]
+        simres = self.sim.run(initials=new_initials)
+        assert np.allclose(simres.species[0], new_initials)
+
+        new_param_values = {'kbindAB': 0}
+        simres = self.sim.run(param_values=new_param_values)
+        # No new AB_complex should be formed
+        assert np.allclose(simres.observables['AB_complex'], 40)
+        assert simres.nsims == 1
+
+
+class TestScipySimulatorMultiple(TestScipySimulatorBase):
+    def test_initials_and_param_values_two_lists(self):
+        initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
+        param_values = [[55, 65, 75, 0, 0, 1],
+                        [90, 100, 110, 5, 6, 7]]
+        simres = self.sim.run(initials=initials, param_values=param_values)
+        assert np.allclose(simres.species[0][0], initials[0])
+        assert np.allclose(simres.species[1][0], initials[1])
+        assert np.allclose(self.sim.param_values[0], param_values[0])
+        assert np.allclose(self.sim.param_values[1], param_values[1])
+
+        assert simres.nsims == 2
+
+        # Check the methods underlying these properties work
+        df = simres.dataframe
+        all = simres.all
+
+    @raises(SimulatorException)
+    def test_initials_and_param_values_differing_lengths(self):
+        initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
+        param_values = [[55, 65, 75, 0, 0, 1],
+                        [90, 100, 110, 5, 6, 7],
+                        [90, 100, 110, 5, 6, 7]]
+        self.sim.run(initials=initials, param_values=param_values)
 
 
 @with_model
@@ -210,3 +255,48 @@ def test_nonexistent_integrator():
     """Ensure nonexistent integrator raises."""
     ScipyOdeSimulator(robertson.model, tspan=np.linspace(0, 1, 2),
                       integrator='does_not_exist')
+
+
+def test_unicode_obsname_ascii():
+    """Ensure ascii-convetible unicode observable names are handled."""
+    t = np.linspace(0, 100)
+    rob_copy = copy.deepcopy(robertson.model)
+    rob_copy.observables[0].name = u'A_total'
+    sim = ScipyOdeSimulator(rob_copy)
+    simres = sim.run(tspan=t)
+
+
+if sys.version_info[0] < 3:
+    @raises(ValueError)
+    def test_unicode_obsname_nonascii():
+        """Ensure non-ascii unicode observable names error in python 2."""
+        t = np.linspace(0, 100)
+        rob_copy = copy.deepcopy(robertson.model)
+        rob_copy.observables[0].name = u'A_total\u1234'
+        sim = ScipyOdeSimulator(rob_copy)
+        simres = sim.run(tspan=t)
+
+
+def test_unicode_exprname_ascii():
+    """Ensure ascii-convetible unicode expression names are handled."""
+    t = np.linspace(0, 100)
+    rob_copy = copy.deepcopy(robertson.model)
+    ab = rob_copy.observables['A_total'] + rob_copy.observables['B_total']
+    expr = Expression(u'A_plus_B', ab, _export=False)
+    rob_copy.add_component(expr)
+    sim = ScipyOdeSimulator(rob_copy)
+    simres = sim.run(tspan=t)
+
+
+if sys.version_info[0] < 3:
+    @raises(ValueError)
+    def test_unicode_exprname_nonascii():
+        """Ensure non-ascii unicode expression names error in python 2."""
+        t = np.linspace(0, 100)
+        rob_copy = copy.deepcopy(robertson.model)
+        ab = rob_copy.observables['A_total'] + rob_copy.observables['B_total']
+        expr = Expression(u'A_plus_B\u1234', ab, _export=False)
+        rob_copy.add_component(expr)
+        sim = ScipyOdeSimulator(rob_copy)
+        simres = sim.run(tspan=t)
+
