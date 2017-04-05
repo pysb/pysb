@@ -37,24 +37,24 @@ class StochKitSimulator(Simulator):
                       num_processors=1, stats=False):
 
         extra_args = ''
-        extra_args += '-p %d' % num_processors
+        extra_args += '-p {:d}'.format(num_processors)
 
         # Random seed for stochastic simulation
         if seed is not None:
-            extra_args += ' --seed %d' % seed
+            extra_args += ' --seed {:d}'.format(seed)
 
         # Keep all the trajectories by default
         extra_args += ' --keep-trajectories'
 
         # Number of trajectories
-        extra_args += ' --realizations %d' % number_of_trajectories
+        extra_args += ' --realizations {:d}'.format(number_of_trajectories)
 
         # We generally don't need the extra stats
         if not stats:
             extra_args += ' --no-stats'
 
         if method is not None:  # This only works for StochKit 2.1
-            extra_args += ' --method %s' % method
+            extra_args += ' --method {}'.format(method)
 
         # Find binary for selected algorithm (SSA, Tau-leaping, ...)
         if algorithm is None:
@@ -97,10 +97,8 @@ class StochKitSimulator(Simulator):
                     self.initials[i], self.param_values[i]))
 
             # Assemble the argument list
-            args = '--model %s --out-dir %s -t %f -i %d' % (fname,
-                                                            prefix_outdir,
-                                                            t,
-                                                            t_length)
+            args = '--model {} --out-dir {} -t {:f} -i {:d}'.format(
+                fname, prefix_outdir, t, t_length)
 
             # If we are using local mode, shell out and run StochKit
             # (SSA or Tau-leaping or ODE)
@@ -159,9 +157,9 @@ class StochKitSimulator(Simulator):
                                            initials=initials,
                                            param_values=param_values)
 
-        self._logger.info('Running StochKit with %d parameter sets, '
-                          '%d repeats (%d simulations total)' %
-                          (len(self.initials), n_runs, len(self.initials) *
+        self._logger.info('Running StochKit with {:d} parameter sets, '
+                          '{:d} repeats ({:d} simulations total)'.format(
+                           len(self.initials), n_runs, len(self.initials) *
                            n_runs))
 
         if output_dir is None:
