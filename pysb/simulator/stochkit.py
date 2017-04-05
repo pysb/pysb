@@ -14,20 +14,59 @@ class StochKitSimulator(Simulator):
     """
     Interface to the StochKit 2 stochastic simulation toolkit
 
-    For more information on StochKit and to install it, please see its website
-    https://engineering.ucsb.edu/~cse/StochKit/
+    StochKit can be installed from GitHub:
+    https://github.com/stochss/stochkit
 
     This class is inspired by the `gillespy
     <https://github.com/JohnAbel/gillespy>` library, but has been optimised
     for use with PySB.
+
+    .. warning::
+        The interface for this class is considered experimental and may
+        change without warning as PySB is updated.
+
+    Parameters
+    ----------
+    model : pysb.Model
+        Model to simulate.
+    tspan : vector-like, optional
+        Time values over which to simulate. The first and last values define
+        the time range. Returned trajectories are sampled at every value unless
+        the simulation is interrupted for some reason, e.g., due to
+        satisfaction of a logical stopping criterion (see 'tout' below).
+    initials : vector-like or dict, optional
+        Values to use for the initial condition of all species. Ordering is
+        determined by the order of model.species. If not specified, initial
+        conditions will be taken from model.initial_conditions (with
+        initial condition parameter values taken from `param_values` if
+        specified).
+    param_values : vector-like or dict, optional
+        Values to use for every parameter in the model. Ordering is
+        determined by the order of model.parameters.
+        If passed as a dictionary, keys must be parameter names.
+        If not specified, parameter values will be taken directly from
+        model.parameters.
+    verbose : bool or int, optional (default: False)
+        Sets the verbosity level of the logger. See the logging levels and
+        constants from Python's logging module for interpretation of integer
+        values. False is equal to the PySB default level (currently WARNING),
+        True is equal to DEBUG.
+    **kwargs : dict
+        Extra keyword arguments, including:
+
+        * ``cleanup``: Boolean, delete directory after completion if True
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
-    def __init__(self, model, tspan=None, cleanup=True, verbose=False):
+    def __init__(self, model, tspan=None, initials=None,
+                 param_values=None, verbose=False, **kwargs):
         super(StochKitSimulator, self).__init__(model,
                                                 tspan=tspan,
-                                                verbose=verbose)
-        self.cleanup = cleanup
+                                                initials=initials,
+                                                param_values=param_values,
+                                                verbose=verbose,
+                                                **kwargs)
+        self.cleanup = kwargs.get('cleanup', True)
         self._outdir = None
         generate_equations(self._model,
                            cleanup=self.cleanup,
@@ -144,9 +183,51 @@ class StochKitSimulator(Simulator):
         return trajectories
 
     def run(self, tspan=None, initials=None, param_values=None, n_runs=1,
-            algorithm='ssa', seed=None, output_dir=None,
-            num_processors=1, method=None, stats=False, epsilon=None,
-            threshold=None):
+            algorithm='ssa', output_dir=None,
+            num_processors=1, seed=None, method=None, stats=False,
+            epsilon=None, threshold=None):
+        """
+        Run a simulation and returns the result (trajectories)
+
+        .. note::
+            ``tspan``, ``initials`` and ``param_values`` values supplied to
+            this method will persist to future :func:`run` calls.
+
+        Parameters
+        ----------
+        tspan
+        initials
+        param_values
+            See parameter definitions in :class:`StochKitSimulator`.
+        n_runs : int
+            The number of simulation runs per parameter set. The total
+            number of simulations is therefore n_runs * max(len(initials),
+            len(param_values))
+        algorithm : str
+            Choice of 'ssa' (Gillespie's stochastic simulation algorithm) or
+            'tau_leaping' (Tau leaping algorithm)
+        output_dir : str or None
+            Directory for StochKit output, or None for a system-specific
+            temporary directory
+        num_processors : int
+            Number of CPU cores for StochKit to use (default: 1)
+        seed : int or None
+            A random number seed for StochKit. Set to any integer value for
+            deterministic behavior.
+        method : str or None
+            StochKit "method" argument, default None. Only used by StochKit
+            2.1 (not yet released at time of writing).
+        stats : bool
+            Ask StochKit to generate simulation summary statistics if True
+        epsilon : float or None
+            Tolerance parameter for tau-leaping algorithm
+        threshold : int or None
+            Threshold parameter for tau-leaping algorithm
+
+        Returns
+        -------
+        A :class:`SimulationResult` object
+        """
         super(StochKitSimulator, self).run(tspan=tspan,
                                            initials=initials,
                                            param_values=param_values)
