@@ -55,6 +55,34 @@ class StochKitSimulator(Simulator):
         Extra keyword arguments, including:
 
         * ``cleanup``: Boolean, delete directory after completion if True
+
+    Examples
+    --------
+    Simulate a model and display the results for an observable:
+
+    >>> from pysb.examples.robertson import model
+    >>> import numpy as np
+    >>> np.set_printoptions(precision=4)
+    >>> sim = StochKitSimulator(model, tspan=np.linspace(0, 10, 5))
+
+    Here we supply a "seed" to the random number generator for deterministic
+    results, but for most purposes it is recommended to leave this blank.
+    >>> simulation_result = sim.run(n_runs=2, seed=123456)
+
+    A_total trajectory for first run
+    >>> print(simulation_result.observables[0]['A_total']) \
+        #doctest: +ELLIPSIS
+    [ 1.  0.  0.  0.  0.  0.]
+
+    A_total trajectory for second run
+    >>> print(simulation_result.observables[1]['A_total']) \
+        #doctest: +ELLIPSIS
+    [ 1.  1.  1.  1.  0.  0.]
+
+    For further information on retrieving trajectories (species,
+    observables, expressions over time) from the ``simulation_result``
+    object returned by :func:`run`, see the examples under the
+    :class:`SimulationResult` class.
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
@@ -166,7 +194,7 @@ class StochKitSimulator(Simulator):
             traj_dir = os.path.join(prefix_outdir, 'trajectories')
             try:
                 trajectories.extend([np.loadtxt(os.path.join(
-                    traj_dir, f)) for f in os.listdir(traj_dir)])
+                    traj_dir, f)) for f in sorted(os.listdir(traj_dir))])
             except Exception as e:
                 raise SimulatorException(
                     "Error using solver.get_trajectories('{0}'): {1}".format(
