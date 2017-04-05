@@ -39,7 +39,25 @@ _path_config = {
             'posix': ('/usr/local/share/cupSODA',),
             'nt': ('c:/Program Files/cupSODA',)
         }
-    }
+    },
+    'stochkit_ssa': {
+        'name': 'StochKit [SSA]',
+        'executable': 'ssa',
+        'env_var': 'STOCHKITPATH',
+        'search_paths': {
+            'posix': ('/usr/local/share/StochKit', ),
+            'nt': ('c:/Program Files/StochKit',)
+        }
+    },
+    'stochkit_tau_leaping': {
+        'name': 'StochKit [Tau Leaping]',
+        'executable': 'tau_leaping',
+        'env_var': 'STOCHKITPATH',
+        'search_paths': {
+            'posix': ('/usr/local/share/StochKit',),
+            'nt': ('c:/Program Files/StochKit',)
+        }
+    },
 }
 _path_cache = {}
 

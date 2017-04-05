@@ -7,6 +7,7 @@ import os
 import shutil
 import tempfile
 import re
+from pysb.pathfinder import get_path
 
 
 class StochKitSimulator(Simulator):
@@ -70,24 +71,12 @@ class StochKitSimulator(Simulator):
             raise SimulatorException("StochKit algorithm name should contain "
                                      "only alphanumeric and underscore "
                                      "characters")
-        executable = None
-        if os.environ.get('STOCHKIT_HOME') is not None:
-            if os.path.isfile(os.path.join(os.environ.get('STOCHKIT_HOME'),
-                                           algorithm)):
-                executable = os.path.join(os.environ.get('STOCHKIT_HOME'),
-                                          algorithm)
-        if executable is None:
-            # try to find the executable in the path
-            if os.environ.get('PATH') is not None:
-                for dir in os.environ.get('PATH').split(':'):
-                    if os.path.isfile(os.path.join(dir, algorithm)):
-                        executable = os.path.join(dir, algorithm)
-                        break
-        if executable is None:
-            raise SimulatorException("stochkit executable '{0}' not found. "
-                                     "Make sure it is in your path, or set "
-                                     "STOCHKIT_HOME environment "
-                                     "variable.".format(algorithm))
+
+        if algorithm not in ['ssa', 'tau_leaping']:
+            raise SimulatorException(
+                "algorithm must be 'ssa' or 'tau_leaping'")
+
+        executable = get_path('stochkit_{}'.format(algorithm))
 
         # Output model file to directory
         fname = os.path.join(self._outdir, 'pysb.xml')

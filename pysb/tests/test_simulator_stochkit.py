@@ -15,6 +15,7 @@ def test_stochkit_earm():
     tspan = np.linspace(0, 1000, 10)
     sim = StochKitSimulator(earm_1_0.model, tspan=tspan)
     simres = sim.run(n_runs=2, seed=_STOCHKIT_SEED, algorithm="ssa")
+    simres_tl = sim.run(n_runs=2, seed=_STOCHKIT_SEED, algorithm="tau_leaping")
 
 
 def test_stochkit_earm_multi_initials():

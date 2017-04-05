@@ -41,8 +41,8 @@ before_install:
 # Install StochKit
 - wget https://github.com/StochSS/StochKit/archive/master.zip -O StochKit.zip
 - unzip -q -d $HOME StochKit.zip
-- export STOCHKIT_HOME=$HOME/StochKit-master
-- cd $STOCHKIT_HOME
+- export STOCHKITPATH=$HOME/StochKit-master
+- cd $STOCHKITPATH
 - ./install.sh >/dev/null 2>&1
 - cd $TRAVIS_BUILD_DIR
 install:
