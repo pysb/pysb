@@ -14,6 +14,7 @@ from warnings import warn
 import shutil
 import collections
 import pysb.pathfinder as pf
+from pysb.simulator import SimulationResult
 
 try:
     from cStringIO import StringIO
@@ -179,29 +180,50 @@ class BngBaseInterface(object):
         """
         Reads the results of a BNG simulation and parses them into a numpy
         array
+
+        Returns
+        -------
+        numpy.ndarray
+            Simulation results in a 2D matrix (time on Y axis,
+            species/observables/expressions on X axis depending on
+            simulation type)
         """
+        names = ['time']
+
         # Read concentrations data
-        cdat_arr = numpy.loadtxt(self.base_filename + '.cdat', skiprows=1)
-        names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)] # -1 for time column
+        try:
+            cdat_arr = numpy.loadtxt(self.base_filename + '.cdat', skiprows=1)
+            # -1 for time column
+            names += ['__s%d' % i for i in range(cdat_arr.shape[1] - 1)]
+        except IOError:
+            cdat_arr = None
 
         # Read groups data
-        if os.path.isfile(self.base_filename + '.gdat'):
-            f = open(self.base_filename + '.gdat', 'r')
-            names += f.readline().split()[2:] # exclude \# and time column
-            f.close()
-            # Exclude first column (time)
-            gdat_arr = numpy.loadtxt(self.base_filename + '.gdat',
-                                     skiprows=1)[:,1:]
-        else:
+        try:
+            with open(self.base_filename + '.gdat', 'r') as f:
+                # Exclude \# and time column
+                names += f.readline().split()[2:]
+                # Exclude first column (time)
+                gdat_arr = numpy.loadtxt(f)
+                print(gdat_arr)
+                if cdat_arr is None:
+                    cdat_arr = numpy.ndarray((len(gdat_arr), 0))
+                else:
+                    gdat_arr = gdat_arr[:, 1:]
+        except IOError:
+            if cdat_arr is None:
+                raise BngInterfaceError('Need at least one of .cdat file or '
+                                        '.gdat file to read simulation '
+                                        'results')
             gdat_arr = numpy.ndarray((len(cdat_arr), 0))
-        
+
         yfull_dtype = list(zip(names, itertools.repeat(float)))
         yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
 
         yfull_view = yfull.view(float).reshape(len(yfull), -1)
         yfull_view[:, :cdat_arr.shape[1]] = cdat_arr
         yfull_view[:, cdat_arr.shape[1]:] = gdat_arr
-        
+
         return yfull
 
 
