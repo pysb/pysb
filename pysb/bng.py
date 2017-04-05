@@ -182,26 +182,26 @@ class BngBaseInterface(object):
         """
         # Read concentrations data
         cdat_arr = numpy.loadtxt(self.base_filename + '.cdat', skiprows=1)
+        names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)] # -1 for time column
+
         # Read groups data
-        if self.model and len(self.model.observables):
+        if os.path.isfile(self.base_filename + '.gdat'):
+            f = open(self.base_filename + '.gdat', 'r')
+            names += f.readline().split()[2:] # exclude \# and time column
+            f.close()
             # Exclude first column (time)
             gdat_arr = numpy.loadtxt(self.base_filename + '.gdat',
                                      skiprows=1)[:,1:]
         else:
             gdat_arr = numpy.ndarray((len(cdat_arr), 0))
-
-        # -1 for time column
-        names = ['time'] + ['__s%d' % i for i in range(cdat_arr.shape[1]-1)]
+        
         yfull_dtype = list(zip(names, itertools.repeat(float)))
-        if self.model and len(self.model.observables):
-            yfull_dtype += list(zip(self.model.observables.keys(),
-                                    itertools.repeat(float)))
         yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
 
         yfull_view = yfull.view(float).reshape(len(yfull), -1)
-        yfull_view[:, :len(names)] = cdat_arr
-        yfull_view[:, len(names):] = gdat_arr
-
+        yfull_view[:, :cdat_arr.shape[1]] = cdat_arr
+        yfull_view[:, cdat_arr.shape[1]:] = gdat_arr
+        
         return yfull
 
 
