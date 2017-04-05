@@ -34,10 +34,10 @@ class StochKitSimulator(Simulator):
 
     def _run_stochkit(self, t=20, t_length=100, number_of_trajectories=1,
                       seed=None, algorithm='ssa', method=None,
-                      num_processors=1, stats=False):
+                      num_processors=1, stats=False, epsilon=None,
+                      threshold=None):
 
-        extra_args = ''
-        extra_args += '-p {:d}'.format(num_processors)
+        extra_args = '-p {:d}'.format(num_processors)
 
         # Random seed for stochastic simulation
         if seed is not None:
@@ -55,6 +55,12 @@ class StochKitSimulator(Simulator):
 
         if method is not None:  # This only works for StochKit 2.1
             extra_args += ' --method {}'.format(method)
+
+        if epsilon is not None:
+            extra_args += ' --epsilon {:f}'.format(epsilon)
+
+        if threshold is not None:
+            extra_args += ' --threshold {:d}'.format(threshold)
 
         # Find binary for selected algorithm (SSA, Tau-leaping, ...)
         if algorithm is None:
@@ -112,7 +118,7 @@ class StochKitSimulator(Simulator):
                                           stderr=subprocess.PIPE, shell=True)
                 return_code = handle.wait()
             except OSError as e:
-                raise SimulatorException("Solver execution failed: \
+                raise SimulatorException("StochKit execution failed: \
                 {0}\n{1}".format(cmd, e))
 
             try:
@@ -126,7 +132,8 @@ class StochKitSimulator(Simulator):
 
             if return_code != 0:
                 raise SimulatorException("Solver execution failed: \
-                '{0}' output: {1}{2}".format(cmd, stdout, stderr))
+                '{0}' output:\nSTDOUT:\n{1}\nSTDERR:\n{2}".format(
+                    cmd, stdout, stderr))
 
             traj_dir = os.path.join(prefix_outdir, 'trajectories')
             try:
@@ -137,22 +144,20 @@ class StochKitSimulator(Simulator):
                     "Error using solver.get_trajectories('{0}'): {1}".format(
                         prefix_outdir, e))
 
-            if len(trajectories) == 0:
+            if len(trajectories) == 0 or len(stderr) != 0:
                 raise SimulatorException("Solver execution failed: \
-                '{0}' output: {1}{2}".format(cmd, stdout, stderr))
+                '{0}' output:\nSTDOUT:\n{1}\nSTDERR:\n{2}".format(
+                    cmd, stdout, stderr))
 
-        if self.verbose:
-            print("prefix_basedir={0}".format(self._outdir))
-            print("STDOUT: {0}".format(stdout))
-            if len(stderr) == 0:
-                stderr = '<EMPTY>'
-            print("STDERR: {0}".format(stderr))
+            self._logger.debug("StochKit STDOUT:\n{0}".format(stdout))
 
         # Return data
         return trajectories
 
     def run(self, tspan=None, initials=None, param_values=None, n_runs=1,
-            seed=None, output_dir=None, **additional_args):
+            algorithm='ssa', seed=None, output_dir=None,
+            num_processors=1, method=None, stats=False, epsilon=None,
+            threshold=None):
         super(StochKitSimulator, self).run(tspan=tspan,
                                            initials=initials,
                                            param_values=param_values)
@@ -180,7 +185,12 @@ class StochKitSimulator(Simulator):
                                               number_of_trajectories=n_runs,
                                               t_length=t_length,
                                               seed=seed,
-                                              **additional_args)
+                                              algorithm=algorithm,
+                                              method=method,
+                                              num_processors=num_processors,
+                                              stats=stats,
+                                              epsilon=epsilon,
+                                              threshold=threshold)
         finally:
             if self.cleanup:
                 try:
@@ -189,8 +199,9 @@ class StochKitSimulator(Simulator):
                     pass
 
         # set output time points
-        self.tout = np.array(trajectories)[:, :, 0] + self.tspan[0]
+        trajectories_array = np.array(trajectories)
+        self.tout = trajectories_array[:, :, 0] + self.tspan[0]
         # species
-        species = np.array(trajectories)[:, :, 1:]
+        species = trajectories_array[:, :, 1:]
         return SimulationResult(self, self.tout, species,
                                 simulations_per_param_set=n_runs)
