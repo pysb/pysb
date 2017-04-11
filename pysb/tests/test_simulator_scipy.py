@@ -173,6 +173,27 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
         df = simres.dataframe
         all = simres.all
 
+    def test_param_values_dict(self):
+        param_values = {'A_init': [0, 100]}
+        initials = {self.model.monomers['B'](b=None): [250, 350]}
+
+        simres = self.sim.run(param_values=param_values)
+        print(simres.dataframe.loc[0, 0]['A_free'])
+        assert np.allclose(simres.dataframe.loc[(slice(None), 0.0), 'A_free'],
+                           [0, 100])
+
+        simres = self.sim.run(param_values={'B_init': [200, 300]})
+        assert np.allclose(simres.dataframe.loc[(slice(None), 0.0), 'A_free'],
+                           [0, 0])
+        assert np.allclose(simres.dataframe.loc[(slice(None), 0.0), 'B_free'],
+                           [200, 300])
+
+        simres = self.sim.run(initials=initials, param_values=param_values)
+        assert np.allclose(simres.dataframe.loc[(slice(None), 0.0), 'A_free'],
+                           [0, 100])
+        assert np.allclose(simres.dataframe.loc[(slice(None), 0.0), 'B_free'],
+                           [250, 350])
+
     @raises(SimulatorException)
     def test_initials_and_param_values_differing_lengths(self):
         initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
@@ -214,6 +235,12 @@ def test_integrate_with_expression():
     keff_vals = simres.expressions['keff']
     assert len(keff_vals) == len(time)
     assert np.allclose(keff_vals, 1.8181818181818182e-05)
+
+
+def test_set_initial_to_zero():
+    sim = ScipyOdeSimulator(robertson.model, tspan=np.linspace(0, 100))
+    simres = sim.run(initials={robertson.model.monomers['A'](): 0})
+    assert np.allclose(simres.observables['A_total'], 0)
 
 
 def test_robertson_integration():
