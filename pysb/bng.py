@@ -9,7 +9,6 @@ import itertools
 import sympy
 import numpy
 import tempfile
-from pkg_resources import parse_version
 import abc
 from warnings import warn
 import shutil
@@ -413,7 +412,7 @@ class BngFileInterface(BngBaseInterface):
             (p_out, p_err) = p.communicate()
             p_out = p_out.decode('utf-8')
             p_err = p_err.decode('utf-8')
-            self._logger.log(EXTENDED_DEBUG, 'BNG output:\n\n' + p_out)
+            self._logger.debug('BNG output:\n\n' + p_out)
             if p.returncode:
                 raise BngInterfaceError(p_out.rstrip("at line") + "\n" +
                                         p_err.rstrip())
@@ -592,15 +591,8 @@ def generate_equations(model, cleanup=True, verbose=False):
 
 
 def _parse_netfile(model, lines):
-    """Parse 'species', 'reactions', and 'groups' blocks from a BNGL net file."""
+    """ Parse species, rxns and groups from a BNGL net file """
     try:
-        global new_reverse_convention
-        (bng_version, bng_codename) = re.match(r'# Created by BioNetGen (\d+\.\d+\.\d+)(?:-(\w+))?$', next(lines)).groups()
-        if parse_version(bng_version) > parse_version("2.2.6") or parse_version(bng_version) == parse_version("2.2.6") and bng_codename == "stable":
-            new_reverse_convention = True
-        else:
-            new_reverse_convention = False
-
         while 'begin species' not in next(lines):
             pass
         model.species = []
@@ -612,12 +604,12 @@ def _parse_netfile(model, lines):
         while 'begin reactions' not in next(lines):
             pass
         model.odes = [sympy.numbers.Zero()] * len(model.species)
-        global reaction_cache
+
         reaction_cache = {}
         while True:
             line = next(lines)
             if 'end reactions' in line: break
-            _parse_reaction(model, line)
+            _parse_reaction(model, line, reaction_cache=reaction_cache)
         # fix up reactions whose reverse version we saw first
         for r in model.reactions_bidirectional:
             if all(r['reverse']):
@@ -640,12 +632,14 @@ def _parse_netfile(model, lines):
 def _parse_species(model, line):
     """Parse a 'species' line from a BNGL net file."""
     index, species, value = line.strip().split()
-    species_compartment_name, complex_string = re.match(r'(?:@(\w+)::)?(.*)', species).groups()
+    species_compartment_name, complex_string = \
+        re.match(r'(?:@(\w+)::)?(.*)', species).groups()
     species_compartment = model.compartments.get(species_compartment_name)
     monomer_strings = complex_string.split('.')
     monomer_patterns = []
     for ms in monomer_strings:
-        monomer_name, site_strings, monomer_compartment_name = re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
+        monomer_name, site_strings, monomer_compartment_name = \
+            re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
         site_conditions = {}
         if len(site_strings):
             for ss in site_strings.split(','):
@@ -683,7 +677,7 @@ def _parse_species(model, line):
     model.species.append(cp)
 
 
-def _parse_reaction(model, line):
+def _parse_reaction(model, line, reaction_cache):
     """Parse a 'reaction' line from a BNGL net file."""
     (number, reactants, products, rate, rule) = line.strip().split(' ', 4)
     # the -1 is to switch from one-based to zero-based indexing
@@ -691,10 +685,13 @@ def _parse_reaction(model, line):
     products = tuple(int(p) - 1 for p in products.split(','))
     rate = rate.rsplit('*')
     (rule_list, unit_conversion) = re.match(
-                    r'#([\w,\(\)]+)(?: unit_conversion=(.*))?\s*$', rule).groups()
-    rule_list = rule_list.split(',') # BNG lists all rules that generate a rxn
-    # Support new (BNG 2.2.6-stable or greater) and old BNG naming convention for reverse rules
-    rule_name, is_reverse = zip(*[re.subn('^_reverse_|\(reverse\)$', '', r) for r in rule_list])
+        r'#([\w,\(\)]+)(?: unit_conversion=(.*))?\s*$',
+        rule).groups()
+    rule_list = rule_list.split(',')  # BNG lists all rules that generate a rxn
+    # Support new (BNG 2.2.6-stable or greater) and old BNG naming convention
+    # for reverse rules
+    rule_name, is_reverse = zip(*[re.subn('^_reverse_|\(reverse\)$', '', r)
+                                  for r in rule_list])
     is_reverse = tuple(bool(i) for i in is_reverse)
     r_names = ['__s%d' % r for r in reactants]
     rate_param = [model.parameters.get(r) or model.expressions.get(r) or
@@ -721,7 +718,7 @@ def _parse_reaction(model, line):
         reaction_bd['reversible'] = True
         reaction_bd['rate'] -= combined_rate
         reaction_bd['rule'] += tuple(r for r in rule_name if r not in
-                                         reaction_bd['rule'])
+                                     reaction_bd['rule'])
     else:
         # make a copy of the reaction dict
         reaction_bd = dict(reaction)
@@ -758,6 +755,7 @@ class NoInitialConditionsError(RuntimeError):
     def __init__(self):
         RuntimeError.__init__(self, "Model has no initial conditions or "
                                     "zero-order synthesis rules")
+
 
 class NoRulesError(RuntimeError):
     """Model rules is empty."""
