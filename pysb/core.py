@@ -857,8 +857,13 @@ class Compartment(Component):
         self.size = size
 
     def __repr__(self):
-        return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.parent), repr(self.dimension), repr(self.size))
+        return '%s(name=%s, parent=%s, dimension=%s, size=%s)' % (
+            self.__class__.__name__,
+            repr(self.name),
+            'None' if self.parent is None else self.parent.name,
+            repr(self.dimension),
+            'None' if self.size is None else self.size.name
+        )
 
 
 class Rule(Component):
