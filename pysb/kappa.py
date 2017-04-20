@@ -267,18 +267,19 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     # Contact map args:
     if contact_map:
         cm_args = ['--compute-contact-map', '--output-contact-map',
-                   os.path.basename(cm_filename)]
+                   os.path.basename(cm_filename),
+                   '--output-contact-map-directory', base_directory]
     else:
         cm_args = ['--no-compute-contact-map']
     # Influence map args:
     if influence_map:
         im_args = ['--compute-influence-map', '--output-influence-map',
-                   os.path.basename(im_filename)]
+                   os.path.basename(im_filename),
+                   '--output-influence-map-directory', base_directory]
     else:
         im_args = ['--no-compute-influence-map']
     # Full arg list
-    args = [kappa_filename, '--output-directory', base_directory] \
-            + cm_args + im_args
+    args = [kappa_filename] + cm_args + im_args
 
     # Generate the Kappa model code from the PySB model and write it to
     # the Kappa file:
