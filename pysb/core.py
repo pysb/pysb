@@ -516,15 +516,22 @@ class ComplexPattern(object):
         """Checks for equality with another ComplexPattern"""
         # Didn't implement __eq__ to avoid confusion with __ne__ operator used for Rule building
 
+        # Check both patterns are concrete
+        assert self.is_concrete(), "%s is not a concrete pattern (species)" \
+                                   % repr(self)
+        assert other.is_concrete(), "%s is not a concrete pattern (species)" \
+                                    % repr(other)
+
         # FIXME the literal site_conditions comparison requires bond numbering to be identical,
         #   so some sort of canonicalization of that numbering is necessary.
         if not isinstance(other, ComplexPattern):
             raise Exception("Can only compare ComplexPattern to another ComplexPattern")
         mp_order = lambda mp: (mp[0], mp[1].keys(), mp[2])
-        return (self.compartment == other.compartment and
-                sorted([(repr(mp.monomer), mp.site_conditions, mp.compartment)
+        return (sorted([(repr(mp.monomer), mp.site_conditions,
+                         mp.compartment or self.compartment)
                        for mp in self.monomer_patterns], key=mp_order) ==
-                sorted([(repr(mp.monomer), mp.site_conditions, mp.compartment)
+                sorted([(repr(mp.monomer), mp.site_conditions,
+                         mp.compartment or other.compartment)
                        for mp in other.monomer_patterns], key=mp_order))
 
     def copy(self):
