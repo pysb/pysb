@@ -443,6 +443,8 @@ class MonomerPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
+            if self.compartment is not None:
+                raise CompartmentAlreadySpecifiedError()
             mp_new = self()
             mp_new.compartment = other
             return mp_new
@@ -626,6 +628,8 @@ class ComplexPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
+            if self.compartment is not None:
+                raise CompartmentAlreadySpecifiedError()
             cp_new = self.copy()
             cp_new.compartment = other
             return cp_new
@@ -1456,7 +1460,7 @@ class Model(object):
         source_cp = as_complex_pattern(self.monomers['__source']())
         if self.compartments:
             for c in self.compartments:
-                source_cp = source_cp ** c
+                source_cp.compartment = c
                 if not any(source_cp.is_equivalent_to(other_cp) for
                            other_cp, value in self.initial_conditions):
                     self.initial(source_cp, self.parameters['__source_0'])
@@ -1528,6 +1532,9 @@ class DuplicateSiteError(ValueError):
     pass
 
 class UnknownSiteError(ValueError):
+    pass
+
+class CompartmentAlreadySpecifiedError(ValueError):
     pass
 
 
