@@ -436,7 +436,7 @@ class BngFileInterface(BngBaseInterface):
 
         # Add the command to the queue
         if action_args == '':
-            self.command_queue.write('\t%s()\n' % (action))
+            self.command_queue.write('\t%s()\n' % action)
         else:
             self.command_queue.write('\t%s({%s})\n' % (action, action_args))
 
