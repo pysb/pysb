@@ -421,8 +421,12 @@ def _parse_kasim_outfile(out_filename):
         # Get rid of the quotes surrounding the observable names
         for raw_name in raw_names:
             mo = re.match('"(.*)"', raw_name)
-            if (mo):
-                column_names.append(mo.group(1))
+            if mo:
+                name = mo.group(1)
+                # Rename the time column to remain backwards compatible
+                if name == '[T]':
+                    name = 'time'
+                column_names.append(name)
             else:
                 column_names.append(raw_name)
 
@@ -430,7 +434,7 @@ def _parse_kasim_outfile(out_filename):
         dt = list(zip(column_names, ('float', ) * len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
-        arr = np.loadtxt(out_filename, dtype=float, skiprows=3)
+        arr = np.loadtxt(out_filename, dtype=float, skiprows=3, delimiter=',')
         recarr = arr.view(dt)
     except Exception as e:
         raise Exception("problem parsing KaSim outfile: " + str(e))
