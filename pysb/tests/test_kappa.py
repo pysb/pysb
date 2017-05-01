@@ -21,7 +21,6 @@ def test_kappa_simulation_results():
     Observable('AB', A(b=1) % B(b=1))
     npts = 200
     kres = run_simulation(model, time=100, points=npts, seed=_KAPPA_SEED)
-    import ipdb; ipdb.set_trace()
     ok_(len(kres['time']) == npts + 1)
     ok_(len(kres['AB']) == npts + 1)
     ok_(kres['time'][0] == 0)
@@ -40,6 +39,8 @@ def test_kappa_expressions():
     Rule('dimerize_rev',
          A(site=('u', 1)) % A(site=('u',1)) >>
          A(site='u') + A(site='u'), kr)
+    # We need an arbitrary observable here to get a Kappa output file
+    Observable('A_obs', A())
     # Accommodates Expression in kappa simulation
     run_simulation(model, time=0)
 
