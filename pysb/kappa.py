@@ -410,16 +410,17 @@ def _parse_kasim_outfile(out_filename):
 
     try:
         out_file = open(out_filename, 'r')
+        preamble_len = 2 # First 2 lines are comments
+        [out_file.readline() for i in range(preamble_len)]
 
-        line = out_file.readline().strip()  # Get the first line
+        header_line = out_file.readline().strip()  # Get the header line
         out_file.close()
-        line = line[2:]  # strip off opening '# '
-        raw_names = re.split(' ', line)
+        raw_names = [term.strip() for term in re.split(',', header_line)]
         column_names = []
 
         # Get rid of the quotes surrounding the observable names
         for raw_name in raw_names:
-            mo = re.match("'(.*)'", raw_name)
+            mo = re.match('"(.*)"', raw_name)
             if (mo):
                 column_names.append(mo.group(1))
             else:
@@ -429,7 +430,7 @@ def _parse_kasim_outfile(out_filename):
         dt = list(zip(column_names, ('float', ) * len(column_names)))
 
         # Load the output file as a numpy record array, skip the name row
-        arr = np.loadtxt(out_filename, dtype=float, skiprows=1)
+        arr = np.loadtxt(out_filename, dtype=float, skiprows=3)
         recarr = arr.view(dt)
     except Exception as e:
         raise Exception("problem parsing KaSim outfile: " + str(e))
