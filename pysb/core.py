@@ -1468,10 +1468,10 @@ class Model(object):
         source_cp = as_complex_pattern(self.monomers['__source']())
         if self.compartments:
             for c in self.compartments:
-                source_cp.compartment = c
-                if not any(source_cp.is_equivalent_to(other_cp) for
+                source_cp_cpt = source_cp ** c
+                if not any(source_cp_cpt.is_equivalent_to(other_cp) for
                            other_cp, value in self.initial_conditions):
-                    self.initial(source_cp, self.parameters['__source_0'])
+                    self.initial(source_cp_cpt, self.parameters['__source_0'])
         else:
             if not any(source_cp.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
                 self.initial(source_cp, self.parameters['__source_0'])
