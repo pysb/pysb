@@ -73,11 +73,14 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         The model to simulate/analyze using KaSim.
     time : number
         The amount of time (in arbitrary units) to run a simulation.
-        Identical to the -t argument when using KaSim at the command line.
+        Identical to the -u time -l argument when using KaSim at the command
+        line.
         Default value is 10000. If set to 0, no simulation will be run.
     points : integer
         The number of data points to collect for plotting.
-        Identical to the -p argument when using KaSim at the command line.
+        Note that this is not identical to the -p argument of KaSim when
+        called from the command line, which denotes plot period (time interval
+        between points in plot).
         Default value is 200. Note that the number of points actually returned
         by the simulator will be points + 1 (including the 0 point).
     cleanup : boolean
@@ -138,8 +141,12 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     fm_filename = base_filename + '_fm.dot'
     out_filename = base_filename + '.out'
 
-    args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
-            '-o', out_filename]
+    if points == 0:
+        raise ValueError('The number of data points cannot be zero.')
+    plot_period = (1.0 * time / points) if time > 0 else 1.0
+
+    args = ['-i', kappa_filename, '-u', 'time', '-l', str(time),
+            '-p', '%.5f' % plot_period, '-o', out_filename]
 
     if seed:
         args.extend(['-seed', str(seed)])
