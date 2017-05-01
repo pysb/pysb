@@ -256,6 +256,8 @@ class CupSodaSimulator(Simulator):
         #     if 'Running time' in line:
         #         self._logger.info(line[:-1])
         (p_out, p_err) = p.communicate()
+        p_out = p_out.decode('utf-8')
+        p_err = p_err.decode('utf-8')
         logger_level = self._logger.logger.getEffectiveLevel()
         if logger_level <= logging.INFO:
             run_time_match = self._running_time_regex.search(p_out)
@@ -332,14 +334,14 @@ class CupSodaSimulator(Simulator):
         n_sims = len(self.param_values)
 
         # atol_vector
-        with open(os.path.join(directory, "atol_vector"), 'wb') as atol_vector:
+        with open(os.path.join(directory, "atol_vector"), 'w') as atol_vector:
             for i in range(self._len_species):
                 atol_vector.write(str(self.opts.get('atol')))
                 if i < self._len_species - 1:
                     atol_vector.write("\n")
 
         # c_matrix
-        with open(os.path.join(directory, "c_matrix"), 'wb') as c_matrix:
+        with open(os.path.join(directory, "c_matrix"), 'w') as c_matrix:
             cmtx = self._get_cmatrix()
             for i in range(n_sims):
                 line = ""
@@ -352,7 +354,7 @@ class CupSodaSimulator(Simulator):
                     c_matrix.write("\n")
 
         # cs_vector
-        with open(os.path.join(directory, "cs_vector"), 'wb') as cs_vector:
+        with open(os.path.join(directory, "cs_vector"), 'w') as cs_vector:
             self._out_species = range(self._len_species)  # species to output
             if self._obs_species_only:
                 self._out_species = [False for sp in self._model.species]
@@ -367,7 +369,7 @@ class CupSodaSimulator(Simulator):
                 cs_vector.write(str(self._out_species[i]))
 
         # left_side
-        with open(os.path.join(directory, "left_side"), 'wb') as left_side:
+        with open(os.path.join(directory, "left_side"), 'w') as left_side:
             for i in range(self._len_rxns):
                 line = ""
                 for j in range(self._len_species):
@@ -384,16 +386,16 @@ class CupSodaSimulator(Simulator):
                     left_side.write(line)
 
         # max_steps
-        with open(os.path.join(directory, "max_steps"), 'wb') as mxsteps:
+        with open(os.path.join(directory, "max_steps"), 'w') as mxsteps:
             mxsteps.write(str(self.opts['max_steps']))
 
         # model_kind
-        with open(os.path.join(directory, "modelkind"), 'wb') as model_kind:
+        with open(os.path.join(directory, "modelkind"), 'w') as model_kind:
             # always set modelkind to 'deterministic'
             model_kind.write("deterministic")
 
         # MX_0
-        with open(os.path.join(directory, "MX_0"), 'wb') as MX_0:
+        with open(os.path.join(directory, "MX_0"), 'w') as MX_0:
             mx0 = self.initials
             # if a volume has been defined, rescale populations
             # by N_A*vol to get concentration
@@ -418,7 +420,7 @@ class CupSodaSimulator(Simulator):
                     MX_0.write("\n")
 
         # right_side
-        with open(os.path.join(directory, "right_side"), 'wb') as right_side:
+        with open(os.path.join(directory, "right_side"), 'w') as right_side:
             for i in range(self._len_rxns):
                 line = ""
                 for j in range(self._len_species):
@@ -435,16 +437,16 @@ class CupSodaSimulator(Simulator):
                     right_side.write(line)
 
         # rtol
-        with open(os.path.join(directory, "rtol"), 'wb') as rtol:
+        with open(os.path.join(directory, "rtol"), 'w') as rtol:
             rtol.write(str(self.opts.get('rtol')))
 
         # t_vector
-        with open(os.path.join(directory, "t_vector"), 'wb') as t_vector:
+        with open(os.path.join(directory, "t_vector"), 'w') as t_vector:
             for t in self.tspan:
                 t_vector.write(str(float(t)) + "\n")
 
         # time_max
-        with open(os.path.join(directory, "time_max"), 'wb') as time_max:
+        with open(os.path.join(directory, "time_max"), 'w') as time_max:
             time_max.write(str(float(self.tspan[-1])))
 
     def _get_cmatrix(self):
@@ -570,7 +572,7 @@ class CupSodaSimulator(Simulator):
 
     @staticmethod
     def _load_with_openfile(filename):
-        with open(filename, 'rb') as f:
+        with open(filename, 'r') as f:
             data = [line.rstrip('\n').split() for line in f]
         data = np.array(data, dtype=np.float, copy=False)
         return data
