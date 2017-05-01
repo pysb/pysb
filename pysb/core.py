@@ -515,19 +515,27 @@ class ComplexPattern(object):
         return mp_concrete_ok or compartment_ok
 
     def is_equivalent_to(self, other):
-        """Checks for equality with another ComplexPattern"""
-        # Didn't implement __eq__ to avoid confusion with __ne__ operator used for Rule building
+        """
+        Test a concrete ComplexPattern for equality with another.
+
+        Use of this method on non-concrete ComplexPatterns was previously
+        allowed, but is now deprecated.
+        """
+
+        # Didn't implement __eq__ to avoid confusion with __ne__ operator used
+        # for Rule building
 
         # Check both patterns are concrete
-        assert self.is_concrete(), "%s is not a concrete pattern (species)" \
-                                   % repr(self)
-        assert other.is_concrete(), "%s is not a concrete pattern (species)" \
-                                    % repr(other)
+        if not self.is_concrete() or not other.is_concrete():
+            warnings.warn("is_equivalent_to() will only work with concrete "
+                          "patterns in a future version", DeprecationWarning)
 
-        # FIXME the literal site_conditions comparison requires bond numbering to be identical,
-        #   so some sort of canonicalization of that numbering is necessary.
+        # FIXME the literal site_conditions comparison requires bond numbering
+        # to be identical, so some sort of canonicalization of that
+        # numbering is necessary.
         if not isinstance(other, ComplexPattern):
-            raise Exception("Can only compare ComplexPattern to another ComplexPattern")
+            raise Exception("Can only compare ComplexPattern to another "
+                            "ComplexPattern")
         mp_order = lambda mp: (mp[0], mp[1].keys(), mp[2])
         return (sorted([(repr(mp.monomer), mp.site_conditions,
                          mp.compartment or self.compartment)
