@@ -118,3 +118,12 @@ def test_unicode_strs():
     Rule(u'rule1', A(b=u'y') >> B(), Parameter(u'k', 1))
     Initial(A(b=u'y'), Parameter(u'A_0', 100))
     generate_equations(model)
+
+
+@with_model
+def test_sympy_parameter_keyword():
+    Monomer('A')
+    Initial(A(), Parameter('A_0', 100))
+    Parameter('deg', 10)  # deg is a sympy function
+    Rule('Rule1', A() >> None, deg)
+    generate_equations(model)

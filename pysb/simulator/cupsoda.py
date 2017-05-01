@@ -1,5 +1,6 @@
 from __future__ import print_function as _
 from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
+import pysb
 import pysb.bng
 import numpy as np
 from scipy.constants import N_A
@@ -455,7 +456,6 @@ class CupSodaSimulator(Simulator):
         par_names = [p.name for p in self._model_parameters_rules]
         rate_mask = np.array([p in self._model_parameters_rules for p in
                               self._model.parameters])
-        par_dict = {par_names[i]: i for i in range(len(par_names))}
         rate_args = []
         par_vals = self.param_values[:, rate_mask]
         rate_order = []
@@ -476,12 +476,13 @@ class CupSodaSimulator(Simulator):
             for j in range(self._len_rxns):
                 rate = 1.0
                 for r in rate_args[j]:
-                    x = str(r)
-                    if x in par_names:
-                        rate *= par_vals[i][par_dict[x]]
+                    if isinstance(r, pysb.Parameter):
+                        rate *= par_vals[i][par_names.index(r.name)]
+                    elif isinstance(r, pysb.Expression):
+                        raise ValueError('cupSODA does not currently support '
+                                         'models with Expressions')
                     else:
-                        # FIXME: need to detect non-numbers and throw an error
-                        rate *= float(x)
+                        rate *= r
                 # volume correction
                 if self.vol:
                     rate *= (N_A * self.vol) ** (rate_order[j] - 1)
