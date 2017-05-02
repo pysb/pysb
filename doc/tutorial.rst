@@ -922,7 +922,7 @@ hierarchical name of the module from which ``Model()`` is called, e.g.
 
 .. _BioNetGen: http://bionetgen.org/index.php/Documentation
 
-.. _Kappa: http://www.kappalanguage.org/documentation
+.. _Kappa: http://dev.executableknowledge.org/docs/KaSim-manual-master/KaSim_manual.htm
 
 .. _extrinsic apoptosis signaling: http://www.plosbiology.org/article/info%3Adoi%2F10.1371%2Fjournal.pbio.0060299
 
