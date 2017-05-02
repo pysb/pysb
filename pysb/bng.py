@@ -14,8 +14,6 @@ from warnings import warn
 import shutil
 import collections
 import pysb.pathfinder as pf
-from pysb.simulator import SimulationResult
-
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -205,7 +203,6 @@ class BngBaseInterface(object):
                 names += f.readline().split()[2:]
                 # Exclude first column (time)
                 gdat_arr = numpy.loadtxt(f)
-                print(gdat_arr)
                 if cdat_arr is None:
                     cdat_arr = numpy.ndarray((len(gdat_arr), 0))
                 else:
