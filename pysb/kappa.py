@@ -143,7 +143,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
 
     if points == 0:
         raise ValueError('The number of data points cannot be zero.')
-    plot_period = (1.0 * time / points) if time > 0 else 1.0
+    plot_period = (float(time) / points) if time > 0 else 1.0
 
     args = ['-i', kappa_filename, '-u', 'time', '-l', str(time),
             '-p', '%.5f' % plot_period, '-o', out_filename]
@@ -407,14 +407,14 @@ def _parse_kasim_outfile(out_filename):
         simulation. Data for the observables can be accessed by indexing the
         array with the names of the observables.
     """
-
     try:
-        out_file = open(out_filename, 'r')
-        preamble_len = 2 # First 2 lines are comments
-        [out_file.readline() for i in range(preamble_len)]
+        with open(out_filename, 'r') as fh:
+            while True:
+                header_line = fh.readline()
+                # Break when the first non-comment line is found
+                if not header_line.startswith('#'):
+                    break
 
-        header_line = out_file.readline().strip()  # Get the header line
-        out_file.close()
         raw_names = [term.strip() for term in re.split(',', header_line)]
         column_names = []
 
