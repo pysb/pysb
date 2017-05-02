@@ -39,6 +39,8 @@ def test_kappa_expressions():
     Rule('dimerize_rev',
          A(site=('u', 1)) % A(site=('u',1)) >>
          A(site='u') + A(site='u'), kr)
+    # We need an arbitrary observable here to get a Kappa output file
+    Observable('A_obs', A())
     # Accommodates Expression in kappa simulation
     run_simulation(model, time=0)
 
