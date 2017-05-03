@@ -54,8 +54,11 @@ class ScipyOdeSimulator(Simulator):
         If passed as a dictionary, keys must be parameter names.
         If not specified, parameter values will be taken directly from
         model.parameters.
-    verbose : bool, optional (default: False)
-        Verbose output.
+    verbose : bool or int, optional (default: False)
+        Sets the verbosity level of the logger. See the logging levels and
+        constants from Python's logging module for interpretation of integer
+        values. False is equal to the PySB default level (currently WARNING),
+        True is equal to DEBUG.
     **kwargs : dict
         Extra keyword arguments, including:
 

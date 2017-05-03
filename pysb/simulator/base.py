@@ -426,6 +426,11 @@ class SimulationResult(object):
     squeeze : bool, optional (default: True)
         Return trajectories as a 2D array, rather than a 3d array, if only
         a single simulation was performed.
+    simulations_per_param_set : int
+        Number of trajectories per parameter set. Typically always 1 for
+        deterministic simulators (e.g. ODE), but with stochastic simulators
+        multiple trajectories per parameter/initial condition set are often
+        desired.
 
     Examples
     --------
@@ -496,12 +501,14 @@ class SimulationResult(object):
     8.888889   0.000138    4.995633
     13.333333  0.000002    4.999927
     """
-    def __init__(self, simulator, tout, trajectories, squeeze=True):
+    def __init__(self, simulator, tout, trajectories, squeeze=True,
+                 simulations_per_param_set=1):
         simulator._logger.debug('SimulationResult constructor started')
         self.squeeze = squeeze
         self.tout = tout
         self._yfull = None
         self._model = simulator._model
+        self.n_sims_per_parameter_set = simulations_per_param_set
 
         # Validate incoming trajectories
         if hasattr(trajectories, 'ndim') and trajectories.ndim == 3:
@@ -581,7 +588,8 @@ class SimulationResult(object):
 
             # expressions
             sym_dict = dict((k, self._yobs[n][k]) for k in obs_names)
-            sym_dict.update(dict((p.name, param_values[n][i]) for i, p in
+            sym_dict.update(dict((p.name, param_values[
+                n // self.n_sims_per_parameter_set][i]) for i, p in
                             enumerate(self._model.parameters)))
             for i, expr in enumerate(exprs):
                 self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)
@@ -676,6 +684,7 @@ class SimulationResult(object):
         List of trajectory sets. The first dimension contains expressions.
         """
         return self._squeeze_output(self._yexpr)
+
 
 def _allow_unicode_recarray():
     """Return True if numpy recarray can take unicode data type.
