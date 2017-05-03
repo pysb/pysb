@@ -24,10 +24,8 @@ def plot_mean_min_max(name, title=None):
     plt.ylabel('Population of %s' % name)
 
 tspan = np.linspace(0, 20000, 1000)
-simres = StochKitSimulator(model,
-                           tspan).run(n_runs=20,
-                                      seed=None,
-                                      algorithm="ssa")
+sim = StochKitSimulator(model, tspan)
+simres = sim.run(n_runs=20, seed=None, algorithm="ssa")
 
 trajectories = simres.all
 tout = simres.tout

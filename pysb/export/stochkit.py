@@ -15,11 +15,11 @@ import sympy
 import re
 try:
     import lxml.etree as etree
-    no_pretty_print = False
+    pretty_print = True
 except ImportError:
     import xml.etree.ElementTree as etree
     import xml.dom.minidom
-    no_pretty_print = True
+    pretty_print = False
 
 
 class StochKitExporter(Exporter):
@@ -245,9 +245,9 @@ class StochKitExporter(Exporter):
                                                    products))
         document.append(reacs)
 
-        try:
+        if pretty_print:
             return etree.tostring(document, pretty_print=True)
-        except:
+        else:
             # Hack to print pretty xml without pretty-print
             # (requires the lxml module).
             doc = etree.tostring(document)

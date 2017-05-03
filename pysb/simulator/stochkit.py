@@ -6,7 +6,6 @@ import subprocess
 import os
 import shutil
 import tempfile
-import re
 from pysb.pathfinder import get_path
 
 
@@ -131,14 +130,6 @@ class StochKitSimulator(Simulator):
             extra_args += ' --threshold {:d}'.format(threshold)
 
         # Find binary for selected algorithm (SSA, Tau-leaping, ...)
-        if algorithm is None:
-            raise SimulatorException("No StochKit algorithm selected")
-        if not re.match(r'\w', algorithm):
-            # Security check failure
-            raise SimulatorException("StochKit algorithm name should contain "
-                                     "only alphanumeric and underscore "
-                                     "characters")
-
         if algorithm not in ['ssa', 'tau_leaping']:
             raise SimulatorException(
                 "algorithm must be 'ssa' or 'tau_leaping'")
@@ -197,8 +188,7 @@ class StochKitSimulator(Simulator):
                     traj_dir, f)) for f in sorted(os.listdir(traj_dir))])
             except Exception as e:
                 raise SimulatorException(
-                    "Error using solver.get_trajectories('{0}'): {1}".format(
-                        prefix_outdir, e))
+                    "Error reading StochKit trajectories: {1}".format(e))
 
             if len(trajectories) == 0 or len(stderr) != 0:
                 raise SimulatorException("Solver execution failed: \
