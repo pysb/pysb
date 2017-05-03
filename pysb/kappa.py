@@ -73,11 +73,14 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         The model to simulate/analyze using KaSim.
     time : number
         The amount of time (in arbitrary units) to run a simulation.
-        Identical to the -t argument when using KaSim at the command line.
+        Identical to the -u time -l argument when using KaSim at the command
+        line.
         Default value is 10000. If set to 0, no simulation will be run.
     points : integer
         The number of data points to collect for plotting.
-        Identical to the -p argument when using KaSim at the command line.
+        Note that this is not identical to the -p argument of KaSim when
+        called from the command line, which denotes plot period (time interval
+        between points in plot).
         Default value is 200. Note that the number of points actually returned
         by the simulator will be points + 1 (including the 0 point).
     cleanup : boolean
@@ -138,8 +141,12 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     fm_filename = base_filename + '_fm.dot'
     out_filename = base_filename + '.out'
 
-    args = ['-i', kappa_filename, '-t', str(time), '-p', str(points),
-            '-o', out_filename]
+    if points == 0:
+        raise ValueError('The number of data points cannot be zero.')
+    plot_period = (float(time) / points) if time > 0 else 1.0
+
+    args = ['-i', kappa_filename, '-u', 'time', '-l', str(time),
+            '-p', '%.5f' % plot_period, '-o', out_filename]
 
     if seed:
         args.extend(['-seed', str(seed)])
@@ -161,7 +168,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     # Run KaSim
     kasim_path = pf.get_path('kasim')
     p = subprocess.Popen([kasim_path] + args,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         cwd=base_directory)
     if verbose:
         for line in iter(p.stdout.readline, b''):
             print('@@', line, end='')
@@ -267,18 +275,19 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     # Contact map args:
     if contact_map:
         cm_args = ['--compute-contact-map', '--output-contact-map',
-                   os.path.basename(cm_filename)]
+                   os.path.basename(cm_filename),
+                   '--output-contact-map-directory', base_directory]
     else:
         cm_args = ['--no-compute-contact-map']
     # Influence map args:
     if influence_map:
         im_args = ['--compute-influence-map', '--output-influence-map',
-                   os.path.basename(im_filename)]
+                   os.path.basename(im_filename),
+                   '--output-influence-map-directory', base_directory]
     else:
         im_args = ['--no-compute-influence-map']
     # Full arg list
-    args = [kappa_filename, '--output-directory', base_directory] \
-            + cm_args + im_args
+    args = [kappa_filename] + cm_args + im_args
 
     # Generate the Kappa model code from the PySB model and write it to
     # the Kappa file:
@@ -288,7 +297,8 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     # Run KaSa using the given args
     kasa_path = pf.get_path('kasa')
     p = subprocess.Popen([kasa_path] + args,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         cwd=base_directory)
     if verbose:
         for line in iter(p.stdout.readline, b''):
             print('@@', line, end='')
@@ -399,29 +409,33 @@ def _parse_kasim_outfile(out_filename):
         simulation. Data for the observables can be accessed by indexing the
         array with the names of the observables.
     """
-
     try:
-        out_file = open(out_filename, 'r')
+        with open(out_filename, 'r') as fh:
+            for header_line in fh:
+                if header_line[0] != '#':
+                    break
 
-        line = out_file.readline().strip()  # Get the first line
-        out_file.close()
-        line = line[2:]  # strip off opening '# '
-        raw_names = re.split(' ', line)
+            # Load the output file as a numpy record array, skip the name row
+            arr = np.loadtxt(fh, dtype=float, delimiter=',')
+
+        raw_names = [term.strip() for term in re.split(',', header_line)]
         column_names = []
 
         # Get rid of the quotes surrounding the observable names
         for raw_name in raw_names:
-            mo = re.match("'(.*)'", raw_name)
-            if (mo):
-                column_names.append(mo.group(1))
+            mo = re.match('"(.*)"', raw_name)
+            if mo:
+                name = mo.group(1)
+                # Rename the time column to remain backwards compatible
+                if name == '[T]':
+                    name = 'time'
+                column_names.append(name)
             else:
                 column_names.append(raw_name)
 
         # Create the dtype argument for the numpy record array
         dt = list(zip(column_names, ('float', ) * len(column_names)))
 
-        # Load the output file as a numpy record array, skip the name row
-        arr = np.loadtxt(out_filename, dtype=float, skiprows=1)
         recarr = arr.view(dt)
     except Exception as e:
         raise Exception("problem parsing KaSim outfile: " + str(e))

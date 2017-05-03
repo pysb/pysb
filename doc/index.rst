@@ -14,7 +14,7 @@ standard scientific Python libraries such as `NumPy`_, `SciPy`_ and `SymPy`_ to
 enable model simulation and analysis.
 
 .. _BNGL: http://www.bionetgen.org
-.. _Kappa: http://www.kappalanguage.org
+.. _Kappa: http://dev.executableknowledge.org
 .. _NumPy: http://numpy.scipy.org
 .. _SciPy: http://www.scipy.org
 .. _SymPy: http://sympy.org

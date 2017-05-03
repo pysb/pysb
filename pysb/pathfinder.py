@@ -15,8 +15,8 @@ _path_config = {
         'executable': 'KaSa',
         'env_var': 'KAPPAPATH',
         'search_paths': {
-            'posix': ('/usr/local/share/KaSim', ),
-            'nt': ('c:/Program Files/KaSim', )
+            'posix': ('/usr/local/share/KaSa', ),
+            'nt': ('c:/Program Files/KaSa', )
         }
     },
     'kasim': {

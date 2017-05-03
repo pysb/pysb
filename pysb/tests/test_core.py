@@ -1,6 +1,8 @@
 from pysb.testing import *
 from pysb.core import *
 from functools import partial
+import itertools
+
 
 def test_component_names_valid():
     for name in 'a', 'B', 'AbC', 'dEf', '_', '_7', '__a01b__999x_x___':
@@ -132,5 +134,44 @@ def test_complex_pattern_call():
 def test_monomer_unicode():
     Monomer(u'A', [u's'], {u's': [u's1', u's2']})
 
-if __name__ == '__main__':
-    test_monomer_unicode()
+
+def _check_pattern_equivalence(complex_pattern_list, equivalent=True):
+    """ Check all complex pattern permutations are equivalent (or not) """
+    for cp0, cp1 in itertools.permutations(complex_pattern_list, 2):
+        assert cp0.is_equivalent_to(cp1) == equivalent
+
+
+@with_model
+def test_complex_pattern_equivalence_compartments():
+    Monomer('A')
+    Monomer('B')
+
+    Compartment('C1')
+    Compartment('C2')
+
+    cp0 = ComplexPattern([A()], compartment=C1)  # Only species compartment
+    cp1 = as_complex_pattern(A() ** C1)          # Only monomer compartment
+    cp2 = ComplexPattern([A() ** C1], compartment=C1)  # Both compartments
+
+    _check_pattern_equivalence((cp0, cp1, cp2))
+
+    cp3 = (A() % B()) ** C1
+    cp4 = A() ** C1 % B() ** C1
+    cp5 = (A() ** C1 % B()) ** C1
+    # Species compartment is ignored if all monomer patterns have a compartment
+    cp6 = (A() ** C1 % B() ** C1) ** C2
+
+    _check_pattern_equivalence((cp3, cp4, cp5, cp6))
+
+    # Species compartment should not override a specified monomer compartment
+    cp7 = (A() ** C1 % B() ** C2) ** C1
+    _check_pattern_equivalence((cp5, cp7), equivalent=False)
+
+    # Test enable_synth_deg creates two initial conditions, one for each
+    # compartment
+    model.enable_synth_deg()
+    assert len(model.initial_conditions) == 2
+
+    # Check that enable_synth_deg is idempotent
+    model.enable_synth_deg()
+    assert len(model.initial_conditions) == 2

@@ -443,6 +443,8 @@ class MonomerPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
+            if self.compartment is not None:
+                raise CompartmentAlreadySpecifiedError()
             mp_new = self()
             mp_new.compartment = other
             return mp_new
@@ -513,18 +515,33 @@ class ComplexPattern(object):
         return mp_concrete_ok or compartment_ok
 
     def is_equivalent_to(self, other):
-        """Checks for equality with another ComplexPattern"""
-        # Didn't implement __eq__ to avoid confusion with __ne__ operator used for Rule building
+        """
+        Test a concrete ComplexPattern for equality with another.
 
-        # FIXME the literal site_conditions comparison requires bond numbering to be identical,
-        #   so some sort of canonicalization of that numbering is necessary.
+        Use of this method on non-concrete ComplexPatterns was previously
+        allowed, but is now deprecated.
+        """
+
+        # Didn't implement __eq__ to avoid confusion with __ne__ operator used
+        # for Rule building
+
+        # Check both patterns are concrete
+        if not self.is_concrete() or not other.is_concrete():
+            warnings.warn("is_equivalent_to() will only work with concrete "
+                          "patterns in a future version", DeprecationWarning)
+
+        # FIXME the literal site_conditions comparison requires bond numbering
+        # to be identical, so some sort of canonicalization of that
+        # numbering is necessary.
         if not isinstance(other, ComplexPattern):
-            raise Exception("Can only compare ComplexPattern to another ComplexPattern")
+            raise Exception("Can only compare ComplexPattern to another "
+                            "ComplexPattern")
         mp_order = lambda mp: (mp[0], mp[1].keys(), mp[2])
-        return (self.compartment == other.compartment and
-                sorted([(repr(mp.monomer), mp.site_conditions, mp.compartment)
+        return (sorted([(repr(mp.monomer), mp.site_conditions,
+                         mp.compartment or self.compartment)
                        for mp in self.monomer_patterns], key=mp_order) ==
-                sorted([(repr(mp.monomer), mp.site_conditions, mp.compartment)
+                sorted([(repr(mp.monomer), mp.site_conditions,
+                         mp.compartment or other.compartment)
                        for mp in other.monomer_patterns], key=mp_order))
 
     def copy(self):
@@ -619,6 +636,8 @@ class ComplexPattern(object):
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
+            if self.compartment is not None:
+                raise CompartmentAlreadySpecifiedError()
             cp_new = self.copy()
             cp_new.compartment = other
             return cp_new
@@ -857,8 +876,13 @@ class Compartment(Component):
         self.size = size
 
     def __repr__(self):
-        return  '%s(name=%s, parent=%s, dimension=%s, size=%s)' % \
-            (self.__class__.__name__, repr(self.name), repr(self.parent), repr(self.dimension), repr(self.size))
+        return '%s(name=%s, parent=%s, dimension=%s, size=%s)' % (
+            self.__class__.__name__,
+            repr(self.name),
+            'None' if self.parent is None else self.parent.name,
+            repr(self.dimension),
+            'None' if self.size is None else self.size.name
+        )
 
 
 class Rule(Component):
@@ -1444,10 +1468,10 @@ class Model(object):
         source_cp = as_complex_pattern(self.monomers['__source']())
         if self.compartments:
             for c in self.compartments:
-                source_cp = source_cp ** c
-                if not any(source_cp.is_equivalent_to(other_cp) for
+                source_cp_cpt = source_cp ** c
+                if not any(source_cp_cpt.is_equivalent_to(other_cp) for
                            other_cp, value in self.initial_conditions):
-                    self.initial(source_cp, self.parameters['__source_0'])
+                    self.initial(source_cp_cpt, self.parameters['__source_0'])
         else:
             if not any(source_cp.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
                 self.initial(source_cp, self.parameters['__source_0'])
@@ -1516,6 +1540,9 @@ class DuplicateSiteError(ValueError):
     pass
 
 class UnknownSiteError(ValueError):
+    pass
+
+class CompartmentAlreadySpecifiedError(ValueError):
     pass
 
 

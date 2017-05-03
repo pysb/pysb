@@ -1,9 +1,6 @@
 from pysb.testing import *
 from pysb import *
 from pysb.kappa import *
-from pysb.bng import generate_network
-import subprocess 
-from re import split
 import pygraphviz as pgv
 
 _KAPPA_SEED = 123456
@@ -39,6 +36,8 @@ def test_kappa_expressions():
     Rule('dimerize_rev',
          A(site=('u', 1)) % A(site=('u',1)) >>
          A(site='u') + A(site='u'), kr)
+    # We need an arbitrary observable here to get a Kappa output file
+    Observable('A_obs', A())
     # Accommodates Expression in kappa simulation
     run_simulation(model, time=0)
 
@@ -61,8 +60,7 @@ def test_flux_map():
     Initial(B(a=None, c=None), Parameter('B_0', 100))
     Initial(C(b=None), Parameter('C_0', 100))
     res = run_simulation(model, time=10, points=100, flux_map=True,
-                         output_dir='.', cleanup=True,
-                         seed=_KAPPA_SEED, verbose=False)
+                         cleanup=True, seed=_KAPPA_SEED, verbose=False)
     simdata = res.timecourse
     ok_(len(simdata['time']) == 101)
     ok_(len(simdata['ABC']) == 101)
@@ -90,8 +88,8 @@ def test_run_static_analysis_valueerror():
     Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=1),
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
-    res = run_static_analysis(model, contact_map=False, influence_map=False,
-                              output_dir='.')
+    res = run_static_analysis(model, contact_map=False, influence_map=False)
+
 
 @with_model
 def test_run_static_analysis_cmap():
@@ -101,8 +99,7 @@ def test_run_static_analysis_cmap():
     Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=1),
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
-    res = run_static_analysis(model, contact_map=True, influence_map=False,
-                              output_dir='.')
+    res = run_static_analysis(model, contact_map=True, influence_map=False)
     ok_(isinstance(res.contact_map, pgv.AGraph))
     ok_(res.influence_map is None)
 
@@ -121,8 +118,7 @@ def test_run_static_analysis_imap():
     Rule('B_activates_C',
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
-    res = run_static_analysis(model, contact_map=False, influence_map=True,
-                              output_dir='.')
+    res = run_static_analysis(model, contact_map=False, influence_map=True)
     ok_(isinstance(res.influence_map, pgv.AGraph))
     ok_(res.contact_map is None)
 
@@ -141,8 +137,7 @@ def test_run_static_analysis_both():
     Rule('B_activates_C',
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
-    res = run_static_analysis(model, contact_map=True, influence_map=True,
-                              output_dir='.')
+    res = run_static_analysis(model, contact_map=True, influence_map=True)
     ok_(isinstance(res.influence_map, pgv.AGraph))
     ok_(isinstance(res.contact_map, pgv.AGraph))
 
@@ -153,7 +148,7 @@ def test_contact_map():
     Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=1),
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
-    res = contact_map(model, cleanup=True, output_dir='.')
+    res = contact_map(model, cleanup=True)
     ok_(isinstance(res, pgv.AGraph))
 
 @with_model
