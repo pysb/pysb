@@ -168,7 +168,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     # Run KaSim
     kasim_path = pf.get_path('kasim')
     p = subprocess.Popen([kasim_path] + args,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         cwd=base_directory)
     if verbose:
         for line in iter(p.stdout.readline, b''):
             print('@@', line, end='')
@@ -296,7 +297,8 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     # Run KaSa using the given args
     kasa_path = pf.get_path('kasa')
     p = subprocess.Popen([kasa_path] + args,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         cwd=base_directory)
     if verbose:
         for line in iter(p.stdout.readline, b''):
             print('@@', line, end='')
@@ -408,10 +410,13 @@ def _parse_kasim_outfile(out_filename):
         array with the names of the observables.
     """
     try:
-        fh = open(out_filename, 'r')
-        for header_line in fh:
-            if header_line[0] != '#':
-                break
+        with open(out_filename, 'r') as fh:
+            for header_line in fh:
+                if header_line[0] != '#':
+                    break
+
+            # Load the output file as a numpy record array, skip the name row
+            arr = np.loadtxt(fh, dtype=float, delimiter=',')
 
         raw_names = [term.strip() for term in re.split(',', header_line)]
         column_names = []
@@ -431,8 +436,6 @@ def _parse_kasim_outfile(out_filename):
         # Create the dtype argument for the numpy record array
         dt = list(zip(column_names, ('float', ) * len(column_names)))
 
-        # Load the output file as a numpy record array, skip the name row
-        arr = np.loadtxt(fh, dtype=float, delimiter=',')
         recarr = arr.view(dt)
     except Exception as e:
         raise Exception("problem parsing KaSim outfile: " + str(e))
