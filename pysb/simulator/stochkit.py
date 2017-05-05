@@ -66,14 +66,17 @@ class StochKitSimulator(Simulator):
 
     Here we supply a "seed" to the random number generator for deterministic
     results, but for most purposes it is recommended to leave this blank.
+
     >>> simulation_result = sim.run(n_runs=2, seed=123456)
 
     A_total trajectory for first run
+
     >>> print(simulation_result.observables[0]['A_total']) \
         #doctest: +ELLIPSIS
     [ 1.  0.  0.  0.  0.  0.]
 
     A_total trajectory for second run
+
     >>> print(simulation_result.observables[1]['A_total']) \
         #doctest: +ELLIPSIS
     [ 1.  1.  1.  1.  0.  0.]
