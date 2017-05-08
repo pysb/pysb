@@ -1,7 +1,6 @@
-from pysb.simulator.base import Simulator, SimulationResult, SimulationResultNF
-from pysb.bng import generate_equations, BngFileInterface
+from pysb.simulator.base import Simulator, SimulationResult
+from pysb.bng import BngFileInterface, load_equations
 import numpy as np
-import os
 
 
 class BngSimulator(Simulator):
@@ -29,10 +28,10 @@ class BngSimulator(Simulator):
         initials: vector-like, optional
             initial conditions of model
         param_values : vector-like or dictionary, optional
-                Values to use for every parameter in the model. Ordering is
-                determined by the order of model.parameters.
-                If not specified, parameter values will be taken directly from
-                model.parameters.
+            Values to use for every parameter in the model. Ordering is
+            determined by the order of model.parameters.
+            If not specified, parameter values will be taken directly from
+            model.parameters.
         n_sim: int, optional
             number of simulations to run
         method : str
@@ -57,8 +56,7 @@ class BngSimulator(Simulator):
         """
         super(BngSimulator, self).run(tspan=tspan,
                                       initials=initials,
-                                      param_values=param_values,
-                                      n_sim=n_sim,
+                                      param_values=param_values
                                       )
 
         if method not in ['ssa', 'nf', 'pla', 'ode']:
@@ -70,69 +68,55 @@ class BngSimulator(Simulator):
         additional_args['verbose'] = verbose
         params_names = [g.name for g in self._model.parameters]
 
-        self._logger.info('Running %d BNG %s simulations' % (n_sim, method))
+        n_param_sets = len(self.initials)
+        total_sims = n_sim * n_param_sets
+
+        self._logger.info('Running %d BNG %s simulations' % (total_sims,
+                                                             method))
 
         with BngFileInterface(self._model, verbose=verbose,
                               output_dir=output_dir,
                               output_prefix=output_file_basename,
                               cleanup=cleanup) as bngfile:
             if method != 'nf':
+                # TODO: Write existing netfile if already generated
                 bngfile.action('generate_network', overwrite=True,
                                verbose=verbose)
-            bngfile.action('saveConcentrations')
+            # bngfile.action('saveConcentrations')
             if output_file_basename is None:
                 prefix = 'pysb'
             else:
                 prefix = output_file_basename
-            for i in range(n_sim):
 
-                tmp = additional_args.copy()
-                tmp['prefix'] = prefix + str(i)
-                for n, p_val in enumerate(self.param_values[i]):
+            sim_prefix = 0
+            for pset_idx in range(n_param_sets):
+                for n in range(len(self.param_values[pset_idx])):
                     bngfile.set_parameter(params_names[n],
-                                          self.param_values[i][n])
-                for n, p_val in enumerate(self.initials[i]):
+                                          self.param_values[pset_idx][n])
+                for n in range(len(self.initials[pset_idx])):
                     bngfile.set_concentration(self._model.species[n],
-                                              self.initials[i][n])
-                bngfile.action('simulate', **tmp)
+                                              self.initials[pset_idx][n])
+                for sim_rpt in range(n_sim):
+                    tmp = additional_args.copy()
+                    tmp['prefix'] = '{}{}'.format(prefix, sim_prefix)
+                    bngfile.action('simulate', **tmp)
+                    sim_prefix += 1
             bngfile.execute()
-            tout, yout = read_multi_simulation_results(n_sim,
-                                                       bngfile.base_filename,
-                                                       method)
+            if method != 'nf':
+                load_equations(self.model, bngfile.net_filename)
+            _, list_of_yfull_views = \
+                BngFileInterface.read_simulation_results_multi(
+                [bngfile.base_filename + str(n) for n in range(total_sims)])
 
-        if method == 'nf':
-            return SimulationResultNF(self, tout=tout, trajectories=yout)
+        tout = []
+        yout = []
+        for i in range(total_sims):
+            tout.append(list_of_yfull_views[i][:, 0])
+            if method != 'nf':
+                yout.append(list_of_yfull_views[i][:,
+                            1:(len(self.model.species) + 1)])
+            else:
+                raise NotImplementedError()
 
-        return SimulationResult(self, tout=tout, trajectories=yout)
-
-
-def read_multi_simulation_results(n_sims, base_filename, method):
-    """
-    Reads the results of a BNG simulation and parses them into a numpy
-    array
-    """
-    # Read concentrations data
-
-    trajectories = [None] * n_sims
-    tout = []
-    # load the data
-
-    for n in range(n_sims):
-        filename = base_filename + str(n) + '.cdat'
-
-        if method == 'nf':
-            filename = base_filename + str(n) + '.gdat'
-            # species = base_filename+str(n)+'.species'
-            # with open(species, 'r') as f:
-            #     out = f.read()
-
-            if not os.path.isfile(filename):
-                raise Exception("Cannot find input file " + filename)
-            data = np.loadtxt(filename)
-        else:
-            data = np.loadtxt(filename, skiprows=1)
-
-        # store data
-        tout.append(data[:, 0])
-        trajectories[n] = data[:, 1:]
-    return np.array(tout), np.array(trajectories)
+        return SimulationResult(self, tout=tout, trajectories=yout,
+                                simulations_per_param_set=n_sim)

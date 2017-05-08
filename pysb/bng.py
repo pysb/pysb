@@ -181,8 +181,7 @@ class BngBaseInterface(object):
 
     def read_simulation_results(self):
         """
-        Reads the results of a BNG simulation and parses them into a numpy
-        array
+        Read the results of a BNG simulation as a numpy array
 
         Returns
         -------
@@ -191,44 +190,71 @@ class BngBaseInterface(object):
             species/observables/expressions on X axis depending on
             simulation type)
         """
-        self._logger.debug('Reading simulation results: %s.{cdat,gdat}' %
-                           self.base_filename)
-        names = ['time']
+        return self.read_simulation_results_multi([self.base_filename])[0][0]
 
-        # Read concentrations data
-        try:
-            cdat_arr = numpy.loadtxt(self.base_filename + '.cdat', skiprows=1)
-            # -1 for time column
-            names += ['__s%d' % i for i in range(cdat_arr.shape[1] - 1)]
-        except IOError:
-            cdat_arr = None
+    @staticmethod
+    def read_simulation_results_multi(base_filenames):
+        """
+        Read the results of multiple BNG simulations
 
-        # Read groups data
-        try:
-            with open(self.base_filename + '.gdat', 'r') as f:
-                # Exclude \# and time column
-                names += f.readline().split()[2:]
-                # Exclude first column (time)
-                gdat_arr = numpy.loadtxt(f)
+        Parameters
+        ----------
+        base_filenames: list of str
+            A list of filename stems to read simulation results in from,
+            including the full path but not including any file extension.
+
+        Returns
+        -------
+        list of numpy.ndarray
+            List of simulation results, each in a 2D matrix (time on Y axis,
+            species/observables/expressions on X axis depending on
+            simulation type)
+        list of numpy.ndarray
+            List of simulation results, each in a 2D matrix
+        """
+        # TODO: Describe yfull_view in docstring
+        list_of_yfulls = []
+        list_of_yfull_views = []
+        for base_filename in base_filenames:
+            names = ['time']
+
+            # Read concentrations data
+            try:
+                cdat_arr = numpy.loadtxt(base_filename + '.cdat', skiprows=1)
+                # -1 for time column
+                names += ['__s%d' % i for i in range(cdat_arr.shape[1] - 1)]
+            except IOError:
+                cdat_arr = None
+
+            # Read groups data
+            try:
+                with open(base_filename + '.gdat', 'r') as f:
+                    # Exclude \# and time column
+                    names += f.readline().split()[2:]
+                    # Exclude first column (time)
+                    gdat_arr = numpy.loadtxt(f)
+                    if cdat_arr is None:
+                        cdat_arr = numpy.ndarray((len(gdat_arr), 0))
+                    else:
+                        gdat_arr = gdat_arr[:, 1:]
+            except IOError:
                 if cdat_arr is None:
-                    cdat_arr = numpy.ndarray((len(gdat_arr), 0))
-                else:
-                    gdat_arr = gdat_arr[:, 1:]
-        except IOError:
-            if cdat_arr is None:
-                raise BngInterfaceError('Need at least one of .cdat file or '
-                                        '.gdat file to read simulation '
-                                        'results')
-            gdat_arr = numpy.ndarray((len(cdat_arr), 0))
+                    raise BngInterfaceError('Need at least one of .cdat file or '
+                                            '.gdat file to read simulation '
+                                            'results')
+                gdat_arr = numpy.ndarray((len(cdat_arr), 0))
 
-        yfull_dtype = list(zip(names, itertools.repeat(float)))
-        yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
+            yfull_dtype = list(zip(names, itertools.repeat(float)))
+            yfull = numpy.ndarray(len(cdat_arr), yfull_dtype)
 
-        yfull_view = yfull.view(float).reshape(len(yfull), -1)
-        yfull_view[:, :cdat_arr.shape[1]] = cdat_arr
-        yfull_view[:, cdat_arr.shape[1]:] = gdat_arr
+            yfull_view = yfull.view(float).reshape(len(yfull), -1)
+            yfull_view[:, :cdat_arr.shape[1]] = cdat_arr
+            yfull_view[:, cdat_arr.shape[1]:] = gdat_arr
 
-        return yfull
+            list_of_yfulls.append(yfull)
+            list_of_yfull_views.append(yfull_view)
+
+        return list_of_yfulls, list_of_yfull_views
 
 
 class BngConsole(BngBaseInterface):
@@ -334,7 +360,7 @@ class BngConsole(BngBaseInterface):
 
     def load_bngl(self, bngl_file):
         """
-        Loads a BNGL file in the BNG console
+        Load a BNGL file in the BNG console
 
         Parameters
         ----------
@@ -454,11 +480,7 @@ class BngFileInterface(BngBaseInterface):
             Value of parameter
 
         """
-        # Add the command to the queue
-
         self.command_queue.write('\tsetParameter("%s", %f)\n' % (name, value))
-
-        return
 
     def set_concentration(self, name, value):
         """
@@ -472,13 +494,9 @@ class BngFileInterface(BngBaseInterface):
             Value of parameter or initial concentration
 
         """
-        # Add the command to the queue
         formatted_name = format_complexpattern(name)
-
         self.command_queue.write('\tsetConcentration("%s", %f)\n' % (
             formatted_name, value))
-
-        return
 
 
 def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
@@ -593,6 +611,23 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
         output = bngfile.read_netfile()
 
     return output
+
+
+def load_equations(model, netfile):
+    """
+    Load model equations from a specified netfile
+
+    Parameters
+    ----------
+    model: pysb.Model
+        PySB model file
+    netfile: str
+        BNG netfile
+    """
+    if model.odes:
+        return
+    with open(netfile, 'r') as f:
+        _parse_netfile(model, iter(f.readline()))
 
 
 def generate_equations(model, cleanup=True, verbose=False):
