@@ -11,10 +11,12 @@ except NameError:
 
 class BngGenerator(object):
 
-    def __init__(self, model):
+    def __init__(self, model, additional_initials=None):
         self.model = model
         if self.model.has_synth_deg():
             self.model.enable_synth_deg()
+        self._additional_initials = additional_initials if \
+            additional_initials is not None else []
         self.__content = None
 
     def get_content(self):
@@ -135,11 +137,19 @@ class BngGenerator(object):
             warn_caller("Model does not contain any initial conditions")
             return
         species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
+        for cp in self._additional_initials:
+            if not any([cp.is_equivalent_to(i) for i, _ in
+                        self.model.initial_conditions]):
+                species_codes.append(format_complexpattern(cp))
         max_length = max(len(code) for code in species_codes)
         self.__content += "begin species\n"
         for i, code in enumerate(species_codes):
-            param = self.model.initial_conditions[i][1]
-            self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code, param.name)
+            if i < len(self.model.initial_conditions):
+                param = self.model.initial_conditions[i][1].name
+            else:
+                param = '0'
+            self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code,
+                                                                         param)
         self.__content += "end species\n\n"
 
 def format_monomer_site(monomer, site):

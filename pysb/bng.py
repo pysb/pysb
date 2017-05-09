@@ -51,7 +51,8 @@ class BngBaseInterface(object):
 
     @abc.abstractmethod
     def __init__(self, model=None, verbose=False, cleanup=False,
-                 output_prefix=None, output_dir=None):
+                 output_prefix=None, output_dir=None,
+                 model_additional_species=None):
         self._logger = get_logger(__name__,
                                   model=model,
                                   log_level=verbose)
@@ -60,7 +61,9 @@ class BngBaseInterface(object):
         self.output_prefix = 'tmpBNG' if output_prefix is None else \
             output_prefix
         if model:
-            self.generator = BngGenerator(model)
+            self.generator = BngGenerator(
+                model, additional_initials=model_additional_species
+            )
             self.model = self.generator.model
             self._check_model()
         else:
@@ -190,7 +193,7 @@ class BngBaseInterface(object):
             species/observables/expressions on X axis depending on
             simulation type)
         """
-        return self.read_simulation_results_multi([self.base_filename])[0][0]
+        return self.read_simulation_results_multi([self.base_filename])[0]
 
     @staticmethod
     def read_simulation_results_multi(base_filenames):
@@ -209,12 +212,8 @@ class BngBaseInterface(object):
             List of simulation results, each in a 2D matrix (time on Y axis,
             species/observables/expressions on X axis depending on
             simulation type)
-        list of numpy.ndarray
-            List of simulation results, each in a 2D matrix
         """
-        # TODO: Describe yfull_view in docstring
         list_of_yfulls = []
-        list_of_yfull_views = []
         for base_filename in base_filenames:
             names = ['time']
 
@@ -252,18 +251,19 @@ class BngBaseInterface(object):
             yfull_view[:, cdat_arr.shape[1]:] = gdat_arr
 
             list_of_yfulls.append(yfull)
-            list_of_yfull_views.append(yfull_view)
 
-        return list_of_yfulls, list_of_yfull_views
+        return list_of_yfulls
 
 
 class BngConsole(BngBaseInterface):
     """ Interact with BioNetGen through BNG Console """
     def __init__(self, model=None, verbose=False, cleanup=True,
                  output_dir=None, output_prefix=None, timeout=30,
-                 suppress_warnings=False):
-        super(BngConsole, self).__init__(model, verbose, cleanup,
-                                         output_prefix, output_dir)
+                 suppress_warnings=False, model_additional_species=None):
+        super(BngConsole, self).__init__(
+            model, verbose, cleanup, output_prefix, output_dir,
+            model_additional_species=model_additional_species
+        )
 
         try:
             import pexpect
@@ -376,9 +376,12 @@ class BngConsole(BngBaseInterface):
 
 class BngFileInterface(BngBaseInterface):
     def __init__(self, model=None, verbose=False, output_dir=None,
-                 output_prefix=None, cleanup=True):
-        super(BngFileInterface, self).__init__(model, verbose, cleanup,
-                                               output_prefix, output_dir)
+                 output_prefix=None, cleanup=True,
+                 model_additional_species=None):
+        super(BngFileInterface, self).__init__(
+            model, verbose, cleanup, output_prefix, output_dir,
+            model_additional_species=model_additional_species
+        )
         self._init_command_queue()
 
     def _init_command_queue(self):
