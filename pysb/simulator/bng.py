@@ -77,7 +77,9 @@ class BngSimulator(Simulator):
         with BngFileInterface(self._model, verbose=verbose,
                               output_dir=output_dir,
                               output_prefix=output_file_basename,
-                              cleanup=cleanup) as bngfile:
+                              cleanup=cleanup,
+                              model_additional_species=self.model.species
+                              ) as bngfile:
             if method != 'nf':
                 # TODO: Write existing netfile if already generated
                 bngfile.action('generate_network', overwrite=True,
@@ -104,19 +106,28 @@ class BngSimulator(Simulator):
             bngfile.execute()
             if method != 'nf':
                 load_equations(self.model, bngfile.net_filename)
-            _, list_of_yfull_views = \
+            list_of_yfull = \
                 BngFileInterface.read_simulation_results_multi(
                 [bngfile.base_filename + str(n) for n in range(total_sims)])
 
         tout = []
-        yout = []
+        species_out = []
+        obs_exp_out = []
         for i in range(total_sims):
-            tout.append(list_of_yfull_views[i][:, 0])
-            if method != 'nf':
-                yout.append(list_of_yfull_views[i][:,
-                            1:(len(self.model.species) + 1)])
-            else:
-                raise NotImplementedError()
+            yfull = list_of_yfull[i]
+            yfull_view = yfull.view(float).reshape(len(yfull), -1)
 
-        return SimulationResult(self, tout=tout, trajectories=yout,
+            tout.append(yfull_view[:, 0])
+
+            if method != 'nf':
+                species_out.append(yfull_view[:,
+                                   1:(len(self.model.species) + 1)])
+                if len(self.model.observables) or len(self.model.expressions):
+                    obs_exp_out.append(yfull_view[:,
+                                       (len(self.model.species) + 1):])
+            else:
+                obs_exp_out.append(yfull_view[:, 1:])
+
+        return SimulationResult(self, tout=tout, trajectories=species_out,
+                                observables_and_expressions=obs_exp_out,
                                 simulations_per_param_set=n_sim)

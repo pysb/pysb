@@ -1,7 +1,7 @@
 from pysb.testing import *
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule
-from pysb.simulator.bng_ssa import BngSimulator
+from pysb.simulator.bng import BngSimulator
 from pysb.bng import generate_equations
 
 

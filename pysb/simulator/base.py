@@ -501,7 +501,9 @@ class SimulationResult(object):
     8.888889   0.000138    4.995633
     13.333333  0.000002    4.999927
     """
-    def __init__(self, simulator, tout, trajectories, squeeze=True,
+    def __init__(self, simulator, tout, trajectories=None,
+                 observables_and_expressions=None,
+                 squeeze=True,
                  simulations_per_param_set=1):
         simulator._logger.debug('SimulationResult constructor started')
         self.squeeze = squeeze
@@ -510,34 +512,41 @@ class SimulationResult(object):
         self._model = simulator._model
         self.n_sims_per_parameter_set = simulations_per_param_set
 
-        # Validate incoming trajectories
-        if hasattr(trajectories, 'ndim') and trajectories.ndim == 3:
-            # trajectories is a 3D array, create a list of 2D arrays
-            # This is just a view and doesn't copy the data
-            self._y = [tr for tr in trajectories]
-        else:
-            # Not a 3D array, check for a list of 2D arrays
-            try:
-                if any([tr.ndim != 2 for tr in trajectories]):
-                    raise AttributeError
-            except (AttributeError, TypeError):
-                raise ValueError("trajectories should be a 3D array or a list "
-                                 "of 2D arrays")
-            self._y = trajectories
+        if trajectories is None and observables_and_expressions is None:
+            raise ValueError('Need to supply at least one of species '
+                             'trajectories or observables_and_expressions')
 
-        self._nsims = len(self._y)
-        if len(self.tout) != self.nsims:
-            raise ValueError("Simulator tout should be the same length as "
-                             "trajectories")
-        for i in range(self.nsims):
-            if len(self.tout[i]) != self._y[i].shape[0]:
-                raise ValueError("The number of time points in tout[{0}] "
-                                 "should match the trajectories array for "
-                                 "simulation {0}".format(i))
-            if self._y[i].shape[1] != len(self._model.species):
-                raise ValueError("The number of species in trajectory {0} "
-                                 "should match length of "
-                                 "model.species".format(i))
+        if trajectories is not None and len(trajectories) > 0:
+            # Validate incoming trajectories
+            if hasattr(trajectories, 'ndim') and trajectories.ndim == 3:
+                # trajectories is a 3D array, create a list of 2D arrays
+                # This is just a view and doesn't copy the data
+                self._y = [tr for tr in trajectories]
+            else:
+                # Not a 3D array, check for a list of 2D arrays
+                try:
+                    if any([tr.ndim != 2 for tr in trajectories]):
+                        raise AttributeError
+                except (AttributeError, TypeError):
+                    raise ValueError("trajectories should be a 3D array or a "
+                                     "list of 2D arrays")
+                self._y = trajectories
+
+            self._nsims = len(self._y)
+            if len(self.tout) != self.nsims:
+                raise ValueError("Simulator tout should be the same length as "
+                                 "trajectories")
+            for i in range(self.nsims):
+                if len(self.tout[i]) != self._y[i].shape[0]:
+                    raise ValueError("The number of time points in tout[{0}] "
+                                     "should match the trajectories array for "
+                                     "simulation {0}".format(i))
+                if self._y[i].shape[1] != len(self._model.species):
+                    raise ValueError("The number of species in trajectory {0} "
+                                     "should match length of "
+                                     "model.species".format(i))
+        else:
+            self._y = None
 
         # Calculate ``yobs`` and ``yexpr`` based on values of ``y``
         exprs = self._model.expressions_dynamic()
@@ -563,38 +572,54 @@ class SimulationResult(object):
         yexpr_dtype = zip(expr_names, itertools.repeat(float)) if expr_names \
             else float
 
-        self._yobs = [np.ndarray((len(self.tout[n]),),
-                                 dtype=yobs_dtype) for n in range(self.nsims)]
-        self._yobs_view = [self._yobs[n].view(float).
-                           reshape(len(self._yobs[n]), -1) for n in range(
-            self.nsims)]
-        self._yexpr = [np.ndarray((len(self.tout[n]),),
-                                  dtype=yexpr_dtype) for n in range(
-            self.nsims)]
-        self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
-            self._yexpr[n]), -1) for n in range(self.nsims)]
-        param_values = simulator.param_values
+        if observables_and_expressions is not None and len(
+                observables_and_expressions) > 0:
+            # Observables and expression values are used as supplied
+            self._nsims = len(observables_and_expressions)
+            self._yobs_view = [observables_and_expressions[n][:, 0:(len(
+                self._model.observables) + 1)] for n in range(self.nsims)]
+            self._yexpr_view = [observables_and_expressions[n][:, (len(
+                self._model.observables) + 1):] for n in range(self.nsims)]
 
-        # loop over simulations
-        sym_names = obs_names + param_names
-        expanded_exprs = [sympy.lambdify(sym_names, expr.expand_expr(),
-                                         "numpy") for expr in exprs]
-        for n in range(self.nsims):
-            simulator._logger.log(EXTENDED_DEBUG, 'Evaluating exprs/obs %d/%d'
-                                  % (n + 1, self.nsims))
+            self._yobs = [self._yobs_view[n].reshape(
+                len(tout[n]) * len(yobs_dtype)).view(dtype=yobs_dtype) for n
+                          in range(self.nsims)]
+            self._yexpr = [self._yexpr_view[n].reshape(
+                len(tout[n]) * len(yexpr_dtype)).view(dtype=yexpr_dtype) for n
+                          in range(self.nsims)]
+        else:
+            self._yobs = [np.ndarray((len(self.tout[n]),),
+                                     dtype=yobs_dtype) for n in range(self.nsims)]
+            self._yobs_view = [self._yobs[n].view(float).
+                               reshape(len(self._yobs[n]), -1) for n in range(
+                self.nsims)]
+            self._yexpr = [np.ndarray((len(self.tout[n]),),
+                                      dtype=yexpr_dtype) for n in range(
+                self.nsims)]
+            self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
+                self._yexpr[n]), -1) for n in range(self.nsims)]
+            param_values = simulator.param_values
 
-            # observables
-            for i, obs in enumerate(model_obs):
-                self._yobs_view[n][:, i] = (
-                    self._y[n][:, obs.species] * obs.coefficients).sum(axis=1)
+            # loop over simulations
+            sym_names = obs_names + param_names
+            expanded_exprs = [sympy.lambdify(sym_names, expr.expand_expr(),
+                                             "numpy") for expr in exprs]
+            for n in range(self.nsims):
+                simulator._logger.log(EXTENDED_DEBUG, 'Evaluating exprs/obs %d/%d'
+                                      % (n + 1, self.nsims))
 
-            # expressions
-            sym_dict = dict((k, self._yobs[n][k]) for k in obs_names)
-            sym_dict.update(dict((p.name, param_values[
-                n // self.n_sims_per_parameter_set][i]) for i, p in
-                            enumerate(self._model.parameters)))
-            for i, expr in enumerate(exprs):
-                self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)
+                # observables
+                for i, obs in enumerate(model_obs):
+                    self._yobs_view[n][:, i] = (
+                        self._y[n][:, obs.species] * obs.coefficients).sum(axis=1)
+
+                # expressions
+                sym_dict = dict((k, self._yobs[n][k]) for k in obs_names)
+                sym_dict.update(dict((p.name, param_values[
+                    n // self.n_sims_per_parameter_set][i]) for i, p in
+                                enumerate(self._model.parameters)))
+                for i, expr in enumerate(exprs):
+                    self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)
 
         simulator._logger.debug('SimulationResult constructor finished')
 
@@ -629,15 +654,16 @@ class SimulationResult(object):
             if len(self._model.expressions_dynamic()):
                 yfull_dtype += zip(self._model.expressions_dynamic().keys(),
                                    itertools.repeat(float))
-            yfull = len(self._y) * [None]
+            yfull = []
             # loop over simulations
             for n in range(self.nsims):
-                yfull[n] = np.ndarray(len(self.tout[n]), yfull_dtype)
+                yfull.append(np.ndarray(len(self.tout[n]), yfull_dtype))
                 yfull_view = yfull[n].view(float).reshape((len(yfull[n]), -1))
-                n_sp = self._y[n].shape[1]
+                n_sp = self._y[n].shape[1] if self._y else 0
                 n_ob = self._yobs_view[n].shape[1]
                 n_ex = self._yexpr_view[n].shape[1]
-                yfull_view[:, :n_sp] = self._y[n]
+                if self._y:
+                    yfull_view[:, :n_sp] = self._y[n]
                 yfull_view[:, n_sp:n_sp + n_ob] = self._yobs_view[n]
                 yfull_view[:, n_sp + n_ob:n_sp + n_ob + n_ex] = \
                     self._yexpr_view[n]
@@ -671,6 +697,9 @@ class SimulationResult(object):
         """
         List of trajectory sets. The first dimension contains species.
         """
+        if self._y is None:
+            raise ValueError('No trajectories are available for network-free '
+                             'simulations')
         return self._squeeze_output(self._y)
 
     @property
