@@ -103,7 +103,42 @@ class Simulator(object):
         return self._model
 
     @property
+    def initials_length(self):
+        try:
+            return len(self.initials)
+        except SimulatorException:
+            # Network free simulators
+            if self._initials:
+                return len(self._initials.values()[0])
+            else:
+                return 1
+
+    @property
+    def initials_dict(self):
+        if isinstance(self._initials, collections.Mapping):
+            return self._initials
+        else:
+            try:
+                initials_list = self.initials
+            except SimulatorException:
+                # Network-free and no override defined - use initial_conditions
+                return {cp: [param.value] for cp, param in
+                        self.model.initial_conditions}
+
+            # Construct dictionary from initials list
+            initials_dict = {}
+            for cp_idx, cp in enumerate(self.model.species):
+                initials_dict[cp] = [initials_list[n][cp_idx] for n in
+                                     range(len(initials_list))]
+            return initials_dict
+
+    @property
     def initials(self):
+        if not self.model.species:
+            raise SimulatorException('No model species list - either '
+                                     'generate the model equations or use '
+                                     'initials_dict() for network-free '
+                                     'simulations')
         return self._initials if isinstance(self._initials, np.ndarray) \
                else self._get_initials()
 
@@ -363,18 +398,16 @@ class Simulator(object):
         # with the same parameters
         if len(self.param_values) == 1:
             self.param_values = np.repeat(self.param_values,
-                                          len(self.initials),
+                                          self.initials_length,
                                           axis=0)
 
-        assert len(self.initials) == len(self.param_values)
-
         # Error checks on 'param_values' and 'initials'
-        if len(self.param_values) != len(self.initials):
+        if len(self.param_values) != self.initials_length:
             raise SimulatorException(
                     "'param_values' and 'initials' must be equal lengths.\n"
                     "len(param_values): %d\n"
                     "len(initials): %d" %
-                    (len(self.param_values), len(self.initials)))
+                    (len(self.param_values), self.initials_length))
         elif len(self.param_values.shape) != 2 or \
                 self.param_values.shape[1] != len(self._model.parameters):
             raise SimulatorException(
@@ -383,17 +416,15 @@ class Simulator(object):
                     "param_values.shape: " + str(self.param_values.shape) +
                     "\nlen(model.parameters): %d" %
                     len(self._model.parameters))
-        elif len(self.initials.shape) != 2 or \
-                self.initials.shape[1] != len(self._model.species):
+
+        if self.model.species and (len(self.initials.shape) != 2 or
+                self.initials.shape[1] != len(self._model.species)):
             raise SimulatorException(
                     "'initials' must be a 2D array of dimension N_SIMS x "
                     "len(model.species).\n"
                     "initials.shape: " + str(self.initials.shape) +
                     "\nlen(model.species): %d" % len(self._model.species))
-            # NOTE: Not sure if the check on 'initials' should be here or not.
-            # Network-free simulators don't have species, but we will want to
-            # allow users to supply initials. Right now, that will raise an
-            # exception. Need to think about this. --LAH
+
         return None
 
 

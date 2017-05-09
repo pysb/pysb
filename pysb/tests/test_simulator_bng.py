@@ -3,6 +3,7 @@ import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule
 from pysb.simulator.bng import BngSimulator
 from pysb.bng import generate_equations
+from pysb.examples import robertson
 
 
 class TestBngSimulator(object):
@@ -54,12 +55,24 @@ class TestBngSimulator(object):
         species = np.array(x.all)
         assert species[0][0][0] == 100.
 
-    def test_nfsim(self):
-        x = self.sim.run(n_sim=2, method='nf')
-        observables = np.array(x.observables)
-        assert np.shape(observables) == (2, 51)
-
     def tearDown(self):
         self.model = None
         self.time = None
         self.sim = None
+
+
+def test_nfsim():
+    # Make sure no network generation has taken place
+    model = robertson.model
+    model.reset_equations()
+
+    sim = BngSimulator(model, tspan=np.linspace(0, 1))
+    x = sim.run(n_sim=1, method='nf')
+    observables = np.array(x.observables)
+    assert len(observables) == 51
+
+    A = model.monomers['A']
+    x = sim.run(n_sim=2, method='nf', tspan=np.linspace(0, 1),
+                initials={A(): 100})
+    print(x.dataframe.loc[0, 0.0])
+    assert np.allclose(x.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])

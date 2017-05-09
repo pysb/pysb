@@ -497,7 +497,9 @@ class BngFileInterface(BngBaseInterface):
             Value of parameter or initial concentration
 
         """
-        formatted_name = format_complexpattern(name)
+        formatted_name = format_complexpattern(
+            pysb.core.as_complex_pattern(name)
+        )
         self.command_queue.write('\tsetConcentration("%s", %f)\n' % (
             formatted_name, value))
 
