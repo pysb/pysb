@@ -68,17 +68,22 @@ class BngSimulator(Simulator):
         additional_args['verbose'] = verbose
         params_names = [g.name for g in self._model.parameters]
 
-        n_param_sets = len(self.initials)
+        n_param_sets = self.initials_length
         total_sims = n_sim * n_param_sets
 
         self._logger.info('Running %d BNG %s simulations' % (total_sims,
                                                              method))
 
+        if method == 'nf':
+            model_additional_species = self.model.species
+        else:
+            model_additional_species = None
+
         with BngFileInterface(self._model, verbose=verbose,
                               output_dir=output_dir,
                               output_prefix=output_file_basename,
                               cleanup=cleanup,
-                              model_additional_species=self.model.species
+                              model_additional_species=model_additional_species
                               ) as bngfile:
             if method != 'nf':
                 # TODO: Write existing netfile if already generated
@@ -95,9 +100,8 @@ class BngSimulator(Simulator):
                 for n in range(len(self.param_values[pset_idx])):
                     bngfile.set_parameter(params_names[n],
                                           self.param_values[pset_idx][n])
-                for n in range(len(self.initials[pset_idx])):
-                    bngfile.set_concentration(self._model.species[n],
-                                              self.initials[pset_idx][n])
+                for cp, values in self.initials_dict.items():
+                    bngfile.set_concentration(cp, values[pset_idx])
                 for sim_rpt in range(n_sim):
                     tmp = additional_args.copy()
                     tmp['prefix'] = '{}{}'.format(prefix, sim_prefix)
