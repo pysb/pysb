@@ -444,7 +444,7 @@ def _create_2D_array(matrix):
     tmp_array.format = driver.dtype_to_array_format(matrix.dtype)
     tmp_array.num_channels = 1
     tmp_array.flags = 0
-    ary = driver.Array(descr)
+    ary = driver.Array(tmp_array)
     return ary
 
 
