@@ -9,7 +9,7 @@ t = np.linspace(0, 40, 50)
 # Simulate the model
 print("Simulating...")
 sim = BngSimulator(model, cleanup=False)
-x = sim.run(tspan=t, verbose=False, n_sim=5, cleanup=False, method='ssa')
+x = sim.run(tspan=t, verbose=False, n_runs=5, cleanup=False, method='ssa')
 tout = x.tout
 y = np.array(x.observables)
 # plt.plot(tout.T, y['BAX4'].T)

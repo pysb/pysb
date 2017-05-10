@@ -3,7 +3,7 @@ import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule
 from pysb.simulator.bng import BngSimulator
 from pysb.bng import generate_equations
-from pysb.examples import robertson
+from pysb.examples import robertson, expression_observables
 
 
 class TestBngSimulator(object):
@@ -46,19 +46,32 @@ class TestBngSimulator(object):
         assert x.all.shape == (51,)
 
     def test_multi_simulations(self):
-        x = self.sim.run(n_sim=10)
+        x = self.sim.run(n_runs=10)
         assert np.shape(x.observables) == (10, 51)
 
     def test_change_parameters(self):
-        x = self.sim.run(n_sim=10, param_values={'ksynthA': 200},
+        x = self.sim.run(n_runs=10, param_values={'ksynthA': 200},
                          initials={self.model.species[0]: 100})
         species = np.array(x.all)
         assert species[0][0][0] == 100.
+
+    def test_bng_pla(self):
+        self.sim.run(n_runs=5, method='pla')
 
     def tearDown(self):
         self.model = None
         self.time = None
         self.sim = None
+
+
+def test_bng_ode_with_expressions():
+    model = expression_observables.model
+    model.reset_equations()
+
+    sim = BngSimulator(model, tspan=np.linspace(0, 1))
+    x = sim.run(n_runs=1, method='ode')
+    assert len(x.expressions) == 51
+    assert len(x.observables) == 51
 
 
 def test_nfsim():
@@ -67,12 +80,12 @@ def test_nfsim():
     model.reset_equations()
 
     sim = BngSimulator(model, tspan=np.linspace(0, 1))
-    x = sim.run(n_sim=1, method='nf')
+    x = sim.run(n_runs=1, method='nf')
     observables = np.array(x.observables)
     assert len(observables) == 51
 
     A = model.monomers['A']
-    x = sim.run(n_sim=2, method='nf', tspan=np.linspace(0, 1),
+    x = sim.run(n_runs=2, method='nf', tspan=np.linspace(0, 1),
                 initials={A(): 100})
     print(x.dataframe.loc[0, 0.0])
     assert np.allclose(x.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])

@@ -608,9 +608,9 @@ class SimulationResult(object):
             # Observables and expression values are used as supplied
             self._nsims = len(observables_and_expressions)
             self._yobs_view = [observables_and_expressions[n][:, 0:(len(
-                self._model.observables) + 1)] for n in range(self.nsims)]
+                self._model.observables))] for n in range(self.nsims)]
             self._yexpr_view = [observables_and_expressions[n][:, (len(
-                self._model.observables) + 1):] for n in range(self.nsims)]
+                self._model.observables)):] for n in range(self.nsims)]
 
             self._yobs = [self._yobs_view[n].reshape(
                 len(tout[n]) * len(obs_names)).view(dtype=yobs_dtype) for n

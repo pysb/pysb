@@ -15,6 +15,7 @@ import shutil
 import collections
 import pysb.pathfinder as pf
 from pysb.logging import get_logger, EXTENDED_DEBUG
+import logging
 
 try:
     from cStringIO import StringIO
@@ -56,6 +57,10 @@ class BngBaseInterface(object):
         self._logger = get_logger(__name__,
                                   model=model,
                                   log_level=verbose)
+        if model:
+            self.verbose = self._logger.logger.getEffectiveLevel()
+        else:
+            self.verbose = self._logger.getEffectiveLevel()
         self._base_file_stem = 'pysb'
         self.cleanup = cleanup
         self.output_prefix = 'tmpBNG' if output_prefix is None else \
@@ -439,10 +444,12 @@ class BngFileInterface(BngBaseInterface):
                                  cwd=self.base_directory,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
+            if self.verbose <= logging.DEBUG:
+                for line in iter(p.stdout.readline, b''):
+                    self._logger.debug(line[:-1])
             (p_out, p_err) = p.communicate()
             p_out = p_out.decode('utf-8')
             p_err = p_err.decode('utf-8')
-            self._logger.debug('BNG output:\n\n' + p_out)
             if p.returncode:
                 raise BngInterfaceError(p_out.rstrip("at line") + "\n" +
                                         p_err.rstrip())
@@ -479,26 +486,26 @@ class BngFileInterface(BngBaseInterface):
         ----------
         name: string
             The name of the parameter to set
-        value: float_like
+        value: float-like
             Value of parameter
 
         """
         self.command_queue.write('\tsetParameter("%s", %f)\n' % (name, value))
 
-    def set_concentration(self, name, value):
+    def set_concentration(self, cplx_pat, value):
         """
         Generates a BNG action command and adds it to the command queue
 
         Parameters
         ----------
-        name: string
-            The name of the parameter or initial concentration to set
-        value: float_like
-            Value of parameter or initial concentration
+        cplx_pat: pysb.ComplexPattern
+            Species ComplexPattern
+        value: float-like
+            Initial concentration
 
         """
         formatted_name = format_complexpattern(
-            pysb.core.as_complex_pattern(name)
+            pysb.core.as_complex_pattern(cplx_pat)
         )
         self.command_queue.write('\tsetConcentration("%s", %f)\n' % (
             formatted_name, value))
@@ -632,7 +639,7 @@ def load_equations(model, netfile):
     if model.odes:
         return
     with open(netfile, 'r') as f:
-        _parse_netfile(model, iter(f.readline()))
+        _parse_netfile(model, iter(f.readlines()))
 
 
 def generate_equations(model, cleanup=True, verbose=False):
