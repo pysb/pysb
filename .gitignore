@@ -18,3 +18,4 @@ setuptools*.egg
 setuptools*.zip
 *.egg-info
 .eggs
+.asv
