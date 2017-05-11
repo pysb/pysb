@@ -58,6 +58,17 @@ _path_config = {
             'nt': ('c:/Program Files/StochKit',)
         }
     },
+    'nvcc': {
+        'name': 'NVIDIA CUDA compiler',
+        'executable': 'nvcc',
+        'env_var': 'CUDAPATH',
+        'search_paths': {
+            'posix': ('/usr/local/cuda/bin', ),
+            'nt': ('C:/Program Files/NVIDIA GPU Computing '
+                   'Toolkit/CUDA/v8.0/bin', )
+        }
+    }
+
 }
 _path_cache = {}
 

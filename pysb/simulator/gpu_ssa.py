@@ -17,6 +17,7 @@ import sympy
 from pysb.bng import generate_equations
 from pysb.simulator.base import Simulator, SimulationResult
 import time
+from pysb.pathfinder import get_path
 
 
 class GPUSimulator(Simulator):
@@ -278,6 +279,9 @@ class GPUSimulator(Simulator):
             initials = np.repeat([initials], param_values.shape[0], axis=0)
             self.initials = initials
 
+        if tspan is None:
+            tspan = self.tspan
+
         tout = len(param_values) * [None]
         for n in range(len(param_values)):
             tout[n] = tspan
@@ -382,7 +386,8 @@ class GPUSimulator(Simulator):
 
 
         """
-        self._kernel = pycuda.compiler.SourceModule(code, nvcc="nvcc",
+        nvcc_bin = get_path('nvcc')
+        self._kernel = pycuda.compiler.SourceModule(code, nvcc=nvcc_bin,
                                                     no_extern_c=True)
         self._param_tex = self._kernel.get_texref("param_tex")
         self._ssa = self._kernel.get_function("Gillespie_one_step")
