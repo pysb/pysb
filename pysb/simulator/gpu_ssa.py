@@ -329,6 +329,9 @@ class GPUSimulator(Simulator):
             initials = np.repeat([initials], param_values.shape[0], axis=0)
             self.initials = initials
 
+        if tspan is None:
+            tspan = self.tspan
+
         tout = len(param_values) * [None]
 
         for n in range(len(param_values)):
