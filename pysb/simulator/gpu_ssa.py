@@ -8,14 +8,12 @@ try:
     import pycuda.driver as driver
     import pycuda.gpuarray as gpuarray
 except ImportError:
-    print("Need to install pycuda inorder to use GPUssa")
     pycuda = None
-
 import re
 import os
 import sympy
 from pysb.bng import generate_equations
-from pysb.simulator.base import Simulator, SimulationResult
+from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
 import time
 from pysb.pathfinder import get_path
 
@@ -62,6 +60,12 @@ class GPUSimulator(Simulator):
 
     def __init__(self, model, verbose=False, tspan=None, **kwargs):
         super(GPUSimulator, self).__init__(model, verbose, **kwargs)
+
+        if pycuda is None:
+            raise SimulatorException('pycuda library was not found and is '
+                                     'required for {}'.format(
+                                      self.__class__.__name__))
+
         generate_equations(self._model)
 
         self.tout = None
