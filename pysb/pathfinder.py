@@ -49,6 +49,18 @@ _path_config = {
             'nt': ('c:/Program Files/cupSODA',)
         }
     },
+    'cuTauLeaping': {
+        'name': 'cuTauLeaping',
+        'executable': {
+            'posix': 'cuTauLeaping',
+            'nt': 'cuTauLeaping.exe'
+        },
+        'env_var': 'cuTauLeaping',
+        'search_paths': {
+            'posix': ('/usr/local/share/cuTauLeaping',),
+            'nt': ('c:/Program Files/cuTauLeaping',)
+        }
+    },
     'stochkit_ssa': {
         'name': 'StochKit [SSA]',
         'executable': {

@@ -1,6 +1,7 @@
 from pysb.examples import earm_1_0, schlogl
 from pysb.simulator import ScipyOdeSimulator, CupSodaSimulator, \
     StochKitSimulator, GPUSimulator
+from pysb.simulator.cutauleaping import CuTauLeapingSimulator
 import numpy as np
 import timeit
 
@@ -39,12 +40,14 @@ class Earm10ODESuite(object):
 
 class SSASchlogl(object):
     def setup(self):
-        self.nsims = 1000
+        self.nsims = 100
         self.timer = timeit.default_timer
         self.model = schlogl.model
         self.tspan = np.linspace(0, 100, 101)
         self.stochkit_sim = StochKitSimulator(self.model, tspan=self.tspan)
         self.gpu_ssa_sim = GPUSimulator(self.model, tspan=self.tspan)
+        self.cu_tau_leaping = CuTauLeapingSimulator(self.model,
+                                                    tspan=self.tspan)
 
     def time_stochkit_single_thread(self):
         self.stochkit_sim.run(n_runs=self.nsims, num_processors=1)
@@ -54,3 +57,6 @@ class SSASchlogl(object):
 
     def time_gpu_ssa(self):
         self.gpu_ssa_sim.run(number_sim=self.nsims)
+
+    def time_cutau_ssa(self):
+        self.cu_tau_leaping.run(number_sim=self.nsims)
