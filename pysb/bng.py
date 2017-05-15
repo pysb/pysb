@@ -629,6 +629,10 @@ def load_equations(model, netfile):
     """
     Load model equations from a specified netfile
 
+    Useful for large models where BioNetGen network generation takes a long
+    time - the .net file can be saved and reloaded using this function at a
+    later date.
+
     Parameters
     ----------
     model: pysb.Model
@@ -638,6 +642,8 @@ def load_equations(model, netfile):
     """
     if model.odes:
         return
+    if model.has_synth_deg():
+        model.enable_synth_deg()
     with open(netfile, 'r') as f:
         _parse_netfile(model, iter(f.readlines()))
 
@@ -820,7 +826,7 @@ def _parse_reaction(model, line, reaction_cache):
         model.odes[p] += combined_rate
     for r in reactants:
         model.odes[r] -= combined_rate
-            
+
             
 def _parse_group(model, line):
     """Parse a 'group' line from a BNGL net file."""
