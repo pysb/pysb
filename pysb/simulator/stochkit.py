@@ -191,7 +191,7 @@ class StochKitSimulator(Simulator):
                     traj_dir, f)) for f in sorted(os.listdir(traj_dir))])
             except Exception as e:
                 raise SimulatorException(
-                    "Error reading StochKit trajectories: {1}".format(e))
+                    "Error reading StochKit trajectories: {0}".format(e))
 
             if len(trajectories) == 0 or len(stderr) != 0:
                 raise SimulatorException("Solver execution failed: \
