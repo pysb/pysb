@@ -586,7 +586,8 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
     return yfull
 
 
-def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
+def generate_network(model, cleanup=True, append_stdout=False,
+                     verbose=False, **kwargs):
     """
     Return the output from BNG's generate_network function given a model.
 
@@ -617,7 +618,7 @@ def generate_network(model, cleanup=True, append_stdout=False, verbose=False):
     with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as bngfile:
         bngfile._logger.info('Generating reaction network')
         bngfile.action('generate_network', overwrite=True,
-                       verbose=bng_action_debug)
+                       verbose=bng_action_debug, **kwargs)
         bngfile.execute()
 
         output = bngfile.read_netfile()
@@ -648,7 +649,7 @@ def load_equations(model, netfile):
         _parse_netfile(model, iter(f.readlines()))
 
 
-def generate_equations(model, cleanup=True, verbose=False):
+def generate_equations(model, cleanup=True, verbose=False, **kwargs):
     """
     Generate math expressions for reaction rates and species in a model.
 
@@ -681,7 +682,7 @@ def generate_equations(model, cleanup=True, verbose=False):
     if model.odes:
         return
     lines = iter(generate_network(model, cleanup=cleanup,
-                                  verbose=verbose).split('\n'))
+                                  verbose=verbose, **kwargs).split('\n'))
     _parse_netfile(model, lines)
 
 
