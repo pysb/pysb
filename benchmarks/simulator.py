@@ -9,6 +9,7 @@ class Earm10ODESuite(object):
         self.nsims = 100
         self.timer = timeit.default_timer
         self.model = earm_1_0.model
+        self.model.reset_equations()
         self.parameter_set = np.ones((self.nsims, len(self.model.parameters)))
         for i in range(len(self.parameter_set)):
             for j in range(len(self.parameter_set[i])):
