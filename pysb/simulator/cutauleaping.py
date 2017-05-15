@@ -195,7 +195,7 @@ class CuTauLeapingSimulator(Simulator):
             self._cupsoda_verbose = 0
 
         # regex for extracting cupSODA reported running time
-        self._running_time_regex = re.compile(r'Running time:\s+(\d+\.\d+)')
+        self._running_time_regex = re.compile(r'RUNNING TIME:\s+(\d+\.\d+)')
 
     def run(self, tspan=None, initials=None, param_values=None, number_sim=1):
         """Perform a set of integrations.
@@ -252,13 +252,14 @@ class CuTauLeapingSimulator(Simulator):
 
         super(CuTauLeapingSimulator, self).run(tspan=tspan, initials=initials,
                                                param_values=param_values)
-        if len(param_values) % self._threads == 0:
-            self._blocks = len(param_values) / self._threads
+        if number_sim % self._threads == 0:
+            self._blocks = number_sim / self._threads
+            print("Normal")
         else:
-            self._blocks = len(param_values) / self._threads + 1
-
+            self._blocks = number_sim / self._threads + 1
+            print("added 1")
         self._total_threads = self._blocks * self._threads
-
+        print(self._threads, self._blocks, self._total_threads)
         # Create directories for cupSODA input and output files
         self.outdir = tempfile.mkdtemp(prefix=self._prefix + '_',
                                        dir=self._base_dir)
@@ -282,7 +283,7 @@ class CuTauLeapingSimulator(Simulator):
                    str(self._threads), str(self._blocks), str(self.gpu),
                    '0', self._outfiles_dir, self._prefix,
                    '0']
-        print(' '.join(command))
+
         self._logger.info("Running cuTauLeaping: " + ' '.join(command))
         start_time = time.time()
         # Run simulation and return trajectories
@@ -292,12 +293,14 @@ class CuTauLeapingSimulator(Simulator):
         (p_out, p_err) = p.communicate()
         p_out = p_out.decode('utf-8')
         p_err = p_err.decode('utf-8')
+
         logger_level = self._logger.logger.getEffectiveLevel()
         if logger_level <= logging.INFO:
             run_time_match = self._running_time_regex.search(p_out)
             if run_time_match:
                 self._logger.info('cuTauLeaping reported time: {} '
                                   'seconds'.format(run_time_match.group(1)))
+
         self._logger.debug('cuTauLeaping stdout:\n' + p_out)
         if p_err:
             self._logger.error('cuTauLeaping strerr:\n' + p_err)
@@ -326,22 +329,6 @@ class CuTauLeapingSimulator(Simulator):
             for j in range(self._len_species):
                 species_matrix[i][j] = initials[i][j]
         return species_matrix
-    @property
-    def _memory_usage(self):
-        try:
-            return self._memory_options[self.opts['memory_usage']]
-        except KeyError:
-            raise Exception('memory_usage must be one of %s',
-                            self._memory_options.keys())
-
-    @property
-    def vol(self):
-        vol = self.opts.get('vol', None)
-        return vol
-
-    @vol.setter
-    def vol(self, volume):
-        self.opts['vol'] = volume
 
     @property
     def n_blocks(self):
@@ -466,10 +453,6 @@ class CuTauLeapingSimulator(Simulator):
                 else:
                     right_side.write(line)
 
-        # rtol
-        with open(os.path.join(directory, "rtol"), 'w') as rtol:
-            rtol.write(str(self.opts.get('rtol')))
-
         # t_vector
         with open(os.path.join(directory, "t_vector"), 'w') as t_vector:
             for t in self.tspan:
@@ -512,9 +495,6 @@ class CuTauLeapingSimulator(Simulator):
                                          'models with Expressions')
                     else:
                         rate *= r
-                # volume correction
-                if self.vol:
-                    rate *= (N_A * self.vol) ** (rate_order[j] - 1)
                 c_matrix[i][j] = rate
         self._logger.debug("100%")
         return c_matrix
@@ -559,9 +539,6 @@ class CuTauLeapingSimulator(Simulator):
             # store data
             tout[n] = data[:, 0]
             trajectories[n][:, self._out_species] = data[:, 1:]
-            # volume correction
-            if self.vol:
-                trajectories[n][:, self._out_species] *= (N_A * self.vol)
         return np.array(tout), np.array(trajectories)
 
     def _test_pandas(self, filename):

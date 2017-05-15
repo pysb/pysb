@@ -202,6 +202,7 @@ class GPUSimulator(Simulator):
                 shape=(self._total_threads, self._species_number),
                 dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
         )
+
         # place starting time on GPU
         start_time = np.array(start_time, dtype=np.float32)
         start_time_gpu = gpuarray.to_gpu(start_time)
@@ -212,6 +213,7 @@ class GPUSimulator(Simulator):
 
         # stride of GPU, allows us to use a 1D array and index as a 2D
         a_stride = np.int32(species_matrix.strides[0])
+
         # run single step
         self._ssa(species_matrix_gpu, result, start_time_gpu, end_time,
                   last_time_gpu, a_stride, block=(self._threads, 1, 1),
@@ -224,6 +226,7 @@ class GPUSimulator(Simulator):
         result = result[:n_simulations, :]
 
         current_time = last_time_gpu.get()[:n_simulations]
+
         return result, current_time
 
     def _run_all(self, timepoints, params, initial_conditions):
@@ -243,8 +246,8 @@ class GPUSimulator(Simulator):
 
         # allocate space on GPU for results
         result = driver.managed_zeros(
-                shape=(self._total_threads, n_results, self._species_number),
-                dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
+            shape=(self._total_threads, n_results, self._species_number),
+            dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
         )
 
         # allocate and upload time to GPU
@@ -253,11 +256,11 @@ class GPUSimulator(Simulator):
 
         # perform simulation
         self._ssa_all(species_matrix_gpu, result, time_points_gpu, n_results,
-                      block=(self._threads, 1, 1), grid=(self._blocks, 1))
+                      block=(self._threads, 1, 1), grid=(self._blocks, 1)
+                      )
 
         # Wait for kernel completion before host access
         pycuda.autoinit.context.synchronize()
-
         # retrieve and store results, only keeping n_simulations
         return result[:n_simulations, :, :]
 
@@ -346,7 +349,7 @@ class GPUSimulator(Simulator):
         if threads is None:
             self._threads = 128
         else:
-            self._threads = threads
+            self._threads = int(threads)
 
         if len(param_values) % self._threads == 0:
             self._blocks = len(param_values) / self._threads
