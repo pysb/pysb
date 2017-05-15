@@ -13,6 +13,7 @@ from pysb.bng import generate_equations
 import numpy as np
 import sympy
 import re
+from collections import defaultdict
 try:
     import lxml.etree as etree
     pretty_print = True
@@ -189,28 +190,36 @@ class StochKitExporter(Exporter):
 
         document.append(params)
 
+        # Expressions and observables
+        expr_strings = {e.name: sympy.ccode(e.expand_expr()) for e in
+                        self.model.expressions}
+        obs_strings = {}
+        for obs in self.model.observables:
+            obs_string = ''
+            for i in range(len(obs.coefficients)):
+                if i > 0:
+                    obs_string += "+"
+                if obs.coefficients[i] > 1:
+                    obs_string += str(obs.coefficients[i]) + "*"
+                obs_string += "__s" + str(obs.species[i])
+            if len(obs.coefficients) > 1:
+                obs_string = '(' + obs_string + ')'
+            obs_strings[obs.name] = obs_string
+
         # Reactions
         reacs = etree.Element('ReactionsList')
         for rxn_id, rxn in enumerate(self.model.reactions):
             rxn_name = 'Rxn%d' % rxn_id
             rxn_desc = 'Rules: %s' % rxn["rule"]
 
-            reactants = {}
-            products = {}
+            reactants = defaultdict(int)
+            products = defaultdict(int)
             # reactants
             for r in rxn["reactants"]:
-                r = "__s%d" % r
-                if r in reactants:
-                    reactants[r] += 1
-                else:
-                    reactants[r] = 1
+                reactants["__s%d" % r] += 1
             # products
             for p in rxn["products"]:
-                p = "__s%d" % p
-                if p in products:
-                    products[p] += 1
-                else:
-                    products[p] = 1
+                products["__s%d" % p] += 1
             # replace terms like __s**2 with __s*(__s-1)
             rate = str(rxn["rate"])
             pattern = "(__s\d+)\*\*(\d+)"
@@ -223,20 +232,11 @@ class StochKitExporter(Exporter):
             # expand expressions
             for e in self.model.expressions:
                 rate = re.sub(r'\b%s\b' % e.name,
-                              '(%s)' % sympy.ccode(e.expand_expr(self.model)),
+                              '(%s)' % expr_strings[e.name],
                               rate)
             # replace observables w/ sums of species
             for obs in self.model.observables:
-                obs_string = ''
-                for i in range(len(obs.coefficients)):
-                    if i > 0:
-                        obs_string += "+"
-                    if obs.coefficients[i] > 1:
-                        obs_string += str(obs.coefficients[i]) + "*"
-                    obs_string += "__s" + str(obs.species[i])
-                if len(obs.coefficients) > 1:
-                    obs_string = '(' + obs_string + ')'
-                rate = re.sub(r'%s' % obs.name, obs_string, rate)
+                rate = re.sub(r'%s' % obs.name, obs_strings[obs.name], rate)
 
             reacs.append(self._reaction_to_element(rxn_name,
                                                    rxn_desc,
