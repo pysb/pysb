@@ -1,6 +1,6 @@
 from pysb.export.stochkit import StochKitExporter
 from pysb.simulator import StochKitSimulator
-from pysb.examples import robertson, earm_1_0
+from pysb.examples import robertson, earm_1_0, expression_observables
 import numpy as np
 from pysb.core import as_complex_pattern
 
@@ -32,3 +32,10 @@ def test_stochkit_earm_multi_initials():
     # Check we have two repeats of each initial
     assert np.allclose(df.loc[(slice(None), 0), '__s%d' % unbound_L_index],
                        [3000, 3000, 1500, 1500])
+
+
+def test_stochkit_expressions():
+    model = expression_observables.model
+    tspan = np.linspace(0, 100, 10)
+    sim = StochKitSimulator(model, tspan=tspan)
+    sim.run()
