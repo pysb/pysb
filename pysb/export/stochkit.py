@@ -191,7 +191,7 @@ class StochKitExporter(Exporter):
         document.append(params)
 
         # Expressions and observables
-        expr_strings = {e.name: sympy.ccode(e.expand_expr()) for e in
+        expr_strings = {e.name: '(%s)' % sympy.ccode(e.expand_expr()) for e in
                         self.model.expressions}
         obs_strings = {}
         for obs in self.model.observables:
@@ -208,6 +208,7 @@ class StochKitExporter(Exporter):
 
         # Reactions
         reacs = etree.Element('ReactionsList')
+        pattern = re.compile("(__s\d+)\*\*(\d+)")
         for rxn_id, rxn in enumerate(self.model.reactions):
             rxn_name = 'Rxn%d' % rxn_id
             rxn_desc = 'Rules: %s' % rxn["rule"]
@@ -222,8 +223,8 @@ class StochKitExporter(Exporter):
                 products["__s%d" % p] += 1
             # replace terms like __s**2 with __s*(__s-1)
             rate = str(rxn["rate"])
-            pattern = "(__s\d+)\*\*(\d+)"
-            matches = re.findall(pattern, rate)
+
+            matches = pattern.findall(rate)
             for m in matches:
                 repl = m[0]
                 for i in range(1, int(m[1])):
@@ -232,11 +233,11 @@ class StochKitExporter(Exporter):
             # expand expressions
             for e in self.model.expressions:
                 rate = re.sub(r'\b%s\b' % e.name,
-                              '(%s)' % expr_strings[e.name],
+                              expr_strings[e.name],
                               rate)
             # replace observables w/ sums of species
             for obs in self.model.observables:
-                rate = re.sub(r'%s' % obs.name, obs_strings[obs.name], rate)
+                rate = rate.replace(obs.name, obs_strings[obs.name])
 
             reacs.append(self._reaction_to_element(rxn_name,
                                                    rxn_desc,
