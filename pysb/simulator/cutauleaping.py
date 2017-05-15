@@ -254,12 +254,12 @@ class CuTauLeapingSimulator(Simulator):
                                                param_values=param_values)
         if number_sim % self._threads == 0:
             self._blocks = number_sim / self._threads
-            print("Normal")
+
         else:
             self._blocks = number_sim / self._threads + 1
-            print("added 1")
+
         self._total_threads = self._blocks * self._threads
-        print(self._threads, self._blocks, self._total_threads)
+
         # Create directories for cupSODA input and output files
         self.outdir = tempfile.mkdtemp(prefix=self._prefix + '_',
                                        dir=self._base_dir)
@@ -281,8 +281,7 @@ class CuTauLeapingSimulator(Simulator):
         # fitness_calculation
         command = [bin_path, _cutauleaping_infiles_dir,
                    str(self._threads), str(self._blocks), str(self.gpu),
-                   '0', self._outfiles_dir, self._prefix,
-                   '0']
+                   '0', self._outfiles_dir, self._prefix, '0']
 
         self._logger.info("Running cuTauLeaping: " + ' '.join(command))
         start_time = time.time()
