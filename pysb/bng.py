@@ -641,7 +641,7 @@ def load_equations(model, netfile):
     netfile: str
         BNG netfile
     """
-    if model.odes:
+    if model.reactions:
         return
     if model.has_synth_deg():
         model.enable_synth_deg()
@@ -679,7 +679,7 @@ def generate_equations(model, cleanup=True, verbose=False, **kwargs):
     # only need to do this once
     # TODO track "dirty" state, i.e. "has model been modified?"
     #   or, use a separate "math model" object to contain ODEs
-    if model.odes:
+    if model.reactions:
         return
     lines = iter(generate_network(model, cleanup=cleanup,
                                   verbose=verbose, **kwargs).split('\n'))
@@ -699,7 +699,6 @@ def _parse_netfile(model, lines):
 
         while 'begin reactions' not in next(lines):
             pass
-        model.odes = [sympy.numbers.Zero()] * len(model.species)
 
         reaction_cache = {}
         while True:
@@ -822,11 +821,6 @@ def _parse_reaction(model, line, reaction_cache):
         reaction_bd['reversible'] = False
         reaction_cache[key] = reaction_bd
         model.reactions_bidirectional.append(reaction_bd)
-    # odes
-    for p in products:
-        model.odes[p] += combined_rate
-    for r in reactants:
-        model.odes[r] -= combined_rate
 
             
 def _parse_group(model, line):

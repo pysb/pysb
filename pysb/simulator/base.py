@@ -613,10 +613,10 @@ class SimulationResult(object):
                 self._model.observables)):] for n in range(self.nsims)]
 
             self._yobs = [self._yobs_view[n].reshape(
-                len(tout[n]) * len(yobs_dtype)).view(dtype=yobs_dtype) for n
+                len(tout[n]) * len(obs_names)).view(dtype=yobs_dtype) for n
                           in range(self.nsims)]
             self._yexpr = [self._yexpr_view[n].reshape(
-                len(tout[n]) * len(yexpr_dtype)).view(dtype=yexpr_dtype) for n
+                len(tout[n]) * len(expr_names)).view(dtype=yexpr_dtype) for n
                           in range(self.nsims)]
         else:
             self._yobs = [np.ndarray((len(self.tout[n]),),
