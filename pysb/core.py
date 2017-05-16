@@ -1043,6 +1043,14 @@ class Observable(Component, sympy.Symbol):
     def func(self):
         return sympy.Symbol
 
+    def expand_obs(self):
+        """ Expand observables in terms of species and coefficients """
+        return sympy.Add(*[a * b for a, b in zip(
+            self.coefficients,
+            sympy.symbols(','.join('__s%d' % sp_id for sp_id in
+                                   self.species) + ',')
+        )])
+
     def __repr__(self):
         ret = '%s(%s, %s' % (self.__class__.__name__, repr(self.name),
                               repr(self.reaction_pattern))
@@ -1082,10 +1090,15 @@ class Expression(Component, sympy.Symbol):
         Component.__init__(self, name, _export)
         self.expr = expr
 
-    def expand_expr(self):
+    def expand_expr(self, expand_observables=False):
         """Return expr rewritten in terms of terminal symbols only."""
-        subs = ((a, a.expand_expr()) for a in self.expr.atoms()
-                if isinstance(a, Expression))
+        subs = []
+        for a in self.expr.atoms():
+            if isinstance(a, Expression):
+                subs.append((a, a.expand_expr(
+                    expand_observables=expand_observables)))
+            elif expand_observables and isinstance(a, Observable):
+                subs.append((a, a.expand_obs()))
         return self.expr.subs(subs)
 
     def is_constant_expression(self):
