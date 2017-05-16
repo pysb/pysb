@@ -16,6 +16,7 @@ from pysb.bng import generate_equations
 from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
 import time
 from pysb.pathfinder import get_path
+from pysb.core import Expression
 
 
 class GPUSimulator(Simulator):
@@ -112,26 +113,23 @@ class GPUSimulator(Simulator):
             stoich_string += '\n'
         # stoich_string += ''
         hazards_string = ''
+        pattern = "(__s\d+)\*\*(\d+)"
         for n, rxn in enumerate(self._model.reactions):
+
             hazards_string += "\th[%s] = " % repr(n)
-            rate = sympy.fcode(rxn["rate"])
-            for e in self._model.expressions:
+            rate = sympy.ccode(rxn["rate"])
+
+            expr_strings = {
+                e.name: '(%s)' % sympy.ccode(
+                    e.expand_expr(expand_observables=True)
+                ) for e in self.model.expressions}
+            # expand only expressions used in the rate eqn
+            for e in {sym for sym in rxn["rate"].atoms()
+                      if isinstance(sym, Expression)}:
                 rate = re.sub(r'\b%s\b' % e.name,
-                              '(' + sympy.ccode(e.expand_expr()) + ')', rate)
-            # replace observables w/ sums of species
-            for obs in self._model.observables:
-                obs_string = ''
-                for i in range(len(obs.coefficients)):
-                    if i > 0:
-                        obs_string += "+"
-                    if obs.coefficients[i] > 1:
-                        obs_string += str(obs.coefficients[i]) + "*"
-                    obs_string += "__s" + str(obs.species[i])
-                if len(obs.coefficients) > 1:
-                    obs_string = '(' + obs_string + ')'
-                rate = re.sub(r'\b(%s)\b' % obs.name, obs_string, rate)
-            # rate = str(rxn["rate"])
-            pattern = "(__s\d+)\*\*(\d+)"
+                              expr_strings[e.name],
+                              rate)
+
             matches = re.findall(pattern, rate)
             for m in matches:
                 repl = m[0]
@@ -139,10 +137,12 @@ class GPUSimulator(Simulator):
                     repl += "*(%s-%d)" % (m[0], i)
                 rate = re.sub(pattern, repl, rate)
 
-            rate = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))),
+            rate = re.sub(r'_*s(\d+)',
+                          lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
             for q, prm in enumerate(params_names):
-                rate = re.sub(r'\b(%s)\b' % prm, 'tex2D(param_tex,%s,tid)' % q,
+                rate = re.sub(r'\b(%s)\b' % prm,
+                              'tex2D(param_tex,%s,tid)' % q,
                               rate)
                 # rate = re.sub(r'\b(%s)\b' % prm, '%s' % str(params_vals[q]), rate)
             rate = re.sub('d0', '', rate)
@@ -338,7 +338,7 @@ class GPUSimulator(Simulator):
 
         if tspan is None:
             tspan = self.tspan
-
+        tspan = np.array(tspan, dtype=np.float32)
         tout = len(param_values) * [None]
 
         for n in range(len(param_values)):
