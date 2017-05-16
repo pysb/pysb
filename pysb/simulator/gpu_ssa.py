@@ -246,7 +246,7 @@ class GPUSimulator(Simulator):
 
         # allocate space on GPU for results
         result = driver.managed_zeros(
-            shape=(self._total_threads, n_results, self._species_number),
+            shape=(self._total_threads, len(timepoints), self._species_number),
             dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
         )
 
