@@ -8,7 +8,7 @@ For information on how to use the model exporters, see the documentation
 for :py:mod:`pysb.export`.
 """
 from pysb.export import Exporter
-from pysb.core import as_complex_pattern
+from pysb.core import as_complex_pattern, Expression
 from pysb.bng import generate_equations
 import numpy as np
 import sympy
@@ -191,20 +191,10 @@ class StochKitExporter(Exporter):
         document.append(params)
 
         # Expressions and observables
-        expr_strings = {e.name: '(%s)' % sympy.ccode(e.expand_expr()) for e in
-                        self.model.expressions}
-        obs_strings = {}
-        for obs in self.model.observables:
-            obs_string = ''
-            for i in range(len(obs.coefficients)):
-                if i > 0:
-                    obs_string += "+"
-                if obs.coefficients[i] > 1:
-                    obs_string += str(obs.coefficients[i]) + "*"
-                obs_string += "__s" + str(obs.species[i])
-            if len(obs.coefficients) > 1:
-                obs_string = '(' + obs_string + ')'
-            obs_strings[obs.name] = obs_string
+        expr_strings = {
+            e.name: '(%s)' % sympy.ccode(
+                e.expand_expr(expand_observables=True)
+            ) for e in self.model.expressions}
 
         # Reactions
         reacs = etree.Element('ReactionsList')
@@ -229,15 +219,14 @@ class StochKitExporter(Exporter):
                 repl = m[0]
                 for i in range(1, int(m[1])):
                     repl += "*(%s-%d)" % (m[0], i)
-                rate = re.sub(pattern, repl, rate)
-            # expand expressions
-            for e in self.model.expressions:
+                rate = re.sub(pattern, repl, rate, count=1)
+
+            # expand only expressions used in the rate eqn
+            for e in {sym for sym in rxn["rate"].atoms()
+                      if isinstance(sym, Expression)}:
                 rate = re.sub(r'\b%s\b' % e.name,
                               expr_strings[e.name],
                               rate)
-            # replace observables w/ sums of species
-            for obs in self.model.observables:
-                rate = rate.replace(obs.name, obs_strings[obs.name])
 
             reacs.append(self._reaction_to_element(rxn_name,
                                                    rxn_desc,
