@@ -36,6 +36,6 @@ def test_stochkit_earm_multi_initials():
 
 def test_stochkit_expressions():
     model = expression_observables.model
-    tspan = np.linspace(0, 100, 10)
+    tspan = np.linspace(0, 100, 11)
     sim = StochKitSimulator(model, tspan=tspan)
-    sim.run()
+    assert np.allclose(sim.run().tout, tspan)
