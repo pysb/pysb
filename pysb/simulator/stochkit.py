@@ -154,7 +154,7 @@ class StochKitSimulator(Simulator):
 
             # Assemble the argument list
             args = '--model {} --out-dir {} -t {:f} -i {:d}'.format(
-                fname, prefix_outdir, t, t_length)
+                fname, prefix_outdir, t, t_length - 1)
 
             # If we are using local mode, shell out and run StochKit
             # (SSA or Tau-leaping or ODE)
