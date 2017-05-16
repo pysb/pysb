@@ -197,7 +197,8 @@ class CuTauLeapingSimulator(Simulator):
         # regex for extracting cupSODA reported running time
         self._running_time_regex = re.compile(r'RUNNING TIME:\s+(\d+\.\d+)')
 
-    def run(self, tspan=None, initials=None, param_values=None, number_sim=1):
+    def run(self, tspan=None, initials=None, param_values=None, number_sim=1,
+            use_std_out=True):
         """Perform a set of integrations.
 
         Returns a :class:`.SimulationResult` object.
@@ -217,7 +218,8 @@ class CuTauLeapingSimulator(Simulator):
             Number of simulations to run. If initials and param_values are
             both none, then the model parameters will be copied number_sim 
             times.
-
+        use_std_out : bool
+            Use cuTauLeapings std out to load in trajectories into pysb.
         Returns
         -------
         A :class:`SimulationResult` object
@@ -281,14 +283,23 @@ class CuTauLeapingSimulator(Simulator):
         # fitness_calculation
         command = [bin_path, _cutauleaping_infiles_dir,
                    str(self._threads), str(self._blocks), str(self.gpu),
-                   '0', self._outfiles_dir, self._prefix, '0']
+                   '0', self._outfiles_dir, self._prefix, '0', '0',
+                   '2' if use_std_out else '0']
 
         self._logger.info("Running cuTauLeaping: " + ' '.join(command))
         start_time = time.time()
+
         # Run simulation and return trajectories
+        if use_std_out:
+            result = subprocess.check_output(command)
+            tout, trajectories = self._process_stdout_traj(result)
+            end_time = time.time()
+            self._logger.info("cuTauLeaping + I/O time:"
+                              " {} seconds".format(end_time - start_time))
+            return SimulationResult(self, tout, trajectories)
+
         p = subprocess.Popen(command, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
-
         (p_out, p_err) = p.communicate()
         p_out = p_out.decode('utf-8')
         p_err = p_err.decode('utf-8')
@@ -306,8 +317,8 @@ class CuTauLeapingSimulator(Simulator):
         if p.returncode:
             raise SimulatorException(
                 p_out.rstrip("at line") + "\n" + p_err.rstrip())
-        tout, trajectories = self._load_trajectories(
-            self._outfiles_dir)
+
+        tout, trajectories = self._load_trajectories(self._outfiles_dir)
         if self._cleanup:
             shutil.rmtree(self.outdir)
         end_time = time.time()
@@ -583,9 +594,43 @@ class CuTauLeapingSimulator(Simulator):
         data = np.array(data, dtype=np.float, copy=False)
         return data
 
+    def _process_stdout_traj(self, std_out):
+
+        n_sims = len(self.initials)
+        trajectories = [None] * n_sims
+        tout = [None] * n_sims
+
+        out_size = (len(self.tspan), len(self._out_species)+1)
+        traj_n = np.ones((len(self.tspan), self._len_species)) * float('nan')
+        tout_n = np.ones(len(self.tspan)) * float('nan')
+
+        std_out = std_out.decode('utf-8')
+
+        results = std_out.split('\n\n')
+
+        for n, i in enumerate(results):
+            if n >= n_sims:
+                break
+            i = i.replace('\n', '\t')
+
+            single_traj = np.fromstring(i, sep='\t')
+            if single_traj.shape[0] == 0:
+                continue
+            single_traj = single_traj.reshape(out_size)
+
+            trajectories[n] = traj_n.copy()
+            tout[n] = tout_n.copy()
+
+            # store data
+            tout[n] = single_traj[:, 0]
+            trajectories[n][:, self._out_species] = single_traj[:, 1:]
+
+        return np.array(tout), np.array(trajectories)
+
 
 def run_cutauleaping(model, tspan, initials=None, param_values=None,
-                integrator='cupsoda', cleanup=True, verbose=False, **kwargs):
+                     integrator='cutauleaping', cleanup=True, verbose=False,
+                     **kwargs):
     """Wrapper method for running cupSODA simulations.
     
     Parameters
@@ -599,6 +644,6 @@ def run_cutauleaping(model, tspan, initials=None, param_values=None,
         observables and expressions (in that order)
     """
     sim = CuTauLeapingSimulator(model, tspan=tspan, integrator=integrator,
-                           cleanup=cleanup, verbose=verbose, **kwargs)
+                                cleanup=cleanup, verbose=verbose, **kwargs)
     simres = sim.run(initials=initials, param_values=param_values)
     return simres.all
