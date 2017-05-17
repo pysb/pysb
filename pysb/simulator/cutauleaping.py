@@ -150,7 +150,9 @@ class CuTauLeapingSimulator(Simulator):
                                                initials=initials,
                                                param_values=param_values,
                                                verbose=verbose, **kwargs)
-        self.gpu = kwargs.get('gpu', 0)
+        self.gpu = os.environ.get("CUDA_DEVICE")
+        if self.gpu is None:
+            self.gpu = kwargs.get('gpu', 0)
         self._obs_species_only = kwargs.get('obs_species_only', True)
         self._cleanup = kwargs.get('cleanup', True)
         self._prefix = kwargs.get('prefix', self._model.name.replace('.', '_'))
