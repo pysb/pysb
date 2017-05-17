@@ -7,6 +7,7 @@ import os
 import shutil
 import tempfile
 from pysb.pathfinder import get_path
+from pysb.logging import EXTENDED_DEBUG
 
 
 class StochKitSimulator(Simulator):
@@ -148,9 +149,11 @@ class StochKitSimulator(Simulator):
             prefix_outdir = os.path.join(self._outdir, 'output_{}'.format(i))
 
             # Export model file
+            stoch_xml = StochKitExporter(self._model).export(
+                self.initials[i], self.param_values[i])
+            self._logger.log(EXTENDED_DEBUG, 'StochKit XML:\n' + stoch_xml)
             with open(fname, 'w') as f:
-                f.write(StochKitExporter(self._model).export(
-                    self.initials[i], self.param_values[i]))
+                f.write(stoch_xml)
 
             # Assemble the argument list
             args = '--model {} --out-dir {} -t {:f} -i {:d}'.format(
@@ -191,7 +194,8 @@ class StochKitSimulator(Simulator):
                     traj_dir, f)) for f in sorted(os.listdir(traj_dir))])
             except Exception as e:
                 raise SimulatorException(
-                    "Error reading StochKit trajectories: {0}".format(e))
+                    "Error reading StochKit trajectories: {0}"
+                    "\nSTDOUT:{1}\nSTDERR:{2}".format(e, stdout, stderr))
 
             if len(trajectories) == 0 or len(stderr) != 0:
                 raise SimulatorException("Solver execution failed: \
