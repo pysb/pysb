@@ -17,6 +17,7 @@ from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
 import time
 from pysb.pathfinder import get_path
 from pysb.core import Expression
+import logging
 
 
 class GPUSimulator(Simulator):
@@ -92,6 +93,7 @@ class GPUSimulator(Simulator):
             self._device = 0
         else:
             self._device = int(device)
+        self._logger.info("Initialized GPU class")
 
     def _pysb_to_cuda(self):
         """ converts pysb reactions to cuda compilable code
@@ -155,13 +157,13 @@ class GPUSimulator(Simulator):
                                          n_reactions=_reaction_number,
                                          hazards=hazards_string,
                                          stoch=stoich_string, )
-
+        self._logger.debug("Converted PySB model to pycuda code")
         return cs_string
 
     def _compile(self, code):
 
         if self.verbose:
-            print("Output cuda file to ssa_cuda_code.cu")
+            self._logger.info("Output cuda file to ssa_cuda_code.cu")
             with open("ssa_cuda_code.cu", "w") as source_file:
                 source_file.write(code)
         self.compile_ssa(code)
@@ -306,11 +308,13 @@ class GPUSimulator(Simulator):
             self._blocks = len(param_values) / self._threads + 1
 
         self._total_threads = self._blocks * self._threads
+        self._logger.info("Starting {} simulations".format(number_sim))
+
         timer_start = time.time()
         result = self._run_all(t_out, param_values, initials)
         timer_end = time.time()
-        print("{} simulations in {}s".format(number_sim,
-                                             timer_end - timer_start))
+        self._logger.info("{} simulations "
+                          "in {}s".format(number_sim, timer_end - timer_start))
 
         return SimulationResult(self, tout, result)
 
@@ -369,7 +373,8 @@ class GPUSimulator(Simulator):
         timer_start = time.time()
         for n, i in enumerate(tspan):
             if verbose:
-                print('{} out of {}'.format(n, len_time))
+                self._logger.info('{} out of {}'.format(n, len_time))
+
             if n == 0:
                 continue
             end = i
@@ -381,8 +386,8 @@ class GPUSimulator(Simulator):
             final_result[:, n, :] = result
             start_array = result
         timer_end = time.time()
-        print("{} simulations in {}s".format(n_simulations,
-                                             timer_end - timer_start))
+        self._logger.info("{} simulations "
+                          "in {}s".format(number_sim, timer_end - timer_start))
 
         return SimulationResult(self, tout, final_result)
 
@@ -397,15 +402,18 @@ class GPUSimulator(Simulator):
 
         """
         nvcc_bin = get_path('nvcc')
+        self._logger.debug("Compiling CUDA code")
         self._kernel = pycuda.compiler.SourceModule(code, nvcc=nvcc_bin,
                                                     no_extern_c=True)
         self._param_tex = self._kernel.get_texref("param_tex")
         self._ssa = self._kernel.get_function("Gillespie_one_step")
         self._ssa_all = self._kernel.get_function("Gillespie_all_steps")
+        self._logger.debug("Compiled CUDA code")
 
     def _print_verbose(self):
-        print("threads = {}\n_blocks = {}"
+        self._logger.info("threads = {}\n_blocks = {}"
               "".format(self._threads, self._blocks))
+        print()
         print("Kernel Memory\n\tlocal = {}  \n\tshared = {}  \n"
               "registers {} ".format(self._ssa.local_size_bytes,
                                      self._ssa.shared_size_bytes,
