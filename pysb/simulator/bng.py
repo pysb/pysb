@@ -125,6 +125,7 @@ class BngSimulator(Simulator):
                     tmp = additional_args.copy()
                     tmp['prefix'] = '{}{}'.format(prefix, sim_prefix)
                     bngfile.action('simulate', **tmp)
+                    bngfile.action('resetConcentrations')
                     sim_prefix += 1
             bngfile.execute()
             if method != 'nf':

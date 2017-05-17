@@ -48,6 +48,8 @@ class TestBngSimulator(object):
     def test_multi_simulations(self):
         x = self.sim.run(n_runs=10)
         assert np.shape(x.observables) == (10, 50)
+        # Check initials are getting correctly reset on each simulation
+        assert np.allclose(x.species[-1][0, :], x.species[0][0, :])
 
     def test_change_parameters(self):
         x = self.sim.run(n_runs=10, param_values={'ksynthA': 200},
