@@ -69,7 +69,7 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, double* ti
     for(int i=0; i<NRESULTS;){{
 //        __syncthreads();
         if(t>=time[i]){{
-            for(unsigned int j=0; j<num_species; j++){{
+            for(int j=0; j<num_species; j++){{
                 result[tid*NRESULTS*num_species + i*num_species + j] = y[j];
                 }}
             i++;
@@ -82,7 +82,7 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, double* ti
             propensities( y, A, tid , param_arry);
             a0 = 0;
             // summing up propensities
-            for(unsigned int j=0; j<NREACT; j++)
+            for(int j=0; j<NREACT; j++)
                 a0 += A[j];
 
 
@@ -112,13 +112,13 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, double* sta
 
    double param_arry[NPARAM];
 
-    for(unsigned int i=0; i<NPARAM; i++){{
+    for(int i=0; i<NPARAM; i++){{
         param_arry[i] = param_values[tid*NPARAM + i];
         }}
     double A[NREACT];
 
     // start first step
-    for(unsigned int i=0; i<NREACT; i++){{
+    for(int i=0; i<NREACT; i++){{
         A[i] = 0;
         }}
 
@@ -142,7 +142,7 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, double* sta
         propensities( y, A, tid , param_arry);
         a0 = 0;
         // summing up propensities
-        for(unsigned int j=0; j<NREACT; j++){{
+        for(int j=0; j<NREACT; j++){{
             a0 += A[j];
             }}
 
@@ -153,7 +153,7 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, double* sta
 
         }}
 
-    for(unsigned int j=0; j<num_species; j++){{
+    for(int j=0; j<num_species; j++){{
         result[tid*num_species +  j] = y[j];
         }}
     result_time[tid] = start_t;
