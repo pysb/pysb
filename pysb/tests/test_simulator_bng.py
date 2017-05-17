@@ -43,11 +43,11 @@ class TestBngSimulator(object):
 
     def test_1_simulation(self):
         x = self.sim.run()
-        assert x.all.shape == (51,)
+        assert np.allclose(x.tout, self.time)
 
     def test_multi_simulations(self):
         x = self.sim.run(n_runs=10)
-        assert np.shape(x.observables) == (10, 51)
+        assert np.shape(x.observables) == (10, 50)
 
     def test_change_parameters(self):
         x = self.sim.run(n_runs=10, param_values={'ksynthA': 200},
@@ -70,8 +70,8 @@ def test_bng_ode_with_expressions():
 
     sim = BngSimulator(model, tspan=np.linspace(0, 1))
     x = sim.run(n_runs=1, method='ode')
-    assert len(x.expressions) == 51
-    assert len(x.observables) == 51
+    assert len(x.expressions) == 50
+    assert len(x.observables) == 50
 
 
 def test_nfsim():
@@ -82,7 +82,7 @@ def test_nfsim():
     sim = BngSimulator(model, tspan=np.linspace(0, 1))
     x = sim.run(n_runs=1, method='nf')
     observables = np.array(x.observables)
-    assert len(observables) == 51
+    assert len(observables) == 50
 
     A = model.monomers['A']
     x = sim.run(n_runs=2, method='nf', tspan=np.linspace(0, 1),

@@ -80,7 +80,7 @@ class BngSimulator(Simulator):
 
         additional_args['method'] = method
         additional_args['t_end'] = self.tspan[-1]
-        additional_args['n_steps'] = len(self.tspan)
+        additional_args['n_steps'] = len(self.tspan) - 1
         additional_args['print_functions'] = True
         verbose_bool = self._logger.logger.getEffectiveLevel() <= logging.DEBUG
         extended_debug = self._logger.logger.getEffectiveLevel() <= \
