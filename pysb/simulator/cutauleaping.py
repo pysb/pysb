@@ -1,18 +1,20 @@
 from __future__ import print_function as _
-from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
-import pysb
-import pysb.bng
-import numpy as np
-from scipy.constants import N_A
+
+import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
-import logging
+
+import numpy as np
+
+import pysb
+import pysb.bng
 from pysb.logging import EXTENDED_DEBUG
-import shutil
 from pysb.pathfinder import get_path
+from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
 
 try:
     import pandas as pd
@@ -179,7 +181,7 @@ class CuTauLeapingSimulator(Simulator):
 
         # private variables (to reduce the number of function calls)
         self._len_rxns = len(self._model.reactions)
-        self._threads = 32
+        self._threads = 16
         self._len_species = len(self._model.species)
         self._len_params = len(self._model.parameters)
         self._model_parameters_rules = self._model.parameters_rules()
@@ -192,11 +194,11 @@ class CuTauLeapingSimulator(Simulator):
         if logger_level <= EXTENDED_DEBUG:
             self._cupsoda_verbose = 2
         elif logger_level <= logging.DEBUG:
-            self._cupsoda_verbose = 1
+            self._cutauleaping_verbose = 1
         else:
-            self._cupsoda_verbose = 0
+            self._cutauleaping_verbose = 0
 
-        # regex for extracting cupSODA reported running time
+        # regex for extracting cutauleaping reported running time
         self._running_time_regex = re.compile(r'RUNNING TIME:\s+(\d+\.\d+)')
 
     def run(self, tspan=None, initials=None, param_values=None, number_sim=1,
@@ -264,7 +266,7 @@ class CuTauLeapingSimulator(Simulator):
 
         self._total_threads = self._blocks * self._threads
 
-        # Create directories for cupSODA input and output files
+        # Create directories for cutauleaping input and output files
         self.outdir = tempfile.mkdtemp(prefix=self._prefix + '_',
                                        dir=self._base_dir)
 
@@ -273,10 +275,10 @@ class CuTauLeapingSimulator(Simulator):
         os.mkdir(_cutauleaping_infiles_dir)
         self._outfiles_dir = os.path.join(self.outdir, "OUTPUT")
 
-        # Path to cupSODA executable
+        # Path to cutauleaping executable
         bin_path = get_path('cuTauLeaping')
 
-        # Create cupSODA input files
+        # Create cutauleaping input files
 
         self._create_input_files(_cutauleaping_infiles_dir)
 
@@ -503,7 +505,8 @@ class CuTauLeapingSimulator(Simulator):
                     if isinstance(r, pysb.Parameter):
                         rate *= par_vals[i][par_names.index(r.name)]
                     elif isinstance(r, pysb.Expression):
-                        raise ValueError('cupSODA does not currently support '
+                        raise ValueError(
+                            'cutauleaping does not currently support '
                                          'models with Expressions')
                     else:
                         rate *= r
@@ -633,11 +636,11 @@ class CuTauLeapingSimulator(Simulator):
 def run_cutauleaping(model, tspan, initials=None, param_values=None,
                      integrator='cutauleaping', cleanup=True, verbose=False,
                      **kwargs):
-    """Wrapper method for running cupSODA simulations.
+    """Wrapper method for running cutauleaping simulations.
     
     Parameters
     ----------
-    See ``CupSodaSimulator`` constructor.
+    See ``cutauleapingSimulator`` constructor.
     
     Returns
     -------
