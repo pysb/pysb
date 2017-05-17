@@ -119,7 +119,7 @@ class GPUSimulator(Simulator):
         for n, rxn in enumerate(self._model.reactions):
 
             hazards_string += "\th[%s] = " % repr(n)
-            rate = sympy.ccode(rxn["rate"])
+            rate = sympy.fcode(rxn["rate"])
 
             expr_strings = {
                 e.name: '(%s)' % sympy.ccode(
@@ -143,8 +143,11 @@ class GPUSimulator(Simulator):
                           lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
             for q, prm in enumerate(params_names):
+                # rate = re.sub(r'\b(%s)\b' % prm,
+                #               'tex2D(param_tex,%s,tid)' % q,
+                #               rate)
                 rate = re.sub(r'\b(%s)\b' % prm,
-                              'tex2D(param_tex,%s,tid)' % q,
+                              'param_arry[%s]' % q,
                               rate)
                 # rate = re.sub(r'\b(%s)\b' % prm, '%s' % str(params_vals[q]), rate)
             rate = re.sub('d0', '', rate)
@@ -188,13 +191,22 @@ class GPUSimulator(Simulator):
         """
 
         if self._step_0:
-            self._setup(params)
+            self._setup()
 
             if self.verbose:
                 self._print_verbose()
 
         n_simulations = len(params)
 
+        # set up paramters to GPU
+        param = np.zeros((self._total_threads, self._parameter_number),
+                         dtype=np.float64)
+        for i in range(len(params)):
+            for j in range(self._parameter_number):
+                param[i][j] = params[i][j]
+        param_array = gpuarray.to_gpu(param)
+
+        # set up species matrix, initial conditions
         species_matrix = self._create_gpu_init(initials=initials)
 
         # allocate space on GPU for results
@@ -206,11 +218,11 @@ class GPUSimulator(Simulator):
         )
 
         # place starting time on GPU
-        start_time = np.array(start_time, dtype=np.float32)
+        start_time = np.array(start_time, dtype=np.float64)
         start_time_gpu = gpuarray.to_gpu(start_time)
 
         # allocate and upload time to GPU
-        last_time = np.zeros(n_simulations, dtype=np.float32)
+        last_time = np.zeros(n_simulations, dtype=np.float64)
         last_time_gpu = gpuarray.to_gpu(last_time)
 
         # stride of GPU, allows us to use a 1D array and index as a 2D
@@ -218,7 +230,8 @@ class GPUSimulator(Simulator):
 
         # run single step
         self._ssa(species_matrix_gpu, result, start_time_gpu, end_time,
-                  last_time_gpu, a_stride, block=(self._threads, 1, 1),
+                  last_time_gpu, a_stride, param_array,
+                  block=(self._threads, 1, 1),
                   grid=(self._blocks, 1))
 
         # Wait for kernel completion before host access
@@ -235,10 +248,18 @@ class GPUSimulator(Simulator):
 
         # compile kernel and send parameters to GPU
         if self._step_0:
-            self._setup(params)
+            self._setup()
 
         if self.verbose:
             self._print_verbose()
+
+        param = np.zeros((self._total_threads, self._parameter_number),
+                         dtype=np.float64)
+        for i in range(len(params)):
+            for j in range(self._parameter_number):
+                param[i][j] = params[i][j]
+        param_array = gpuarray.to_gpu(param)
+
 
         n_simulations = len(params)
         n_results = np.int32(len(timepoints))
@@ -253,11 +274,12 @@ class GPUSimulator(Simulator):
         )
 
         # allocate and upload time to GPU
-        time_points = np.array(timepoints, dtype=np.float32)
+        time_points = np.array(timepoints, dtype=np.float64)
         time_points_gpu = gpuarray.to_gpu(time_points)
 
         # perform simulation
         self._ssa_all(species_matrix_gpu, result, time_points_gpu, n_results,
+                      param_array,
                       block=(self._threads, 1, 1), grid=(self._blocks, 1)
                       )
 
@@ -275,7 +297,7 @@ class GPUSimulator(Simulator):
             nominal_values = np.array(
                     [p.value for p in self._model.parameters])
             param_values = np.zeros((num_particles, len(nominal_values)),
-                                    dtype=np.float32)
+                                    dtype=np.float64)
             param_values[:, :] = nominal_values
             self.param_values = param_values
 
@@ -295,7 +317,7 @@ class GPUSimulator(Simulator):
         for n in range(len(param_values)):
             tout[n] = tspan
 
-        t_out = np.array(tspan, dtype=np.float32)
+        t_out = np.array(tspan, dtype=np.float64)
 
         if threads is None:
             self._threads = 128
@@ -327,7 +349,7 @@ class GPUSimulator(Simulator):
             nominal_values = np.array(
                     [p.value for p in self._model.parameters])
             param_values = np.zeros((num_particles, len(nominal_values)),
-                                    dtype=np.float32)
+                                    dtype=np.float64)
             param_values[:, :] = nominal_values
             self.param_values = param_values
 
@@ -342,12 +364,12 @@ class GPUSimulator(Simulator):
 
         if tspan is None:
             tspan = self.tspan
-        tspan = np.array(tspan, dtype=np.float32)
+        tspan = np.array(tspan, dtype=np.float64)
         tout = len(param_values) * [None]
 
         for n in range(len(param_values)):
             tout[n] = tspan
-        t_out = np.array(tout, dtype=np.float32)
+        t_out = np.array(tout, dtype=np.float64)
         len_time = len(tspan)
 
         if threads is None:
@@ -405,7 +427,7 @@ class GPUSimulator(Simulator):
         self._logger.debug("Compiling CUDA code")
         self._kernel = pycuda.compiler.SourceModule(code, nvcc=nvcc_bin,
                                                     no_extern_c=True)
-        self._param_tex = self._kernel.get_texref("param_tex")
+
         self._ssa = self._kernel.get_function("Gillespie_one_step")
         self._ssa_all = self._kernel.get_function("Gillespie_all_steps")
         self._logger.debug("Compiled CUDA code")
@@ -413,7 +435,7 @@ class GPUSimulator(Simulator):
     def _print_verbose(self):
         self._logger.info("threads = {}\n_blocks = {}"
               "".format(self._threads, self._blocks))
-        print()
+        # """
         print("Kernel Memory\n\tlocal = {}  \n\tshared = {}  \n"
               "registers {} ".format(self._ssa.local_size_bytes,
                                      self._ssa.shared_size_bytes,
@@ -426,21 +448,10 @@ class GPUSimulator(Simulator):
               "warps_per_mp = {}\ntb_per_mp_limits {}"
               "".format(occ.tb_per_mp, occ.limited_by, occ.occupancy,
                         occ.warps_per_mp, occ.tb_per_mp_limits))
+        # """
 
-    def _setup(self, params):
+    def _setup(self):
         self._compile(self._code)
-        param = np.zeros((self._total_threads, self._parameter_number),
-                         dtype=np.float32)
-        try:
-            for i in range(len(params)):
-                for j in range(self._parameter_number):
-                    param[i][j] = params[i][j]
-        except IndexError:
-            pass
-        ary = _create_2D_array(param)
-        _copy2D_host_to_array(ary, param, self._parameter_number * 4,
-                              self._total_threads)
-        self._param_tex.set_array(ary)
         self._step_0 = False
 
     def _create_gpu_init(self, initials):
@@ -473,27 +484,6 @@ class GPUSimulator(Simulator):
         else:
             blocks = len(parameters) / threads + 1
         return blocks, threads
-
-
-def _create_2D_array(matrix):
-    tmp_array = driver.ArrayDescriptor()
-    tmp_array.width = matrix.shape[1]
-    tmp_array.height = matrix.shape[0]
-    tmp_array.format = driver.dtype_to_array_format(matrix.dtype)
-    tmp_array.num_channels = 1
-    tmp_array.flags = 0
-    ary = driver.Array(tmp_array)
-    return ary
-
-
-def _copy2D_host_to_array(arr, host, width, height):
-    tmp_array = driver.Memcpy2D()
-    tmp_array.set_src_host(host)
-    tmp_array.set_dst_array(arr)
-    tmp_array.height = height
-    tmp_array.width_in_bytes = tmp_array.src_pitch = width
-    tmp_array.height = height
-    tmp_array(aligned=True)
 
 
 def _lhs(model):
