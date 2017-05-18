@@ -291,6 +291,7 @@ class CuTauLeapingSimulator(Simulator):
                    '2' if use_std_out else '0']
 
         self._logger.info("Running cuTauLeaping: " + ' '.join(command))
+        time.sleep(3)
         start_time = time.time()
 
         # Run simulation and return trajectories
