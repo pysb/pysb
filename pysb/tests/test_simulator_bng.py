@@ -1,9 +1,9 @@
 from pysb.testing import *
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule
-from pysb.simulator.bng import BngSimulator
+from pysb.simulator.bng import BngSimulator, PopulationMap
 from pysb.bng import generate_equations
-from pysb.examples import robertson, expression_observables
+from pysb.examples import robertson, expression_observables, earm_1_0
 
 
 class TestBngSimulator(object):
@@ -91,3 +91,25 @@ def test_nfsim():
                 initials={A(): 100})
     print(x.dataframe.loc[0, 0.0])
     assert np.allclose(x.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])
+
+
+def test_hpp():
+    # EARM 1.0 fails with vanilla NFsim
+    model = earm_1_0.model
+    # Make sure no network generation has taken place
+    model.reset_equations()
+
+    PARP, Mito, mCytoC = [earm_1_0.model.monomers[x] for x in
+                          ['PARP', 'Mito', 'mCytoC']]
+    klump = Parameter('klump', 10000, _export=False)
+    model.add_component(klump)
+
+    population_maps = [
+        PopulationMap(PARP(b=None), klump),
+        PopulationMap(Mito(b=None), klump),
+        PopulationMap(mCytoC(b=None), klump)
+    ]
+
+    sim = BngSimulator(model, tspan=np.linspace(0, 1000, 101))
+    x = sim.run(n_runs=2, method='hpp', population_maps=population_maps,
+                cleanup=False)

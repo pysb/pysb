@@ -11,12 +11,13 @@ except NameError:
 
 class BngGenerator(object):
 
-    def __init__(self, model, additional_initials=None):
+    def __init__(self, model, additional_initials=None, population_maps=None):
         self.model = model
         if self.model.has_synth_deg():
             self.model.enable_synth_deg()
         self._additional_initials = additional_initials if \
             additional_initials is not None else []
+        self._population_maps = population_maps
         self.__content = None
 
     def get_content(self):
@@ -33,6 +34,7 @@ class BngGenerator(object):
         self.generate_functions()
         self.generate_species()
         self.generate_reaction_rules()
+        self.generate_population_maps()
         self.__content += "end model\n"
 
     def generate_parameters(self):
@@ -151,6 +153,24 @@ class BngGenerator(object):
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code,
                                                                          param)
         self.__content += "end species\n\n"
+
+    def generate_population_maps(self):
+        if self._population_maps is None:
+            return
+        self.__content += 'begin population maps\n'
+        cplx_pats = [format_complexpattern(pm.complex_pattern)
+                     for pm in self._population_maps]
+        str_padding = max(len(cp) for cp in cplx_pats)
+        for i in range(len(cplx_pats)):
+            cs = self._population_maps[i].counter_species
+            if cs is None:
+                cs = '__hppcounter%d()' % i
+                self._population_maps[i].counter_species = cs
+            self.__content += ('  %-' + str(str_padding) + 's -> %s\t%s\n') % \
+                              (cplx_pats[i], cs,
+                               self._population_maps[i].lumping_rate.name)
+        self.__content += 'end population maps\n\n'
+
 
 def format_monomer_site(monomer, site):
     ret = site
