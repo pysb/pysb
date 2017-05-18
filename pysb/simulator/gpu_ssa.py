@@ -1,5 +1,7 @@
 from __future__ import print_function
+
 import numpy as np
+
 try:
     import pycuda
     import pycuda.autoinit
@@ -17,7 +19,6 @@ from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
 import time
 from pysb.pathfinder import get_path
 from pysb.core import Expression
-import logging
 
 
 class GPUSimulator(Simulator):
@@ -60,7 +61,8 @@ class GPUSimulator(Simulator):
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
-    def __init__(self, model, verbose=False, tspan=None, **kwargs):
+    def __init__(self, model, verbose=False, tspan=None, precision=np.float32,
+                 **kwargs):
         super(GPUSimulator, self).__init__(model, verbose, **kwargs)
 
         if pycuda is None:
@@ -69,14 +71,14 @@ class GPUSimulator(Simulator):
                                       self.__class__.__name__))
 
         generate_equations(self._model)
-
+        self._precision = precision
         self.tout = None
         self.tspan = tspan
         self.verbose = verbose
 
         # private attribute
         self._blocks = None
-        self._threads = None
+        self._threads = 32
         self._total_threads = 0
         self._parameter_number = len(self._model.parameters)
         self._species_number = len(self._model.species)
@@ -120,7 +122,8 @@ class GPUSimulator(Simulator):
 
             hazards_string += "\th[%s] = " % repr(n)
             rate = sympy.fcode(rxn["rate"])
-
+            rate = re.sub('d0', '', rate)
+            rate = p.sub('', rate)
             expr_strings = {
                 e.name: '(%s)' % sympy.ccode(
                     e.expand_expr(expand_observables=True)
@@ -143,13 +146,17 @@ class GPUSimulator(Simulator):
                           lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
             for q, prm in enumerate(params_names):
-                # rate = re.sub(r'\b(%s)\b' % prm,
-                #               'tex2D(param_tex,%s,tid)' % q,
-                #               rate)
-                rate = re.sub(r'\b(%s)\b' % prm,
-                              'param_arry[%s]' % q,
-                              rate)
-                # rate = re.sub(r'\b(%s)\b' % prm, '%s' % str(params_vals[q]), rate)
+                rate = re.sub(r'\b(%s)\b' % prm, 'param_arry[%s]' % q, rate)
+            items = rate.split('*')
+            rate = ''
+            for i in items:
+                if i.startswith('param_arry'):
+                    rate += i + '*'
+            for i in sorted(items):
+                if i.startswith('param_arry'):
+                    continue
+                rate += i + '*'
+            rate = re.sub('\*$', '', rate)
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
             rate = rate.replace('pow', 'powf')
@@ -160,6 +167,8 @@ class GPUSimulator(Simulator):
                                          n_reactions=_reaction_number,
                                          hazards=hazards_string,
                                          stoch=stoich_string, )
+        if self._precision == np.float64:
+            cs_string = cs_string.replace('float', 'double')
         self._logger.debug("Converted PySB model to pycuda code")
         return cs_string
 
@@ -194,13 +203,13 @@ class GPUSimulator(Simulator):
             self._setup()
 
             if self.verbose:
-                self._print_verbose()
+                self._print_verbose(self._ssa)
 
         n_simulations = len(params)
 
         # set up paramters to GPU
         param = np.zeros((self._total_threads, self._parameter_number),
-                         dtype=np.float64)
+                         dtype=self._precision)
         for i in range(len(params)):
             for j in range(self._parameter_number):
                 param[i][j] = params[i][j]
@@ -218,11 +227,11 @@ class GPUSimulator(Simulator):
         )
 
         # place starting time on GPU
-        start_time = np.array(start_time, dtype=np.float64)
+        start_time = np.array(start_time, dtype=self._precision)
         start_time_gpu = gpuarray.to_gpu(start_time)
 
         # allocate and upload time to GPU
-        last_time = np.zeros(n_simulations, dtype=np.float64)
+        last_time = np.zeros(n_simulations, dtype=self._precision)
         last_time_gpu = gpuarray.to_gpu(last_time)
 
         # stride of GPU, allows us to use a 1D array and index as a 2D
@@ -251,15 +260,14 @@ class GPUSimulator(Simulator):
             self._setup()
 
         if self.verbose:
-            self._print_verbose()
+            self._print_verbose(self._ssa_all)
 
         param = np.zeros((self._total_threads, self._parameter_number),
-                         dtype=np.float64)
+                         dtype=self._precision)
         for i in range(len(params)):
             for j in range(self._parameter_number):
                 param[i][j] = params[i][j]
         param_array = gpuarray.to_gpu(param)
-
 
         n_simulations = len(params)
         n_results = np.int32(len(timepoints))
@@ -274,7 +282,7 @@ class GPUSimulator(Simulator):
         )
 
         # allocate and upload time to GPU
-        time_points = np.array(timepoints, dtype=np.float64)
+        time_points = np.array(timepoints, dtype=self._precision)
         time_points_gpu = gpuarray.to_gpu(time_points)
 
         # perform simulation
@@ -297,7 +305,7 @@ class GPUSimulator(Simulator):
             nominal_values = np.array(
                     [p.value for p in self._model.parameters])
             param_values = np.zeros((num_particles, len(nominal_values)),
-                                    dtype=np.float64)
+                                    dtype=self._precision)
             param_values[:, :] = nominal_values
             self.param_values = param_values
 
@@ -317,7 +325,7 @@ class GPUSimulator(Simulator):
         for n in range(len(param_values)):
             tout[n] = tspan
 
-        t_out = np.array(tspan, dtype=np.float64)
+        t_out = np.array(tspan, dtype=self._precision)
 
         if threads is None:
             self._threads = 128
@@ -349,7 +357,7 @@ class GPUSimulator(Simulator):
             nominal_values = np.array(
                     [p.value for p in self._model.parameters])
             param_values = np.zeros((num_particles, len(nominal_values)),
-                                    dtype=np.float64)
+                                    dtype=self._precision)
             param_values[:, :] = nominal_values
             self.param_values = param_values
 
@@ -364,12 +372,12 @@ class GPUSimulator(Simulator):
 
         if tspan is None:
             tspan = self.tspan
-        tspan = np.array(tspan, dtype=np.float64)
+        tspan = np.array(tspan, dtype=self._precision)
         tout = len(param_values) * [None]
 
         for n in range(len(param_values)):
             tout[n] = tspan
-        t_out = np.array(tout, dtype=np.float64)
+        t_out = np.array(tout, dtype=self._precision)
         len_time = len(tspan)
 
         if threads is None:
@@ -428,27 +436,28 @@ class GPUSimulator(Simulator):
         self._kernel = pycuda.compiler.SourceModule(code, nvcc=nvcc_bin,
                                                     no_extern_c=True)
 
-        self._ssa = self._kernel.get_function("Gillespie_one_step")
+        # self._ssa = self._kernel.get_function("Gillespie_one_step")
         self._ssa_all = self._kernel.get_function("Gillespie_all_steps")
         self._logger.debug("Compiled CUDA code")
 
-    def _print_verbose(self):
-        self._logger.info("threads = {}\n_blocks = {}"
-              "".format(self._threads, self._blocks))
-        # """
-        print("Kernel Memory\n\tlocal = {}  \n\tshared = {}  \n"
-              "registers {} ".format(self._ssa.local_size_bytes,
-                                     self._ssa.shared_size_bytes,
-                                     self._ssa.num_regs))
+    def _print_verbose(self, code):
+        self._logger.info("threads = {}".format(self._threads))
+        self._logger.info("blocks  = {}".format(self._blocks))
+
+        self._logger.debug("Local memory  = {}".format(code.local_size_bytes))
+        self._logger.debug("shared memory = {}".format(code.shared_size_bytes))
+        self._logger.debug("registers  = {}".format(code.num_regs))
+
         occ = tools.OccupancyRecord(tools.DeviceData(),
                                     threads=self._threads,
-                                    shared_mem=self._ssa.shared_size_bytes,
-                                    registers=self._ssa.num_regs)
-        print("tb_per_mp = {} \nlimit = {} \noccupancy = {}\n"
-              "warps_per_mp = {}\ntb_per_mp_limits {}"
-              "".format(occ.tb_per_mp, occ.limited_by, occ.occupancy,
-                        occ.warps_per_mp, occ.tb_per_mp_limits))
-        # """
+                                    shared_mem=code.shared_size_bytes,
+                                    registers=code.num_regs)
+        self._logger.debug("tb_per_mp  = {}".format(occ.tb_per_mp))
+        self._logger.debug("limited by = {}".format(occ.limited_by))
+        self._logger.debug("occupancy  = {}".format(occ.occupancy))
+        self._logger.debug(
+            "tb_per_mp_limits  = {}".format(occ.tb_per_mp_limits))
+
 
     def _setup(self):
         self._compile(self._code)
