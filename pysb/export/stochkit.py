@@ -190,11 +190,12 @@ class StochKitExporter(Exporter):
         # Parameters
         params = etree.Element('ParametersList')
         for p_id, param in enumerate(self.model.parameters):
-            if param.name == 'vol':
-                param.rename('__vol')
+            p_name = param.name
+            if p_name == 'vol':
+                p_name = '__vol'
             p_value = param.value if param_values is None else \
                 param_values[p_id]
-            params.append(self._parameter_to_element(param.name, p_value))
+            params.append(self._parameter_to_element(p_name, p_value))
         # Default volume parameter value
         params.append(self._parameter_to_element('vol', 1.0))
 
