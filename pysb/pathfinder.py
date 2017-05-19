@@ -12,7 +12,10 @@ _path_config = {
     },
     'kasa': {
         'name': 'KaSa (Kappa)',
-        'executable': 'KaSa',
+        'executable': {
+            'posix': 'KaSa',
+            'nt': 'KaSa.exe'
+        },
         'env_var': 'KAPPAPATH',
         'search_paths': {
             'posix': ('/usr/local/share/KaSa', ),
@@ -21,7 +24,10 @@ _path_config = {
     },
     'kasim': {
         'name': 'KaSim (Kappa)',
-        'executable': 'KaSim',
+        'executable': {
+            'posix': 'KaSim',
+            'nt': 'KaSim.exe'
+        },
         'env_var': 'KAPPAPATH',
         'search_paths': {
             'posix': ('/usr/local/share/KaSim',),
@@ -42,7 +48,10 @@ _path_config = {
     },
     'stochkit_ssa': {
         'name': 'StochKit [SSA]',
-        'executable': 'ssa',
+        'executable': {
+            'posix': 'ssa',
+            'nt': 'ssa.exe'
+        },
         'env_var': 'STOCHKITPATH',
         'search_paths': {
             'posix': ('/usr/local/share/StochKit', ),
@@ -51,7 +60,10 @@ _path_config = {
     },
     'stochkit_tau_leaping': {
         'name': 'StochKit [Tau Leaping]',
-        'executable': 'tau_leaping',
+        'executable': {
+            'posix': 'tau_leaping',
+            'nt': 'tau_leaping.exe'
+        },
         'env_var': 'STOCHKITPATH',
         'search_paths': {
             'posix': ('/usr/local/share/StochKit',),

@@ -45,6 +45,11 @@ install:
   - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4beta/KaSa.exe" -FileName KaSa.exe
   - set "KAPPAPATH=%cd%"
 
+  # StochKit
+  - appveyor DownloadFile "https://downloads.sourceforge.net/project/stochkit/StochKit2/StochKit2.0.10/StochKit2.0.10_WINDOWS_LITE.zip" -FileName stochkit.zip
+  - 7z x stochkit.zip -y > nul
+  - set "STOCHKITPATH=%cd%\StochKit2.0.10_WINDOWS_LITE"
+
   # Build PySB
   - python setup.py build --build-lib=build/lib
 test_script:
