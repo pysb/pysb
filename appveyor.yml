@@ -40,9 +40,10 @@ install:
   - 7z x BioNetGen.zip -y > nul
   - set "BNGPATH=%cd%\BioNetGen-2.2.6-stable"
 
-  # KaSim
-  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v3.5-121114/KaSim_3.5_winxp.exe" -FileName KaSim.exe
-  - set "KAPPAPATH=%cd%\KaSim.exe"
+  # KaSim and KaSa
+  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4beta/KaSim.exe" -FileName KaSim.exe
+  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4beta/KaSa.exe" -FileName KaSa.exe
+  - set "KAPPAPATH=%cd%"
 
   # Build PySB
   - python setup.py build --build-lib=build/lib
