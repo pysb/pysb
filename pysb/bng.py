@@ -490,7 +490,7 @@ class BngFileInterface(BngBaseInterface):
             Value of parameter
 
         """
-        self.command_queue.write('\tsetParameter("%s", %f)\n' % (name, value))
+        self.command_queue.write('\tsetParameter("%s", %g)\n' % (name, value))
 
     def set_concentration(self, cplx_pat, value):
         """
@@ -507,7 +507,7 @@ class BngFileInterface(BngBaseInterface):
         formatted_name = format_complexpattern(
             pysb.core.as_complex_pattern(cplx_pat)
         )
-        self.command_queue.write('\tsetConcentration("%s", %f)\n' % (
+        self.command_queue.write('\tsetConcentration("%s", %g)\n' % (
             formatted_name, value))
 
 
