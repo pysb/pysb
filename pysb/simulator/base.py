@@ -538,7 +538,7 @@ class SimulationResult(object):
                  simulations_per_param_set=1):
         simulator._logger.debug('SimulationResult constructor started')
         self.squeeze = squeeze
-        self.tout = tout
+        self.tout = np.asarray(tout)
         self._yfull = None
         self._model = simulator._model
         self.n_sims_per_parameter_set = simulations_per_param_set
