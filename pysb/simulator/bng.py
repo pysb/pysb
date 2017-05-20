@@ -139,8 +139,6 @@ class BngSimulator(Simulator):
                 self._logger.debug('HPP BNGL:\n\n' + hpp_bngl)
                 with open(hpp_bngl_filename, 'w') as f:
                     f.write(hpp_bngl)
-                bngfile.action('readFile', file=hpp_bngl_filename,
-                               skip_actions=True)
             if method not in ['nf', 'hpp']:
                 # TODO: Write existing netfile if already generated
                 bngfile.action('generate_network', overwrite=True,
@@ -170,7 +168,11 @@ class BngSimulator(Simulator):
                     bngfile.action('simulate', **tmp)
                     bngfile.action('resetConcentrations')
                     sim_prefix += 1
-            bngfile.execute()
+            if hpp_bngl:
+                bngfile.execute(reload_netfile=hpp_bngl_filename,
+                                skip_file_actions=True)
+            else:
+                bngfile.execute()
             if method not in ['nf', 'hpp']:
                 load_equations(self.model, bngfile.net_filename)
             list_of_yfull = \

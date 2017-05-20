@@ -413,17 +413,23 @@ class BngFileInterface(BngBaseInterface):
         if self.cleanup:
             self._delete_tmpdir()
 
-    def execute(self, reload_netfile=False):
+    def execute(self, reload_netfile=False, skip_file_actions=True):
         """
         Executes all BNG commands in the command queue.
 
         Parameters
         ----------
-        reload_netfile: bool
+        reload_netfile: bool or str
             If true, attempts to reload an existing .net file from a
-            previous execute() iteration. This is useful for running
-            multiple actions in a row, where results need to be read
-            into PySB before a new series of actions is executed.
+            previous execute() iteration. If a string, the filename
+            specified in the string is supplied to BNG's readFile (which can be
+            any file type BNG supports, such as .net or .bngl).
+            This is useful for running multiple actions in a row,
+            where results need to be read into PySB before a new series of
+            actions is executed.
+        skip_file_actions: bool
+            Only used if the previous argument is not False. Set this
+            argument to True to ignore any actions block in the loaded file.
         """
         self.command_queue.write('end actions\n')
         bng_commands = self.command_queue.getvalue()
@@ -432,12 +438,14 @@ class BngFileInterface(BngBaseInterface):
             # Generate BNGL file
             with open(self.bng_filename, 'w') as bng_file:
                 output = ''
-                if reload_netfile:
-                    bng_commands = bng_commands.replace('begin actions\n',
-                                         'begin actions\n\treadFile({'
-                                         'file=>"%s"});\n' % self.net_filename)
-                elif self.model:
+                if self.model and not reload_netfile:
                     output += self.generator.get_content()
+                if reload_netfile:
+                    filename = reload_netfile if \
+                        isinstance(reload_netfile, (str, unicode)) \
+                        else self.net_filename
+                    output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
+                        % (filename, int(skip_file_actions))
                 output += bng_commands
                 self._logger.debug('BNG command file contents:\n\n' + output)
                 bng_file.write(output)
