@@ -8,19 +8,25 @@ __constant__ int stoch_matrix[]={{
 {stoch}
 }};
 
-
 __device__ void propensities(int *y, float *h, int tid, float *param_arry)
 {{
 {hazards}
+}}
+
+__device__ float single_propensities(int *y, float *h, int tid, float *param_arry, int rxn_index)
+{{
+{rxn_dependency}
 //if (tid == 0)
 //    for(int i=0; i<NREACT;i++)
 //        printf("h[%i] = %f\n", i, h[i]);
 }}
 
 extern "C"{{
-__device__ void stoichiometry(int *y, int r){{
+__device__ void stoichiometry(int *y, int r, int *stoch_matrix2){{
+//__device__ void stoichiometry(int *y, int r){{
     for(int i=0; i<num_species; i++){{
-        y[i]+=stoch_matrix[r*num_species+ i];
+//        y[i]+=stoch_matrix[r*num_species+ i];
+        y[i]+=stoch_matrix2[r*num_species+ i];
     }}
 }}
 
@@ -34,10 +40,10 @@ __device__ int sample(int nr, float* a, float u){{
 }}
 ///*
 __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* time, int NRESULTS,
-                                    const float* param_values){{
+                                    const float* param_values, int *stoch_matrix2){{
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    //curandState randState;
+//    curandState randState;
     curandStateMRG32k3a randState;
     curand_init(clock64(), tid, 0, &randState);
     float t = time[0] ;
@@ -89,10 +95,11 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* tim
 //                printf("ts = %f, a0 = %f\n", t, a0);
             }}
         else{{
-            r1 =  curand_uniform_double(&randState);
-            r2 =  curand_uniform_double(&randState);
+            r1 =  curand_uniform(&randState);
+            r2 =  curand_uniform(&randState);
             k = sample(NREACT, A, a0*r1);
-            stoichiometry( y ,k );
+//            stoichiometry( y ,k );
+            stoichiometry( y ,k, stoch_matrix2 );
             propensities( y, A, tid , param_arry);
             a0 = 0;
             // summing up propensities
@@ -106,9 +113,9 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* tim
     return;
     }}
 //*/
-///*
+/*
 __global__ void Gillespie_one_step(int* species_matrix, int* result, float* start_time, float end_time,
-                                   float* result_time, int stride, const float* param_values){{
+                                   float* result_time, int stride, const float* param_values, ){{
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     //curandState randState;
@@ -119,7 +126,7 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, float* star
     float r1 = 0.0f;
     float r2 = 0.0f;
     float dt = 0.0f;
-    float a0 = 0;
+    float a0 = 0.0f;
     int k = 0;
     int y[num_species];
     int ylast[num_species];
@@ -149,8 +156,8 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, float* star
     // beginning of loop
     while (start_t < end_time){{
 //        __syncthreads();
-        r1 =  curand_uniform_double(&randState);
-        r2 =  curand_uniform_double(&randState);
+        r1 =  curand_uniform(&randState);
+        r2 =  curand_uniform(&randState);
         k = sample(NREACT, A, a0*r1);
         stoichiometry( y ,k );
         propensities( y, A, tid , param_arry);
@@ -174,5 +181,5 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, float* star
     result_time[tid] = start_t;
     return;
     }}
-//*/
+*/
 }}
