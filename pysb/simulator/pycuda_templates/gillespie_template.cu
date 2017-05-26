@@ -22,11 +22,11 @@ __device__ float single_propensities(int *y, float *h, int tid, float *param_arr
 }}
 
 extern "C"{{
-__device__ void stoichiometry(int *y, int r, int *stoch_matrix2){{
-//__device__ void stoichiometry(int *y, int r){{
+//__device__ void stoichiometry(int *y, int r, int *stoch_matrix2){{
+__device__ void stoichiometry(int *y, int r){{
     for(int i=0; i<num_species; i++){{
-//        y[i]+=stoch_matrix[r*num_species+ i];
-        y[i]+=stoch_matrix2[r*num_species+ i];
+        y[i]+=stoch_matrix[r*num_species+ i];
+//        y[i]+=stoch_matrix2[r*num_species+ i];
     }}
 }}
 
@@ -98,8 +98,8 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* tim
             r1 =  curand_uniform(&randState);
             r2 =  curand_uniform(&randState);
             k = sample(NREACT, A, a0*r1);
-//            stoichiometry( y ,k );
-            stoichiometry( y ,k, stoch_matrix2 );
+            stoichiometry( y ,k );
+//            stoichiometry( y ,k, stoch_matrix2 );
             propensities( y, A, tid , param_arry);
             a0 = 0;
             // summing up propensities
