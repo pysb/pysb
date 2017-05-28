@@ -71,5 +71,5 @@ def test_piecewise_expression():
     Rule('A_deg', A() >> None, A_deg_expr)
     generate_equations(model)
     t = np.linspace(0, 1000, 100)
-    sol = Solver(model, t)
+    sol = Solver(model, t, use_analytic_jacobian=True)
     sol.run()

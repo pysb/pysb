@@ -6,6 +6,11 @@ try:
     import scipy.weave.build_tools
 except ImportError:
     weave_inline = None
+try:
+    import theano.tensor
+    from sympy.printing.theanocode import theano_function
+except ImportError:
+    theano = None
 import distutils
 import pysb.bng
 import sympy
@@ -14,12 +19,7 @@ import numpy as np
 import warnings
 import os
 from pysb.logging import EXTENDED_DEBUG
-
-
-def _exec(code, locals):
-    # This is function call under Python 3, and a statement with a
-    # tuple under Python 2. The effect should be the same.
-    exec(code, locals)
+import itertools
 
 
 class ScipyOdeSimulator(Simulator):
@@ -132,60 +132,57 @@ class ScipyOdeSimulator(Simulator):
                                                  False)
         self.cleanup = kwargs.get('cleanup', True)
         integrator = kwargs.get('integrator', 'vode')
+        use_theano = kwargs.get('use_theano', False)
         # Generate the equations for the model
         pysb.bng.generate_equations(self._model, self.cleanup, self.verbose)
 
-        def _eqn_substitutions(eqns):
-            """String substitutions on the sympy C code for the ODE RHS and
-            Jacobian functions to use appropriate terms for variables and
-            parameters."""
-            # Substitute expanded parameter formulas for any named expressions
-            for e in self._model.expressions:
-                eqns = re.sub(r'\b(%s)\b' % e.name, '(' + sympy.ccode(
-                    e.expand_expr(expand_observables=True)) + ')', eqns)
-
-            # Substitute 'y[i]' for 'si'
-            eqns = re.sub(r'\b__s(\d+)\b',
-                          lambda m: 'y[%s]' % (int(m.group(1))),
-                          eqns)
-
-            # Substitute 'p[i]' for any named parameters
-            for i, p in enumerate(self._model.parameters):
-                eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
-            return eqns
-
         # ODE RHS -----------------------------------------------
-        # Prepare the string representations of the RHS equations
-        code_eqs = '\n'.join(['ydot[%d] = %s;' %
-                              (i, sympy.ccode(self._model.odes[i]))
-                              for i in range(len(self._model.odes))])
-        code_eqs = _eqn_substitutions(code_eqs)
+        self._eqn_subs = {e: e.expand_expr(expand_observables=True) for
+                          e in self._model.expressions}
+        ode_mat = sympy.Matrix(self.model.odes).subs(self._eqn_subs)
 
         self._test_inline()
 
-        # If we can't use weave.inline to run the C code, compile it as
-        # Python code instead for use with
-        # exec. Note: C code with array indexing, basic math operations,
-        # and pow() just happens to also
-        # be valid Python.  If the equations ever have more complex things
-        # in them, this might fail.
-        if not self._use_inline:
-            code_eqs_py = compile(code_eqs, '<%s odes>' % self._model.name,
-                                  'exec')
-        else:
+        if self._use_inline:
+            # Prepare the string representations of the RHS equations
+            code_eqs = '\n'.join(['ydot[%d] = %s;' %
+                                  (i, sympy.ccode(o))
+                                  for i, o in enumerate(ode_mat)])
+            code_eqs = self._eqn_substitutions(code_eqs)
+
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
                 code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                   '%s(\\1)' % macro, code_eqs)
 
-        def rhs(t, y, p):
-            ydot = self.ydot
-            # note that the evaluated code sets ydot as a side effect
-            if self._use_inline:
+            def rhs(t, y, p):
+                ydot = self.ydot
+                # note that the evaluated code sets ydot as a side effect
                 weave_inline(code_eqs, ['ydot', 't', 'y', 'p'])
+                return ydot
+
+        if use_theano or not self._use_inline:
+            self._symbols = sympy.symbols(','.join('__s%d' % sp_id for sp_id in
+                                                   range(len(
+                                                       self.model.species)))
+                                          + ',') + tuple(model.parameters)
+
+            if use_theano:
+                if theano is None:
+                    raise ImportError('Theano library is not installed')
+
+                code_eqs_py = theano_function(
+                    self._symbols,
+                    [o if not o.is_zero else theano.tensor.zeros(1)
+                     for o in ode_mat],
+                    on_unused_input='ignore'
+                )
             else:
-                _exec(code_eqs_py, locals())
-            return ydot
+                code_eqs_py = sympy.lambdify(self._symbols,
+                                             sympy.flatten(ode_mat))
+
+            def rhs(t, y, p):
+                return code_eqs_py(*itertools.chain(y, p))
 
         # JACOBIAN -----------------------------------------------
         # We'll keep the code for putting together the matrix in Sympy
@@ -195,37 +192,39 @@ class ScipyOdeSimulator(Simulator):
         if self._use_analytic_jacobian:
             species_names = ['__s%d' % i for i in
                              range(len(self._model.species))]
-            jac_matrix = []
-            # Rows of jac_matrix are by equation f_i:
-            # [[df1/x1, df1/x2, ..., df1/xn],
-            #  [   ...                     ],
-            #  [dfn/x1, dfn/x2, ..., dfn/xn],
-            for eqn in self._model.odes:
-                # Derivatives for f_i...
-                jac_row = []
-                for species_name in species_names:
-                    # ... with respect to s_j
-                    d = sympy.diff(eqn, species_name)
-                    jac_row.append(d)
-                jac_matrix.append(jac_row)
 
-            # Next, prepare the stringified Jacobian equations
-            jac_eqs_list = []
-            for i, row in enumerate(jac_matrix):
-                for j, entry in enumerate(row):
-                    # Skip zero entries in the Jacobian
-                    if entry == 0:
-                        continue
-                    jac_eq_str = 'jac[%d, %d] = %s;' % (
-                    i, j, sympy.ccode(entry))
-                    jac_eqs_list.append(jac_eq_str)
-            jac_eqs = _eqn_substitutions('\n'.join(jac_eqs_list))
+            jac_matrix = ode_mat.jacobian(species_names)
 
-            # Try to inline the Jacobian if possible (as above for RHS)
-            if not self._use_inline:
-                jac_eqs_py = compile(jac_eqs,
-                                     '<%s jacobian>' % self._model.name, 'exec')
-            else:
+            if use_theano:
+                jac_eqs_py = theano_function(
+                    self._symbols,
+                    [j if not j.is_zero else theano.tensor.zeros(1)
+                     for j in jac_matrix],
+                    on_unused_input='ignore'
+                )
+
+                def jacobian(t, y, p):
+                    jacmat = np.asarray(jac_eqs_py(*itertools.chain(y, p)))
+                    jacmat.shape = (len(self.model.odes),
+                                    len(self.model.species))
+                    return jacmat
+
+            elif self._use_inline:
+                self.jac = np.zeros(
+                    (len(self._model.odes), len(self._model.species)))
+                # Next, prepare the stringified Jacobian equations
+                jac_eqs_list = []
+                for i in range(jac_matrix.shape[0]):
+                    for j in range(jac_matrix.shape[1]):
+                        entry = jac_matrix[i, j]
+                        # Skip zero entries in the Jacobian
+                        if entry == 0:
+                            continue
+                        jac_eq_str = 'jac[%d, %d] = %s;' % (
+                            i, j, sympy.ccode(entry))
+                        jac_eqs_list.append(jac_eq_str)
+                jac_eqs = self._eqn_substitutions('\n'.join(jac_eqs_list))
+
                 # Substitute array refs with calls to the JAC1 macro for inline
                 jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
                                  r'JAC2(\1, \2)', jac_eqs)
@@ -235,21 +234,20 @@ class ScipyOdeSimulator(Simulator):
                     jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                      '%s(\\1)' % macro, jac_eqs)
 
-            def jacobian(t, y, p):
-                jac = self.jac
-                # note that the evaluated code sets jac as a side effect
-                if self._use_inline:
-                    weave_inline(jac_eqs, ['jac', 't', 'y', 'p']);
-                else:
-                    _exec(jac_eqs_py, locals())
-                return jac
+                def jacobian(t, y, p):
+                    jac = self.jac
+                    weave_inline(jac_eqs, ['jac', 't', 'y', 'p'])
+                    return jac
+            else:
+                jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
+
+                def jacobian(t, y, p):
+                    return jac_eqs_py(*itertools.chain(y, p))
 
             # Initialize the jacobian argument to None if we're not going to
             #  use it
             # jac = self.jac as defined in jacobian() earlier
             # Initialization of matrix for storing the Jacobian
-            self.jac = np.zeros(
-                (len(self._model.odes), len(self._model.species)))
             jac_fn = jacobian
 
         # build integrator options list from our defaults and any kwargs
@@ -313,6 +311,20 @@ class ScipyOdeSimulator(Simulator):
                     distutils.errors.CompileError, ImportError):
                 pass
 
+    def _eqn_substitutions(self, eqns):
+        """String substitutions on the sympy C code for the ODE RHS and
+        Jacobian functions to use appropriate terms for variables and
+        parameters."""
+        # Substitute 'y[i]' for 'si'
+        eqns = re.sub(r'\b__s(\d+)\b',
+                      lambda m: 'y[%s]' % (int(m.group(1))),
+                      eqns)
+
+        # Substitute 'p[i]' for any named parameters
+        for i, p in enumerate(self._model.parameters):
+            eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
+        return eqns
+
     def run(self, tspan=None, initials=None, param_values=None):
         """
         Run a simulation and returns the result (trajectories)
@@ -341,12 +353,13 @@ class ScipyOdeSimulator(Simulator):
         for n in range(n_sims):
             self._logger.info('Running simulation %d of %d', n + 1, n_sims)
             if self.integrator == 'lsoda':
-                trajectories[n] = scipy.integrate.odeint(self.func,
-                                                    self.initials[n],
-                                                    self.tspan,
-                                                    Dfun=self.jac_fn,
-                                                    args=(self.param_values[n],),
-                                                    **self.opts)
+                trajectories[n] = scipy.integrate.odeint(
+                    self.func,
+                    self.initials[n],
+                    self.tspan,
+                    Dfun=self.jac_fn,
+                    args=(self.param_values[n],),
+                    **self.opts)
             else:
                 self.integrator.set_initial_value(self.initials[n],
                                                   self.tspan[0])
