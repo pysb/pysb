@@ -544,10 +544,12 @@ class SimulationResult(object):
         expr_names = [expr.name for expr in exprs]
         model_obs = self._model.observables
         obs_names = list(model_obs.keys())
+        param_names = list(p.name for p in self._model.parameters)
 
         if not _allow_unicode_recarray():
-            for name_list, name_type in zip((expr_names, obs_names),
-                                            ('Expression', 'Observable')):
+            for name_list, name_type in zip(
+                    (expr_names, obs_names, param_names),
+                    ('Expression', 'Observable', 'Parameter')):
                 for i, name in enumerate(name_list):
                     try:
                         name_list[i] = name.encode('ascii')
@@ -574,7 +576,7 @@ class SimulationResult(object):
         param_values = simulator.param_values
 
         # loop over simulations
-        sym_names = obs_names + [p.name for p in self._model.parameters]
+        sym_names = obs_names + param_names
         expanded_exprs = [sympy.lambdify(sym_names, expr.expand_expr(),
                                          "numpy") for expr in exprs]
         for n in range(self.nsims):
