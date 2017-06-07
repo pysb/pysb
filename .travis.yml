@@ -24,9 +24,9 @@ before_install:
 - pip install python-coveralls
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
-- wget "http://www.csb.pitt.edu/Faculty/Faeder/?smd_process_download=1&download_id=142"
-    -O BioNetGen-2.2.6-stable.tar.gz
-- tar xzf BioNetGen-2.2.6-stable.tar.gz
+- wget "http://www.csb.pitt.edu/Faculty/Faeder/wp-content/uploads/2017/04/BioNetGen-2.2.6-stable_Linux.tar.gz"
+    -O bionetgen.tar.gz
+- tar xzf bionetgen.tar.gz
 - export BNGPATH=`pwd`/BioNetGen-2.2.6-stable
 # First install ocamlfind via opam (needed to build KaSim/KaSa)
 - opam init -a git://github.com/ocaml/opam-repository && eval $(opam config env)
