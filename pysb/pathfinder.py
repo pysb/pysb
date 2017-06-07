@@ -31,7 +31,7 @@ _path_config = {
     'cupsoda': {
         'name': 'cupSODA',
         'executable': {
-            'posix': 'cupsoda',
+            'posix': 'cupSODA',
             'nt': 'cupsoda.exe'
         },
         'env_var': 'CUPSODAPATH',
