@@ -14,7 +14,7 @@ except ImportError:
     from urllib import urlretrieve
 from pysb.logging import get_logger, EXTENDED_DEBUG
 
-BIOMODELS_REGEX = re.compile(r'BIOMD[0-9]{10}')
+BIOMODELS_REGEX = re.compile(r'(BIOMD|MODEL)[0-9]{10}')
 BIOMODELS_URL = 'http://www.ebi.ac.uk/biomodels-main/download?mid={}'
 
 
