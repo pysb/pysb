@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from pysb.simulator.bng_ssa import BngSimulator
+from pysb.simulator.bng import BngSimulator
 from kinase_cascade import model
 # from bax_pore import  model
 
