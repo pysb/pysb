@@ -89,7 +89,10 @@ _path_config = {
     },
     'nvcc': {
         'name': 'NVIDIA CUDA compiler',
-        'executable': 'nvcc',
+        'executable': {
+            'posix': 'nvcc',
+            'nt': 'nvcc.exe'
+        },
         'env_var': 'CUDAPATH',
         'search_paths': {
             'posix': ('/usr/local/cuda/bin', ),
