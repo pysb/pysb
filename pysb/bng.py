@@ -58,12 +58,6 @@ class BngBaseInterface(object):
         self._logger = get_logger(__name__,
                                   model=model,
                                   log_level=verbose)
-        if model:
-            # self._logger is an adapter when a model is set, so call
-            # getEffectiveLevel on the underlying Logger, not the Adapter
-            self.verbose = self._logger.logger.getEffectiveLevel()
-        else:
-            self.verbose = self._logger.getEffectiveLevel()
         self._base_file_stem = 'pysb'
         self.cleanup = cleanup
         self.output_prefix = 'tmpBNG' if output_prefix is None else \
