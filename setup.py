@@ -36,7 +36,7 @@ def main():
           install_requires=['numpy', 'scipy', 'sympy'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
-                         'pandas', 'theano'],
+                         'pandas', 'theano', 'h5py'],
           cmdclass=cmdclass,
           use_2to3=True,
           keywords=['systems', 'biology', 'model', 'rules'],
