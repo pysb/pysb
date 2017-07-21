@@ -18,7 +18,8 @@ Reference: Hogg et al. Plos Comb Biol 2014
            https://doi.org/10.1371/journal.pcbi.1003544
 """
 from pysb.examples.earm_1_0 import model
-from pysb.simulator import BngSimulator, PopulationMap
+from pysb.simulator import BngSimulator
+from pysb.simulator.bng import PopulationMap
 from pysb import Parameter
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,7 +51,7 @@ population_maps = [
 ]
 
 sim = BngSimulator(model, tspan=np.linspace(0, 20000, 101))
-simres = sim.run(n_runs=20, method='hpp', population_maps=population_maps)
+simres = sim.run(n_runs=20, method='nf', population_maps=population_maps)
 
 trajectories = simres.all
 tout = simres.tout

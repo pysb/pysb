@@ -15,8 +15,9 @@ class BngGenerator(object):
         self.model = model
         if self.model.has_synth_deg():
             self.model.enable_synth_deg()
-        self._additional_initials = additional_initials if \
-            additional_initials is not None else []
+        if additional_initials is None:
+            additional_initials = []
+        self._additional_initials = additional_initials
         self._population_maps = population_maps
         self.__content = None
 

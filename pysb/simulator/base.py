@@ -549,14 +549,14 @@ class SimulationResult(object):
 
         if trajectories is not None and len(trajectories) > 0:
             # Validate incoming trajectories
-            if hasattr(trajectories, 'ndim') and trajectories.ndim == 3:
+            if getattr(trajectories, 'ndim', None) == 3:
                 # trajectories is a 3D array, create a list of 2D arrays
                 # This is just a view and doesn't copy the data
                 self._y = [tr for tr in trajectories]
             else:
                 # Not a 3D array, check for a list of 2D arrays
                 try:
-                    if any([tr.ndim != 2 for tr in trajectories]):
+                    if any(tr.ndim != 2 for tr in trajectories):
                         raise AttributeError
                 except (AttributeError, TypeError):
                     raise ValueError("trajectories should be a 3D array or a "
@@ -603,8 +603,7 @@ class SimulationResult(object):
         yexpr_dtype = zip(expr_names, itertools.repeat(float)) if expr_names \
             else float
 
-        if observables_and_expressions is not None and len(
-                observables_and_expressions) > 0:
+        if observables_and_expressions:
             # Observables and expression values are used as supplied
             self._nsims = len(observables_and_expressions)
             self._yobs_view = [observables_and_expressions[n][:, 0:(len(

@@ -79,8 +79,8 @@ def test_bng_ode_with_expressions():
 
 
 def test_nfsim():
-    # Make sure no network generation has taken place
     model = robertson.model
+    # Reset equations from any previous network generation
     model.reset_equations()
 
     sim = BngSimulator(model, tspan=np.linspace(0, 1))
@@ -91,13 +91,12 @@ def test_nfsim():
     A = model.monomers['A']
     x = sim.run(n_runs=2, method='nf', tspan=np.linspace(0, 1),
                 initials={A(): 100}, seed=_BNG_SEED)
-    print(x.dataframe.loc[0, 0.0])
     assert np.allclose(x.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])
 
 
 def test_hpp():
-    # Make sure no network generation has taken place
     model = robertson.model
+    # Reset equations from any previous network generation
     model.reset_equations()
 
     A = robertson.model.monomers['A']
@@ -109,7 +108,7 @@ def test_hpp():
     ]
 
     sim = BngSimulator(model, tspan=np.linspace(0, 1))
-    x = sim.run(n_runs=1, method='hpp', population_maps=population_maps,
+    x = sim.run(n_runs=1, method='nf', population_maps=population_maps,
                 seed=_BNG_SEED)
     observables = np.array(x.observables)
     assert len(observables) == 50

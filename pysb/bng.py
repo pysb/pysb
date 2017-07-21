@@ -59,6 +59,8 @@ class BngBaseInterface(object):
                                   model=model,
                                   log_level=verbose)
         if model:
+            # self._logger is an adapter when a model is set, so call
+            # getEffectiveLevel on the underlying Logger, not the Adapter
             self.verbose = self._logger.logger.getEffectiveLevel()
         else:
             self.verbose = self._logger.getEffectiveLevel()
@@ -282,7 +284,11 @@ class BngConsole(BngBaseInterface):
                               "BNGConsole, please install it to continue.\n"
                               "It is not currently available on Windows.")
 
-        self.suppress_warnings = suppress_warnings
+        if suppress_warnings:
+            warn("suppress_warnings is deprecated and has no effect. Adjust "
+                 "the log level with the verbose argument instead.",
+                 category=DeprecationWarning,
+                 stacklevel=2)
 
         try:
             # Generate BNGL file
@@ -322,7 +328,7 @@ class BngConsole(BngBaseInterface):
         console_msg = self.console.before.decode('utf-8')
         if "ERROR:" in console_msg:
             raise BngInterfaceError(console_msg)
-        elif not self.suppress_warnings and "WARNING:" in console_msg:
+        elif "WARNING:" in console_msg:
             self._logger.warning(console_msg)
         else:
             self._logger.debug(console_msg)
@@ -361,7 +367,10 @@ class BngConsole(BngBaseInterface):
         action_args = self._format_action_args(**kwargs)
 
         # Execute the command via the console
-        cmd = 'action %s({%s})' % (action, action_args)
+        if action_args == '':
+            cmd = 'action %s()' % action
+        else:
+            cmd = 'action %s({%s})' % (action, action_args)
         self._logger.debug(cmd)
         self.console.sendline(cmd)
 
@@ -442,7 +451,7 @@ class BngFileInterface(BngBaseInterface):
                     output += self.generator.get_content()
                 if reload_netfile:
                     filename = reload_netfile if \
-                        isinstance(reload_netfile, (str, unicode)) \
+                        isinstance(reload_netfile, basestring) \
                         else self.net_filename
                     output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
                         % (filename, int(skip_file_actions))
@@ -459,9 +468,8 @@ class BngFileInterface(BngBaseInterface):
                                  cwd=self.base_directory,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
-            if self.verbose <= logging.DEBUG:
-                for line in iter(p.stdout.readline, b''):
-                    self._logger.debug(line[:-1])
+            for line in iter(p.stdout.readline, b''):
+                self._logger.debug(line[:-1])
             (p_out, p_err) = p.communicate()
             p_out = p_out.decode('utf-8')
             p_err = p_err.decode('utf-8')
@@ -519,7 +527,7 @@ class BngFileInterface(BngBaseInterface):
             Initial concentration
 
         """
-        if isinstance(cplx_pat, (str, unicode)):
+        if isinstance(cplx_pat, basestring):
             formatted_name = cplx_pat
         else:
             formatted_name = format_complexpattern(
@@ -680,7 +688,7 @@ def load_equations(model, netfile):
     if model.has_synth_deg():
         model.enable_synth_deg()
     with open(netfile, 'r') as f:
-        _parse_netfile(model, iter(f.readlines()))
+        _parse_netfile(model, f)
 
 
 def generate_equations(model, cleanup=True, verbose=False):
