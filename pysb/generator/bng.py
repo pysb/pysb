@@ -11,10 +11,14 @@ except NameError:
 
 class BngGenerator(object):
 
-    def __init__(self, model):
+    def __init__(self, model, additional_initials=None, population_maps=None):
         self.model = model
         if self.model.has_synth_deg():
             self.model.enable_synth_deg()
+        if additional_initials is None:
+            additional_initials = []
+        self._additional_initials = additional_initials
+        self._population_maps = population_maps
         self.__content = None
 
     def get_content(self):
@@ -31,6 +35,7 @@ class BngGenerator(object):
         self.generate_functions()
         self.generate_species()
         self.generate_reaction_rules()
+        self.generate_population_maps()
         self.__content += "end model\n"
 
     def generate_parameters(self):
@@ -135,12 +140,38 @@ class BngGenerator(object):
             warn_caller("Model does not contain any initial conditions")
             return
         species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
+        for cp in self._additional_initials:
+            if not any([cp.is_equivalent_to(i) for i, _ in
+                        self.model.initial_conditions]):
+                species_codes.append(format_complexpattern(cp))
         max_length = max(len(code) for code in species_codes)
         self.__content += "begin species\n"
         for i, code in enumerate(species_codes):
-            param = self.model.initial_conditions[i][1]
-            self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code, param.name)
+            if i < len(self.model.initial_conditions):
+                param = self.model.initial_conditions[i][1].name
+            else:
+                param = '0'
+            self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code,
+                                                                         param)
         self.__content += "end species\n\n"
+
+    def generate_population_maps(self):
+        if self._population_maps is None:
+            return
+        self.__content += 'begin population maps\n'
+        cplx_pats = [format_complexpattern(pm.complex_pattern)
+                     for pm in self._population_maps]
+        str_padding = max(len(cp) for cp in cplx_pats)
+        for i in range(len(cplx_pats)):
+            cs = self._population_maps[i].counter_species
+            if cs is None:
+                cs = '__hppcounter%d()' % i
+                self._population_maps[i].counter_species = cs
+            self.__content += ('  %-' + str(str_padding) + 's -> %s\t%s\n') % \
+                              (cplx_pats[i], cs,
+                               self._population_maps[i].lumping_rate.name)
+        self.__content += 'end population maps\n\n'
+
 
 def format_monomer_site(monomer, site):
     ret = site
