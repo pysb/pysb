@@ -679,10 +679,10 @@ class SimulationResult(object):
             sp_names = ['__s%d' % i for i in range(len(self._model.species))]
             yfull_dtype = zip(sp_names, itertools.repeat(float))
             if len(self._model.observables):
-                yfull_dtype += zip(self._model.observables.keys(),
+                yfull_dtype += zip(self._yobs[0].dtype.names,
                                    itertools.repeat(float))
             if len(self._model.expressions_dynamic()):
-                yfull_dtype += zip(self._model.expressions_dynamic().keys(),
+                yfull_dtype += zip(self._yexpr[0].dtype.names,
                                    itertools.repeat(float))
             yfull = []
             # loop over simulations
