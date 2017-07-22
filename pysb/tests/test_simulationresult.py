@@ -4,7 +4,6 @@ from pysb.examples import tyson_oscillator, robertson, expression_observables
 import numpy as np
 import tempfile
 from nose.tools import assert_raises
-from pandas.util.testing import assert_frame_equal
 
 
 def test_simres_dataframe():
@@ -61,7 +60,7 @@ def test_save_load():
 
     # NFsim with expressions
     nfsim2 = BngSimulator(expression_observables.model)
-    nfres2 = nfsim2.run(n_runs=1, method='nf', tspan=np.linspace(0, 1, 24))
+    nfres2 = nfsim2.run(n_runs=1, method='nf', tspan=np.linspace(0, 100, 11))
 
     with tempfile.NamedTemporaryFile() as tf:
         simres.save(tf.name, dataset_name='test', append=True)
@@ -117,7 +116,7 @@ def test_save_load():
     _check_resultsets_equal(simres, simres_load)
     _check_resultsets_equal(nfres1, nfres1_load)
     _check_resultsets_equal(nfres2, nfres2_load)
-        
+
 
 def _check_resultsets_equal(res1, res2):
     try:
@@ -127,16 +126,20 @@ def _check_resultsets_equal(res1, res2):
         pass
     assert np.allclose(res1.tout, res2.tout)
     assert np.allclose(res1.param_values, res2.param_values)
+    
     if isinstance(res1.initials, np.ndarray):
         assert np.allclose(res1.initials, res2.initials)
     else:
         for k, v in res1.initials.items():
             assert np.allclose(res1.initials[k], v)
-    assert_frame_equal(res1.dataframe, res2.dataframe)
+
+    assert np.allclose(res1._yobs_view, res1._yobs_view)
+    assert np.allclose(res1._yexpr_view, res2._yexpr_view)
 
     assert res1.squeeze == res2.squeeze
     assert res1.simulator_class == res2.simulator_class
-    assert res1.simulator_kwargs == res2.simulator_kwargs
+    assert res1.init_kwargs == res2.init_kwargs
+    assert res1.run_kwargs == res2.run_kwargs
     assert res1.n_sims_per_parameter_set == \
            res2.n_sims_per_parameter_set
     assert res1._model.name == res2._model.name

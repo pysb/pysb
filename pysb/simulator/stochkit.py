@@ -255,7 +255,8 @@ class StochKitSimulator(Simulator):
         """
         super(StochKitSimulator, self).run(tspan=tspan,
                                            initials=initials,
-                                           param_values=param_values)
+                                           param_values=param_values,
+                                           _run_kwargs=locals())
 
         self._logger.info('Running StochKit with {:d} parameter sets, '
                           '{:d} repeats ({:d} simulations total)'.format(

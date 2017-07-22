@@ -74,7 +74,8 @@ class BngSimulator(Simulator):
         """
         super(BngSimulator, self).run(tspan=tspan,
                                       initials=initials,
-                                      param_values=param_values
+                                      param_values=param_values,
+                                      _run_kwargs=locals()
                                       )
 
         if method not in self._SIMULATOR_TYPES:

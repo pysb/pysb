@@ -105,6 +105,7 @@ class Simulator(object):
         self._params = None
         self.param_values = param_values
         self._init_kwargs = kwargs
+        self._run_kwargs = None
 
     @property
     def model(self):
@@ -387,12 +388,20 @@ class Simulator(object):
             self._params = new_params
 
     @abstractmethod
-    def run(self, tspan=None, initials=None, param_values=None):
+    def run(self, tspan=None, initials=None, param_values=None,
+            _run_kwargs=None):
         """Run a simulation.
 
         Implementations should return a :class:`.SimulationResult` object.
         """
         self._logger.info('Simulation(s) started')
+        if _run_kwargs:
+            # Don't store these arguments twice
+            _run_kwargs.pop('self')
+            _run_kwargs.pop('initials', None)
+            _run_kwargs.pop('param_values', None)
+            _run_kwargs.pop('tspan', None)
+            self._run_kwargs = _run_kwargs
         if tspan is not None:
             self.tspan = tspan
         if self.tspan is None:
@@ -549,8 +558,8 @@ class SimulationResult(object):
     """
     def __init__(self, simulator, tout, trajectories=None,
                  observables_and_expressions=None, squeeze=True,
-                 simulations_per_param_set=1, model=None, initials=None,
-                 param_values=None):
+                 simulations_per_param_set=1,
+                 model=None, initials=None, param_values=None):
         if simulator:
             simulator._logger.debug('SimulationResult constructor started')
             self._param_values = simulator.param_values
@@ -561,13 +570,15 @@ class SimulationResult(object):
                 self._initials = simulator.initials_dict
             self._model = simulator._model
             self.simulator_class = simulator.__class__
-            self.simulator_kwargs = simulator._init_kwargs
+            self.init_kwargs = simulator._init_kwargs
+            self.run_kwargs = simulator._run_kwargs
         else:
             self._param_values = param_values
             self._initials = initials
             self._model = model
             self.simulator_class = None
-            self.simulator_kwargs = None
+            self.init_kwargs = {}
+            self.run_kwargs = {}
 
         self.squeeze = squeeze
         self.tout = np.asarray(tout)
@@ -882,7 +893,8 @@ class SimulationResult(object):
             dset.create_dataset('tout', data=self.tout,
                                 compression='gzip')
             dset.attrs['simulator_class'] = enpickle(self.simulator_class)
-            dset.attrs['simulator_kwargs'] = enpickle(self.simulator_kwargs)
+            dset.attrs['init_kwargs'] = enpickle(self.init_kwargs)
+            dset.attrs['run_kwargs'] = enpickle(self.run_kwargs)
             dset.attrs['squeeze'] = self.squeeze
             dset.attrs['simulations_per_param_set'] = \
                 self.n_sims_per_parameter_set
@@ -984,8 +996,8 @@ class SimulationResult(object):
                 dset.attrs['creation_date'])
             simres.simulator_class = pickle.loads(
                 dset.attrs['simulator_class'])
-            simres.simulator_kwargs = pickle.loads(
-                dset.attrs['simulator_kwargs'])
+            simres.init_kwargs = pickle.loads(dset.attrs['init_kwargs'])
+            simres.run_kwargs = pickle.loads(dset.attrs['run_kwargs'])
             return simres
 
 
