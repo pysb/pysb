@@ -10,10 +10,8 @@ class Earm10ODESuite(object):
         self.timer = timeit.default_timer
         self.model = earm_1_0.model
         self.model.reset_equations()
-        self.parameter_set = np.ones((self.nsims, len(self.model.parameters)))
-        for i in range(len(self.parameter_set)):
-            for j in range(len(self.parameter_set[i])):
-                self.parameter_set[i][j] *= self.model.parameters[j].value
+        self.parameter_set = np.repeat(
+            [[p.value for p in self.model.parameters]], self.nsims, axis=0)
         integrator_options_common = {
             'model': self.model,
             'tspan': np.linspace(0, 1000, 101),
