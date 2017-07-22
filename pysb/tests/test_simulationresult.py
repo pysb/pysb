@@ -1,6 +1,6 @@
-from pysb.simulator import ScipyOdeSimulator
+from pysb.simulator import ScipyOdeSimulator, BngSimulator
 from pysb.simulator.base import SimulationResult
-from pysb.examples import tyson_oscillator, robertson
+from pysb.examples import tyson_oscillator, robertson, expression_observables
 import numpy as np
 import tempfile
 from nose.tools import assert_raises
@@ -51,6 +51,18 @@ def test_save_load():
     sim_rob = ScipyOdeSimulator(robertson.model, integrator='lsoda')
     simres_rob = sim_rob.run(tspan=tspan)
 
+    # Reset equations from any previous network generation
+    robertson.model.reset_equations()
+    A = robertson.model.monomers['A']
+
+    # NFsim without expressions
+    nfsim1 = BngSimulator(robertson.model)
+    nfres1 = nfsim1.run(n_runs=2, method='nf', tspan=np.linspace(0, 1))
+
+    # NFsim with expressions
+    nfsim2 = BngSimulator(expression_observables.model)
+    nfres2 = nfsim2.run(n_runs=1, method='nf', tspan=np.linspace(0, 1, 24))
+
     with tempfile.NamedTemporaryFile() as tf:
         simres.save(tf.name, dataset_name='test', append=True)
 
@@ -86,17 +98,47 @@ def test_save_load():
         simres_load = SimulationResult.load(tf.name, group_name=model.name,
                                             dataset_name='test')
 
-    assert np.allclose(simres.species, simres_load.species)
-    assert np.allclose(simres.tout, simres_load.tout)
-    assert np.allclose(simres.param_values, simres_load.param_values)
-    assert np.allclose(simres.initials, simres_load.initials)
-    assert_frame_equal(simres.dataframe, simres_load.dataframe)
+        # Saving network free results requires include_obs_exprs=True
+        assert_raises(ValueError, nfres1.save, tf.name, append=True)
 
-    assert simres.squeeze == simres_load.squeeze
-    assert simres.simulator_class == simres_load.simulator_class
-    assert simres.simulator_kwargs == simres_load.simulator_kwargs
-    assert simres.n_sims_per_parameter_set == \
-           simres_load.n_sims_per_parameter_set
-    assert simres._model.name == simres_load._model.name
-    assert simres.creation_date == simres_load.creation_date
-    assert simres.pysb_version == simres_load.pysb_version
+        nfres1.save(tf.name, include_obs_exprs=True,
+                    dataset_name='nfsim test', append=True)
+
+        # NFsim load
+        nfres1_load = SimulationResult.load(tf.name,
+                                            group_name=nfres1._model.name,
+                                            dataset_name='nfsim test')
+
+        # NFsim with expression
+        nfres2.save(tf.name, include_obs_exprs=True, append=True)
+        nfres2_load = SimulationResult.load(tf.name,
+                                            group_name=nfres2._model.name)
+
+    _check_resultsets_equal(simres, simres_load)
+    _check_resultsets_equal(nfres1, nfres1_load)
+    _check_resultsets_equal(nfres2, nfres2_load)
+        
+
+def _check_resultsets_equal(res1, res2):
+    try:
+        assert np.allclose(res1.species, res2.species)
+    except ValueError:
+        # Network free simulations don't have species
+        pass
+    assert np.allclose(res1.tout, res2.tout)
+    assert np.allclose(res1.param_values, res2.param_values)
+    if isinstance(res1.initials, np.ndarray):
+        assert np.allclose(res1.initials, res2.initials)
+    else:
+        for k, v in res1.initials.items():
+            assert np.allclose(res1.initials[k], v)
+    assert_frame_equal(res1.dataframe, res2.dataframe)
+
+    assert res1.squeeze == res2.squeeze
+    assert res1.simulator_class == res2.simulator_class
+    assert res1.simulator_kwargs == res2.simulator_kwargs
+    assert res1.n_sims_per_parameter_set == \
+           res2.n_sims_per_parameter_set
+    assert res1._model.name == res2._model.name
+    assert res1.creation_date == res2.creation_date
+    assert res1.pysb_version == res2.pysb_version

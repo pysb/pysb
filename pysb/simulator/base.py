@@ -787,7 +787,8 @@ class SimulationResult(object):
     def param_values(self):
         return self._param_values
 
-    def save(self, filename, dataset_name=None, group_name=None, append=False):
+    def save(self, filename, dataset_name=None, group_name=None,
+             append=False, include_obs_exprs=False):
         """
         Save a SimulationResult to a file (HDF5 format)
 
@@ -804,10 +805,11 @@ class SimulationResult(object):
 
         The file hierarchy under group_name/dataset_name/ then consists of
         the following HDF5 gzip compressed HDF5 datasets: trajectories,
-        param_values, initials, tout; and the following attributes:
+        param_values, initials, tout, observables (optional) and expressions
+        (optional); and the following attributes:
         simulator_class (pickled Class), simulator_kwargs (pickled dict),
         squeeze (bool), simulations_per_param_set (int), pysb_version (str),
-        creation_date (pickled datetime).
+        creation_date (ISO 8601 format).
 
         Parameters
         ----------
@@ -822,9 +824,20 @@ class SimulationResult(object):
         append: bool
             If False, raise IOError if the specified file already exists. If
             True, append to existing file (or create if it doesn't exist).
+        include_obs_exprs: bool
+            Whether to save observables and expressions in the file or not.
+            If they are not included, they can be recreated from the model
+            and species trajectories when loaded back into PySB, but you may
+            wish to include them for use with external software, or if you
+            have complex expressions which take a long time to compute.
         """
         if h5py is None:
             raise Exception('Please "pip install h5py" for this feature')
+
+        if self._y is None and not include_obs_exprs:
+            raise ValueError('This SimulationResult has no trajectories - '
+                             'you will need to set include_obs_exprs=True if '
+                             'you wish to save observables and expressions')
 
         if group_name is None:
             group_name = self._model.name
@@ -852,12 +865,20 @@ class SimulationResult(object):
 
             # Create the result dataset, which is actually a nested HDF group
             dset = grp.create_group(dataset_name)
-            dset.create_dataset('trajectories', data=self._y,
-                                compression='gzip')
+            if self._y is not None:
+                dset.create_dataset('trajectories', data=self._y,
+                                    compression='gzip')
+            if include_obs_exprs:
+                dset.create_dataset('observables', data=self._yobs_view)
+                dset.create_dataset('expressions', data=self._yexpr_view)
             dset.create_dataset('param_values', data=self.param_values,
                                 compression='gzip')
-            dset.create_dataset('initials', data=self.initials,
-                                compression='gzip')
+            if isinstance(self.initials, np.ndarray):
+                dset.create_dataset('initials', data=self.initials,
+                                    compression='gzip')
+            else:
+                dset.create_dataset('initials_dict', data=enpickle(
+                    self.initials))
             dset.create_dataset('tout', data=self.tout,
                                 compression='gzip')
             dset.attrs['simulator_class'] = enpickle(self.simulator_class)
@@ -919,13 +940,41 @@ class SimulationResult(object):
 
             dset = grp[dataset_name]
 
+            obs_and_exprs = None
+
+            if 'observables' in dset.keys():
+                obs_and_exprs = list(dset['observables'])
+
+            if 'expressions' in dset.keys():
+                exprs = dset['expressions']
+                if obs_and_exprs is None:
+                    obs_and_exprs = list(exprs)
+                else:
+                    for i in range(len(obs_and_exprs)):
+                        obs_and_exprs[i] = np.concatenate(
+                            [obs_and_exprs[i], exprs[i]],
+                            axis=1
+                        )
+
+            trajectories = None
+            try:
+                trajectories = dset['trajectories']
+            except KeyError:
+                pass
+
+            try:
+                initials = np.array(dset['initials'])
+            except KeyError:
+                initials = pickle.loads(dset['initials_dict'][()])
+
             simres = cls(
                 simulator=None,
                 model=pickle.loads(grp.attrs['model']),
-                initials=np.array(dset['initials']),
+                initials=initials,
                 param_values=np.array(dset['param_values']),
                 tout=np.array(dset['tout']),
-                trajectories=dset['trajectories'],
+                trajectories=trajectories,
+                observables_and_expressions=obs_and_exprs,
                 squeeze=dset.attrs['squeeze'],
                 simulations_per_param_set=dset.attrs[
                     'simulations_per_param_set']
