@@ -9,6 +9,7 @@ class Earm10ODESuite(object):
         self.nsims = 100
         self.timer = timeit.default_timer
         self.model = earm_1_0.model
+        self.model.reset_equations()
         self.parameter_set = np.repeat(
             [[p.value for p in self.model.parameters]], self.nsims, axis=0)
         integrator_options_common = {
