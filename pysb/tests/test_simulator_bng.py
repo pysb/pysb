@@ -1,9 +1,11 @@
 from pysb.testing import *
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule
-from pysb.simulator.bng import BngSimulator
+from pysb.simulator.bng import BngSimulator, PopulationMap
 from pysb.bng import generate_equations
-from pysb.examples import robertson, expression_observables
+from pysb.examples import robertson, expression_observables, earm_1_0
+
+_BNG_SEED = 123
 
 
 class TestBngSimulator(object):
@@ -43,11 +45,13 @@ class TestBngSimulator(object):
 
     def test_1_simulation(self):
         x = self.sim.run()
-        assert x.all.shape == (51,)
+        assert np.allclose(x.tout, self.time)
 
     def test_multi_simulations(self):
         x = self.sim.run(n_runs=10)
-        assert np.shape(x.observables) == (10, 51)
+        assert np.shape(x.observables) == (10, 50)
+        # Check initials are getting correctly reset on each simulation
+        assert np.allclose(x.species[-1][0, :], x.species[0][0, :])
 
     def test_change_parameters(self):
         x = self.sim.run(n_runs=10, param_values={'ksynthA': 200},
@@ -56,7 +60,7 @@ class TestBngSimulator(object):
         assert species[0][0][0] == 100.
 
     def test_bng_pla(self):
-        self.sim.run(n_runs=5, method='pla')
+        self.sim.run(n_runs=5, method='pla', seed=_BNG_SEED)
 
     def tearDown(self):
         self.model = None
@@ -70,22 +74,41 @@ def test_bng_ode_with_expressions():
 
     sim = BngSimulator(model, tspan=np.linspace(0, 1))
     x = sim.run(n_runs=1, method='ode')
-    assert len(x.expressions) == 51
-    assert len(x.observables) == 51
+    assert len(x.expressions) == 50
+    assert len(x.observables) == 50
 
 
 def test_nfsim():
-    # Make sure no network generation has taken place
     model = robertson.model
+    # Reset equations from any previous network generation
     model.reset_equations()
 
     sim = BngSimulator(model, tspan=np.linspace(0, 1))
-    x = sim.run(n_runs=1, method='nf')
+    x = sim.run(n_runs=1, method='nf', seed=_BNG_SEED)
     observables = np.array(x.observables)
-    assert len(observables) == 51
+    assert len(observables) == 50
 
     A = model.monomers['A']
     x = sim.run(n_runs=2, method='nf', tspan=np.linspace(0, 1),
-                initials={A(): 100})
-    print(x.dataframe.loc[0, 0.0])
+                initials={A(): 100}, seed=_BNG_SEED)
     assert np.allclose(x.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])
+
+
+def test_hpp():
+    model = robertson.model
+    # Reset equations from any previous network generation
+    model.reset_equations()
+
+    A = robertson.model.monomers['A']
+    klump = Parameter('klump', 10000, _export=False)
+    model.add_component(klump)
+
+    population_maps = [
+        PopulationMap(A(), klump)
+    ]
+
+    sim = BngSimulator(model, tspan=np.linspace(0, 1))
+    x = sim.run(n_runs=1, method='nf', population_maps=population_maps,
+                seed=_BNG_SEED)
+    observables = np.array(x.observables)
+    assert len(observables) == 50

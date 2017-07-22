@@ -53,21 +53,19 @@ class BngBaseInterface(object):
     @abc.abstractmethod
     def __init__(self, model=None, verbose=False, cleanup=False,
                  output_prefix=None, output_dir=None,
-                 model_additional_species=None):
+                 model_additional_species=None,
+                 model_population_maps=None):
         self._logger = get_logger(__name__,
                                   model=model,
                                   log_level=verbose)
-        if model:
-            self.verbose = self._logger.logger.getEffectiveLevel()
-        else:
-            self.verbose = self._logger.getEffectiveLevel()
         self._base_file_stem = 'pysb'
         self.cleanup = cleanup
         self.output_prefix = 'tmpBNG' if output_prefix is None else \
             output_prefix
         if model:
             self.generator = BngGenerator(
-                model, additional_initials=model_additional_species
+                model, additional_initials=model_additional_species,
+                population_maps=model_population_maps
             )
             self.model = self.generator.model
             self._check_model()
@@ -77,6 +75,9 @@ class BngBaseInterface(object):
 
         self.base_directory = tempfile.mkdtemp(prefix=self.output_prefix,
                                                dir=output_dir)
+        self._logger.debug('{} instantiated in directory {}'.format(
+            self.__class__, self.base_directory)
+        )
 
     def __enter__(self):
         return self
@@ -277,7 +278,11 @@ class BngConsole(BngBaseInterface):
                               "BNGConsole, please install it to continue.\n"
                               "It is not currently available on Windows.")
 
-        self.suppress_warnings = suppress_warnings
+        if suppress_warnings:
+            warn("suppress_warnings is deprecated and has no effect. Adjust "
+                 "the log level with the verbose argument instead.",
+                 category=DeprecationWarning,
+                 stacklevel=2)
 
         try:
             # Generate BNGL file
@@ -317,7 +322,7 @@ class BngConsole(BngBaseInterface):
         console_msg = self.console.before.decode('utf-8')
         if "ERROR:" in console_msg:
             raise BngInterfaceError(console_msg)
-        elif not self.suppress_warnings and "WARNING:" in console_msg:
+        elif "WARNING:" in console_msg:
             self._logger.warning(console_msg)
         else:
             self._logger.debug(console_msg)
@@ -356,7 +361,10 @@ class BngConsole(BngBaseInterface):
         action_args = self._format_action_args(**kwargs)
 
         # Execute the command via the console
-        cmd = 'action %s({%s})' % (action, action_args)
+        if action_args == '':
+            cmd = 'action %s()' % action
+        else:
+            cmd = 'action %s({%s})' % (action, action_args)
         self._logger.debug(cmd)
         self.console.sendline(cmd)
 
@@ -382,10 +390,12 @@ class BngConsole(BngBaseInterface):
 class BngFileInterface(BngBaseInterface):
     def __init__(self, model=None, verbose=False, output_dir=None,
                  output_prefix=None, cleanup=True,
-                 model_additional_species=None):
+                 model_additional_species=None,
+                 model_population_maps=None):
         super(BngFileInterface, self).__init__(
             model, verbose, cleanup, output_prefix, output_dir,
-            model_additional_species=model_additional_species
+            model_additional_species=model_additional_species,
+            model_population_maps=model_population_maps
         )
         self._init_command_queue()
 
@@ -406,17 +416,23 @@ class BngFileInterface(BngBaseInterface):
         if self.cleanup:
             self._delete_tmpdir()
 
-    def execute(self, reload_netfile=False):
+    def execute(self, reload_netfile=False, skip_file_actions=True):
         """
         Executes all BNG commands in the command queue.
 
         Parameters
         ----------
-        reload_netfile: bool
+        reload_netfile: bool or str
             If true, attempts to reload an existing .net file from a
-            previous execute() iteration. This is useful for running
-            multiple actions in a row, where results need to be read
-            into PySB before a new series of actions is executed.
+            previous execute() iteration. If a string, the filename
+            specified in the string is supplied to BNG's readFile (which can be
+            any file type BNG supports, such as .net or .bngl).
+            This is useful for running multiple actions in a row,
+            where results need to be read into PySB before a new series of
+            actions is executed.
+        skip_file_actions: bool
+            Only used if the previous argument is not False. Set this
+            argument to True to ignore any actions block in the loaded file.
         """
         self.command_queue.write('end actions\n')
         bng_commands = self.command_queue.getvalue()
@@ -425,12 +441,14 @@ class BngFileInterface(BngBaseInterface):
             # Generate BNGL file
             with open(self.bng_filename, 'w') as bng_file:
                 output = ''
-                if reload_netfile:
-                    bng_commands = bng_commands.replace('begin actions\n',
-                                         'begin actions\n\treadFile({'
-                                         'file=>"%s"});\n' % self.net_filename)
-                elif self.model:
+                if self.model and not reload_netfile:
                     output += self.generator.get_content()
+                if reload_netfile:
+                    filename = reload_netfile if \
+                        isinstance(reload_netfile, basestring) \
+                        else self.net_filename
+                    output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
+                        % (filename, int(skip_file_actions))
                 output += bng_commands
                 self._logger.debug('BNG command file contents:\n\n' + output)
                 bng_file.write(output)
@@ -444,9 +462,8 @@ class BngFileInterface(BngBaseInterface):
                                  cwd=self.base_directory,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
-            if self.verbose <= logging.DEBUG:
-                for line in iter(p.stdout.readline, b''):
-                    self._logger.debug(line[:-1])
+            for line in iter(p.stdout.readline, b''):
+                self._logger.debug(line[:-1])
             (p_out, p_err) = p.communicate()
             p_out = p_out.decode('utf-8')
             p_err = p_err.decode('utf-8')
@@ -490,7 +507,7 @@ class BngFileInterface(BngBaseInterface):
             Value of parameter
 
         """
-        self.command_queue.write('\tsetParameter("%s", %f)\n' % (name, value))
+        self.command_queue.write('\tsetParameter("%s", %g)\n' % (name, value))
 
     def set_concentration(self, cplx_pat, value):
         """
@@ -498,17 +515,37 @@ class BngFileInterface(BngBaseInterface):
 
         Parameters
         ----------
-        cplx_pat: pysb.ComplexPattern
-            Species ComplexPattern
+        cplx_pat: pysb.ComplexPattern or string
+            Species ComplexPattern, or a BNG format string representation
         value: float-like
             Initial concentration
 
         """
-        formatted_name = format_complexpattern(
-            pysb.core.as_complex_pattern(cplx_pat)
-        )
-        self.command_queue.write('\tsetConcentration("%s", %f)\n' % (
+        if isinstance(cplx_pat, basestring):
+            formatted_name = cplx_pat
+        else:
+            formatted_name = format_complexpattern(
+                pysb.core.as_complex_pattern(cplx_pat)
+            )
+        self.command_queue.write('\tsetConcentration("%s", %g)\n' % (
             formatted_name, value))
+
+
+def generate_hybrid_model(model, population_maps, additional_species=None,
+                          safe=False, verbose=False, output_dir=None,
+                          output_prefix=None, cleanup=True):
+    with BngFileInterface(model,
+                          output_dir=output_dir,
+                          output_prefix=output_prefix,
+                          cleanup=cleanup,
+                          model_additional_species=additional_species,
+                          model_population_maps=population_maps) as bng:
+        bng.action('generate_hybrid_model', verbose=verbose, safe=safe,
+                   suffix='hpp')
+        bng.execute()
+
+        with open(bng.base_filename + '_hpp.bngl', 'r') as f:
+            return f.read()
 
 
 def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
@@ -618,7 +655,7 @@ def generate_network(model, cleanup=True, append_stdout=False,
     with BngFileInterface(model, verbose=verbose, cleanup=cleanup) as bngfile:
         bngfile._logger.info('Generating reaction network')
         bngfile.action('generate_network', overwrite=True,
-                       verbose=bng_action_debug, **kwargs)
+                       verbose=bng_action_debug)
         bngfile.execute()
 
         output = bngfile.read_netfile()
@@ -641,15 +678,15 @@ def load_equations(model, netfile):
     netfile: str
         BNG netfile
     """
-    if model.reactions:
+    if model.odes:
         return
     if model.has_synth_deg():
         model.enable_synth_deg()
     with open(netfile, 'r') as f:
-        _parse_netfile(model, iter(f.readlines()))
+        _parse_netfile(model, f)
 
 
-def generate_equations(model, cleanup=True, verbose=False, **kwargs):
+def generate_equations(model, cleanup=True, verbose=False):
     """
     Generate math expressions for reaction rates and species in a model.
 
@@ -682,7 +719,7 @@ def generate_equations(model, cleanup=True, verbose=False, **kwargs):
     if model.reactions:
         return
     lines = iter(generate_network(model, cleanup=cleanup,
-                                  verbose=verbose, **kwargs).split('\n'))
+                                  verbose=verbose).split('\n'))
     _parse_netfile(model, lines)
 
 
@@ -699,6 +736,7 @@ def _parse_netfile(model, lines):
 
         while 'begin reactions' not in next(lines):
             pass
+        model.odes = [sympy.numbers.Zero()] * len(model.species)
 
         reaction_cache = {}
         while True:
@@ -821,6 +859,11 @@ def _parse_reaction(model, line, reaction_cache):
         reaction_bd['reversible'] = False
         reaction_cache[key] = reaction_bd
         model.reactions_bidirectional.append(reaction_bd)
+    # odes
+    for p in products:
+        model.odes[p] += combined_rate
+    for r in reactants:
+        model.odes[r] -= combined_rate
 
             
 def _parse_group(model, line):
