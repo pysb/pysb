@@ -781,6 +781,8 @@ class SimulationResult(object):
         """
         List of trajectory sets. The first dimension contains observables.
         """
+        if not self._model.observables:
+            raise ValueError('Model has no observables')
         return self._squeeze_output(self._yobs)
 
     @property
@@ -788,6 +790,8 @@ class SimulationResult(object):
         """
         List of trajectory sets. The first dimension contains expressions.
         """
+        if not self._model.expressions_dynamic():
+            raise ValueError('Model has no dynamic expressions')
         return self._squeeze_output(self._yexpr)
 
     @property
