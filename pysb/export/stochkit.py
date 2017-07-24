@@ -205,7 +205,9 @@ class StochKitExporter(Exporter):
         expr_strings = {
             e.name: '(%s)' % sympy.ccode(
                 e.expand_expr(expand_observables=True)
-            ) for e in self.model.expressions}
+            )
+            for e in self.model.expressions
+        }
 
         # Reactions
         reacs = etree.Element('ReactionsList')
