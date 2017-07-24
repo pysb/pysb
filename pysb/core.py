@@ -1707,7 +1707,7 @@ class OdeView(collections.Sequence):
         if isinstance(key, slice):
             return [self[k] for k in range(*key.indices(len(self)))]
         sr = self.model.stoichiometry_matrix[key]
-        terms = [self.model.reactions[i]['rate'] * v
+        terms = [sympy.Mul(self.model.reactions[i]['rate'], v, evaluate=False)
                  for i, v in zip(sr.indices, sr.data)]
         return sympy.Add(*terms, evaluate=False)
 
