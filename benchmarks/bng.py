@@ -11,4 +11,4 @@ class BngNetworkGeneration(object):
     def time_egfr_equations_max_iter_8(self):
         generate_equations(model, max_iter=8)
         # Check model ODEs are generated
-        model.odes
+        [x for x in model.odes]
