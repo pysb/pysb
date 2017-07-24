@@ -11,6 +11,7 @@ import pickle
 from pysb import __version__ as PYSB_VERSION
 from datetime import datetime
 import dateutil.parser
+import copy
 
 try:
     import pandas as pd
@@ -562,16 +563,16 @@ class SimulationResult(object):
                  model=None, initials=None, param_values=None):
         if simulator:
             simulator._logger.debug('SimulationResult constructor started')
-            self._param_values = simulator.param_values
+            self._param_values = simulator.param_values.copy()
             try:
-                self._initials = simulator.initials
+                self._initials = simulator.initials.copy()
             except SimulatorException:
                 # Network free simulations don't have initials list, only dict
-                self._initials = simulator.initials_dict
-            self._model = simulator._model
+                self._initials = simulator.initials_dict.copy()
+            self._model = copy.deepcopy(simulator._model)
             self.simulator_class = simulator.__class__
-            self.init_kwargs = simulator._init_kwargs
-            self.run_kwargs = simulator._run_kwargs
+            self.init_kwargs = copy.deepcopy(simulator._init_kwargs)
+            self.run_kwargs = copy.deepcopy(simulator._run_kwargs)
         else:
             self._param_values = param_values
             self._initials = initials
