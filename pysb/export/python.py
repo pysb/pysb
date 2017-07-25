@@ -114,7 +114,8 @@ class PythonExporter(Exporter):
         output.write("# exported from PySB model '%s'\n" % self.model.name)
         output.write(pad(r"""
             import numpy
-            import scipy.weave, scipy.integrate
+            import weave
+            import scipy.integrate
             import collections
             import itertools
             import distutils.errors
@@ -123,7 +124,7 @@ class PythonExporter(Exporter):
             _use_inline = False
             # try to inline a C statement to see if inline is functional
             try:
-                scipy.weave.inline('int i;', force=1)
+                weave.inline('int i;', force=1)
                 _use_inline = True
             except distutils.errors.CompileError:
                 pass
@@ -179,7 +180,7 @@ class PythonExporter(Exporter):
         output.write(pad(r"""
             def ode_rhs(self, t, y, p):
                 ydot = self.ydot
-                scipy.weave.inline(r'''%s''', ['ydot', 't', 'y', 'p'])
+                weave.inline(r'''%s''', ['ydot', 't', 'y', 'p'])
                 return ydot
             """, 8) % (pad('\n' + code_eqs, 16) + ' ' * 16))
         output.write("    else:\n")
