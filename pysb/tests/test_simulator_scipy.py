@@ -306,6 +306,8 @@ def test_unicode_obsname_ascii():
     rob_copy.observables[0].name = u'A_total'
     sim = ScipyOdeSimulator(rob_copy)
     simres = sim.run(tspan=t)
+    simres.all
+    simres.dataframe
 
 
 if sys.version_info[0] < 3:
@@ -328,6 +330,8 @@ def test_unicode_exprname_ascii():
     rob_copy.add_component(expr)
     sim = ScipyOdeSimulator(rob_copy)
     simres = sim.run(tspan=t)
+    simres.all
+    simres.dataframe
 
 
 if sys.version_info[0] < 3:
