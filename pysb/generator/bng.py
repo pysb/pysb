@@ -1,7 +1,6 @@
 import inspect
 import warnings
 import pysb
-import sympy
 from sympy.printing import StrPrinter
 from sympy.logic.boolalg import BooleanTrue
 

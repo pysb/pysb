@@ -2,8 +2,8 @@ from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
 import scipy.integrate
 try:
     # weave is not available under Python 3.
-    from scipy.weave import inline as weave_inline
-    import scipy.weave.build_tools
+    from weave import inline as weave_inline
+    import weave.build_tools
 except ImportError:
     weave_inline = None
 try:
@@ -291,7 +291,7 @@ class ScipyOdeSimulator(Simulator):
     @classmethod
     def _test_inline(cls):
         """
-        Detect whether scipy.weave.inline is functional.
+        Detect whether weave.inline is functional.
 
         Produces compile warnings, which we suppress by capturing STDERR.
         """
@@ -307,7 +307,7 @@ class ScipyOdeSimulator(Simulator):
                     weave_inline('int i=0; i=i;', force=1,
                                  extra_compile_args=extra_compile_args)
                     cls._use_inline = True
-            except (scipy.weave.build_tools.CompileError,
+            except (weave.build_tools.CompileError,
                     distutils.errors.CompileError, ImportError):
                 pass
 
