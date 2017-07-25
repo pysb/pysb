@@ -5,6 +5,7 @@ import pygraphviz as pgv
 
 _KAPPA_SEED = 123456
 
+
 @with_model
 def test_kappa_simulation_results():
     Monomer('A', ['b'])
@@ -22,6 +23,7 @@ def test_kappa_simulation_results():
     ok_(len(kres['AB']) == npts + 1)
     ok_(kres['time'][0] == 0)
     ok_(sorted(kres['time'])[-1] == 100)
+
 
 @with_model
 def test_kappa_expressions():
@@ -46,6 +48,7 @@ def test_kappa_expressions():
     # Accommodates site with explicit state and arbitrary bond
     run_simulation(model, time=0, seed=_KAPPA_SEED)
 
+
 @with_model
 def test_flux_map():
     """Test kappa simulation with flux map (returns tuple with graph)"""
@@ -69,6 +72,7 @@ def test_flux_map():
     fluxmap = res.flux_map
     ok_(isinstance(fluxmap, pgv.AGraph))
 
+
 @with_model
 def test_kappa_wild():
     Monomer('A',['site'])
@@ -80,6 +84,7 @@ def test_kappa_wild():
     Observable('A_', A())
     run_simulation(model, time=0, seed=_KAPPA_SEED)
 
+
 @raises(ValueError)
 @with_model
 def test_run_static_analysis_valueerror():
@@ -89,6 +94,7 @@ def test_run_static_analysis_valueerror():
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
     res = run_static_analysis(model, contact_map=False, influence_map=False)
+
 
 
 @with_model
@@ -102,6 +108,7 @@ def test_run_static_analysis_cmap():
     res = run_static_analysis(model, contact_map=True, influence_map=False)
     ok_(isinstance(res.contact_map, pgv.AGraph))
     ok_(res.influence_map is None)
+
 
 @with_model
 def test_run_static_analysis_imap():
@@ -122,6 +129,7 @@ def test_run_static_analysis_imap():
     ok_(isinstance(res.influence_map, pgv.AGraph))
     ok_(res.contact_map is None)
 
+
 @with_model
 def test_run_static_analysis_both():
     """Test generation of both influence and contact map by run_static_analysis"""
@@ -141,6 +149,7 @@ def test_run_static_analysis_both():
     ok_(isinstance(res.influence_map, pgv.AGraph))
     ok_(isinstance(res.contact_map, pgv.AGraph))
 
+
 @with_model
 def test_contact_map():
     Monomer('A', ['b'])
@@ -150,6 +159,7 @@ def test_contact_map():
     Observable('AB', A(b=1) % B(b=1))
     res = contact_map(model, cleanup=True)
     ok_(isinstance(res, pgv.AGraph))
+
 
 @with_model
 def test_influence_map_kasa():
@@ -167,6 +177,7 @@ def test_influence_map_kasa():
          Parameter('k_B_activates_C', 1))
     res = influence_map(model, cleanup=True)
     ok_(isinstance(res, pgv.AGraph))
+
 
 @with_model
 def test_unicode_strs():

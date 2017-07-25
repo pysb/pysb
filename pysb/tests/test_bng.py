@@ -1,8 +1,8 @@
 from pysb.testing import *
 from pysb import *
 from pysb.bng import *
-from nose.plugins.skip import SkipTest
 import os
+import unittest
 
 
 @with_model
@@ -18,10 +18,9 @@ def test_generate_network():
     ok_(generate_network(model))
 
 
+@unittest.skipIf(os.name == 'nt', 'BNG Console does not work on Windows')
 @with_model
 def test_simulate_network_console():
-    if os.name == 'nt':
-        raise SkipTest('BNG Console does not work on Windows')
     Monomer('A')
     Parameter('A_0', 1)
     Initial(A(), A_0)
