@@ -149,6 +149,10 @@ the documentation for the MATLAB model, as shown in the following example for
                 observable_names = fieldnames(self.observables);
                 for i = 1:numel(observable_names)
                     obs_matrix = self.observables.(observable_names{i});
+                    if isempty(obs_matrix)
+                        y_obs.(observable_names{i}) = zeros(size(y, 1), 1);
+                        continue
+                    end
                     species = obs_matrix(1, :);
                     coefficients = obs_matrix(2, :);
                     y_obs.(observable_names{i}) = ...
@@ -381,6 +385,10 @@ class MatlabExporter(Exporter):
                         observable_names = fieldnames(self.observables);
                         for i = 1:numel(observable_names)
                             obs_matrix = self.observables.(observable_names{i});
+                            if isempty(obs_matrix)
+                                y_obs.(observable_names{i}) = zeros(size(y, 1), 1);
+                                continue
+                            end
                             species = obs_matrix(1, :);
                             coefficients = obs_matrix(2, :);
                             y_obs.(observable_names{i}) = ...

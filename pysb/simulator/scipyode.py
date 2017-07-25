@@ -142,21 +142,7 @@ class ScipyOdeSimulator(Simulator):
             # Substitute expanded parameter formulas for any named expressions
             for e in self._model.expressions:
                 eqns = re.sub(r'\b(%s)\b' % e.name, '(' + sympy.ccode(
-                    e.expand_expr()) + ')', eqns)
-
-            # Substitute sums of observable species that could've been added
-            # by expressions
-            for obs in self._model.observables:
-                obs_string = ''
-                for i in range(len(obs.coefficients)):
-                    if i > 0:
-                        obs_string += "+"
-                    if obs.coefficients[i] > 1:
-                        obs_string += str(obs.coefficients[i]) + "*"
-                    obs_string += "__s" + str(obs.species[i])
-                if len(obs.coefficients) > 1:
-                    obs_string = '(' + obs_string + ')'
-                eqns = re.sub(r'\b(%s)\b' % obs.name, obs_string, eqns)
+                    e.expand_expr(expand_observables=True)) + ')', eqns)
 
             # Substitute 'y[i]' for 'si'
             eqns = re.sub(r'\b__s(\d+)\b',
