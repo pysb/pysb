@@ -1,8 +1,8 @@
 import inspect
 import warnings
 import pysb
+import sympy
 from sympy.printing import StrPrinter
-from sympy.logic.boolalg import BooleanTrue
 
 # Alias basestring under Python 3 for forwards compatibility
 try:
@@ -256,7 +256,7 @@ class BngPrinter(StrPrinter):
         super(BngPrinter, self).__init__(settings)
 
     def _print_Piecewise(self, expr):
-        if type(expr.args[-1][1]) != BooleanTrue:
+        if expr.args[-1][1] is not sympy.true:
             raise NotImplementedError('Piecewise statements are only '
                                       'supported if convertible to BNG if '
                                       'statements')
