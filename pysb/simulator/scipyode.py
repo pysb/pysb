@@ -158,7 +158,8 @@ class ScipyOdeSimulator(Simulator):
             def rhs(t, y, p):
                 ydot = self.ydot
                 # note that the evaluated code sets ydot as a side effect
-                weave_inline(code_eqs, ['ydot', 't', 'y', 'p'])
+                weave_inline(code_eqs, ['ydot', 't', 'y', 'p'],
+                             extra_compile_args=['-w'])
                 return ydot
 
         if use_theano or not self._use_inline:
@@ -236,7 +237,8 @@ class ScipyOdeSimulator(Simulator):
 
                 def jacobian(t, y, p):
                     jac = self.jac
-                    weave_inline(jac_eqs, ['jac', 't', 'y', 'p'])
+                    weave_inline(jac_eqs, ['jac', 't', 'y', 'p'],
+                                 extra_compile_args=['-w'])
                     return jac
             else:
                 jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
