@@ -3,6 +3,8 @@ from pysb.testing import *
 from pysb.bng import *
 from pysb.integrate import Solver
 import numpy as np
+from sympy import Piecewise
+
 
 @with_model
 def test_ic_expression_with_two_parameters():
@@ -53,6 +55,20 @@ def test_nested_expression():
     Initial(A(), Parameter(u'A_0', 1000))
     Initial(B(), Parameter(u'B_0', 1))
     Rule(u'A_deg', A() >> None, e2)
+    generate_equations(model)
+    t = np.linspace(0, 1000, 100)
+    sol = Solver(model, t, use_analytic_jacobian=True)
+    sol.run()
+
+@with_model
+def test_piecewise_expression():
+    Monomer('A')
+    Observable('A_total', A())
+    Expression('A_deg_expr', Piecewise((0, A_total < 400.0),
+                                       (0.001, A_total < 500.0),
+                                       (0.01, True)))
+    Initial(A(), Parameter('A_0', 1000))
+    Rule('A_deg', A() >> None, A_deg_expr)
     generate_equations(model)
     t = np.linspace(0, 1000, 100)
     sol = Solver(model, t, use_analytic_jacobian=True)

@@ -8,7 +8,8 @@ Analysis: An Introduction, J. Walsh, ed., Academic Press, 1966, pp. 178-182.
 # exported from PySB model 'robertson'
 
 import numpy
-import scipy.weave, scipy.integrate
+import weave
+import scipy.integrate
 import collections
 import itertools
 import distutils.errors
@@ -17,7 +18,7 @@ import distutils.errors
 _use_inline = False
 # try to inline a C statement to see if inline is functional
 try:
-    scipy.weave.inline('int i;', force=1)
+    weave.inline('int i;', force=1)
     _use_inline = True
 except distutils.errors.CompileError:
     pass
@@ -61,7 +62,7 @@ class Model(object):
         
         def ode_rhs(self, t, y, p):
             ydot = self.ydot
-            scipy.weave.inline(r'''                
+            weave.inline(r'''
                 ydot[0] = -p[0]*y[0] + p[2]*y[1]*y[2];
                 ydot[1] = p[0]*y[0] - p[1]*pow(y[1], 2) - p[2]*y[1]*y[2];
                 ydot[2] = p[1]*pow(y[1], 2);

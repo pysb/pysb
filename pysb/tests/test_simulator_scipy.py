@@ -56,10 +56,25 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
 
     def test_vode_jac_solver_run(self):
         """Test vode and analytic jacobian."""
-        solver_vode_jac = ScipyOdeSimulator(self.model, tspan=self.time,
-                                            integrator='vode',
-                                            use_analytic_jacobian=True)
-        solver_vode_jac.run()
+        args = {'model': self.model,
+                'tspan': self.time,
+                'integrator': 'vode',
+                'use_analytic_jacobian': True}
+        solver_vode_jac = ScipyOdeSimulator(**args)
+        res1 = solver_vode_jac.run()
+        # Test again with analytic jacobian
+        if ScipyOdeSimulator._use_inline:
+            ScipyOdeSimulator._use_inline = False
+            sim = ScipyOdeSimulator(**args)
+            simres = sim.run()
+            assert simres.species.shape[0] == args['tspan'].shape[0]
+            assert np.allclose(res1.dataframe, simres.dataframe)
+            ScipyOdeSimulator._use_inline = True
+
+        # Test again using theano
+        solver = ScipyOdeSimulator(use_theano=True, **args)
+        simres = solver.run()
+        assert np.allclose(res1.dataframe, simres.dataframe)
 
     def test_lsoda_solver_run(self):
         """Test lsoda."""
