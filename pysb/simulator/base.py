@@ -868,10 +868,10 @@ class SimulationResult(object):
             # Get or create the group
             try:
                 grp = hdf.create_group(group_name)
-                grp.attrs['model'] = enpickle(self._model)
+                grp.create_dataset('_model', data=enpickle(self._model))
             except ValueError:
                 grp = hdf[group_name]
-                model = pickle.loads(grp.attrs['model'])
+                model = pickle.loads(grp['_model'][()])
                 if model.name != self._model.name:
                     raise ValueError('SimulationResult model has name "{}", '
                                      'but the model in HDF5 file group "{}" '
@@ -949,11 +949,12 @@ class SimulationResult(object):
 
             if dataset_name is None:
                 datasets = grp.keys()
+                datasets.remove('_model')
                 if len(datasets) > 1:
                     raise ValueError("dataset_name must be specified when "
                                      "group contains more than one dataset. "
                                      "Options are: {}".format(str(datasets)))
-                dataset_name = grp.keys()[0]
+                dataset_name = datasets[0]
 
             dset = grp[dataset_name]
 
@@ -986,7 +987,7 @@ class SimulationResult(object):
 
             simres = cls(
                 simulator=None,
-                model=pickle.loads(grp.attrs['model']),
+                model=pickle.loads(grp['_model'][()]),
                 initials=initials,
                 param_values=np.array(dset['param_values']),
                 tout=np.array(dset['tout']),
