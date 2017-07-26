@@ -4,6 +4,7 @@ from pysb.examples import tyson_oscillator, robertson, expression_observables
 import numpy as np
 import tempfile
 from nose.tools import assert_raises
+import os
 
 
 def test_simres_dataframe():
@@ -63,6 +64,9 @@ def test_save_load():
     nfres2 = nfsim2.run(n_runs=1, method='nf', tspan=np.linspace(0, 100, 11))
 
     with tempfile.NamedTemporaryFile() as tf:
+        if os.name == 'nt':
+            # Cannot have two file handles on Windows
+            tf.close()
         simres.save(tf.name, dataset_name='test', append=True)
 
         # Try to reload when file contains only one dataset and group
