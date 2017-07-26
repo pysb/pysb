@@ -27,7 +27,7 @@ install:
   - activate test-environment
 
   # Majority of dependencies can be installed with Anaconda
-  - conda install numpy scipy matplotlib sympy networkx nose h5py pandas
+  - conda install numpy scipy matplotlib sympy networkx nose h5py pandas theano
 
   # Graphviz & PyGraphviz
   - appveyor DownloadFile "http://graphviz.org/pub/graphviz/stable/windows/graphviz-2.38.zip" -FileName graphviz.zip
