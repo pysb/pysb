@@ -11,6 +11,7 @@ class SimplePatternMatcher(object):
     """ Methods for one-off pattern matching without caching """
     @classmethod
     def _get_bonds_in_pattern(cls, pat):
+        """ Return the set of integer bond numbers used in a pattern """
         bonds_used = set()
 
         def _get_bonds_in_monomer_pattern(mp):
@@ -35,6 +36,7 @@ class SimplePatternMatcher(object):
 
     @staticmethod
     def _match_graphs(pattern, candidate, exact):
+        """ Compare two pattern graphs for isomorphism """
         node_matcher = categorical_node_match('id', default=None)
         if exact:
             return nx.is_isomorphic(pattern.as_graph(),
@@ -56,7 +58,9 @@ class SimplePatternMatcher(object):
         pattern: pysb.ComplexPattern
         candidate: pysb.Complex.Pattern
         exact: bool
-            Set to True for exact matches (i.e. species equivalence)
+            Set to True for exact matches (i.e. species equivalence,
+            or exact graph isomorphism). Set to False to compare as a
+            pattern (i.e. subgraph isomorphism).
 
         Returns
         -------
@@ -75,7 +79,8 @@ class SimplePatternMatcher(object):
             return False
 
         # Compare the monomer counts in the patterns so we can fail fast
-        # without having to compare bonds
+        # without having to compare bonds using graph isomorphism checks, which
+        # are more computationally expensive
         mons_pat = collections.Counter([mp.monomer for mp in \
                 pattern.monomer_patterns])
         mons_cand = collections.Counter([mp.monomer for mp in \
@@ -96,6 +101,18 @@ class SimplePatternMatcher(object):
     def match_reaction_pattern(cls, pattern, candidate):
         """
         Compare two ReactionPatterns against each other
+
+        This function tests that every ComplexPattern in pattern has a
+        matching ComplexPattern in candidate. If there's a one-to-one
+        mapping of ComplexPattern matches, this is straightforward.
+        Otherwise, we need to check for a maximum matching - a graph theory
+        term referring to the maximum number of edges possible in a
+        bipartite graph (representing ComplexPattern compatibility between
+        pattern and candidate) without overlapping nodes. If every
+        ComplexPattern in pattern has a match, then return True, otherwise
+        return False. This algorithm is polynomial time (although the
+        ComplexPattern isomorphism comparisons using match_complex_pattern are
+        not).
 
         Parameters
         ----------

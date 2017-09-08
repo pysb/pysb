@@ -411,6 +411,11 @@ class MonomerPattern(object):
         return len(self.site_conditions) == len(self.monomer.sites)
 
     def as_graph(self):
+        """
+        Convert MonomerPattern to networkx graph, caching the result
+
+        See :func:`ComplexPattern.as_graph` for implementation details
+        """
         if self._graph is None:
             self._graph = as_complex_pattern(self).as_graph()
 
@@ -528,6 +533,51 @@ class ComplexPattern(object):
     def as_graph(self):
         """
         Return the ComplexPattern represented as a networkx graph
+
+        ComplexPatterns can be represented as a graph. This is mainly useful
+        for comparing if ComplexPatterns are equivalent (see
+        :func:`ComplexPattern.is_equivalent_to`).
+
+        It turns out this is non-trivial because 1) bond numbering is
+        arbitrary and 2) ComplexPatterns can contain MonomerPatterns which
+        are identical. The latter problem makes it impossible to merely
+        order the MonomerPatterns using a canonical ordering for comparison,
+        while ensuring correctness in all cases [Blinov2006]_.
+
+        We solve the problem using broadly the same approach as BioNetGen -
+        encode each complex pattern as a graph and check if they are
+        isomorphic to each other [Faeder2009]_. However, our approach
+        differs in that we do not need to use a hierarchical graph like
+        BioNetGen's hnauty algorithm. We use networkx, in which graph nodes are
+        Python objects rather than strings; thus, we ensure that
+        monomers/sites/states with the same name are not evaluated to be
+        equal, because they have different object type.
+
+        **Implementation details**
+        Each monomer, site, state and compartment is represented as a node.
+        Edges represent bonds (when between sites), or a relationship
+        (monomers have sites, sites have states, MonomerPatterns and
+        ComplexPatterns can have Compartments). A special "no bond" node is
+        used to denote that the connected site is unbound; this is necessary
+        because pattern matching is performed by checking for an isomorphic
+        subgraph, and we need to distinguish between explicitly unbound and
+        unspecified bond (equivalent to the `ANY` keyword).
+
+        Internally, networkx references nodes using an integer. We use a
+        private autoincrementing integer generator function `autoinc` to track
+        nodes, but this is not used when checking graph isomorphism (instead,
+        node to node object equality is checked).
+
+        The `WILD` keyword should match any bond except the special "no
+        bond" node - as special private `WildTester` function is used for
+        this purpose.
+
+        Compartment nodes are tracked and kept unique by the private
+        `add_or_get_compartment_node` function, which uses a dictionary to
+        track Compartment->node_id mapping.
+
+        .. [Blinov2006] https://link.springer.com/chapter/10.1007%2F11905455_5
+        .. [Faeder2009] https://www.csb.pitt.edu/Faculty/Faeder/Publications/Reprints/Faeder_2009.pdf
         """
         if self._graph is not None:
             return self._graph
