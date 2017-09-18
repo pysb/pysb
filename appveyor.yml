@@ -35,7 +35,7 @@ install:
   - if "%PYTHON_VERSION%"=="3.4" pip install https://www.dropbox.com/s/g51cnau5nlww9fc/pygraphviz-1.3.1-cp34-none-win32.whl?dl=1
 
   # BioNetGen
-  - appveyor DownloadFile "http://www.csb.pitt.edu/Faculty/Faeder/?smd_process_download=1&download_id=348" -FileName BioNetGen.zip
+  - appveyor DownloadFile "http://www.csb.pitt.edu/Faculty/Faeder/wp-content/uploads/2017/04/BioNetGen-2.2.6-stable2_Windows.zip" -FileName BioNetGen.zip
   - 7z x BioNetGen.zip -y > nul
   - set "BNGPATH=%cd%\BioNetGen-2.2.6-stable"
 
