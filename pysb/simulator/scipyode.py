@@ -4,6 +4,8 @@ try:
     # weave is not available under Python 3.
     from weave import inline as weave_inline
     import weave.build_tools
+    import distutils.errors
+    import distutils.log
 except ImportError:
     weave_inline = None
 try:
@@ -11,15 +13,16 @@ try:
     from sympy.printing.theanocode import theano_function
 except ImportError:
     theano = None
-import distutils
 import pysb.bng
 import sympy
 import re
 import numpy as np
 import warnings
 import os
-from pysb.logging import EXTENDED_DEBUG
+from pysb.logging import get_logger, EXTENDED_DEBUG
+import logging
 import itertools
+import contextlib
 
 
 class ScipyOdeSimulator(Simulator):
@@ -143,7 +146,12 @@ class ScipyOdeSimulator(Simulator):
 
         self._test_inline()
 
-        if self._use_inline:
+        extra_compile_args = []
+        # Inhibit weave C compiler warnings unless log level <= DEBUG.
+        if not self._logger.isEnabledFor(logging.DEBUG):
+            extra_compile_args.append('-w')
+
+        if self._use_inline and not use_theano:
             # Prepare the string representations of the RHS equations
             code_eqs = '\n'.join(['ydot[%d] = %s;' %
                                   (i, sympy.ccode(o))
@@ -155,14 +163,20 @@ class ScipyOdeSimulator(Simulator):
                 code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                   '%s(\\1)' % macro, code_eqs)
 
+            # Allocate ydot here, once.
+            ydot = np.zeros(len(self.model.species))
             def rhs(t, y, p):
-                ydot = self.ydot
                 # note that the evaluated code sets ydot as a side effect
                 weave_inline(code_eqs, ['ydot', 't', 'y', 'p'],
-                             extra_compile_args=['-w'])
+                             extra_compile_args=extra_compile_args)
                 return ydot
 
-        if use_theano or not self._use_inline:
+            # Call rhs once just to trigger the weave C compilation step while
+            # asserting control over distutils logging.
+            with self._override_distutils_logging:
+                rhs(0.0, self.initials[0], self.param_values[0])
+
+        else:
             self._symbols = sympy.symbols(','.join('__s%d' % sp_id for sp_id in
                                                    range(len(
                                                        self.model.species)))
@@ -191,10 +205,9 @@ class ScipyOdeSimulator(Simulator):
         # put together the sensitivity matrix)
         jac_fn = None
         if self._use_analytic_jacobian:
-            species_names = ['__s%d' % i for i in
-                             range(len(self._model.species))]
-
-            jac_matrix = ode_mat.jacobian(species_names)
+            species_symbols = [sympy.Symbol('__s%d' % i)
+                               for i in range(len(self._model.species))]
+            jac_matrix = ode_mat.jacobian(species_symbols)
 
             if use_theano:
                 jac_eqs_py = theano_function(
@@ -211,9 +224,7 @@ class ScipyOdeSimulator(Simulator):
                     return jacmat
 
             elif self._use_inline:
-                self.jac = np.zeros(
-                    (len(self._model.odes), len(self._model.species)))
-                # Next, prepare the stringified Jacobian equations
+                # Prepare the stringified Jacobian equations.
                 jac_eqs_list = []
                 for i in range(jac_matrix.shape[0]):
                     for j in range(jac_matrix.shape[1]):
@@ -235,21 +246,24 @@ class ScipyOdeSimulator(Simulator):
                     jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                      '%s(\\1)' % macro, jac_eqs)
 
+                # Allocate jac array here, once, and initialize to zeros.
+                jac = np.zeros(
+                    (len(self._model.odes), len(self._model.species)))
                 def jacobian(t, y, p):
-                    jac = self.jac
                     weave_inline(jac_eqs, ['jac', 't', 'y', 'p'],
-                                 extra_compile_args=['-w'])
+                                 extra_compile_args=extra_compile_args)
                     return jac
+
+                # Manage distutils logging, as above for rhs.
+                with self._override_distutils_logging:
+                    jacobian(0.0, self.initials[0], self.param_values[0])
+
             else:
                 jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
 
                 def jacobian(t, y, p):
                     return jac_eqs_py(*itertools.chain(y, p))
 
-            # Initialize the jacobian argument to None if we're not going to
-            #  use it
-            # jac = self.jac as defined in jacobian() earlier
-            # Initialization of matrix for storing the Jacobian
             jac_fn = jacobian
 
         # build integrator options list from our defaults and any kwargs
@@ -262,7 +276,6 @@ class ScipyOdeSimulator(Simulator):
         options.update(kwargs.get('integrator_options', {}))  # overwrite
         # defaults
         self.opts = options
-        self.ydot = np.ndarray(len(self._model.species))
 
         # Integrator
         if integrator == 'lsoda':
@@ -290,6 +303,12 @@ class ScipyOdeSimulator(Simulator):
                 warnings.filterwarnings('error', 'No integrator name match')
                 self.integrator.set_integrator(integrator, **options)
 
+    @property
+    def _override_distutils_logging(self):
+        """Return distutils logging context manager based on our log level."""
+        level = self._logger.logger.getEffectiveLevel()
+        return _override_distutils_logging(level)
+
     @classmethod
     def _test_inline(cls):
         """
@@ -299,19 +318,23 @@ class ScipyOdeSimulator(Simulator):
         """
         if not hasattr(cls, '_use_inline'):
             cls._use_inline = False
-            try:
-                if weave_inline is not None:
-                    extra_compile_args = None
+            if weave_inline is not None:
+                logger = get_logger(__name__)
+                extra_compile_args = []
+                if not logger.isEnabledFor(logging.DEBUG):
                     if os.name == 'posix':
-                        extra_compile_args = ['2>/dev/null']
+                        extra_compile_args.append('2>/dev/null')
                     elif os.name == 'nt':
-                        extra_compile_args = ['2>NUL']
-                    weave_inline('int i=0; i=i;', force=1,
-                                 extra_compile_args=extra_compile_args)
+                        extra_compile_args.append('2>NUL')
+                level = logger.getEffectiveLevel()
+                try:
+                    with _override_distutils_logging(level):
+                        weave_inline('int i=0; i=i;', force=1,
+                                     extra_compile_args=extra_compile_args)
                     cls._use_inline = True
-            except (weave.build_tools.CompileError,
-                    distutils.errors.CompileError, ImportError):
-                pass
+                except (weave.build_tools.CompileError,
+                        distutils.errors.CompileError, ImportError):
+                    pass
 
     def _eqn_substitutions(self, eqns):
         """String substitutions on the sympy C code for the ODE RHS and
@@ -384,3 +407,37 @@ class ScipyOdeSimulator(Simulator):
         tout = np.array([self.tspan]*n_sims)
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, tout, trajectories)
+
+
+@contextlib.contextmanager
+def _override_distutils_logging(level):
+    """Suppress distutils logging below 'level' forcibly.
+
+    Unfortunately, some code deep inside weave unilaterally resets the
+    distutils.log logging threshold to INFO, overriding previous calls to that
+    module's set_threshold function. This context manager allows us to take back
+    control of the verbosity level by monkey-patching logging functions with
+    no-ops for the duration of the wrapped context.
+
+    The value of the 'level' argument should be a standard logging level, e.g.
+    logging.ERROR or logging.DEBUG. If you pass WARNING it will be automatically
+    "upgraded" to ERROR due to excessive use of WARNING-level logging in
+    numpy.distutils, so if you truly want to see those messages then pass INFO
+    instead.
+
+    """
+    if level == logging.WARNING:
+        level = logging.ERROR
+    # distutils.log uses levels 1-6 rather than 10-60.
+    level //= 10
+    suppressed_functions = {}
+    for check_level in ['DEBUG', 'INFO' ,'WARN', 'ERROR', 'FATAL']:
+        if level > getattr(distutils.log, check_level):
+            name = check_level.lower()
+            suppressed_functions[name] = getattr(distutils.log, name)
+            setattr(distutils.log, name, lambda msg, *args: None)
+    try:
+        yield
+    finally:
+        for name, fn in suppressed_functions.items():
+            setattr(distutils.log, name, fn)
