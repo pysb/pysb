@@ -5,7 +5,6 @@ try:
     from weave import inline as weave_inline
     import weave.build_tools
     import distutils.errors
-    import distutils.log
 except ImportError:
     weave_inline = None
 try:
@@ -23,6 +22,7 @@ from pysb.logging import get_logger, EXTENDED_DEBUG
 import logging
 import itertools
 import contextlib
+import importlib
 
 
 class ScipyOdeSimulator(Simulator):
@@ -147,8 +147,12 @@ class ScipyOdeSimulator(Simulator):
         self._test_inline()
 
         extra_compile_args = []
-        # Inhibit weave C compiler warnings unless log level <= DEBUG.
-        if not self._logger.isEnabledFor(logging.DEBUG):
+        # Inhibit weave C compiler warnings unless log level <= EXTENDED_DEBUG.
+        # Note that since the output goes straight to stderr rather than via the
+        # logging system, the threshold must be lower than DEBUG or else the
+        # Nose logcapture plugin will cause the warnings to be shown and tests
+        # will fail due to unexpected output.
+        if True or not self._logger.isEnabledFor(EXTENDED_DEBUG):
             extra_compile_args.append('-w')
 
         if self._use_inline and not use_theano:
@@ -173,7 +177,7 @@ class ScipyOdeSimulator(Simulator):
 
             # Call rhs once just to trigger the weave C compilation step while
             # asserting control over distutils logging.
-            with self._override_distutils_logging:
+            with self._patch_distutils_logging:
                 rhs(0.0, self.initials[0], self.param_values[0])
 
         else:
@@ -255,7 +259,7 @@ class ScipyOdeSimulator(Simulator):
                     return jac
 
                 # Manage distutils logging, as above for rhs.
-                with self._override_distutils_logging:
+                with self._patch_distutils_logging:
                     jacobian(0.0, self.initials[0], self.param_values[0])
 
             else:
@@ -304,10 +308,9 @@ class ScipyOdeSimulator(Simulator):
                 self.integrator.set_integrator(integrator, **options)
 
     @property
-    def _override_distutils_logging(self):
-        """Return distutils logging context manager based on our log level."""
-        level = self._logger.logger.getEffectiveLevel()
-        return _override_distutils_logging(level)
+    def _patch_distutils_logging(self):
+        """Return distutils logging context manager based on our logger."""
+        return _patch_distutils_logging(self._logger.logger)
 
     @classmethod
     def _test_inline(cls):
@@ -321,14 +324,14 @@ class ScipyOdeSimulator(Simulator):
             if weave_inline is not None:
                 logger = get_logger(__name__)
                 extra_compile_args = []
-                if not logger.isEnabledFor(logging.DEBUG):
+                # See comment in __init__ for why this must be EXTENDED_DEBUG.
+                if not logger.isEnabledFor(EXTENDED_DEBUG):
                     if os.name == 'posix':
                         extra_compile_args.append('2>/dev/null')
                     elif os.name == 'nt':
                         extra_compile_args.append('2>NUL')
-                level = logger.getEffectiveLevel()
                 try:
-                    with _override_distutils_logging(level):
+                    with _patch_distutils_logging(logger):
                         weave_inline('int i=0; i=i;', force=1,
                                      extra_compile_args=extra_compile_args)
                     cls._use_inline = True
@@ -410,34 +413,54 @@ class ScipyOdeSimulator(Simulator):
 
 
 @contextlib.contextmanager
-def _override_distutils_logging(level):
-    """Suppress distutils logging below 'level' forcibly.
+def _patch_distutils_logging(base_logger):
+    """Patch distutils logging functionality with logging.Logger calls.
 
-    Unfortunately, some code deep inside weave unilaterally resets the
-    distutils.log logging threshold to INFO, overriding previous calls to that
-    module's set_threshold function. This context manager allows us to take back
-    control of the verbosity level by monkey-patching logging functions with
-    no-ops for the duration of the wrapped context.
+    The value of the 'base_logger' argument should be a logging.Logger instance,
+    and its effective level will be passed on to the patched distutils loggers.
 
-    The value of the 'level' argument should be a standard logging level, e.g.
-    logging.ERROR or logging.DEBUG. If you pass WARNING it will be automatically
-    "upgraded" to ERROR due to excessive use of WARNING-level logging in
-    numpy.distutils, so if you truly want to see those messages then pass INFO
-    instead.
+    distutils.log contains its own internal PEP 282 style logging system that
+    sends messages straight to stdout/stderr, and numpy.distutils.log extends
+    that. This code patches all of this with calls to logging.LoggerAdapter
+    instances, and disables the module-level threshold-setting functions so we
+    can retain full control over the threshold. Also all WARNING messages are
+    "downgraded" to INFO to suppress excessive use of WARNING-level logging in
+    numpy.distutils.
 
     """
-    if level == logging.WARNING:
-        level = logging.ERROR
-    # distutils.log uses levels 1-6 rather than 10-60.
-    level //= 10
-    suppressed_functions = {}
-    for check_level in ['DEBUG', 'INFO' ,'WARN', 'ERROR', 'FATAL']:
-        if level > getattr(distutils.log, check_level):
-            name = check_level.lower()
-            suppressed_functions[name] = getattr(distutils.log, name)
-            setattr(distutils.log, name, lambda msg, *args: None)
+    logger = get_logger(__name__)
+    logger.debug('patching distutils and numpy.distutils logging')
+    logger_methods = 'log', 'debug', 'info', 'warn', 'error', 'fatal'
+    other_functions = 'set_threshold', 'set_verbosity'
+    saved_symbols = {}
+    for module_name in 'distutils.log', 'numpy.distutils.log':
+        new_logger = _DistutilsProxyLoggerAdapter(
+            base_logger, {'module': module_name}
+        )
+        module = importlib.import_module(module_name)
+        # Save the old values.
+        for name in logger_methods + other_functions:
+            saved_symbols[module, name] = getattr(module, name)
+        # Replace logging functions with bound methods of the Logger object.
+        for name in logger_methods:
+            setattr(module, name, getattr(new_logger, name))
+        # Replace threshold-setting functions with no-ops.
+        for name in other_functions:
+            setattr(module, name, lambda *args, **kwargs: None)
     try:
         yield
     finally:
-        for name, fn in suppressed_functions.items():
-            setattr(distutils.log, name, fn)
+        logger.debug('restoring distutils and numpy.distutils logging')
+        # Restore everything we overwrote.
+        for (module, name), value in saved_symbols.items():
+            setattr(module, name, value)
+
+
+class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
+    """A logging adapter for the distutils logging patcher."""
+    def process(self, msg, kwargs):
+        return '(from %s) %s' % (self.extra['module'], msg), kwargs
+    # Map 'warn' to 'info' to reduce chattiness.
+    warn = logging.LoggerAdapter.info
+    # Provide 'fatal' to match up with distutils log functions.
+    fatal = logging.LoggerAdapter.critical
