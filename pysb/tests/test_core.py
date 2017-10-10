@@ -175,3 +175,43 @@ def test_complex_pattern_equivalence_compartments():
     # Check that enable_synth_deg is idempotent
     model.enable_synth_deg()
     assert len(model.initial_conditions) == 2
+
+@with_model
+def test_complex_pattern_equivalence_state():
+    """Ensure CP equivalence handles site states."""
+    Monomer('A', ['s', 't'], {'t': ['x', 'y', 'z']})
+    cp0 = A(s=1, t='x') % A(s=1, t='y')
+    cp1 = A(s=1, t='y') % A(s=1, t='x')
+    cp2 = A(s=1, t='x') % A(s=1, t='z')
+    cp3 = A(s=1, t='z') % A(s=1, t='y')
+    _check_pattern_equivalence((cp0, cp1))
+    _check_pattern_equivalence((cp0, cp2), False)
+    _check_pattern_equivalence((cp0, cp3), False)
+
+@with_model
+def test_complex_pattern_equivalence_bond_state():
+    """Ensure CP equivalence handles bond and state on the same site."""
+    Monomer('A', ['s'], {'s': ['x', 'y', 'z']})
+    cp0 = A(s=('x', 1)) % A(s=('y', 1))
+    cp1 = A(s=('y', 1)) % A(s=('x', 1))
+    cp2 = A(s=('z', 1)) % A(s=('y', 1))
+    cp3 = A(s='x') % A(s='y')
+    _check_pattern_equivalence((cp0, cp1))
+    _check_pattern_equivalence((cp0, cp2), False)
+    _check_pattern_equivalence((cp0, cp3), False)
+
+@with_model
+def test_complex_pattern_equivalence_bond_numbering():
+    """Ensure CP equivalence is insensitive to bond numbers."""
+    Monomer('A', ['s'])
+    cp0 = A(s=1) % A(s=1)
+    cp1 = A(s=2) % A(s=2)
+    _check_pattern_equivalence((cp0, cp1))
+
+@with_model
+def test_complex_pattern_equivalence_monomer_pattern_ordering():
+    """Ensure CP equivalence is insensitive to MP order."""
+    Monomer('A', ['s1', 's2'])
+    cp0 = A(s1=1, s2=2) % A(s1=2, s2=1)
+    cp1 = A(s1=2, s2=1) % A(s1=1, s2=2)
+    _check_pattern_equivalence((cp0, cp1))
