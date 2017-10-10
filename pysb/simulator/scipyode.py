@@ -148,7 +148,7 @@ class ScipyOdeSimulator(Simulator):
             code_eqs = '\n'.join(['ydot[%d] = %s;' %
                                   (i, sympy.ccode(o))
                                   for i, o in enumerate(ode_mat)])
-            code_eqs = self._eqn_substitutions(code_eqs)
+            code_eqs = str(self._eqn_substitutions(code_eqs))
 
             for arr_name in ('ydot', 'y', 'p'):
                 macro = arr_name.upper() + '1'
@@ -224,7 +224,7 @@ class ScipyOdeSimulator(Simulator):
                         jac_eq_str = 'jac[%d, %d] = %s;' % (
                             i, j, sympy.ccode(entry))
                         jac_eqs_list.append(jac_eq_str)
-                jac_eqs = self._eqn_substitutions('\n'.join(jac_eqs_list))
+                jac_eqs = str(self._eqn_substitutions('\n'.join(jac_eqs_list)))
 
                 # Substitute array refs with calls to the JAC1 macro for inline
                 jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
