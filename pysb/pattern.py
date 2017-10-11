@@ -1,159 +1,156 @@
 import collections
 from .core import ComplexPattern, MonomerPattern, Monomer, \
-    ReactionPattern, ANY, WILD, as_complex_pattern
+    ReactionPattern, WILD, as_complex_pattern
 import networkx as nx
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 import numpy as np
 
 
-class SimplePatternMatcher(object):
-    """ Methods for one-off pattern matching without caching """
-    @classmethod
-    def _get_bonds_in_pattern(cls, pat):
-        """ Return the set of integer bond numbers used in a pattern """
-        bonds_used = set()
+def _get_bonds_in_pattern(pat):
+    """ Return the set of integer bond numbers used in a pattern """
+    bonds_used = set()
 
-        def _get_bonds_in_monomer_pattern(mp):
-            for sc in mp.site_conditions.values():
-                if isinstance(sc, int):
-                    bonds_used.add(sc)
-                elif not isinstance(sc, (str, unicode)) and \
-                        isinstance(sc, collections.Iterable):
-                    [bonds_used.add(b) for b in sc if isinstance(b, int)]
+    def _get_bonds_in_monomer_pattern(mp):
+        for sc in mp.site_conditions.values():
+            if isinstance(sc, int):
+                bonds_used.add(sc)
+            elif not isinstance(sc, (str, unicode)) and \
+                    isinstance(sc, collections.Iterable):
+                [bonds_used.add(b) for b in sc if isinstance(b, int)]
 
-        if pat is None:
-            return bonds_used
-        if isinstance(pat, MonomerPattern):
-            _get_bonds_in_monomer_pattern(pat)
-        elif isinstance(pat, ComplexPattern):
-            for mp in pat.monomer_patterns:
-                _get_bonds_in_monomer_pattern(mp)
-        else:
-            raise ValueError('Unknown pattern type: %s' % type(pat))
-
+    if pat is None:
         return bonds_used
+    if isinstance(pat, MonomerPattern):
+        _get_bonds_in_monomer_pattern(pat)
+    elif isinstance(pat, ComplexPattern):
+        for mp in pat.monomer_patterns:
+            _get_bonds_in_monomer_pattern(mp)
+    else:
+        raise ValueError('Unknown pattern type: %s' % type(pat))
 
-    @staticmethod
-    def _match_graphs(pattern, candidate, exact):
-        """ Compare two pattern graphs for isomorphism """
-        node_matcher = categorical_node_match('id', default=None)
-        if exact:
-            return nx.is_isomorphic(pattern.as_graph(),
-                                    candidate.as_graph(),
-                                    node_match=node_matcher)
-        else:
-            return GraphMatcher(
-                candidate.as_graph(), pattern.as_graph(),
-                node_match=node_matcher
-            ).subgraph_is_isomorphic()
+    return bonds_used
 
-    @classmethod
-    def match_complex_pattern(cls, pattern, candidate, exact=False):
-        """
-        Compare two ComplexPatterns against each other
 
-        Parameters
-        ----------
-        pattern: pysb.ComplexPattern
-        candidate: pysb.Complex.Pattern
-        exact: bool
-            Set to True for exact matches (i.e. species equivalence,
-            or exact graph isomorphism). Set to False to compare as a
-            pattern (i.e. subgraph isomorphism).
+def _match_graphs(pattern, candidate, exact):
+    """ Compare two pattern graphs for isomorphism """
+    node_matcher = categorical_node_match('id', default=None)
+    if exact:
+        return nx.is_isomorphic(pattern.as_graph(),
+                                candidate.as_graph(),
+                                node_match=node_matcher)
+    else:
+        return GraphMatcher(
+            candidate.as_graph(), pattern.as_graph(),
+            node_match=node_matcher
+        ).subgraph_is_isomorphic()
 
-        Returns
-        -------
-        True if pattern matches candidate, False otherwise
-        """
-        if exact:
-            if not pattern.is_concrete():
-                raise ValueError('Pattern must be concrete for '
-                                 'exact matching: {}'.format(pattern))
-            if not candidate.is_concrete():
-                raise ValueError('Candidate must be concrete for '
-                                 'exact matching: {}'.format(candidate))
 
-        if exact and len(pattern.monomer_patterns) != len(
-                candidate.monomer_patterns):
+def match_complex_pattern(pattern, candidate, exact=False):
+    """
+    Compare two ComplexPatterns against each other
+
+    Parameters
+    ----------
+    pattern: pysb.ComplexPattern
+    candidate: pysb.Complex.Pattern
+    exact: bool
+        Set to True for exact matches (i.e. species equivalence,
+        or exact graph isomorphism). Set to False to compare as a
+        pattern (i.e. subgraph isomorphism).
+
+    Returns
+    -------
+    True if pattern matches candidate, False otherwise
+    """
+    if exact:
+        if not pattern.is_concrete():
+            raise ValueError('Pattern must be concrete for '
+                             'exact matching: {}'.format(pattern))
+        if not candidate.is_concrete():
+            raise ValueError('Candidate must be concrete for '
+                             'exact matching: {}'.format(candidate))
+
+    if exact and len(pattern.monomer_patterns) != len(
+            candidate.monomer_patterns):
+        return False
+
+    # Compare the monomer counts in the patterns so we can fail fast
+    # without having to compare bonds using graph isomorphism checks, which
+    # are more computationally expensive
+    mons_pat = collections.Counter([mp.monomer for mp in \
+            pattern.monomer_patterns])
+    mons_cand = collections.Counter([mp.monomer for mp in \
+            candidate.monomer_patterns])
+
+    for mon, mon_count_cand in mons_cand.items():
+        mon_count_pat = mons_pat.get(mon, 0)
+        if exact and mon_count_cand != mon_count_pat:
+            return False
+        if mon_count_pat > mon_count_cand:
             return False
 
-        # Compare the monomer counts in the patterns so we can fail fast
-        # without having to compare bonds using graph isomorphism checks, which
-        # are more computationally expensive
-        mons_pat = collections.Counter([mp.monomer for mp in \
-                pattern.monomer_patterns])
-        mons_cand = collections.Counter([mp.monomer for mp in \
-                candidate.monomer_patterns])
+    # If we've got this far, we'll need to do a full pattern match
+    # by searching for a graph isomorphism
+    return _match_graphs(pattern, candidate, exact=exact)
 
-        for mon, mon_count_cand in mons_cand.items():
-            mon_count_pat = mons_pat.get(mon, 0)
-            if exact and mon_count_cand != mon_count_pat:
-                return False
-            if mon_count_pat > mon_count_cand:
-                return False
 
-        # If we've got this far, we'll need to do a full pattern match
-        # by searching for a graph isomorphism
-        return cls._match_graphs(pattern, candidate, exact=exact)
+def match_reaction_pattern(pattern, candidate):
+    """
+    Compare two ReactionPatterns against each other
 
-    @classmethod
-    def match_reaction_pattern(cls, pattern, candidate):
-        """
-        Compare two ReactionPatterns against each other
+    This function tests that every ComplexPattern in pattern has a
+    matching ComplexPattern in candidate. If there's a one-to-one
+    mapping of ComplexPattern matches, this is straightforward.
+    Otherwise, we need to check for a maximum matching - a graph theory
+    term referring to the maximum number of edges possible in a
+    bipartite graph (representing ComplexPattern compatibility between
+    pattern and candidate) without overlapping nodes. If every
+    ComplexPattern in pattern has a match, then return True, otherwise
+    return False. This algorithm is polynomial time (although the
+    ComplexPattern isomorphism comparisons using match_complex_pattern are
+    not).
 
-        This function tests that every ComplexPattern in pattern has a
-        matching ComplexPattern in candidate. If there's a one-to-one
-        mapping of ComplexPattern matches, this is straightforward.
-        Otherwise, we need to check for a maximum matching - a graph theory
-        term referring to the maximum number of edges possible in a
-        bipartite graph (representing ComplexPattern compatibility between
-        pattern and candidate) without overlapping nodes. If every
-        ComplexPattern in pattern has a match, then return True, otherwise
-        return False. This algorithm is polynomial time (although the
-        ComplexPattern isomorphism comparisons using match_complex_pattern are
-        not).
+    Parameters
+    ----------
+    pattern: pysb.ReactionPattern
+    candidate: pysb.ReactionPattern
 
-        Parameters
-        ----------
-        pattern: pysb.ReactionPattern
-        candidate: pysb.ReactionPattern
+    Returns
+    -------
+    True if pattern matches candidate, False otherwise.
 
-        Returns
-        -------
-        True if pattern matches candidate, False otherwise.
+    """
+    if len(pattern.complex_patterns) > len(candidate.complex_patterns):
+        return False
 
-        """
-        if len(pattern.complex_patterns) > len(candidate.complex_patterns):
+    matches = []
+    for cplx_pat in pattern.complex_patterns:
+        matches_this = [cand_cplx_pat.matches(
+            cplx_pat) for cand_cplx_pat in
+            candidate.complex_patterns]
+        matches_this = set(np.where(matches_this)[0])
+        if len(matches_this) == 0:
             return False
+        matches.append(matches_this)
 
-        matches = []
-        for cplx_pat in pattern.complex_patterns:
-            matches_this = [SimplePatternMatcher.match_complex_pattern(
-                cplx_pat, cand_cplx_pat) for cand_cplx_pat in
-                candidate.complex_patterns]
-            matches_this = set(np.where(matches_this)[0])
-            if len(matches_this) == 0:
-                return False
-            matches.append(matches_this)
+    # If a unique 1:1 mapping exists, a match is assured
+    if len(set.intersection(*matches)) == 0:
+        return True
 
-        # If a unique 1:1 mapping exists, a match is assured
-        if len(set.intersection(*matches)) == 0:
-            return True
+    # Find the maximum matching in a bipartite graph representing the
+    # two sets of ComplexPatterns
+    g = nx.Graph()
+    g.add_nodes_from(['p%d' % n for n in
+                     range(len(pattern.complex_patterns))], bipartite=0)
+    g.add_nodes_from(['c%d' % n for n in
+                     range(len(candidate.complex_patterns))], bipartite=1)
+    for src_pat_id, src_pat_matches in enumerate(matches):
+        g.add_edges_from([('p%d' % src_pat_id, 'c%d' % cand_pat_id) for
+                          cand_pat_id in src_pat_matches])
 
-        # Find the maximum matching in a bipartite graph representing the
-        # two sets of ComplexPatterns
-        g = nx.Graph()
-        g.add_nodes_from(['p%d' % n for n in
-                         range(len(pattern.complex_patterns))], bipartite=0)
-        g.add_nodes_from(['c%d' % n for n in
-                         range(len(candidate.complex_patterns))], bipartite=1)
-        for src_pat_id, src_pat_matches in enumerate(matches):
-            g.add_edges_from([('p%d' % src_pat_id, 'c%d' % cand_pat_id) for
-                              cand_pat_id in src_pat_matches])
-
-        return (len(nx.bipartite.maximum_matching(g)) // 2) == len(
-            pattern.complex_patterns)
+    return (len(nx.bipartite.maximum_matching(g)) // 2) == len(
+        pattern.complex_patterns)
 
 
 def monomers_from_pattern(pattern):
@@ -327,7 +324,7 @@ class SpeciesPatternMatcher(object):
         else:
             return [(shortlist_indexes[idx] if index else sp) for idx, sp in
                     enumerate(shortlist) if
-                    SimplePatternMatcher.match_complex_pattern(
+                    match_complex_pattern(
                         as_complex_pattern(pattern), sp, exact=exact
                     )]
 
@@ -554,13 +551,12 @@ class RulePatternMatcher(object):
 
         else:
             return [rule for rule in shortlist if
-                    SimplePatternMatcher.match_reaction_pattern(
-                        pattern, pat_fn(rule))]
+                    pat_fn(rule).matches(pattern)]
 
     @classmethod
     def _match_complex_pattern_to_reaction_pattern(cls, pattern, test_pattern):
         for cp in test_pattern.complex_patterns:
-            if SimplePatternMatcher.match_complex_pattern(pattern, cp):
+            if match_complex_pattern(pattern, cp):
                 return True
         return False
 
@@ -708,11 +704,11 @@ class ReactionPatternMatcher(object):
         rxn_ids = list(rxn_ids)
         rxn_ids.sort()
 
-        return [Reaction(rxn_dict=self.model.reactions_bidirectional[rxn_id],
+        return [_Reaction(rxn_dict=self.model.reactions_bidirectional[rxn_id],
                          model=self.model) for rxn_id in rxn_ids]
 
 
-class Reaction(object):
+class _Reaction(object):
     __slots__ = ['_rxn_dict', 'reactants', 'model', 'products', 'species']
     """
     Store reactions in object form for pretty-printing

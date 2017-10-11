@@ -688,19 +688,37 @@ class ComplexPattern(object):
         Use of this method on non-concrete ComplexPatterns was previously
         allowed, but is now deprecated.
         """
-        from pysb.pattern import SimplePatternMatcher
+        from pysb.pattern import match_complex_pattern
         # Didn't implement __eq__ to avoid confusion with __ne__ operator used
         # for Rule building
 
         # Check both patterns are concrete
-        exact = True
         if not self.is_concrete() or not other.is_concrete():
             warnings.warn("is_equivalent_to() will only work with concrete "
                           "patterns in a future version", DeprecationWarning)
-            exact = False
 
-        return SimplePatternMatcher.match_complex_pattern(self, other,
-                                                          exact=exact)
+        return match_complex_pattern(self, other, exact=True)
+
+    def matches(self, other):
+        """
+        Compare another ComplexPattern against this one
+
+        Parameters
+        ----------
+        other: ComplexPattern
+            A ComplexPattern to match against self
+
+        Returns
+        -------
+        bool
+            True if other matches self; False otherwise.
+
+        """
+        if not self.is_concrete():
+            raise ValueError('matches() requires self to be a concrete '
+                             'pattern')
+        from pysb.pattern import match_complex_pattern
+        return match_complex_pattern(other, self, exact=False)
 
     def copy(self):
         """
@@ -861,6 +879,14 @@ class ReactionPattern(object):
         else:
             return 'None'
 
+    def matches(self, other):
+        """
+        Match the 'other' ReactionPattern against this one
+
+        See :func:`pysb.pattern.match_reaction_pattern` for details
+        """
+        from pysb.pattern import match_reaction_pattern
+        return match_reaction_pattern(other, self)
 
 
 class RuleExpression(object):
