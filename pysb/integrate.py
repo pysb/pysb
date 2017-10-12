@@ -248,14 +248,3 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
                             verbose=verbose, **integrator_options)
     simres = sim.run(param_values=param_values, initials=y0)
     return simres.all
-
-
-def setup_module(module):
-    """Doctest fixture for nose."""
-    # Distutils' temp directory creation code has a more-or-less unsuppressable
-    # print to stdout which will break the doctest which triggers it (via
-    # weave.inline). So here we run an end-to-end test of the inlining
-    # system to get that print out of the way at a point where it won't matter.
-    # As a bonus, the test harness is suppressing writes to stdout at this time
-    # anyway so the message is just swallowed silently.
-    ScipyOdeSimulator._test_inline()

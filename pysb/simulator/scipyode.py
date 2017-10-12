@@ -4,6 +4,7 @@ try:
     # weave is not available under Python 3.
     from weave import inline as weave_inline
     import weave.build_tools
+    import distutils.errors
 except ImportError:
     weave_inline = None
 try:
@@ -11,15 +12,17 @@ try:
     from sympy.printing.theanocode import theano_function
 except ImportError:
     theano = None
-import distutils
 import pysb.bng
 import sympy
 import re
 import numpy as np
 import warnings
 import os
-from pysb.logging import EXTENDED_DEBUG
+from pysb.logging import get_logger, EXTENDED_DEBUG
+import logging
 import itertools
+import contextlib
+import importlib
 
 
 class ScipyOdeSimulator(Simulator):
@@ -143,7 +146,16 @@ class ScipyOdeSimulator(Simulator):
 
         self._test_inline()
 
-        if self._use_inline:
+        extra_compile_args = []
+        # Inhibit weave C compiler warnings unless log level <= EXTENDED_DEBUG.
+        # Note that since the output goes straight to stderr rather than via the
+        # logging system, the threshold must be lower than DEBUG or else the
+        # Nose logcapture plugin will cause the warnings to be shown and tests
+        # will fail due to unexpected output.
+        if not self._logger.isEnabledFor(EXTENDED_DEBUG):
+            extra_compile_args.append('-w')
+
+        if self._use_inline and not use_theano:
             # Prepare the string representations of the RHS equations
             code_eqs = '\n'.join(['ydot[%d] = %s;' %
                                   (i, sympy.ccode(o))
@@ -155,14 +167,20 @@ class ScipyOdeSimulator(Simulator):
                 code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                   '%s(\\1)' % macro, code_eqs)
 
+            # Allocate ydot here, once.
+            ydot = np.zeros(len(self.model.species))
             def rhs(t, y, p):
-                ydot = self.ydot
                 # note that the evaluated code sets ydot as a side effect
                 weave_inline(code_eqs, ['ydot', 't', 'y', 'p'],
-                             extra_compile_args=['-w'])
+                             extra_compile_args=extra_compile_args)
                 return ydot
 
-        if use_theano or not self._use_inline:
+            # Call rhs once just to trigger the weave C compilation step while
+            # asserting control over distutils logging.
+            with self._patch_distutils_logging:
+                rhs(0.0, self.initials[0], self.param_values[0])
+
+        else:
             self._symbols = sympy.symbols(','.join('__s%d' % sp_id for sp_id in
                                                    range(len(
                                                        self.model.species)))
@@ -191,10 +209,9 @@ class ScipyOdeSimulator(Simulator):
         # put together the sensitivity matrix)
         jac_fn = None
         if self._use_analytic_jacobian:
-            species_names = ['__s%d' % i for i in
-                             range(len(self._model.species))]
-
-            jac_matrix = ode_mat.jacobian(species_names)
+            species_symbols = [sympy.Symbol('__s%d' % i)
+                               for i in range(len(self._model.species))]
+            jac_matrix = ode_mat.jacobian(species_symbols)
 
             if use_theano:
                 jac_eqs_py = theano_function(
@@ -211,9 +228,7 @@ class ScipyOdeSimulator(Simulator):
                     return jacmat
 
             elif self._use_inline:
-                self.jac = np.zeros(
-                    (len(self._model.odes), len(self._model.species)))
-                # Next, prepare the stringified Jacobian equations
+                # Prepare the stringified Jacobian equations.
                 jac_eqs_list = []
                 for i in range(jac_matrix.shape[0]):
                     for j in range(jac_matrix.shape[1]):
@@ -235,21 +250,24 @@ class ScipyOdeSimulator(Simulator):
                     jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                      '%s(\\1)' % macro, jac_eqs)
 
+                # Allocate jac array here, once, and initialize to zeros.
+                jac = np.zeros(
+                    (len(self._model.odes), len(self._model.species)))
                 def jacobian(t, y, p):
-                    jac = self.jac
                     weave_inline(jac_eqs, ['jac', 't', 'y', 'p'],
-                                 extra_compile_args=['-w'])
+                                 extra_compile_args=extra_compile_args)
                     return jac
+
+                # Manage distutils logging, as above for rhs.
+                with self._patch_distutils_logging:
+                    jacobian(0.0, self.initials[0], self.param_values[0])
+
             else:
                 jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
 
                 def jacobian(t, y, p):
                     return jac_eqs_py(*itertools.chain(y, p))
 
-            # Initialize the jacobian argument to None if we're not going to
-            #  use it
-            # jac = self.jac as defined in jacobian() earlier
-            # Initialization of matrix for storing the Jacobian
             jac_fn = jacobian
 
         # build integrator options list from our defaults and any kwargs
@@ -262,7 +280,6 @@ class ScipyOdeSimulator(Simulator):
         options.update(kwargs.get('integrator_options', {}))  # overwrite
         # defaults
         self.opts = options
-        self.ydot = np.ndarray(len(self._model.species))
 
         # Integrator
         if integrator == 'lsoda':
@@ -290,6 +307,11 @@ class ScipyOdeSimulator(Simulator):
                 warnings.filterwarnings('error', 'No integrator name match')
                 self.integrator.set_integrator(integrator, **options)
 
+    @property
+    def _patch_distutils_logging(self):
+        """Return distutils logging context manager based on our logger."""
+        return _patch_distutils_logging(self._logger.logger)
+
     @classmethod
     def _test_inline(cls):
         """
@@ -299,19 +321,23 @@ class ScipyOdeSimulator(Simulator):
         """
         if not hasattr(cls, '_use_inline'):
             cls._use_inline = False
-            try:
-                if weave_inline is not None:
-                    extra_compile_args = None
+            if weave_inline is not None:
+                logger = get_logger(__name__)
+                extra_compile_args = []
+                # See comment in __init__ for why this must be EXTENDED_DEBUG.
+                if not logger.isEnabledFor(EXTENDED_DEBUG):
                     if os.name == 'posix':
-                        extra_compile_args = ['2>/dev/null']
+                        extra_compile_args.append('2>/dev/null')
                     elif os.name == 'nt':
-                        extra_compile_args = ['2>NUL']
-                    weave_inline('int i=0; i=i;', force=1,
-                                 extra_compile_args=extra_compile_args)
+                        extra_compile_args.append('2>NUL')
+                try:
+                    with _patch_distutils_logging(logger):
+                        weave_inline('int i=0; i=i;', force=1,
+                                     extra_compile_args=extra_compile_args)
                     cls._use_inline = True
-            except (weave.build_tools.CompileError,
-                    distutils.errors.CompileError, ImportError):
-                pass
+                except (weave.build_tools.CompileError,
+                        distutils.errors.CompileError, ImportError):
+                    pass
 
     def _eqn_substitutions(self, eqns):
         """String substitutions on the sympy C code for the ODE RHS and
@@ -384,3 +410,57 @@ class ScipyOdeSimulator(Simulator):
         tout = np.array([self.tspan]*n_sims)
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, tout, trajectories)
+
+
+@contextlib.contextmanager
+def _patch_distutils_logging(base_logger):
+    """Patch distutils logging functionality with logging.Logger calls.
+
+    The value of the 'base_logger' argument should be a logging.Logger instance,
+    and its effective level will be passed on to the patched distutils loggers.
+
+    distutils.log contains its own internal PEP 282 style logging system that
+    sends messages straight to stdout/stderr, and numpy.distutils.log extends
+    that. This code patches all of this with calls to logging.LoggerAdapter
+    instances, and disables the module-level threshold-setting functions so we
+    can retain full control over the threshold. Also all WARNING messages are
+    "downgraded" to INFO to suppress excessive use of WARNING-level logging in
+    numpy.distutils.
+
+    """
+    logger = get_logger(__name__)
+    logger.debug('patching distutils and numpy.distutils logging')
+    logger_methods = 'log', 'debug', 'info', 'warn', 'error', 'fatal'
+    other_functions = 'set_threshold', 'set_verbosity'
+    saved_symbols = {}
+    for module_name in 'distutils.log', 'numpy.distutils.log':
+        new_logger = _DistutilsProxyLoggerAdapter(
+            base_logger, {'module': module_name}
+        )
+        module = importlib.import_module(module_name)
+        # Save the old values.
+        for name in logger_methods + other_functions:
+            saved_symbols[module, name] = getattr(module, name)
+        # Replace logging functions with bound methods of the Logger object.
+        for name in logger_methods:
+            setattr(module, name, getattr(new_logger, name))
+        # Replace threshold-setting functions with no-ops.
+        for name in other_functions:
+            setattr(module, name, lambda *args, **kwargs: None)
+    try:
+        yield
+    finally:
+        logger.debug('restoring distutils and numpy.distutils logging')
+        # Restore everything we overwrote.
+        for (module, name), value in saved_symbols.items():
+            setattr(module, name, value)
+
+
+class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
+    """A logging adapter for the distutils logging patcher."""
+    def process(self, msg, kwargs):
+        return '(from %s) %s' % (self.extra['module'], msg), kwargs
+    # Map 'warn' to 'info' to reduce chattiness.
+    warn = logging.LoggerAdapter.info
+    # Provide 'fatal' to match up with distutils log functions.
+    fatal = logging.LoggerAdapter.critical
