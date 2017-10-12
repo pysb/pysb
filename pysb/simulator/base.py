@@ -12,6 +12,7 @@ from pysb import __version__ as PYSB_VERSION
 from datetime import datetime
 import dateutil.parser
 import copy
+from warnings import warn
 
 try:
     import pandas as pd
@@ -848,12 +849,12 @@ class SimulationResult(object):
             have complex expressions which take a long time to compute.
         """
         if h5py is None:
-            raise Exception('Please "pip install h5py" for this feature')
+            raise Exception('Please install the h5py package for this feature')
 
         if self._y is None and not include_obs_exprs:
-            raise ValueError('This SimulationResult has no trajectories - '
-                             'you will need to set include_obs_exprs=True if '
-                             'you wish to save observables and expressions')
+            warn('This SimulationResult has no trajectories - '
+                 'you will need to set include_obs_exprs=True if '
+                 'you wish to save observables and expressions')
 
         if group_name is None:
             group_name = self._model.name

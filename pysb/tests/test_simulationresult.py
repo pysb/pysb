@@ -4,7 +4,7 @@ from pysb.examples import tyson_oscillator, robertson, expression_observables
 import numpy as np
 import tempfile
 from nose.tools import assert_raises
-import os
+import warnings
 
 
 def test_simres_dataframe():
@@ -64,9 +64,9 @@ def test_save_load():
     nfres2 = nfsim2.run(n_runs=1, method='nf', tspan=np.linspace(0, 100, 11))
 
     with tempfile.NamedTemporaryFile() as tf:
-        if os.name == 'nt':
-            # Cannot have two file handles on Windows
-            tf.close()
+        # Cannot have two file handles on Windows
+        tf.close()
+
         simres.save(tf.name, dataset_name='test', append=True)
 
         # Try to reload when file contains only one dataset and group
@@ -101,8 +101,13 @@ def test_save_load():
         simres_load = SimulationResult.load(tf.name, group_name=model.name,
                                             dataset_name='test')
 
-        # Saving network free results requires include_obs_exprs=True
-        assert_raises(ValueError, nfres1.save, tf.name, append=True)
+        # Saving network free results requires include_obs_exprs=True,
+        # otherwise a warning should be raised
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            nfres1.save(tf.name, append=True)
+            assert len(w) == 1
+            assert issubclass(w[-1].category, UserWarning)
 
         nfres1.save(tf.name, include_obs_exprs=True,
                     dataset_name='nfsim test', append=True)
