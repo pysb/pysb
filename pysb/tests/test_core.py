@@ -176,6 +176,7 @@ def test_complex_pattern_equivalence_compartments():
     model.enable_synth_deg()
     assert len(model.initial_conditions) == 2
 
+
 @with_model
 def test_complex_pattern_equivalence_state():
     """Ensure CP equivalence handles site states."""
@@ -187,6 +188,7 @@ def test_complex_pattern_equivalence_state():
     _check_pattern_equivalence((cp0, cp1))
     _check_pattern_equivalence((cp0, cp2), False)
     _check_pattern_equivalence((cp0, cp3), False)
+
 
 @with_model
 def test_complex_pattern_equivalence_bond_state():
@@ -200,6 +202,7 @@ def test_complex_pattern_equivalence_bond_state():
     _check_pattern_equivalence((cp0, cp2), False)
     _check_pattern_equivalence((cp0, cp3), False)
 
+
 @with_model
 def test_complex_pattern_equivalence_bond_numbering():
     """Ensure CP equivalence is insensitive to bond numbers."""
@@ -208,6 +211,7 @@ def test_complex_pattern_equivalence_bond_numbering():
     cp1 = A(s=2) % A(s=2)
     _check_pattern_equivalence((cp0, cp1))
 
+
 @with_model
 def test_complex_pattern_equivalence_monomer_pattern_ordering():
     """Ensure CP equivalence is insensitive to MP order."""
@@ -215,3 +219,27 @@ def test_complex_pattern_equivalence_monomer_pattern_ordering():
     cp0 = A(s1=1, s2=2) % A(s1=2, s2=1)
     cp1 = A(s1=2, s2=1) % A(s1=1, s2=2)
     _check_pattern_equivalence((cp0, cp1))
+
+
+@with_model
+def test_complex_pattern_equivalence_compartments():
+    """Ensure CP equivalence is insensitive to Compartment"""
+    Monomer('A', ['s1'])
+    Compartment('C')
+    cp0 = (A(s1=1) % A(s1=1)) ** C
+    cp1 = (A(s1=1) ** C) % (A(s1=1) ** C)
+    _check_pattern_equivalence((cp0, cp1))
+
+
+@with_model
+def test_reaction_pattern_match_complex_pattern_ordering():
+    """Ensure CP equivalence is insensitive to MP order."""
+    Monomer('A', ['s1', 's2'])
+    cp0 = A(s1=1, s2=2) % A(s1=2, s2=1)
+    cp1 = A(s1=2, s2=1) % A(s1=1, s2=2)
+    rp0 = cp0 + cp1
+    rp1 = cp1 + cp0
+    rp2 = cp0 + cp0
+    assert rp0.matches(rp1)
+    assert rp1.matches(rp0)
+    assert rp2.matches(rp0)
