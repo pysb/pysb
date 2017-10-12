@@ -7,8 +7,35 @@ from networkx.algorithms.isomorphism import categorical_node_match
 import numpy as np
 
 
-def _get_bonds_in_pattern(pat):
-    """ Return the set of integer bond numbers used in a pattern """
+def get_bonds_in_pattern(pat):
+    """
+    Return the set of integer bond numbers used in a pattern
+
+    Parameters
+    ----------
+    pat : ComplexPattern, MonomerPattern, or None
+        A pattern from which bond numberings are extracted
+
+    Returns
+    -------
+    set
+        The set of bond numbers used in the supplied pattern
+
+    Examples
+    --------
+
+    These examples convert the set to a list for testing purposes only (sets
+    print differently on Python 2 vs Python3). In general, this should not be
+    necessary.
+
+    >>> A = Monomer('A', ['b1', 'b2'], _export=False)
+    >>> list(get_bonds_in_pattern(A(b1=None, b2=None)))
+    []
+    >>> list(get_bonds_in_pattern(A(b1=1) % A(b2=1)))
+    [1]
+    >>> list(get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)))
+    [1, 2]
+    """
     bonds_used = set()
 
     def _get_bonds_in_monomer_pattern(mp):
@@ -267,12 +294,12 @@ class SpeciesPatternMatcher(object):
 
         Parameters
         ----------
-        species
-        check_duplicate
-
-        Returns
-        -------
-
+        species : ComplexPattern
+            A concrete ComplexPattern (molecular species) to add to the
+            search list
+        check_duplicate : bool, optional
+            If True, check the species list to make sure the new species
+            is not already in the list
         """
         if check_duplicate and self.match(species, exact=True):
             return
@@ -298,6 +325,18 @@ class SpeciesPatternMatcher(object):
             A list of species matching the pattern is returned, unless
             index=True, in which case a list of the numerical indices of
             matching species is returned instead
+
+        Examples
+        --------
+
+        >>> from pysb.examples import earm_1_0
+        >>> from pysb.bng import generate_equations
+        >>> model = earm_1_0.model
+        >>> generate_equations(model)
+        >>> spm = SpeciesPatternMatcher(model)
+        >>> L = model.monomers['L']
+        >>> spm.match(L())
+        [L(b=None), L(b=1) % pR(b=1)]
         """
         if not isinstance(pattern, (Monomer, MonomerPattern, ComplexPattern)):
             raise ValueError('A Monomer, MonomerPattern or ComplexPattern is '
@@ -354,21 +393,45 @@ class SpeciesPatternMatcher(object):
         else:
             return [self.species[sp] for sp in sp_indexes], list(sp_indexes)
 
-    def rules_fired_by_species(self, rules_to_consider=None):
+    def rule_firing_species(self, rules_to_consider=None,
+                            include_reverse=True):
         """
-        Filter a list of rules (reactant side) by a list of species
+        Return the species which match the reactants of a set of rules
 
         Parameters
         ----------
         rules_to_consider: list of pysb.Rule or None
-            A list of rules to use
+            A list of rules to use. If None, use all rules in the model.
+        include_reverse: bool, optional
+            For reversible rules, include species triggering the rule in
+            reverse
 
         Returns
         -------
-        dict
+        collections.OrderedDict
             Dictionary of PySB rules whose reactants contain at least one of
-            the species in the model. Keys are PySB rules, values are the
-            species matching the reactant side of those rules.
+            the species in the model. Keys are PySB rules, values are a list
+            of lists. Each outer list corresponding to each
+            ComplexPattern in the ReactantPattern (or ReactantPattern and
+            ProductPattern, if rule is reversible). Each inner list contains
+            the list of species matching the corresponding ComplexPattern.
+
+        Examples
+        --------
+
+        >>> from pysb.examples import robertson
+        >>> from pysb.bng import generate_equations
+        >>> model = robertson.model
+        >>> generate_equations(model)
+        >>> spm = SpeciesPatternMatcher(model)
+
+        Get a list of species which fire each rule:
+
+        >>> spm.rule_firing_species() \
+                #doctest: +NORMALIZE_WHITESPACE
+        OrderedDict([(Rule('A_to_B', A() >> B(), k1), [[A()]]),
+         (Rule('BB_to_BC', B() + B() >> B() + C(), k2), [[B()], [B()]]),
+         (Rule('BC_to_AC', B() + C() >> A() + C(), k3), [[B()], [C()]])])
         """
         if rules_to_consider is None:
             rules_to_consider = self.model.rules
@@ -380,6 +443,9 @@ class SpeciesPatternMatcher(object):
                 rules_fired[r] = []
             else:
                 species_fired = self.species_fired_by_reactant_pattern(rp)
+                if include_reverse and r.is_reversible:
+                    species_fired += self.species_fired_by_reactant_pattern(
+                        r.product_pattern)
                 if species_fired:
                     rules_fired[r] = species_fired
         return rules_fired
@@ -394,8 +460,31 @@ class SpeciesPatternMatcher(object):
 
         Returns
         -------
-        list of pysb.ComplexPattern
-            List of species matching the reactant pattern
+        list of lists of pysb.ComplexPattern
+            List of lists of species matching each ComplexPattern in the
+            ReactantPattern.
+
+        Examples
+        --------
+
+        >>> from pysb.examples import bax_pore
+        >>> from pysb.bng import generate_equations
+        >>> model = bax_pore.model
+        >>> generate_equations(model)
+        >>> spm = SpeciesPatternMatcher(model)
+
+        Get a list of species which fire each rule:
+
+        >>> rxn_pat = model.rules['bax_dim'].reactant_pattern
+        >>> print(rxn_pat)
+        BAX(t1=None, t2=None) + BAX(t1=None, t2=None)
+
+        >>> spm.species_fired_by_reactant_pattern(rxn_pat) \
+                #doctest: +NORMALIZE_WHITESPACE
+        [[BAX(t1=None, t2=None, inh=None),
+          BAX(t1=None, t2=None, inh=1) % MCL1(b=1)],
+         [BAX(t1=None, t2=None, inh=None),
+              BAX(t1=None, t2=None, inh=1) % MCL1(b=1)]]
         """
         species_fired = []
 
@@ -404,7 +493,7 @@ class SpeciesPatternMatcher(object):
             if not species_fired_this_cp:
                 return []
             else:
-                species_fired.append(set(species_fired_this_cp))
+                species_fired.append(species_fired_this_cp)
 
         return species_fired
 
