@@ -152,7 +152,7 @@ class ScipyOdeSimulator(Simulator):
         # logging system, the threshold must be lower than DEBUG or else the
         # Nose logcapture plugin will cause the warnings to be shown and tests
         # will fail due to unexpected output.
-        if True or not self._logger.isEnabledFor(EXTENDED_DEBUG):
+        if not self._logger.isEnabledFor(EXTENDED_DEBUG):
             extra_compile_args.append('-w')
 
         if self._use_inline and not use_theano:
