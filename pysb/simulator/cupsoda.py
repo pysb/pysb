@@ -224,7 +224,8 @@ class CupSodaSimulator(Simulator):
            concentrations and parameter values defined in the model.
         """
         super(CupSodaSimulator, self).run(tspan=tspan, initials=initials,
-                                          param_values=param_values)
+                                          param_values=param_values,
+                                          _run_kwargs=[])
 
         # Create directories for cupSODA input and output files
         self.outdir = tempfile.mkdtemp(prefix=self._prefix + '_',

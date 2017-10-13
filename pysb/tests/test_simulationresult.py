@@ -58,6 +58,10 @@ def test_save_load():
     # NFsim without expressions
     nfsim1 = BngSimulator(robertson.model)
     nfres1 = nfsim1.run(n_runs=2, method='nf', tspan=np.linspace(0, 1))
+    # Test attribute saving (text, float, list)
+    nfres1.custom_attrs['note'] = 'NFsim without expressions'
+    nfres1.custom_attrs['pi'] = 3.14
+    nfres1.custom_attrs['some_list'] = [1, 2, 3]
 
     # NFsim with expressions
     nfsim2 = BngSimulator(expression_observables.model)
@@ -105,7 +109,7 @@ def test_save_load():
         # otherwise a warning should be raised
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            nfres1.save(tf.name, append=True)
+            nfres1.save(tf.name, dataset_name='nfsim_no_obs', append=True)
             assert len(w) == 1
             assert issubclass(w[-1].category, UserWarning)
 
@@ -153,5 +157,6 @@ def _check_resultsets_equal(res1, res2):
     assert res1.n_sims_per_parameter_set == \
            res2.n_sims_per_parameter_set
     assert res1._model.name == res2._model.name
-    assert res1.creation_date == res2.creation_date
+    assert res1.timestamp == res2.timestamp
     assert res1.pysb_version == res2.pysb_version
+    assert res1.custom_attrs == res2.custom_attrs

@@ -374,7 +374,8 @@ class ScipyOdeSimulator(Simulator):
         """
         super(ScipyOdeSimulator, self).run(tspan=tspan,
                                            initials=initials,
-                                           param_values=param_values)
+                                           param_values=param_values,
+                                           _run_kwargs=[])
         n_sims = len(self.param_values)
         trajectories = np.ndarray((n_sims, len(self.tspan),
                               len(self._model.species)))
