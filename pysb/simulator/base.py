@@ -13,6 +13,7 @@ from datetime import datetime
 import dateutil.parser
 import copy
 from warnings import warn
+import sys
 try:
     basestring
 except NameError:
@@ -1028,9 +1029,14 @@ class SimulationResult(object):
             except KeyError:
                 initials = pickle.loads(dset['initials_dict'][()])
 
+            if sys.version_info[0] < 3:
+                model = pickle.loads(grp['_model'][()])
+            else:
+                model = pickle.loads(grp['_model'][()], encoding='latin1')
+
             simres = cls(
                 simulator=None,
-                model=pickle.loads(grp['_model'][()]),
+                model=model,
                 initials=initials,
                 param_values=np.array(dset['param_values']),
                 tout=np.array(dset['tout']),

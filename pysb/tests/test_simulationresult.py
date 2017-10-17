@@ -45,6 +45,8 @@ def test_simres_dataframe():
 def test_save_load():
     tspan = np.linspace(0, 100, 101)
     model = tyson_oscillator.model
+    test_unicode_name = u'Hello \u2603 and \U0001f4a9!'
+    model.name = test_unicode_name
     sim = ScipyOdeSimulator(model, integrator='lsoda')
     simres = sim.run(tspan=tspan, param_values={'k6': 1.0})
 
@@ -104,6 +106,7 @@ def test_save_load():
         # Load should succeed when specifying group_name and dataset_name
         simres_load = SimulationResult.load(tf.name, group_name=model.name,
                                             dataset_name='test')
+        assert simres_load._model.name == test_unicode_name
 
         # Saving network free results requires include_obs_exprs=True,
         # otherwise a warning should be raised
