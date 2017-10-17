@@ -13,6 +13,11 @@ from datetime import datetime
 import dateutil.parser
 import copy
 from warnings import warn
+try:
+    basestring
+except NameError:
+    # Python 3 compatibility.
+    basestring = str
 
 try:
     import pandas as pd
@@ -886,9 +891,8 @@ class SimulationResult(object):
         if dataset_name is None:
             dataset_name = 'result'
 
-        # As per h5py docs, we should encode strings using numpy.string_
-        # http://docs.h5py.org/en/latest/strings.html
-        enpickle = lambda obj: np.string_(pickle.dumps(obj))
+        # np.void maps to bytes in HDF5.
+        enpickle = lambda obj: np.void(pickle.dumps(obj, -1))
 
         with h5py.File(filename, 'a' if append else 'w-') as hdf:
             # Get or create the group
@@ -934,9 +938,17 @@ class SimulationResult(object):
             dset.attrs['pysb_version'] = self.pysb_version
             dset.attrs['timestamp'] = datetime.isoformat(
                 self.timestamp)
+            # This is the range of ints that can be natively encoded in HDF5.
+            int_min = np.iinfo(np.int64).min
+            int_max = np.iinfo(np.uint64).max
             for attr_name, attr_val in self.custom_attrs.items():
-                dset.attrs[self.CUSTOM_ATTR_PREFIX + attr_name] = \
-                    enpickle(attr_val)
+                # Pass HDF5-native values straight through, pickling others.
+                if (not (isinstance(attr_val,
+                                    (basestring, bytes, float, complex))
+                         or (isinstance(attr_val, numbers.Integral)
+                             and int_min <= attr_val <= int_max))):
+                    attr_val = enpickle(attr_val)
+                dset.attrs[self.CUSTOM_ATTR_PREFIX + attr_name] = attr_val
 
     @classmethod
     def load(cls, filename, dataset_name=None, group_name=None):
@@ -1037,9 +1049,12 @@ class SimulationResult(object):
             simres.run_kwargs = pickle.loads(dset.attrs['run_kwargs'])
             for attr_name in dset.attrs.keys():
                 if attr_name.startswith(cls.CUSTOM_ATTR_PREFIX):
-                    simres.custom_attrs[
-                        attr_name[len(cls.CUSTOM_ATTR_PREFIX):]] = \
-                        pickle.loads(dset.attrs[attr_name])
+                    orig_name = attr_name[len(cls.CUSTOM_ATTR_PREFIX):]
+                    attr_val = dset.attrs[attr_name]
+                    # Restore objects that were pickled for storage.
+                    if isinstance(attr_val, np.void):
+                        attr_val = pickle.loads(attr_val)
+                    simres.custom_attrs[orig_name] = attr_val
             return simres
 
 
