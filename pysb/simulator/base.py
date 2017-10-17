@@ -663,10 +663,10 @@ class SimulationResult(object):
                                     '%s names not allowed' % name_type
                         raise ValueError(error_msg)
 
-        yobs_dtype = zip(obs_names, itertools.repeat(float)) if obs_names \
-            else float
-        yexpr_dtype = zip(expr_names, itertools.repeat(float)) if expr_names \
-            else float
+        yobs_dtype = (list(zip(obs_names, itertools.repeat(float)))
+                      if obs_names else float)
+        yexpr_dtype = (list(zip(expr_names, itertools.repeat(float)))
+                       if expr_names else float)
 
         if observables_and_expressions:
             # Observables and expression values are used as supplied
@@ -974,12 +974,12 @@ class SimulationResult(object):
                     raise ValueError("group_name must be specified when file "
                                      "contains more than one group. Options "
                                      "are: {}".format(str(groups)))
-                group_name = hdf.keys()[0]
+                group_name = next(iter(hdf))
 
             grp = hdf[group_name]
 
             if dataset_name is None:
-                datasets = grp.keys()
+                datasets = list(grp.keys())
                 datasets.remove('_model')
                 if len(datasets) > 1:
                     raise ValueError("dataset_name must be specified when "
