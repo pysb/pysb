@@ -1212,6 +1212,14 @@ class Model(object):
                 component._do_export()
             self.initial_conditions = model_copy.initial_conditions
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # The stoichiometry matrix, as a numpy array, is problematic to pickle
+        # in a cross-Python-version-compatible way. Since it's regenerated on
+        # demand anyway, we can just clear it here.
+        state['_stoichiometry_matrix'] = None
+        return state
+
     def __setstate__(self, state):
         # restore the 'model' weakrefs on all components
         self.__dict__.update(state)
