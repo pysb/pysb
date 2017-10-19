@@ -54,7 +54,8 @@ copyright = u'2012, C. F. Lopez, J. L. Muhlich, J. A. Bachman'
 MOCK_MODULES = [ 'pandas', 'pygraphviz', 'sympy',  'sympy.parsing',
                  'sympy.parsing.sympy_parser',
                  'sympy.printing', 'sympy.printing.mathml', 'numpy',
-                 'scipy', 'scipy.integrate', 'scipy.constants', 'scipy.sparse']
+                 'scipy', 'scipy.integrate', 'scipy.constants', 'scipy.sparse',
+                 'h5py', 'theano', 'theano.tensor' ]
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.MagicMock()
 sys.modules['sympy'].Symbol = type('Symbol', (object,), {})
