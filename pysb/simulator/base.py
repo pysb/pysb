@@ -7,12 +7,27 @@ import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
                       Component
 from pysb.logging import get_logger, EXTENDED_DEBUG
-import logging
+import pickle
+from pysb import __version__ as PYSB_VERSION
+from datetime import datetime
+import dateutil.parser
+import copy
+from warnings import warn
+import sys
+try:
+    basestring
+except NameError:
+    # Python 3 compatibility.
+    basestring = str
 
 try:
     import pandas as pd
 except ImportError:
     pd = None
+try:
+    import h5py
+except ImportError:
+    h5py = None
 
 
 class SimulatorException(Exception):
@@ -97,6 +112,8 @@ class Simulator(object):
         self.initials = initials
         self._params = None
         self.param_values = param_values
+        self._init_kwargs = kwargs
+        self._run_kwargs = None
 
     @property
     def model(self):
@@ -379,12 +396,36 @@ class Simulator(object):
             self._params = new_params
 
     @abstractmethod
-    def run(self, tspan=None, initials=None, param_values=None):
+    def run(self, tspan=None, initials=None, param_values=None,
+            _run_kwargs=None):
         """Run a simulation.
 
+        Notes for developers implementing Simulator subclasses:
+
         Implementations should return a :class:`.SimulationResult` object.
+        Subclasses should pass any additional arguments run as a dictonary
+        to the `_run_kwargs` argument when calling the superclass's run
+        method. If the run method has variable keyword arguments, this can
+        be achieved by passing `_run_kwargs=locals()` to the superclass's
+        run method. The run kwargs are used for reference when saving and
+        loading SimulationResults to disk. They aren't compulsory, but not
+        including them will generate a warning. To suppress (e.g. if there
+        are no additional arguments), set `_run_kwargs=[]`.
         """
         self._logger.info('Simulation(s) started')
+        if _run_kwargs:
+            # Don't store these arguments twice
+            _run_kwargs.pop('self')
+            _run_kwargs.pop('initials', None)
+            _run_kwargs.pop('param_values', None)
+            _run_kwargs.pop('tspan', None)
+            self._run_kwargs = _run_kwargs
+        elif _run_kwargs is None:
+            self._logger.warning(
+                '{} has not passed any additional run arguments to '
+                '_run_kwargs. Instructions are included in the Simulation '
+                'base class run method docstring.'.format(
+                    self.__class__.__name__))
         if tspan is not None:
             self.tspan = tspan
         if self.tspan is None:
@@ -462,6 +503,13 @@ class SimulationResult(object):
         deterministic simulators (e.g. ODE), but with stochastic simulators
         multiple trajectories per parameter/initial condition set are often
         desired.
+    model: pysb.Model
+    initials: numpy.ndarray
+    param_values: numpy.ndarray
+        model, initials, param_values are an alternative constructor
+        mechanism used when loading SimulationResults from files (see
+        :func:`SimulationResult.load`). Setting just the simulator argument
+        instead of these arguments is recommended.
 
     Examples
     --------
@@ -532,16 +580,39 @@ class SimulationResult(object):
     8.888889   0.000138    4.995633
     13.333333  0.000002    4.999927
     """
+    CUSTOM_ATTR_PREFIX = 'usrattr_'
+
     def __init__(self, simulator, tout, trajectories=None,
-                 observables_and_expressions=None,
-                 squeeze=True,
-                 simulations_per_param_set=1):
-        simulator._logger.debug('SimulationResult constructor started')
+                 observables_and_expressions=None, squeeze=True,
+                 simulations_per_param_set=1,
+                 model=None, initials=None, param_values=None):
+        if simulator:
+            simulator._logger.debug('SimulationResult constructor started')
+            self._param_values = simulator.param_values.copy()
+            try:
+                self._initials = simulator.initials.copy()
+            except SimulatorException:
+                # Network free simulations don't have initials list, only dict
+                self._initials = simulator.initials_dict.copy()
+            self._model = copy.deepcopy(simulator._model)
+            self.simulator_class = simulator.__class__
+            self.init_kwargs = copy.deepcopy(simulator._init_kwargs)
+            self.run_kwargs = copy.deepcopy(simulator._run_kwargs)
+        else:
+            self._param_values = param_values
+            self._initials = initials
+            self._model = model
+            self.simulator_class = None
+            self.init_kwargs = {}
+            self.run_kwargs = {}
+
         self.squeeze = squeeze
         self.tout = np.asarray(tout)
         self._yfull = None
-        self._model = simulator._model
         self.n_sims_per_parameter_set = simulations_per_param_set
+        self.pysb_version = PYSB_VERSION
+        self.timestamp = datetime.now()
+        self.custom_attrs = {}
 
         if trajectories is None and observables_and_expressions is None:
             raise ValueError('Need to supply at least one of species '
@@ -594,14 +665,14 @@ class SimulationResult(object):
                     try:
                         name_list[i] = name.encode('ascii')
                     except UnicodeEncodeError:
-                        error_msg = 'Non-ASCII compatible' + \
+                        error_msg = 'Non-ASCII compatible ' + \
                                     '%s names not allowed' % name_type
                         raise ValueError(error_msg)
 
-        yobs_dtype = zip(obs_names, itertools.repeat(float)) if obs_names \
-            else float
-        yexpr_dtype = zip(expr_names, itertools.repeat(float)) if expr_names \
-            else float
+        yobs_dtype = (list(zip(obs_names, itertools.repeat(float)))
+                      if obs_names else float)
+        yexpr_dtype = (list(zip(expr_names, itertools.repeat(float)))
+                       if expr_names else float)
 
         if observables_and_expressions:
             # Observables and expression values are used as supplied
@@ -628,15 +699,16 @@ class SimulationResult(object):
                 self.nsims)]
             self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
                 self._yexpr[n]), -1) for n in range(self.nsims)]
-            param_values = simulator.param_values
 
             # loop over simulations
             sym_names = obs_names + param_names
             expanded_exprs = [sympy.lambdify(sym_names, expr.expand_expr(),
                                              "numpy") for expr in exprs]
             for n in range(self.nsims):
-                simulator._logger.log(EXTENDED_DEBUG, 'Evaluating exprs/obs %d/%d'
-                                      % (n + 1, self.nsims))
+                if simulator:
+                    simulator._logger.log(EXTENDED_DEBUG,
+                                          'Evaluating exprs/obs %d/%d'
+                                          % (n + 1, self.nsims))
 
                 # observables
                 for i, obs in enumerate(model_obs):
@@ -645,13 +717,14 @@ class SimulationResult(object):
 
                 # expressions
                 sym_dict = dict((k, self._yobs[n][k]) for k in obs_names)
-                sym_dict.update(dict((p.name, param_values[
+                sym_dict.update(dict((p.name, self.param_values[
                     n // self.n_sims_per_parameter_set][i]) for i, p in
                                 enumerate(self._model.parameters)))
                 for i, expr in enumerate(exprs):
                     self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)
 
-        simulator._logger.debug('SimulationResult constructor finished')
+        if simulator:
+            simulator._logger.debug('SimulationResult constructor finished')
 
     def _squeeze_output(self, trajectories):
         """
@@ -735,6 +808,8 @@ class SimulationResult(object):
         """
         List of trajectory sets. The first dimension contains observables.
         """
+        if not self._model.observables:
+            raise ValueError('Model has no observables')
         return self._squeeze_output(self._yobs)
 
     @property
@@ -742,7 +817,246 @@ class SimulationResult(object):
         """
         List of trajectory sets. The first dimension contains expressions.
         """
+        if not self._model.expressions_dynamic():
+            raise ValueError('Model has no dynamic expressions')
         return self._squeeze_output(self._yexpr)
+
+    @property
+    def initials(self):
+        return self._initials
+
+    @property
+    def param_values(self):
+        return self._param_values
+
+    def save(self, filename, dataset_name=None, group_name=None,
+             append=False, include_obs_exprs=False):
+        """
+        Save a SimulationResult to a file (HDF5 format)
+
+        HDF5 is a hierarchical, binary storage format well suited to storing
+        matrix-like data. Our implementation requires the h5py package.
+
+        Each SimulationResult is treated as an HDF5 dataset, stored within a
+        group which is specific to a model. In this way, it is possible to save
+        multiple SimulationResults for a specific model.
+
+        A group is first created in the HDF file root (see group_name
+        argument). Within that group, a dataset "_model" has a pickled
+        version of the PySB model. SimulationResult are stored as groups
+        within the model group.
+
+        The file hierarchy under group_name/dataset_name/ then consists of
+        the following HDF5 gzip compressed HDF5 datasets: trajectories,
+        param_values, initials, tout, observables (optional) and expressions
+        (optional); and the following attributes:
+        simulator_class (pickled Class), simulator_kwargs (pickled dict),
+        squeeze (bool), simulations_per_param_set (int), pysb_version (str),
+        timestamp (ISO 8601 format).
+
+        Custom attributes can be stored in the SimulationResult's
+        `custom_attrs` dictionary. Keys should be strings, values can be any
+        picklable object. When saved to HDF5, these custom attributes will
+        be prefixed with usrattr_.
+
+        Parameters
+        ----------
+        filename: str
+            Filename to which the data will be saved
+        dataset_name: str or None
+            Dataset name. If None, it will default to 'result'. If the
+            dataset_name already exists within the group, a ValueError is
+            raised.
+        group_name: str or None
+            Group name. If None, will default to the name of the model.
+        append: bool
+            If False, raise IOError if the specified file already exists. If
+            True, append to existing file (or create if it doesn't exist).
+        include_obs_exprs: bool
+            Whether to save observables and expressions in the file or not.
+            If they are not included, they can be recreated from the model
+            and species trajectories when loaded back into PySB, but you may
+            wish to include them for use with external software, or if you
+            have complex expressions which take a long time to compute.
+        """
+        if h5py is None:
+            raise Exception('Please install the h5py package for this feature')
+
+        if self._y is None and not include_obs_exprs:
+            warn('This SimulationResult has no trajectories - '
+                 'you will need to set include_obs_exprs=True if '
+                 'you wish to save observables and expressions')
+
+        if group_name is None:
+            group_name = self._model.name
+        if dataset_name is None:
+            dataset_name = 'result'
+
+        # np.void maps to bytes in HDF5.
+        enpickle = lambda obj: np.void(pickle.dumps(obj, -1))
+
+        with h5py.File(filename, 'a' if append else 'w-') as hdf:
+            # Get or create the group
+            try:
+                grp = hdf.create_group(group_name)
+                grp.create_dataset('_model', data=enpickle(self._model))
+            except ValueError:
+                grp = hdf[group_name]
+                model = pickle.loads(grp['_model'][()])
+                if model.name != self._model.name:
+                    raise ValueError('SimulationResult model has name "{}", '
+                                     'but the model in HDF5 file group "{}" '
+                                     'has name "{}"'.format(self._model.name,
+                                                            group_name,
+                                                            model.name))
+
+            # Create the result dataset, which is actually a nested HDF group
+            dset = grp.create_group(dataset_name)
+            if self._y is not None:
+                dset.create_dataset('trajectories', data=self._y,
+                                    compression='gzip', shuffle=True)
+            if include_obs_exprs:
+                dset.create_dataset('observables', data=self._yobs_view,
+                                    compression='gzip', shuffle=True)
+                dset.create_dataset('expressions', data=self._yexpr_view,
+                                    compression='gzip', shuffle=True)
+            dset.create_dataset('param_values', data=self.param_values,
+                                compression='gzip', shuffle=True)
+            if isinstance(self.initials, np.ndarray):
+                dset.create_dataset('initials', data=self.initials,
+                                    compression='gzip', shuffle=True)
+            else:
+                dset.create_dataset('initials_dict', data=enpickle(
+                    self.initials))
+            dset.create_dataset('tout', data=self.tout,
+                                compression='gzip')
+            dset.attrs['simulator_class'] = enpickle(self.simulator_class)
+            dset.attrs['init_kwargs'] = enpickle(self.init_kwargs)
+            dset.attrs['run_kwargs'] = enpickle(self.run_kwargs)
+            dset.attrs['squeeze'] = self.squeeze
+            dset.attrs['simulations_per_param_set'] = \
+                self.n_sims_per_parameter_set
+            dset.attrs['pysb_version'] = self.pysb_version
+            dset.attrs['timestamp'] = datetime.isoformat(
+                self.timestamp)
+            # This is the range of ints that can be natively encoded in HDF5.
+            int_min = np.iinfo(np.int64).min
+            int_max = np.iinfo(np.uint64).max
+            for attr_name, attr_val in self.custom_attrs.items():
+                # Pass HDF5-native values straight through, pickling others.
+                if (not (isinstance(attr_val,
+                                    (basestring, bytes, float, complex))
+                         or (isinstance(attr_val, numbers.Integral)
+                             and int_min <= attr_val <= int_max))):
+                    attr_val = enpickle(attr_val)
+                dset.attrs[self.CUSTOM_ATTR_PREFIX + attr_name] = attr_val
+
+    @classmethod
+    def load(cls, filename, dataset_name=None, group_name=None):
+        """
+        Load a SimulationResult from a file (HDF5 format)
+
+        For a description of the file format see :func:`save`
+
+        Parameters
+        ----------
+        filename: str
+            Filename from which to load data
+        dataset_name: str or None
+            Dataset name. Can be left as None when the group specified only
+            contains one dataset, which will then be selected. If None and
+            more than one dataset is in the group, a ValueError is raised.
+        group_name: str or None
+            Group name. This is typically the name of the model. Can be left as
+            None when the file only contains one group, which will then be
+            selected. If None and more than group is in the file a
+            ValueError is raised.
+
+        Returns
+        -------
+        SimulationResult
+            Set of trajectories and associated metadata loaded from the file
+        """
+        if h5py is None:
+            raise Exception('Please "pip install h5py" for this feature')
+
+        with h5py.File(filename, 'r') as hdf:
+            if group_name is None:
+                groups = hdf.keys()
+                if len(groups) > 1:
+                    raise ValueError("group_name must be specified when file "
+                                     "contains more than one group. Options "
+                                     "are: {}".format(str(groups)))
+                group_name = next(iter(hdf))
+
+            grp = hdf[group_name]
+
+            if dataset_name is None:
+                datasets = list(grp.keys())
+                datasets.remove('_model')
+                if len(datasets) > 1:
+                    raise ValueError("dataset_name must be specified when "
+                                     "group contains more than one dataset. "
+                                     "Options are: {}".format(str(datasets)))
+                dataset_name = datasets[0]
+
+            dset = grp[dataset_name]
+
+            obs_and_exprs = None
+
+            if 'observables' in dset.keys():
+                obs_and_exprs = list(dset['observables'])
+
+            if 'expressions' in dset.keys():
+                exprs = dset['expressions']
+                if obs_and_exprs is None:
+                    obs_and_exprs = list(exprs)
+                else:
+                    for i in range(len(obs_and_exprs)):
+                        obs_and_exprs[i] = np.concatenate(
+                            [obs_and_exprs[i], exprs[i]],
+                            axis=1
+                        )
+
+            trajectories = None
+            try:
+                trajectories = dset['trajectories']
+            except KeyError:
+                pass
+
+            try:
+                initials = np.array(dset['initials'])
+            except KeyError:
+                initials = pickle.loads(dset['initials_dict'][()])
+
+            simres = cls(
+                simulator=None,
+                model=pickle.loads(grp['_model'][()]),
+                initials=initials,
+                param_values=np.array(dset['param_values']),
+                tout=np.array(dset['tout']),
+                trajectories=trajectories,
+                observables_and_expressions=obs_and_exprs,
+                squeeze=dset.attrs['squeeze'],
+                simulations_per_param_set=dset.attrs[
+                    'simulations_per_param_set']
+            )
+            simres.pysb_version = dset.attrs['pysb_version']
+            simres.timestamp = dateutil.parser.parse(
+                dset.attrs['timestamp'])
+            simres.simulator_class = pickle.loads(
+                dset.attrs['simulator_class'])
+            simres.init_kwargs = pickle.loads(dset.attrs['init_kwargs'])
+            simres.run_kwargs = pickle.loads(dset.attrs['run_kwargs'])
+            for attr_name in dset.attrs.keys():
+                if attr_name.startswith(cls.CUSTOM_ATTR_PREFIX):
+                    orig_name = attr_name[len(cls.CUSTOM_ATTR_PREFIX):]
+                    attr_val = dset.attrs[attr_name]
+                    # Restore objects that were pickled for storage.
+                    if isinstance(attr_val, np.void):
+                        attr_val = pickle.loads(attr_val)
+                    simres.custom_attrs[orig_name] = attr_val
+            return simres
 
 
 def _allow_unicode_recarray():
