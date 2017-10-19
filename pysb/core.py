@@ -410,14 +410,14 @@ class MonomerPattern(object):
         # assume __init__ did a thorough enough job of error checking that this is is all we need to do
         return len(self.site_conditions) == len(self.monomer.sites)
 
-    def as_graph(self):
+    def _as_graph(self):
         """
         Convert MonomerPattern to networkx graph, caching the result
 
-        See :func:`ComplexPattern.as_graph` for implementation details
+        See :func:`ComplexPattern._as_graph` for implementation details
         """
         if self._graph is None:
-            self._graph = as_complex_pattern(self).as_graph()
+            self._graph = as_complex_pattern(self)._as_graph()
 
         return self._graph
 
@@ -530,7 +530,7 @@ class ComplexPattern(object):
             all(mp.is_site_concrete() for mp in self.monomer_patterns)
         return mp_concrete_ok or compartment_ok
 
-    def as_graph(self):
+    def _as_graph(self):
         """
         Return the ComplexPattern represented as a networkx graph
 

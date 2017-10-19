@@ -63,12 +63,12 @@ def _match_graphs(pattern, candidate, exact):
     """ Compare two pattern graphs for isomorphism """
     node_matcher = categorical_node_match('id', default=None)
     if exact:
-        return nx.is_isomorphic(pattern.as_graph(),
-                                candidate.as_graph(),
+        return nx.is_isomorphic(pattern._as_graph(),
+                                candidate._as_graph(),
                                 node_match=node_matcher)
     else:
         return GraphMatcher(
-            candidate.as_graph(), pattern.as_graph(),
+            candidate._as_graph(), pattern._as_graph(),
             node_match=node_matcher
         ).subgraph_is_isomorphic()
 
