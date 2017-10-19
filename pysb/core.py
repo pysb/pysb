@@ -18,9 +18,11 @@ except NameError:
     from imp import reload
 try:
     basestring
+    STRING_TYPES = (str, unicode)
 except NameError:
     # Under Python 3, do not pretend that bytes are a valid string
     basestring = str
+    STRING_TYPES = (basestring)
     long = int
 
 def Initial(*args):
@@ -408,8 +410,28 @@ class MonomerPattern(object):
         Return a bool indicating whether the pattern is 'site-concrete'.
 
         'Site-concrete' means all sites have specified conditions."""
-        # assume __init__ did a thorough enough job of error checking that this is is all we need to do
-        return len(self.site_conditions) == len(self.monomer.sites)
+        if len(self.site_conditions) != len(self.monomer.sites):
+            return False
+        for site_name, site_val in self.site_conditions.items():
+            if isinstance(site_val, STRING_TYPES):
+                site_state = site_val
+                site_bond = None
+            elif isinstance(site_val, collections.Iterable):
+                site_state, site_bond = site_val
+            elif isinstance(site_val, int):
+                site_bond = site_val
+                site_state = None
+            else:
+                site_bond = site_val
+                site_state = None
+
+            if site_bond is ANY or site_bond is WILD:
+                return False
+            if site_state is None and site_name in \
+                    self.monomer.site_states.keys():
+                return False
+
+        return True
 
     def _as_graph(self):
         """
