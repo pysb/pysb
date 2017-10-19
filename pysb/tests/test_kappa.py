@@ -188,3 +188,14 @@ def test_unicode_strs():
     Observable(u'B_', B())
     npts = 200
     kres = run_simulation(model, time=100, points=npts, seed=_KAPPA_SEED)
+
+
+@with_model
+def test_kappa_error():
+    # Model with a dangling bond should raise a KasimInterfaceError
+    Monomer('A', ['b'])
+    Monomer('B', ['b'])
+    Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=None),
+         Parameter('k_A_binds_B', 1))
+    Initial(A(b=None), Parameter('A_0', 100))
+    assert_raises(KasimInterfaceError, run_simulation, model, time=10)
