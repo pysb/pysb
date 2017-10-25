@@ -778,7 +778,7 @@ def _parse_species(model, line):
     monomer_patterns = []
     for ms in monomer_strings:
         monomer_name, site_strings, monomer_compartment_name = \
-            re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
+            re.match(r'\$?(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
         site_conditions = {}
         if len(site_strings):
             for ss in site_strings.split(','):

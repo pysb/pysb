@@ -136,6 +136,8 @@ class BngGenerator(object):
             warn_caller("Model does not contain any initial conditions")
             return
         species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
+        fixed = ['$' if f else '' for f in self.model.initial_conditions_fixed]
+        species_codes = [f + c for f, c in zip(fixed, species_codes)]
         for cp in self._additional_initials:
             if not any([cp.is_equivalent_to(i) for i, _ in
                         self.model.initial_conditions]):
