@@ -33,7 +33,7 @@ Initial(EGF(R=None), EGF0)
 Initial(EGFR(L=None, CR1=None, Y1068='U'), EGFR0)
 
 
-Rule('egf_binds_egfr', EGF(R=None) + EGFR(L=None) <> EGF(R=1) % EGFR(L=1), kp1, km1)
+Rule('egf_binds_egfr', EGF(R=None) + EGFR(L=None) | EGF(R=1) % EGFR(L=1), kp1, km1)
 
 
 # Species LR EGF(R!1).EGFR(L!1)

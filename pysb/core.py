@@ -453,8 +453,15 @@ class MonomerPattern(object):
     def __rrshift__(self, other):
         return build_rule_expression(other, self, False)
 
-    def __ne__(self, other):
+    def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ne__(self, other):
+        warnings.warn("'<>' for reversible rules will be removed in a future "
+                      "version of PySB. Use '|' instead.",
+                      PendingDeprecationWarning,
+                      stacklevel=2)
+        return self.__or__(other)
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
@@ -808,8 +815,15 @@ class ComplexPattern(object):
     def __rrshift__(self, other):
         return build_rule_expression(other, self, False)
 
-    def __ne__(self, other):
+    def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ne__(self, other):
+        warnings.warn("'<>' for reversible rules will be removed in a future "
+                      "version of PySB. Use '|' instead.",
+                      PendingDeprecationWarning,
+                      stacklevel=2)
+        return self.__or__(other)
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
@@ -870,9 +884,15 @@ class ReactionPattern(object):
     def __rrshift__(self, other):
         return build_rule_expression(other, self, False)
 
-    def __ne__(self, other):
-        """Reversible reaction"""
+    def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ne__(self, other):
+        warnings.warn("'<>' for reversible rules will be removed in a future "
+                      "version of PySB. Use '|' instead.",
+                      PendingDeprecationWarning,
+                      stacklevel=2)
+        return self.__or__(other)
 
     def __repr__(self):
         if len(self.complex_patterns):
@@ -920,7 +940,7 @@ class RuleExpression(object):
         self.is_reversible = is_reversible
 
     def __repr__(self):
-        operator = '<>' if self.is_reversible else '>>'
+        operator = '|' if self.is_reversible else '>>'
         return '%s %s %s' % (repr(self.reactant_pattern), operator,
                              repr(self.product_pattern))
 

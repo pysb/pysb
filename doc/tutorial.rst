@@ -273,24 +273,29 @@ parameters. The rule interactions make use of the following
 operators::
 
    *+* operator to represent complexation 
-   *<>* operator to represent backward/forward reaction
+   *|* operator to represent backward/forward reaction
    *>>* operator to represent forward-only reaction
    *%* operator to represent a binding interaction between two species
+
+.. note:: PySB used to use the <> operator for reversible rules, but that
+          operator was removed in Python 3. All new models should use the |
+          operator instead. Support for the <> in PySB with Python 2 will be
+          removed in a future version of PySB.
 
 To illustrate the use of the operators and the rule syntax we write
 the complex formation reaction with labels illustrating the parts of
 the rule::
 
-   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') <> C8(b=1) % Bid(b=1, S='u'), *[kf, kr]) 
-	     |              |     |           |         |     |    |     |             |
-             |              |     |           |         |     |    |     |            parameter list
-	     |              |     |           |         |     |    |     |
-	     |              |     |           |         |     |    |    bound species
-	     |              |     |           |         |     |    |
-	     |		    |     |           |         |     |   binding operator
-	     |              |     |           |         |     |
-	     |              |     |           |         |    bound species
-	     |              |     |           |         |
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') | C8(b=1) % Bid(b=1, S='u'), *[kf, kr])
+	     |              |     |           |        |     |    |     |             |
+             |              |     |           |        |     |    |     |            parameter list
+	     |              |     |           |        |     |    |     |
+	     |              |     |           |        |     |    |    bound species
+	     |              |     |           |        |     |    |
+	     |		    |     |           |        |     |   binding operator
+	     |              |     |           |        |     |
+	     |              |     |           |        |    bound species
+	     |              |     |           |        |
 	     |		    |     |           |        forward/backward operator
 	     |              |     |           |
 	     |		    |     |          unbound species
@@ -328,7 +333,7 @@ With this state site added, we can now go ahead and write the rules
 that will account for the binding step and the unbinding step as
 follows::
 
-   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') <>C8(b=1) % Bid(b=1, S='u'), kf, kr)
+   Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') | C8(b=1) % Bid(b=1, S='u'), kf, kr)
    Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) % Bid(b=None, S='t'), kc)
 
 As shown, the initial reactants, *C8* and *Bid* initially in the
@@ -620,7 +625,7 @@ happens quite often in models and it is one of the basic functions we
 have found useful in our model development. Rather than typing many
 lines such as::
 
-   Rule("association",  Enz(b=None) + Sub(b=None, S="i") <> Enz(b=1)%Sub(b=1,S="i"), kf, kr)
+   Rule("association",  Enz(b=None) + Sub(b=None, S="i") | Enz(b=1)%Sub(b=1,S="i"), kf, kr)
    Rule("dissociation", Enz(b=1)%Sub(b=1,S="i") >> Enz(b=None) + Sub(b=None, S="a"), kc)
    
 multiple times, we find it more powerful, transparent and easy to
@@ -642,7 +647,7 @@ concepts into a programmatic format. Examine the function below::
        S = sub({'b': None, site: state1})                      # (5) define substrate state in function
        ES = enz(b=1) % sub({'b': 1, site: state1})             # (6) define state of enzyme:substrate complex
        P = sub({'b': None, site: state2})                      # (7) define state of product
-       Rule(r1_name, E + S <> ES, kf, kr)                      # (8) rule for enzyme + substrate association (bidirectional)
+       Rule(r1_name, E + S | ES, kf, kr)                       # (8) rule for enzyme + substrate association (bidirectional)
        Rule(r2_name, ES >> E + P, kc)                          # (9) rule for enzyme:substrate dissociation  (unidirectional)
 
 As shown it takes about ten lines to write the catalyze function
