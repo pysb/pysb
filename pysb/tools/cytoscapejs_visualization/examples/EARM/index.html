@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <title>Model visualization</title>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="../../libraries/d3-colorbar.js"></script>
+    <script src="../../libraries/d3-scale-chromatic.js"></script>
+    <script src="../../libraries/cytoscape.js"></script>
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="../../libraries/bootstrap-3.3.7-dist/css/bootstrap.min.css">
+    <script src="../../libraries/bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+    <link href="../../libraries/font-awesome-4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.0/jquery.qtip.min.js"></script>
+    <link href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.0/jquery.qtip.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-qtip/2.7.0/cytoscape-qtip.js"></script>
+    <script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=Promise,fetch"></script>
+    <link href="../../old_functions/cy_html/style.css" rel="stylesheet" />
+
+</head>
+<body>
+    <h1 id="myHeader"></h1>
+
+    <div id="cy"></div>
+    <div id="con">
+        <input type="range" class="slider" id='range' min="0" max="50" value="0" step="1">
+        <input type="text" size="400" id="textInput" value="0">
+        <button class="controls" id="Play">Play</button>
+        <button class="controls" id="Reset">Reset</button>
+        <svg id="colorbar"></svg>
+    </div>
+
+    <script src="../../old_functions/cy_html/network4.js"></script>
+
+    <button id="zoom" class="btn btn-default">Z</button>
+
+    <button id="reset_fit" class="btn btn-default"><i class="fa fa-arrows-h"></i></button>
+
+</body>
+</html>

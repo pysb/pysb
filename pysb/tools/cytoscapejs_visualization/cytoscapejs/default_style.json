@@ -1,0 +1,443 @@
+[ {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "default2",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 12.0,
+      "border-color" : "rgb(0,153,0)",
+      "text-valign" : "bottom",
+      "text-halign" : "right",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 1.0,
+      "font-size" : 11,
+      "height" : 12.0,
+      "shape" : "ellipse",
+      "color" : "rgb(51,51,51)",
+      "border-width" : 0.0,
+      "background-color" : "rgb(0,102,153)",
+      "font-family" : "HelveticaNeue-UltraLight",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,255,0)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 10,
+      "content" : "",
+      "color" : "rgb(0,0,0)",
+      "line-style" : "solid",
+      "text-opacity" : 1.0,
+      "target-arrow-color" : "rgb(64,64,64)",
+      "width" : 0.5,
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(64,64,64)",
+      "target-arrow-shape" : "triangle",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(64,64,64)",
+      "opacity" : 0.6274509803921569
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+}, {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "Minimal",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 45.0,
+      "border-color" : "rgb(51,51,51)",
+      "text-valign" : "center",
+      "text-halign" : "center",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 1.0,
+      "font-size" : 7,
+      "height" : 45.0,
+      "shape" : "rectangle",
+      "color" : "rgb(51,51,51)",
+      "border-width" : 2.0,
+      "background-color" : "rgb(255,255,255)",
+      "font-family" : "SansSerif",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,255,0)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 10,
+      "content" : "",
+      "color" : "rgb(0,0,0)",
+      "line-style" : "solid",
+      "text-opacity" : 1.0,
+      "target-arrow-color" : "rgb(0,0,0)",
+      "width" : 2.0,
+      "font-family" : "SansSerif",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(0,0,0)",
+      "target-arrow-shape" : "none",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(153,153,153)",
+      "opacity" : 0.5882352941176471
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+}, {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "Directed",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 45.0,
+      "border-color" : "rgb(51,51,51)",
+      "text-valign" : "center",
+      "text-halign" : "center",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 1.0,
+      "font-size" : 9,
+      "height" : 45.0,
+      "shape" : "ellipse",
+      "color" : "rgb(0,153,234)",
+      "border-width" : 3.0,
+      "background-color" : "rgb(255,255,255)",
+      "font-family" : "SansSerif",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,0,102)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 12,
+      "color" : "rgb(0,0,0)",
+      "line-style" : "solid",
+      "text-opacity" : 1.0,
+      "target-arrow-color" : "rgb(51,51,51)",
+      "width" : 2.0,
+      "font-family" : "SansSerif",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(0,0,0)",
+      "target-arrow-shape" : "triangle",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(51,51,51)",
+      "opacity" : 1.0,
+      "content" : "data(interaction)"
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+}, {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "Big Labels",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 50.0,
+      "border-color" : "rgb(0,0,0)",
+      "text-valign" : "center",
+      "text-halign" : "center",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 1.0,
+      "font-size" : 24,
+      "height" : 50.0,
+      "shape" : "ellipse",
+      "color" : "rgb(51,51,51)",
+      "border-width" : 0.0,
+      "background-color" : "rgb(255,255,255)",
+      "font-family" : "HelveticaNeue-UltraLight",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,0,102)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 10,
+      "content" : "",
+      "color" : "rgb(0,0,0)",
+      "line-style" : "solid",
+      "text-opacity" : 1.0,
+      "target-arrow-color" : "rgb(0,0,0)",
+      "width" : 1.0,
+      "font-family" : "SansSerif",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(0,0,0)",
+      "target-arrow-shape" : "none",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(102,102,102)",
+      "opacity" : 1.0
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+}, {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "Ripple",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 50.0,
+      "border-color" : "rgb(204,255,255)",
+      "text-valign" : "center",
+      "text-halign" : "center",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 1.0,
+      "font-size" : 8,
+      "height" : 50.0,
+      "shape" : "ellipse",
+      "color" : "rgb(102,102,102)",
+      "border-width" : 30.0,
+      "background-color" : "rgb(255,255,255)",
+      "font-family" : "SansSerif",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,255,204)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 10,
+      "content" : "",
+      "color" : "rgb(0,0,0)",
+      "line-style" : "solid",
+      "text-opacity" : 1.0,
+      "target-arrow-color" : "rgb(0,0,0)",
+      "width" : 3.0,
+      "font-family" : "SansSerif",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(0,0,0)",
+      "target-arrow-shape" : "none",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(102,204,255)",
+      "opacity" : 1.0
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+}, {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "Sample1",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 40.0,
+      "border-color" : "rgb(0,0,0)",
+      "text-valign" : "bottom",
+      "text-halign" : "right",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 0.39215686274509803,
+      "font-size" : 10,
+      "height" : 40.0,
+      "shape" : "ellipse",
+      "color" : "rgb(51,51,51)",
+      "border-width" : 0.0,
+      "background-color" : "rgb(0,153,153)",
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,255,0)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 10,
+      "color" : "rgb(51,51,51)",
+      "line-style" : "solid",
+      "text-opacity" : 0.39215686274509803,
+      "target-arrow-color" : "rgb(0,0,0)",
+      "width" : 1.0,
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(0,0,0)",
+      "target-arrow-shape" : "none",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(51,51,51)",
+      "opacity" : 0.39215686274509803,
+      "content" : "data(interaction)"
+    }
+  }, {
+    "selector" : "edge[interaction = 'pp']",
+    "css" : {
+      "line-style" : "solid"
+    }
+  }, {
+    "selector" : "edge[interaction = 'pd']",
+    "css" : {
+      "line-style" : "dashed"
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+}, {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "Solid",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 40.0,
+      "border-color" : "rgb(0,0,0)",
+      "text-valign" : "center",
+      "text-halign" : "center",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 1.0,
+      "font-size" : 14,
+      "height" : 40.0,
+      "shape" : "ellipse",
+      "color" : "rgb(0,0,0)",
+      "border-width" : 0.0,
+      "background-color" : "rgb(153,153,153)",
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,255,0)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 10,
+      "color" : "rgb(0,0,0)",
+      "line-style" : "solid",
+      "text-opacity" : 1.0,
+      "target-arrow-color" : "rgb(0,0,0)",
+      "width" : 12.0,
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(0,0,0)",
+      "target-arrow-shape" : "none",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(204,204,204)",
+      "opacity" : 1.0,
+      "content" : "data(interaction)"
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+}, {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.2.1",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "default",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "width" : 70.0,
+      "border-color" : "rgb(0,102,153)",
+      "text-valign" : "center",
+      "text-halign" : "center",
+      "text-opacity" : 1.0,
+      "border-opacity" : 1.0,
+      "background-opacity" : 1.0,
+      "font-size" : 12,
+      "height" : 30.0,
+      "shape" : "roundrectangle",
+      "color" : "rgb(255,255,255)",
+      "border-width" : 4.0,
+      "background-color" : "rgb(0,153,204)",
+      "font-family" : "HelveticaNeue-UltraLight",
+      "font-weight" : "normal",
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,255,0)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "font-size" : 10,
+      "content" : "",
+      "color" : "rgb(0,0,0)",
+      "line-style" : "solid",
+      "text-opacity" : 1.0,
+      "target-arrow-color" : "rgb(0,0,0)",
+      "width" : 3.0,
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "source-arrow-color" : "rgb(0,0,0)",
+      "target-arrow-shape" : "none",
+      "source-arrow-shape" : "none",
+      "line-color" : "rgb(102,102,102)",
+      "opacity" : 1.0
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+} ]
