@@ -7,7 +7,7 @@ _path_config = {
         'env_var': 'BNGPATH',
         'search_paths': {
             'posix': ('/usr/local/share/BioNetGen', ),
-            'nt': ('c:/Program Files/BioNetGen', )
+            'nt': ('c:\Program Files\BioNetGen', )
         }
     },
     'kasa': {
