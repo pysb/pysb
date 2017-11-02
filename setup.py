@@ -14,8 +14,8 @@ class build_py(setuptools.command.build_py.build_py):
 
 def main():
 
-    cmdclass = {'build_py': build_py}
-    cmdclass.update(versioneer.get_cmdclass())
+    cmdclass = versioneer.get_cmdclass()
+    cmdclass['build_py'] = build_py
 
     setup(name='pysb',
           version=versioneer.get_version(),
