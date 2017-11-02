@@ -1889,7 +1889,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         return [c for c in self]
 
     def items(self):
-        return zip(self.keys(), self)
+        return list(zip(self.keys(), self))
 
     def index(self, c):
         # We can implement this in O(1) ourselves, whereas the Sequence mixin
