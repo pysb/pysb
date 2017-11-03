@@ -157,7 +157,7 @@ class Simulator(object):
         except SimulatorException:
             # Network free simulators
             if self._initials:
-                return len(self._initials.values()[0])
+                return len(list(self._initials.values())[0])
             else:
                 return 1
 
