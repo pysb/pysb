@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import networkx as nx
 import json
-from py2cytoscape.util import from_networkx
+from util_networkx import from_networkx
 import collections
 import sympy
 import numpy
@@ -10,6 +10,7 @@ import matplotlib.cm as cm
 from pysb.simulator.base import SimulatorException
 from pysb.simulator import ScipyOdeSimulator
 import pysb
+import re
 
 layouts = ['circular_layout',
            'random_layout',
@@ -21,11 +22,11 @@ layouts = ['circular_layout',
 
 def parse_name(spec):
     """
-
+    Function that writes short names of the species to name the nodes
     Parameters
     ----------
     spec : pysb.ComplexPattern
-        Name of species to pase
+        Name of species to parse
 
     Returns
     Parsed name of species
@@ -133,7 +134,7 @@ class ModelVisualization(object):
         Parameters
         ----------
         layout : str
-            Name of the layout algorithm to define layout of the nodes
+            Name of the layout algorithm to define positions of the nodes
         get_passengers : bool
             if True, nodes that only have one incoming or outgoing edge are painted with a different color
 
@@ -145,7 +146,7 @@ class ModelVisualization(object):
             self.passengers = find_nonimportant_nodes(self.model)
         self.species_graph(view='static')
         if layout == 'dot':
-            g_layout = self.dot_layout(self.sp_graph)
+            g_layout = self.graph_layout(self.sp_graph)
         data = self.graph_to_json(sp_graph=self.sp_graph, layout=g_layout)
         return data
 
@@ -175,7 +176,7 @@ class ModelVisualization(object):
         self._setup_dynamics(tspan=tspan, param_values=param_values, get_passengers=get_passengers, verbose=verbose)
         self.species_graph(view='dynamic')
         if layout == 'dot':
-            g_layout = self.dot_layout(self.sp_graph)
+            g_layout = self.graph_layout(self.sp_graph)
         self._add_edge_node_dynamics()
         data = self.graph_to_json(sp_graph=self.sp_graph, layout=g_layout)
         return data
@@ -239,22 +240,19 @@ class ModelVisualization(object):
             # Setting the information about the node
             node_data = {}
             node_data['label'] = parse_name(self.model.species[idx])
-            node_data['shape_cy'] = "roundrectangle"
-            node_data['font_size'] = 18
             if idx in self.passengers:
                 node_data['background_color'] = "#162899"
             else:
                 node_data['background_color'] = "#2b913a"
 
-            self.sp_graph.add_node(species_node, attr_dict=node_data)
+            self.sp_graph.add_node(species_node, **node_data)
 
         for reaction in self.model.reactions_bidirectional:
             reactants = set(reaction['reactants'])
             products = set(reaction['products'])
-            attr_reversible = {'source_arrow_shape': 'diamond', 'target_arrow_shape': 'triangle',
-                               'source_arrow_fill': 'filled', 'width': 3, 'curve_style': 'bezier'} if reaction[
-                'reversible'] else {
-                'source_arrow_shape': 'none', 'target_arrow_shape': 'triangle', 'width': 6}
+            attr_reversible = {'source_arrow_shape': 'diamond', 'target_arrow_shape': 'triangle'} \
+                                if reaction['reversible'] \
+                                else {'source_arrow_shape': 'none', 'target_arrow_shape': 'triangle'}
             for s in reactants:
                 for p in products:
                     self._r_link(s, p, **attr_reversible)
@@ -281,18 +279,30 @@ class ModelVisualization(object):
         if attrs.get('_flip'):
             del attrs['_flip']
             nodes = nodes[::-1]
-        attrs.setdefault('arrowhead', 'normal')
+        # attrs.setdefault('arrowhead', 'normal')
         self.sp_graph.add_edge(*nodes, **attrs)
 
     def _add_edge_node_dynamics(self):
-        edge_sizes, edge_colors, edge_qtips = self.edges_colors_sizes()
-        nx.set_edge_attributes(self.sp_graph, 'edge_color', edge_colors)
-        nx.set_edge_attributes(self.sp_graph, 'edge_size', edge_sizes)
-        nx.set_edge_attributes(self.sp_graph, 'edge_qtip', edge_qtips)
+        # in networkx 2.0 the order is G, values, names
+        # in networkx 1.11 the order is G, names, values
+        if float(nx.__version__) >= 2:
+            edge_sizes, edge_colors, edge_qtips = self.edges_colors_sizes()
+            nx.set_edge_attributes(self.sp_graph, edge_colors, 'edge_color')
+            nx.set_edge_attributes(self.sp_graph, edge_sizes, 'edge_size')
+            nx.set_edge_attributes(self.sp_graph, edge_qtips, 'edge_qtip')
 
-        node_abs, node_rel = self.node_data()
-        nx.set_node_attributes(self.sp_graph, 'abs_value', node_abs)
-        nx.set_node_attributes(self.sp_graph, 'rel_value', node_rel)
+            node_abs, node_rel = self.node_data()
+            nx.set_node_attributes(self.sp_graph, node_abs, 'abs_value')
+            nx.set_node_attributes(self.sp_graph, node_rel, 'rel_value')
+        else:
+            edge_sizes, edge_colors, edge_qtips = self.edges_colors_sizes()
+            nx.set_edge_attributes(self.sp_graph, 'edge_color', edge_colors)
+            nx.set_edge_attributes(self.sp_graph, 'edge_size', edge_sizes)
+            nx.set_edge_attributes(self.sp_graph, 'edge_qtip', edge_qtips)
+
+            node_abs, node_rel = self.node_data()
+            nx.set_node_attributes(self.sp_graph, 'abs_value', node_abs)
+            nx.set_node_attributes(self.sp_graph, 'rel_value', node_rel)
 
     @staticmethod
     def graph_to_json(sp_graph, layout=None, path=''):
@@ -318,18 +328,33 @@ class ModelVisualization(object):
         return data
 
     @staticmethod
-    def dot_layout(sp_graph):
+    def graph_layout(sp_graph, layout='dot'):
         """
 
         Parameters
         ----------
         sp_graph : nx.Digraph graph
+            Graph to layout
+        layout : str
+            Type of layout for the graph
 
         Returns
         -------
         An OrderedDict containing the node position according to the dot layout
         """
-        pos = nx.drawing.nx_agraph.pygraphviz_layout(sp_graph, prog='dot', args="-Grankdir=LR")
+        if layout == 'dot':
+            pos = nx.drawing.nx_agraph.pygraphviz_layout(sp_graph, prog='dot', args="-Grankdir=LR")
+        elif layout == 'circular':
+            pos = nx.circular_layout(sp_graph)
+        elif layout == 'random':
+            pos = nx.random_layout(sp_graph)
+        elif layout == 'shell':
+            pos = nx.shell_layout(sp_graph)
+        elif layout == 'spring':
+            pos = nx.spring_layout(sp_graph)
+        else:
+            raise ValueError('Layout not supported')
+
         # TODO: may be better to change the way the py2cytoscape function reads the layout
         ordered_pos = collections.OrderedDict((node, pos[node]) for node in sp_graph.nodes())
         return ordered_pos

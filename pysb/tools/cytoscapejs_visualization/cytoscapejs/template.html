@@ -76,7 +76,7 @@
                     container: $('#{{uuid}}'),
                     style: cytoscape.stylesheet()
                         .selector('node')
-                        .css({
+                        .style({
                             'label': 'data(label)',
                             'pie-size': '80%',
                             'pie-1-background-color': 'data(background_color)',
@@ -86,7 +86,7 @@
                         })
 
                         .selector('edge')
-                        .css({
+                        .style({
                             'curve-style': 'bezier',
                             // 'width': 'data(width)',
                             'target-arrow-shape': 'data(target_arrow_shape)',
