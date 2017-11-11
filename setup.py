@@ -34,7 +34,7 @@ def main():
                     'pysb.testing', 'pysb.tests'],
           scripts=['scripts/pysb_export'],
           # We should really specify some minimum versions here.
-          install_requires=['numpy', 'scipy', 'sympy', 'networkx', 'matplotlib', 'ipython'],
+          install_requires=['numpy', 'scipy', 'sympy', 'networkx'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'theano', 'h5py'],

@@ -5,24 +5,56 @@ from util_networkx import from_networkx
 import collections
 import sympy
 import numpy
-import matplotlib.colors as colors
-import matplotlib.cm as cm
 from pysb.simulator.base import SimulatorException
 from pysb.simulator import ScipyOdeSimulator
 import pysb
 import re
+import matplotlib.colors as colors
+import matplotlib.cm as cm
 
-layouts = ['circular_layout',
-           'random_layout',
-           'shell_layout',
-           'spring_layout',
-           'spectral_layout',
-           'fruchterman_reingold_layout']
+# try:
+#     import matplotlib.colors as colors
+# except ImportError:
+#     colors = None
+#
+# try:
+#     import matplotlib.cm as cm
+# except ImportError:
+#     cm = None
+
+
+class OrderedGraph(nx.DiGraph):
+    """
+    Networkx Digraph that stores the nodes in the order they are input
+    """
+    node_dict_factory = OrderedDict
+    adjlist_outer_dict_factory = OrderedDict
+    adjlist_inner_dict_factory = OrderedDict
+    edge_attr_dict_factory = OrderedDict
+
+
+class MidpointNormalize(colors.Normalize):
+    """
+    A class which, when called, can normalize data into the ``[vmin,midpoint,vmax] interval
+    """
+
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        colors.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        # I'm ignoring masked values and all kinds of edge cases to make a
+        # simple example...
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return numpy.ma.masked_array(numpy.interp(value, x, y))
 
 
 def parse_name(spec):
     """
-    Function that writes short names of the species to name the nodes
+    Function that writes short names of the species to name the nodes.
+    It counts how many times a monomer_pattern is present in the complex pattern an its states
+    then it takes only the monomer name and its state to write a shorter name to name the nodes.
+
     Parameters
     ----------
     spec : pysb.ComplexPattern
@@ -59,13 +91,14 @@ def parse_name(spec):
 
 def find_nonimportant_nodes(model):
     """
+    Function that finds nodes that only have one incoming and outgoing edge
 
     Parameters
     ----------
     model: pysb.Model
 
     Returns
-    a list of nodes that only have one incoming or outgoing edge
+    a list of nodes that only have one incoming and outgoing edge
     -------
 
     """
@@ -83,43 +116,19 @@ def find_nonimportant_nodes(model):
     return passengers
 
 
-class OrderedGraph(nx.DiGraph):
-    """
-    Networkx Digraph that stores the nodes in the order they are input
-    """
-    node_dict_factory = OrderedDict
-    adjlist_outer_dict_factory = OrderedDict
-    adjlist_inner_dict_factory = OrderedDict
-    edge_attr_dict_factory = OrderedDict
-
-
-class MidpointNormalize(colors.Normalize):
-    """
-    A class which, when called, can normalize data into the ``[vmin,midpoint,vmax] interval
-    """
-
-    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
-        self.midpoint = midpoint
-        colors.Normalize.__init__(self, vmin, vmax, clip)
-
-    def __call__(self, value, clip=None):
-        # I'm ignoring masked values and all kinds of edge cases to make a
-        # simple example...
-        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
-        return numpy.ma.masked_array(numpy.interp(value, x, y))
-
-
 class ModelVisualization(object):
+    """
+    Class to visualize models and their dynamics
+
+    Parameters
+    ----------
+    model : pysb.Model
+        Model to visualize.
+    """
     mach_eps = numpy.finfo(float).eps
 
     def __init__(self, model):
-        """
 
-        Parameters
-        ----------
-        model : pysb.Model
-            Model to visualize.
-        """
         self.model = model
         self.tspan = None
         self.y_df = None
@@ -128,15 +137,21 @@ class ModelVisualization(object):
         self.passengers = []
         self.is_setup = False
 
-    def static_view(self, layout='dot', get_passengers=True):
+    def static_view(self, get_passengers=True):
         """
+        Generates a dictionary with the model graph data that can be converted in the Cytoscape.js JSON format
 
         Parameters
         ----------
-        layout : str
-            Name of the layout algorithm to define positions of the nodes
         get_passengers : bool
             if True, nodes that only have one incoming or outgoing edge are painted with a different color
+
+        Examples
+        --------
+        >>> from pysb.examples.earm_1_0 import model
+        >>> import numpy as np
+        >>> viz = ModelVisualization(model)
+        >>> data = viz.static_view()
 
         Returns
         -------
@@ -145,13 +160,13 @@ class ModelVisualization(object):
         if get_passengers:
             self.passengers = find_nonimportant_nodes(self.model)
         self.species_graph(view='static')
-        if layout == 'dot':
-            g_layout = self.graph_layout(self.sp_graph)
+        g_layout = self.dot_layout(self.sp_graph)
         data = self.graph_to_json(sp_graph=self.sp_graph, layout=g_layout)
         return data
 
-    def dynamic_view(self, tspan=None, param_values=None, get_passengers=True, layout='dot', verbose=False):
+    def dynamic_view(self, tspan=None, param_values=None, get_passengers=True, verbose=False):
         """
+        Generates a dictionary with the model dynamics data that can be converted in the Cytoscape.js JSON format
 
         Parameters
         ----------
@@ -165,18 +180,26 @@ class ModelVisualization(object):
             model.parameters.
         get_passengers : bool
             if True, nodes that only have one incoming or outgoing edge are painted with a different color
-        layout : str
-            Name of the layout algorithm to define layout of the nodes
-        verbose
+        verbose : bool
+            if True, prints state of code execution
+
+        Examples
+        --------
+        >>> from pysb.examples.earm_1_0 import model
+        >>> import numpy as np
+        >>> viz = ModelVisualization(model)
+        >>> data = viz.dynamic_view(tspan=np.linspace(0, 20000, 100))
 
         Returns
         -------
         A Dictionary Object that can be converted into Cytoscape.js JSON
         """
+        # if (colors is None) or (cm is None):
+        #     raise Exception('Please "pip install matplotlib" for this feature')
+
         self._setup_dynamics(tspan=tspan, param_values=param_values, get_passengers=get_passengers, verbose=verbose)
         self.species_graph(view='dynamic')
-        if layout == 'dot':
-            g_layout = self.graph_layout(self.sp_graph)
+        g_layout = self.dot_layout(self.sp_graph)
         self._add_edge_node_dynamics()
         data = self.graph_to_json(sp_graph=self.sp_graph, layout=g_layout)
         return data
@@ -216,6 +239,7 @@ class ModelVisualization(object):
 
     def species_graph(self, view):
         """
+        Creates a networkx.digraph graph
 
         Parameters
         ----------
@@ -283,6 +307,12 @@ class ModelVisualization(object):
         self.sp_graph.add_edge(*nodes, **attrs)
 
     def _add_edge_node_dynamics(self):
+        """
+        Add the edge size and color data as well as node color and values data
+        Returns
+        -------
+
+        """
         # in networkx 2.0 the order is G, values, names
         # in networkx 1.11 the order is G, names, values
         if float(nx.__version__) >= 2:
@@ -328,34 +358,20 @@ class ModelVisualization(object):
         return data
 
     @staticmethod
-    def graph_layout(sp_graph, layout='dot'):
+    def dot_layout(sp_graph):
         """
 
         Parameters
         ----------
         sp_graph : nx.Digraph graph
             Graph to layout
-        layout : str
-            Type of layout for the graph
 
         Returns
         -------
         An OrderedDict containing the node position according to the dot layout
         """
-        if layout == 'dot':
-            pos = nx.drawing.nx_agraph.pygraphviz_layout(sp_graph, prog='dot', args="-Grankdir=LR")
-        elif layout == 'circular':
-            pos = nx.circular_layout(sp_graph)
-        elif layout == 'random':
-            pos = nx.random_layout(sp_graph)
-        elif layout == 'shell':
-            pos = nx.shell_layout(sp_graph)
-        elif layout == 'spring':
-            pos = nx.spring_layout(sp_graph)
-        else:
-            raise ValueError('Layout not supported')
 
-        # TODO: may be better to change the way the py2cytoscape function reads the layout
+        pos = nx.drawing.nx_agraph.pygraphviz_layout(sp_graph, prog='dot', args="-Grankdir=LR")
         ordered_pos = collections.OrderedDict((node, pos[node]) for node in sp_graph.nodes())
         return ordered_pos
 
@@ -465,6 +481,7 @@ class ModelVisualization(object):
         :param vmax: Value of maximum for normalization
         :return: This function returns a vector of colors in hex format that represents flux
         """
+
         norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
         f2rgb = cm.ScalarMappable(norm=norm, cmap=cm.get_cmap('RdBu_r'))
         rgb = [f2rgb.to_rgba(rate)[:3] for rate in fx]

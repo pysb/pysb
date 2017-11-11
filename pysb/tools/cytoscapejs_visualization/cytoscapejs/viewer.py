@@ -13,15 +13,6 @@ DEF_BACKGROUND_COLOR = '#FFFFFF'
 HTML_TEMPLATE_FILE = 'template.html'
 STYLE_FILE = 'default_style.json'
 
-# Default network
-DEF_NODES = [
-    {'data': {'id': 'Network Data'}},
-    {'data': {'id': 'Empty'}}
-]
-
-DEF_EDGES = [
-    {'data': {'id': 'is', 'source': 'Network Data', 'target': 'Empty'}}
-]
 
 DEF_LAYOUT = 'preset'
 DEF_STYLE = 'default2'
