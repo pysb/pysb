@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8 />
+    <link href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.0/jquery.qtip.min.css" rel="stylesheet" type="text/css" />
+    <style type="text/css">
+        body {
+            font: 14px helvetica neue, helvetica, arial, sans-serif;
+        }
+
+        #{{uuid}} {
+            height: {{widget_height}}px;
+            width: {{widget_width}}%;
+            position: absolute;
+            left: 4px;
+            top: 5px;
+            background: {{background}};
+        }
+        #{{playid}} {
+            width: 5%;
+            height: 4%;
+            font-size:130%;
+            position: absolute;
+            top: 93%;
+            left: 10%;
+        }
+
+        #{{resetid}} {
+            width: 7%;
+            height: 4%;
+            font-size:130%;
+            position: absolute;
+            top: 93%;
+            left: 16%;
+        }
+
+        #{{rangeid}} {
+            width:80%;
+            height:25px;
+            top:89%;
+            left:10%;
+            border:1px solid black;
+            position:absolute;
+        }
+
+        #{{textid}} {
+            width:10%;
+            height:5%;
+            top:92.5%;
+            left:24%;
+            font-size:120%;
+            border:0px solid black;
+            position:absolute;
+        }
+        #{{fitbutton}} {
+            width: 3em;
+            margin: 0.5em;
+            position: absolute;
+            z-index: 999;
+            top: 0;
+            right: 0;
+        }
+
+        #{{fitbutton}} i {
+            transform: rotate(45deg);
+        }
+
+    </style>
+
+    <script>
+        (function() {
+            var all_data ={{datos}};
+            function render() {
+
+                var cy = window.cy = cytoscape({
+                    container: $('#{{uuid}}'),
+                    style: cytoscape.stylesheet()
+                        .selector('node')
+                        .style({
+                            'label': 'data(label)',
+                            'pie-size': '80%',
+                            'pie-1-background-color': 'data(background_color)',
+                            'pie-1-background-size': '100',
+                            'pie-2-background-color': '#dddcd4',
+                            'pie-2-background-size': '100',
+                        })
+
+                        .selector('edge')
+                        .style({
+                            'curve-style': 'bezier',
+                            // 'width': 'data(width)',
+                            'target-arrow-shape': 'data(target_arrow_shape)',
+                            'source-arrow-shape': 'data(source_arrow_shape)',
+                        }),
+                    elements: all_data.elements,
+
+                    layout: {name: '{{layout}}'
+                    },
+
+                    boxSelectionEnabled: true,
+                });
+
+                var dynamics_vis = function(){
+                    // setting qtip style
+                    cy.elements().qtip({
+                        content: ' ',
+                        position: {
+                            my: 'bottom right',
+                            at: 'bottom left'
+                        },
+                        style: {
+                            classes: 'qtip-bootstrap',
+                            tip: {
+                                width: 8,
+                                height: 4
+                            }
+                        }
+                    });
+                    var tspan = all_data.data.tspan;
+                    var text = $('#{{textid}}')[0];
+                    var rangeInput = $('#{{rangeid}}')[0];
+                    rangeInput.max = tspan.length;
+
+
+                    function update_nodes(t){
+                        rangeInput.value = t;
+                        text.value = tspan[t].toFixed(2);
+                        cy.batch(function(){
+                            cy.edges().forEach(function (e) {
+                                var c = e.data('edge_color')[t];
+                                var s = e.data('edge_size')[t];
+                                var a = e.data('edge_qtip')[t];
+                                e.style({'line-color': c,
+                                    'target-arrow-color': c,
+                                    'source-arrow-color': c,
+                                    'width': s});
+
+                                // e.animate({
+                                //     style: {'line-color': c,
+                                //         'target-arrow-color': c,
+                                //         'source-arrow-color': c,
+                                //         'width': s},
+                                //     duration: 100,
+                                //     queue: false
+                                // });
+                                e.qtip('api').set('content.text', a.toString());
+                                // n.animate({style: {'width': s}})
+
+                            });
+                            cy.nodes().forEach(function(n){
+                                var p = n.data('rel_value')[t];
+                                var q = n.data('abs_value')[t];
+                                n.style({'pie-1-background-size': p});
+
+                                // n.animate({
+                                //     style: {'pie-1-background-size': p},
+                                //     duration: 100,
+                                //     queue: false
+                                // });
+
+                                n.qtip('api').set('content.text', q.toString())
+                            });
+                        })
+                    }
+
+                    var currentTime = 0;
+                    var tInterval = null;
+
+                    function nextTime(){
+                        currentTime = currentTime+1;
+                        if (currentTime >= tspan.length){
+                            clearInterval(tInterval)
+                        }
+                        else {update_nodes(currentTime)}
+                    }
+
+                    var playing = false;
+                    var playButton = $('#{{playid}}')[0];
+
+                    function pauseSlideshow(){
+                        playButton.innerHTML = 'Play';
+                        playing = false;
+                        clearInterval(tInterval);
+                    }
+
+                    function playSlideshow(){
+                        playButton.innerHTML = 'Pause';
+                        playing = true;
+                        tInterval = setInterval(nextTime, 1000)
+                    }
+
+
+                    var resetButton = $('#{{resetid}}')[0];
+                    resetButton.onclick = function(){
+                        pauseSlideshow();
+                        currentTime = 0;
+                        update_nodes(currentTime)
+                    };
+
+                    playButton.onclick = function(){
+                        if(playing){ pauseSlideshow(); }
+                        else{ playSlideshow(); }
+                    };
+                    rangeInput.addEventListener('mouseup', function(){
+                        pauseSlideshow();
+                        currentTime = this.value;
+                        currentTime = parseInt(currentTime);
+                        update_nodes(currentTime);
+
+                    });
+
+                    rangeInput.onchange = function(){
+                        text.value = tspan[this.value].toFixed(2);
+                        // currentTime = this.value
+                    };
+                };
+
+                var static_vis = function () {
+                    $('#{{textid}}')[0].style.display = 'none';
+                    $('#{{rangeid}}')[0].style.display = 'none';
+                    $('#{{playid}}')[0].style.display = 'none';
+                    $('#{{resetid}}')[0].style.display = 'none';
+                };
+
+                if(all_data.data.view == 'dynamic'){
+                    dynamics_vis();
+                } else {
+                    static_vis()
+                }
+
+                var allNodes;
+                var layoutPadding = 50;
+                var aniDur = 500;
+                var easing = 'linear';
+                allNodes = cy.nodes();
+                $('#{{fitbutton}}').on('click', function(){
+
+                    allNodes.unselect();
+                    cy.stop();
+
+                    cy.animation({
+                        fit: {
+                            eles: cy.elements(),
+                            padding: layoutPadding
+                        },
+                        duration: aniDur,
+                        easing: easing
+                    }).play();
+
+                });
+
+            }
+
+            var before_render = function(){
+                if(window['cytoscape'] === undefined){
+                    console.log("Waiting for Cyjs...");
+                    window.addEventListener("load_cytoscape", before_render);
+                } else {
+                    console.log("Ready to render graph!");
+                    render();
+                }
+            };
+
+            before_render();
+
+        })();
+    </script>
+</head>
+
+<body>
+<div id="{{uuid}}"></div>
+<!-- When only #uuid div is placed on this page,
+the height of output-box on ipynb will be 0px.
+One line below will prevent that. -->
+<button class="controls" id={{playid}}>Play</button>
+<button class="controls" id={{resetid}}>Reset</button>
+<input type="range" class="slider" id={{rangeid}} min="0" max="50" value="0" step="1">
+<input type="text" size="400" id={{textid}} value="0">
+<button id={{fitbutton}} class="btn btn-default"><i class="fa fa-arrows-h"></i></button>
+<div id="dummy" style="width:{{widget_width}}px;height:{{widget_height}}px"></div>
+</body>
+
+</html>

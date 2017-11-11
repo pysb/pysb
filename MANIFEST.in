@@ -1,7 +1,9 @@
 include LICENSE.txt
 include README.rst
 include ez_setup.py
+recursive-include pysb *.js *.json *.html
 graft doc
 prune doc/_build
 include versioneer.py
 include pysb/_version.py
+
