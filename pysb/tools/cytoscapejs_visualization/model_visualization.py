@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import networkx as nx
 import json
-from util_networkx import from_networkx
+from .util_networkx import from_networkx
 import collections
 import sympy
 import numpy
@@ -487,7 +487,8 @@ class ModelVisualization(object):
         rgb = [f2rgb.to_rgba(rate)[:3] for rate in fx]
         colors_hex = [0] * (len(rgb))
         for i, color in enumerate(rgb):
-            colors_hex[i] = '#%02x%02x%02x' % tuple([255 * fc for fc in color])
+
+            colors_hex[i] = '#{0:02x}{1:02x}{2:02x}'.format(*tuple([int(255 * fc) for fc in color]))
         return colors_hex
 
     @staticmethod
