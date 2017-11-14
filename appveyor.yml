@@ -26,6 +26,7 @@ install:
 
   # Majority of dependencies can be installed with Anaconda
   - conda install numpy scipy matplotlib sympy networkx nose h5py pandas theano
+    mkl=2017.0.3
 
   # Graphviz & PyGraphviz
   - appveyor DownloadFile "http://graphviz.org/pub/graphviz/stable/windows/graphviz-2.38.zip" -FileName graphviz.zip
