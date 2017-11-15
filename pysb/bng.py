@@ -680,8 +680,6 @@ def load_equations(model, netfile):
     """
     if model.reactions:
         return
-    if model.has_synth_deg():
-        model.enable_synth_deg()
     with open(netfile, 'r') as f:
         _parse_netfile(model, f)
 
@@ -812,8 +810,8 @@ def _parse_reaction(model, line, reaction_cache):
     """Parse a 'reaction' line from a BNGL net file."""
     (number, reactants, products, rate, rule) = line.strip().split(' ', 4)
     # the -1 is to switch from one-based to zero-based indexing
-    reactants = tuple(int(r) - 1 for r in reactants.split(','))
-    products = tuple(int(p) - 1 for p in products.split(','))
+    reactants = tuple(int(r) - 1 for r in reactants.split(',') if r != '0')
+    products = tuple(int(p) - 1 for p in products.split(',') if p != '0')
     rate = rate.rsplit('*')
     (rule_list, unit_conversion) = re.match(
         r'#([\w,\(\)]+)(?: unit_conversion=(.*))?\s*$',

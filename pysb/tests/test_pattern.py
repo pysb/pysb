@@ -45,25 +45,15 @@ def check_all_species_generated(model):
     """Check the lists of rules and triggering species match BNG"""
     generate_equations(model)
     spm = SpeciesPatternMatcher(model)
-    try:
-        src_idx = model.get_species_index(as_complex_pattern(
-            model.monomers['__source']()
-        ))
-    except KeyError:
-        src_idx = None
 
     # Get the rules and species firing them using the pattern matcher
-    species_produced = collections.defaultdict(set)
+    species_produced = dict()
     for rule, rp_species in spm.rule_firing_species().items():
-        if rp_species:
-            for sp_list in rp_species:
-                for sp in sp_list:
-                    species_produced[rule.name].add(
-                        model.get_species_index(sp))
-        else:
-            # If the reactant species is empty, mark the generating species
-            # as the __source monomer to match BNG
-            species_produced[rule.name].add(src_idx)
+        species_produced[rule.name] = set()
+        for sp_list in rp_species:
+            for sp in sp_list:
+                species_produced[rule.name].add(
+                    model.get_species_index(sp))
 
     # Get the equivalent dictionary of {rule name: [reactant species]} from BNG
     species_bng = collections.defaultdict(set)

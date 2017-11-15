@@ -412,11 +412,6 @@ class CupSodaSimulator(Simulator):
             if self.vol:
                 mx0 = mx0.copy()
                 mx0 /= (N_A * self.vol)
-                # Set the concentration of __source() to 1
-                for i, sp in enumerate(self._model.species):
-                    if str(sp) == '__source()':
-                        mx0[:, i] = 1.
-                        break
             for i in range(n_sims):
                 line = ""
                 for j in range(self._len_species):
@@ -469,10 +464,7 @@ class CupSodaSimulator(Simulator):
         for rxn in self._model.reactions:
             rate_args.append([arg for arg in rxn['rate'].args if
                               not re.match("_*s", str(arg))])
-            reactants = 0
-            for i in rxn['reactants']:
-                if not str(self._model.species[i]) == '__source()':
-                    reactants += 1
+            reactants = len(rxn['reactants'])
             rate_order.append(reactants)
         output = 0.01 * len(par_vals)
         output = int(output) if output > 1 else 1
