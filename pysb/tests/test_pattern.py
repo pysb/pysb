@@ -1,9 +1,10 @@
-from pysb.pattern import SpeciesPatternMatcher
+from pysb.pattern import SpeciesPatternMatcher, match_complex_pattern
 from pysb.examples import robertson, bax_pore, bax_pore_sequential, \
     earm_1_3, kinase_cascade, bngwiki_egfr_simple
 from pysb.bng import generate_equations
 from nose.tools import assert_raises
-from pysb import as_complex_pattern, as_reaction_pattern, ANY
+from pysb import as_complex_pattern, as_reaction_pattern, ANY, WILD, \
+    Monomer
 import collections
 
 
@@ -30,6 +31,14 @@ def test_species_pattern_matcher():
     )
     assert len(sp_sets) == 1
     assert len(sp_sets[0]) == 12
+
+
+def test_wildcards():
+    a_wild = as_complex_pattern(Monomer('A', ['b'], _export=False)(b=WILD))
+    b_mon = as_complex_pattern(Monomer('B', _export=None))
+
+    # B() should not match A(b=WILD)
+    assert not match_complex_pattern(b_mon, a_wild)
 
 
 def check_all_species_generated(model):

@@ -593,7 +593,8 @@ class ComplexPattern(object):
 
         class WildTester(object):
             def __eq__(self, other):
-                return other != NO_BOND
+                return not isinstance(other, Component) and other != NO_BOND
+
         wild_tester = WildTester()
 
         bond_edges = collections.defaultdict(list)
