@@ -13,7 +13,7 @@ from datetime import datetime
 import dateutil.parser
 import copy
 from warnings import warn
-import sys
+from pysb.pattern import SpeciesPatternMatcher
 try:
     basestring
 except NameError:
@@ -811,6 +811,14 @@ class SimulationResult(object):
         if not self._model.observables:
             raise ValueError('Model has no observables')
         return self._squeeze_output(self._yobs)
+
+    def observable(self, pattern):
+        """ Calculate observable without adding to model """
+        obs_matches = SpeciesPatternMatcher(self._model).match(
+            pattern, index=True, counts=True)
+
+        return self.dataframe.iloc[:, obs_matches.keys()].multiply(
+            obs_matches.values()).sum(axis=1)
 
     @property
     def expressions(self):

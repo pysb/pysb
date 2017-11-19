@@ -1,10 +1,14 @@
 from pysb.simulator import ScipyOdeSimulator, BngSimulator
 from pysb.simulator.base import SimulationResult
-from pysb.examples import tyson_oscillator, robertson, expression_observables
+from pysb.examples import tyson_oscillator, robertson, \
+    expression_observables, earm_1_3, bax_pore_sequential, bax_pore, \
+    bngwiki_egfr_simple
+from pysb.bng import generate_equations
 import numpy as np
 import tempfile
 from nose.tools import assert_raises
 import warnings
+from pysb.pattern import SpeciesPatternMatcher
 
 
 def test_simres_dataframe():
@@ -40,6 +44,28 @@ def test_simres_dataframe():
 
     assert df2.shape == (len(tspan1) + len(tspan3),
                          len(model.species) + len(model.observables))
+
+
+def test_simres_observable():
+    """ Test dynamic observable evaluation """
+    models = [tyson_oscillator.model, robertson.model,
+              expression_observables.model, earm_1_3.model,
+              bax_pore_sequential.model, bax_pore.model,
+              bngwiki_egfr_simple.model]
+    for model in models:
+        generate_equations(model)
+        spm = SpeciesPatternMatcher(model)
+        for obs in model.observables:
+            dyn_obs = spm.match(pattern=obs.reaction_pattern, index=True,
+                                counts=True)
+
+            if obs.match == 'species':
+                dyn_coeffs = [1] * len(dyn_obs)
+            else:
+                dyn_coeffs = dyn_obs.values()
+
+            assert dyn_obs.keys() == obs.species
+            assert dyn_coeffs == obs.coefficients
 
 
 def test_save_load():

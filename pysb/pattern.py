@@ -59,21 +59,28 @@ def get_bonds_in_pattern(pat):
     return bonds_used
 
 
-def _match_graphs(pattern, candidate, exact):
+def _match_graphs(pattern, candidate, exact, count):
     """ Compare two pattern graphs for isomorphism """
     node_matcher = categorical_node_match('id', default=None)
     if exact:
-        return nx.is_isomorphic(pattern._as_graph(),
+        match = nx.is_isomorphic(pattern._as_graph(),
                                 candidate._as_graph(),
                                 node_match=node_matcher)
+        return 1 if count else match
     else:
-        return GraphMatcher(
+        gm = GraphMatcher(
             candidate._as_graph(), pattern._as_graph(),
             node_match=node_matcher
-        ).subgraph_is_isomorphic()
+        )
+        if count:
+            if pattern.match_once:
+                return 1 if gm.subgraph_is_isomorphic() else 0
+            return sum(1 for _ in gm.subgraph_isomorphisms_iter())
+        else:
+            return gm.subgraph_is_isomorphic()
 
 
-def match_complex_pattern(pattern, candidate, exact=False):
+def match_complex_pattern(pattern, candidate, exact=False, count=False):
     """
     Compare two ComplexPatterns against each other
 
@@ -85,6 +92,8 @@ def match_complex_pattern(pattern, candidate, exact=False):
         Set to True for exact matches (i.e. species equivalence,
         or exact graph isomorphism). Set to False to compare as a
         pattern (i.e. subgraph isomorphism).
+    count: bool
+        Provide match counts for pattern in candidate
 
     Returns
     -------
@@ -119,7 +128,7 @@ def match_complex_pattern(pattern, candidate, exact=False):
 
     # If we've got this far, we'll need to do a full pattern match
     # by searching for a graph isomorphism
-    return _match_graphs(pattern, candidate, exact=exact)
+    return _match_graphs(pattern, candidate, exact=exact, count=count)
 
 
 def match_reaction_pattern(pattern, candidate):
@@ -306,7 +315,7 @@ class SpeciesPatternMatcher(object):
         self.species.append(species)
         self._add_species(len(self.species) - 1, species)
 
-    def match(self, pattern, index=False, exact=False):
+    def match(self, pattern, index=False, exact=False, counts=False):
         """
         Match a pattern against the list of species
 
@@ -318,6 +327,9 @@ class SpeciesPatternMatcher(object):
         exact: bool
             Treat Match as exact equivalence, not a pattern match (i.e. must be
             concrete if a MonomerPattern or ComplexPattern)
+        counts: bool
+            If True, return match counts for the search pattern within each
+            species.
 
         Returns
         -------
@@ -338,6 +350,12 @@ class SpeciesPatternMatcher(object):
         >>> spm.match(L())
         [L(b=None), L(b=1) % pR(b=1)]
         """
+        if isinstance(pattern, ReactionPattern):
+            if len(pattern.complex_patterns) == 1:
+                pattern = pattern.complex_patterns[0]
+            else:
+                raise NotImplementedError()
+
         if not isinstance(pattern, (Monomer, MonomerPattern, ComplexPattern)):
             raise ValueError('A Monomer, MonomerPattern or ComplexPattern is '
                              'required to match species')
@@ -357,15 +375,23 @@ class SpeciesPatternMatcher(object):
         shortlist, shortlist_indexes = self._species_containing_monomers(
             monomers, num_mon_pats)
 
-        # If pattern is a Monomer, we're done
-        if isinstance(pattern, Monomer):
+        # If pattern is a Monomer and we don't need match counts, we're done
+        if isinstance(pattern, Monomer) and not counts:
             return shortlist_indexes if index else shortlist
         else:
-            return [(shortlist_indexes[idx] if index else sp) for idx, sp in
-                    enumerate(shortlist) if
-                    match_complex_pattern(
-                        as_complex_pattern(pattern), sp, exact=exact
-                    )]
+            matches = collections.OrderedDict() if counts else []
+            for idx, sp in enumerate(shortlist):
+                val = match_complex_pattern(
+                    as_complex_pattern(pattern), sp, exact=exact, count=counts
+                )
+                if val:
+                    key = shortlist_indexes[idx] if index else sp
+                    if counts:
+                        matches[key] = val
+                    else:
+                        matches.append(key)
+
+            return matches
 
     def _species_containing_monomers(self, monomer_list, num_mon_pats=None):
         """
@@ -383,15 +409,15 @@ class SpeciesPatternMatcher(object):
         -------
         Model species containing all of the monomers in the list
         """
-        sp_indexes = set.intersection(*[self._species_cache[mon] for mon in
-                                        monomer_list])
+        sp_indexes = sorted(set.intersection(*[self._species_cache[mon] for
+                                             mon in monomer_list]))
         if num_mon_pats:
             retval = zip(*[(self.species[sp], sp) for sp in sp_indexes
                            if len(self.species[sp].monomer_patterns)
                            == num_mon_pats])
             return retval if retval else ((), ())
         else:
-            return [self.species[sp] for sp in sp_indexes], list(sp_indexes)
+            return [self.species[sp] for sp in sp_indexes], sp_indexes
 
     def rule_firing_species(self, rules_to_consider=None,
                             include_reverse=True):
