@@ -27,10 +27,10 @@ def test_species_pattern_matcher():
     assert len(sp_sets[0]) == 2
 
     sp_sets = spm.species_fired_by_reactant_pattern(
-        as_reaction_pattern(BAX(t1=ANY, t2=ANY))
+        as_reaction_pattern(BAX(t1=WILD, t2=ANY))
     )
     assert len(sp_sets) == 1
-    assert len(sp_sets[0]) == 12
+    assert len(sp_sets[0]) == 10
 
 
 def test_wildcards():

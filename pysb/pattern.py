@@ -1,6 +1,6 @@
 import collections
 from .core import ComplexPattern, MonomerPattern, Monomer, \
-    ReactionPattern, WILD, as_complex_pattern
+    ReactionPattern, ANY, as_complex_pattern
 import networkx as nx
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
@@ -230,8 +230,8 @@ class SpeciesPatternMatcher(object):
     Search using a MonomerPattern (ANY and WILD keywords can be used)
 
     >>> spm.match(Bax4(b=WILD))
-    [Bax4(b=1) % Bcl2(b=1), Bax4(b=1) % Mito(b=1)]
-    >>> spm.match(Bcl2(b=WILD))
+    [Bax4(b=None), Bax4(b=1) % Bcl2(b=1), Bax4(b=1) % Mito(b=1)]
+    >>> spm.match(Bcl2(b=ANY))
     [Bax2(b=1) % Bcl2(b=1), Bax4(b=1) % Bcl2(b=1), Bcl2(b=1) % MBax(b=1)]
 
     Search using a ComplexPattern
@@ -261,9 +261,9 @@ class SpeciesPatternMatcher(object):
     >>> spm2.match(A(a='u'))
     [A(a='u')]
     >>> spm2.match(A(a=('u', ANY)))
-    [A(a='u'), A(a=('u', 1)) % A(a=('u', 1))]
-    >>> spm2.match(A(a=('u', WILD)))
     [A(a=('u', 1)) % A(a=('u', 1))]
+    >>> spm2.match(A(a=('u', WILD)))
+    [A(a='u'), A(a=('u', 1)) % A(a=('u', 1))]
     """
     def __init__(self, model, species=None):
         self.model = model
@@ -705,7 +705,7 @@ class ReactionPatternMatcher(object):
 
     Search using a MonomerPattern
 
-    >>> rpm.match_reactants(AMito(b=WILD)) # doctest:+NORMALIZE_WHITESPACE
+    >>> rpm.match_reactants(AMito(b=ANY)) # doctest:+NORMALIZE_WHITESPACE
     [Rxn (>>):
         Reactants: {'__s46': AMito(b=1) % mCytoC(b=1)}
         Products: {'__s45': AMito(b=None), '__s48': ACytoC(b=None)}
@@ -719,7 +719,7 @@ class ReactionPatternMatcher(object):
         Rules: [Rule('produce_ASmac_via_AMito', AMito(b=1) % mSmac(b=1) >>
                 AMito(b=None) + ASmac(b=None), kc21)]]
 
-    >>> rpm.match_products(cSmac(b=WILD)) # doctest:+NORMALIZE_WHITESPACE
+    >>> rpm.match_products(cSmac(b=ANY)) # doctest:+NORMALIZE_WHITESPACE
     [Rxn (<>):
         Reactants: {'__s7': XIAP(b=None), '__s51': cSmac(b=None)}
         Products: {'__s53': XIAP(b=1) % cSmac(b=1)}
