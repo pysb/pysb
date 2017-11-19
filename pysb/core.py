@@ -591,11 +591,11 @@ class ComplexPattern(object):
                 i += 1
         node_count = autoinc()
 
-        class WildTester(object):
+        class AnyBondTester(object):
             def __eq__(self, other):
                 return not isinstance(other, Component) and other != NO_BOND
 
-        wild_tester = WildTester()
+        any_bond_tester = AnyBondTester()
 
         bond_edges = collections.defaultdict(list)
         g = nx.Graph()
@@ -628,7 +628,7 @@ class ComplexPattern(object):
                 g.add_edge(mon_node_id, mon_site_id)
                 state = None
                 bond_num = None
-                if state_or_bond is ANY:
+                if state_or_bond is WILD:
                     continue
                 elif isinstance(state_or_bond, (str, unicode)):
                     state = state_or_bond
@@ -639,11 +639,11 @@ class ComplexPattern(object):
                 elif isinstance(state_or_bond, int):
                     bond_num = state_or_bond
 
-                if state_or_bond is WILD or bond_num is WILD:
-                    bond_num = wild_tester
-                    wild_tester_id = next(node_count)
-                    g.add_node(wild_tester_id, id=wild_tester)
-                    g.add_edge(mon_site_id, wild_tester_id)
+                if state_or_bond is ANY or bond_num is ANY:
+                    bond_num = any_bond_tester
+                    any_bond_tester_id = next(node_count)
+                    g.add_node(any_bond_tester_id, id=any_bond_tester)
+                    g.add_edge(mon_site_id, any_bond_tester_id)
 
                 if state is not None:
                     mon_site_state_id = next(node_count)
@@ -667,9 +667,9 @@ class ComplexPattern(object):
         for site_nodes in bond_edges.values():
             if len(site_nodes) == 1:
                 # Treat dangling bond as WILD
-                wild_tester_id = next(node_count)
-                g.add_node(wild_tester_id, id=wild_tester)
-                g.add_edge(site_nodes[0], wild_tester_id)
+                any_bond_tester_id = next(node_count)
+                g.add_node(any_bond_tester_id, id=any_bond_tester)
+                g.add_edge(site_nodes[0], any_bond_tester_id)
             for n1, n2 in itertools.combinations(site_nodes, 2):
                 g.add_edge(n1, n2)
 
