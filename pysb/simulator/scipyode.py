@@ -197,6 +197,13 @@ class ScipyOdeSimulator(Simulator):
                     on_unused_input='ignore'
                 )
             else:
+                self._logger.warning(
+                    "This system of ODEs will be evaluated in pure Python. "
+                    "This may be slow for large models. You may wish to "
+                    "install the 'weave' package (which compiles ODEs to C "
+                    "code for speed), or use the experimental use_theano=True "
+                    "flag (also compiles to C, with advanced options e.g. for "
+                    "GPU offloading).")
                 code_eqs_py = sympy.lambdify(self._symbols,
                                              sympy.flatten(ode_mat))
 
