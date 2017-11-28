@@ -63,18 +63,22 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         solver_vode_jac = ScipyOdeSimulator(**args)
         res1 = solver_vode_jac.run()
         # Test again with analytic jacobian
-        if ScipyOdeSimulator._use_inline:
-            ScipyOdeSimulator._use_inline = False
-            sim = ScipyOdeSimulator(**args)
+        if solver_vode_jac._compiler != 'python':
+            sim = ScipyOdeSimulator(compiler='python', **args)
             simres = sim.run()
             assert simres.species.shape[0] == args['tspan'].shape[0]
             assert np.allclose(res1.dataframe, simres.dataframe)
-            ScipyOdeSimulator._use_inline = True
 
         # Test again using theano
-        solver = ScipyOdeSimulator(use_theano=True, **args)
+        solver = ScipyOdeSimulator(compiler='theano', **args)
         simres = solver.run()
         assert np.allclose(res1.dataframe, simres.dataframe)
+
+        # Test again using cython (if original was not cython)
+        if solver_vode_jac._compiler != 'cython':
+            solver = ScipyOdeSimulator(compiler='cython', **args)
+            simres = solver.run()
+            assert np.allclose(res1.dataframe, simres.dataframe)
 
     def test_lsoda_solver_run(self):
         """Test lsoda."""
@@ -348,13 +352,11 @@ def test_robertson_integration():
     sim = ScipyOdeSimulator(robertson.model)
     simres = sim.run(tspan=t)
     assert simres.species.shape[0] == t.shape[0]
-    if ScipyOdeSimulator._use_inline:
+    if sim._compiler != 'python':
         # Also run without inline
-        ScipyOdeSimulator._use_inline = False
-        sim = ScipyOdeSimulator(robertson.model, tspan=t)
+        sim = ScipyOdeSimulator(robertson.model, tspan=t, compiler='python')
         simres = sim.run()
         assert simres.species.shape[0] == t.shape[0]
-        ScipyOdeSimulator._use_inline = True
 
 
 def test_earm_integration():
@@ -363,11 +365,9 @@ def test_earm_integration():
     # Run with or without inline
     sim = ScipyOdeSimulator(earm_1_0.model, tspan=t)
     sim.run()
-    if ScipyOdeSimulator._use_inline:
+    if sim._compiler != 'python':
         # Also run without inline
-        ScipyOdeSimulator._use_inline = False
-        ScipyOdeSimulator(earm_1_0.model, tspan=t).run()
-        ScipyOdeSimulator._use_inline = True
+        ScipyOdeSimulator(earm_1_0.model, tspan=t, compiler='python').run()
 
 
 @raises(ValueError)

@@ -1,4 +1,4 @@
-from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
+from pysb.simulator.base import Simulator, SimulationResult
 import scipy.integrate
 try:
     # weave is not available under Python 3.
@@ -12,6 +12,12 @@ try:
     from sympy.printing.theanocode import theano_function
 except ImportError:
     theano = None
+try:
+    import cython
+except ImportError:
+    cython = None
+from sympy.printing.lambdarepr import lambdarepr
+import distutils
 import pysb.bng
 import sympy
 import re
@@ -23,6 +29,10 @@ import logging
 import itertools
 import contextlib
 import importlib
+
+
+CYTHON_DECL = '#cython: boundscheck=False, wraparound=False, ' \
+              'nonecheck=False, initializedcheck=False\n'
 
 
 class ScipyOdeSimulator(Simulator):
@@ -70,6 +80,12 @@ class ScipyOdeSimulator(Simulator):
           :func:`scipy.integrate.ode` for further information.
         * ``integrator_options``: A dictionary of keyword arguments to
           supply to the integrator. See :func:`scipy.integrate.ode`.
+        * ``compiler``: Choice of compiler for ODE system: ``cython``,
+          ``weave`` (Python 2 only), ``theano`` or ``python``. Leave
+          unspecified or equal to None for auto-select (tries weave,
+          then cython, then python). Cython, weave and theano all compile the
+          equation system into C code. Python is the slowest but most
+          compatible.
         * ``cleanup``: Boolean, `cleanup` argument used for
           :func:`pysb.bng.generate_equations` call
 
@@ -135,7 +151,7 @@ class ScipyOdeSimulator(Simulator):
                                                  False)
         self.cleanup = kwargs.get('cleanup', True)
         integrator = kwargs.get('integrator', 'vode')
-        use_theano = kwargs.get('use_theano', False)
+        compiler_mode = kwargs.get('compiler', None)
         # Generate the equations for the model
         pysb.bng.generate_equations(self._model, self.cleanup, self.verbose)
 
@@ -144,7 +160,19 @@ class ScipyOdeSimulator(Simulator):
                           e in self._model.expressions}
         ode_mat = sympy.Matrix(self.model.odes).subs(self._eqn_subs)
 
-        self._test_inline()
+        if compiler_mode is None:
+            self._compiler = self._autoselect_compiler()
+            if self._compiler == 'python':
+                self._logger.warning(
+                    "This system of ODEs will be evaluated in pure Python. "
+                    "This may be slow for large models. We recommend "
+                    "installing a package for compiling the ODEs to C code: "
+                    "'weave' (recommended for Python 2) or "
+                    "'cython' (recommended for Python 3). This warning can "
+                    "be suppressed by specifying compiler_mode='python'.")
+            self._logger.debug('Equation mode set to "%s"' % self._compiler)
+        else:
+            self._compiler = compiler_mode
 
         extra_compile_args = []
         # Inhibit weave C compiler warnings unless log level <= EXTENDED_DEBUG.
@@ -155,38 +183,60 @@ class ScipyOdeSimulator(Simulator):
         if not self._logger.isEnabledFor(EXTENDED_DEBUG):
             extra_compile_args.append('-w')
 
-        if self._use_inline and not use_theano:
+        # Use lambdarepr (Python code) with Cython, otherwise use C code
+        eqn_repr = lambdarepr if self._compiler == 'cython' else sympy.ccode
+
+        if self._compiler in ('weave', 'cython'):
             # Prepare the string representations of the RHS equations
+
             code_eqs = '\n'.join(['ydot[%d] = %s;' %
-                                  (i, sympy.ccode(o))
+                                  (i, eqn_repr(o))
                                   for i, o in enumerate(ode_mat)])
             code_eqs = str(self._eqn_substitutions(code_eqs))
 
-            for arr_name in ('ydot', 'y', 'p'):
-                macro = arr_name.upper() + '1'
-                code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
-                                  '%s(\\1)' % macro, code_eqs)
-
             # Allocate ydot here, once.
             ydot = np.zeros(len(self.model.species))
-            def rhs(t, y, p):
-                # note that the evaluated code sets ydot as a side effect
-                weave_inline(code_eqs, ['ydot', 't', 'y', 'p'],
-                             extra_compile_args=extra_compile_args)
-                return ydot
 
-            # Call rhs once just to trigger the weave C compilation step while
-            # asserting control over distutils logging.
-            with self._patch_distutils_logging:
-                rhs(0.0, self.initials[0], self.param_values[0])
+            if self._compiler == 'cython':
+                if not cython:
+                    raise ImportError('Cython library is not installed')
+                code_eqs = CYTHON_DECL + code_eqs
 
-        else:
+                def rhs(t, y, p):
+                    # note that the evaluated code sets ydot as a side effect
+                    cython.inline(code_eqs, quiet=True)
+
+                    return ydot
+
+                with _set_cflags_no_warnings(self._logger):
+                    rhs(0.0, self.initials[0], self.param_values[0])
+            else:
+                # Weave
+                if not weave_inline:
+                    raise ImportError('Weave library is not installed')
+                for arr_name in ('ydot', 'y', 'p'):
+                    macro = arr_name.upper() + '1'
+                    code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
+                                      '%s(\\1)' % macro, code_eqs)
+
+                def rhs(t, y, p):
+                    # note that the evaluated code sets ydot as a side effect
+                    weave_inline(code_eqs, ['ydot', 't', 'y', 'p'],
+                                 extra_compile_args=extra_compile_args)
+                    return ydot
+
+                # Call rhs once just to trigger the weave C compilation step
+                # while asserting control over distutils logging.
+                with self._patch_distutils_logging:
+                    rhs(0.0, self.initials[0], self.param_values[0])
+
+        elif self._compiler in ('theano', 'python'):
             self._symbols = sympy.symbols(','.join('__s%d' % sp_id for sp_id in
                                                    range(len(
                                                        self.model.species)))
                                           + ',') + tuple(model.parameters)
 
-            if use_theano:
+            if self._compiler == 'theano':
                 if theano is None:
                     raise ImportError('Theano library is not installed')
 
@@ -202,6 +252,8 @@ class ScipyOdeSimulator(Simulator):
 
             def rhs(t, y, p):
                 return code_eqs_py(*itertools.chain(y, p))
+        else:
+            raise ValueError('Unknown compiler_mode: %s' % self._compiler)
 
         # JACOBIAN -----------------------------------------------
         # We'll keep the code for putting together the matrix in Sympy
@@ -213,7 +265,7 @@ class ScipyOdeSimulator(Simulator):
                                for i in range(len(self._model.species))]
             jac_matrix = ode_mat.jacobian(species_symbols)
 
-            if use_theano:
+            if self._compiler == 'theano':
                 jac_eqs_py = theano_function(
                     self._symbols,
                     [j if not j.is_zero else theano.tensor.zeros(1)
@@ -227,7 +279,7 @@ class ScipyOdeSimulator(Simulator):
                                     len(self.model.species))
                     return jacmat
 
-            elif self._use_inline:
+            elif self._compiler in ('weave', 'cython'):
                 # Prepare the stringified Jacobian equations.
                 jac_eqs_list = []
                 for i in range(jac_matrix.shape[0]):
@@ -237,31 +289,41 @@ class ScipyOdeSimulator(Simulator):
                         if entry == 0:
                             continue
                         jac_eq_str = 'jac[%d, %d] = %s;' % (
-                            i, j, sympy.ccode(entry))
+                            i, j, eqn_repr(entry))
                         jac_eqs_list.append(jac_eq_str)
                 jac_eqs = str(self._eqn_substitutions('\n'.join(jac_eqs_list)))
-
-                # Substitute array refs with calls to the JAC1 macro for inline
-                jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
-                                 r'JAC2(\1, \2)', jac_eqs)
-                # Substitute calls to the Y1 and P1 macros
-                for arr_name in ('y', 'p'):
-                    macro = arr_name.upper() + '1'
-                    jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
-                                     '%s(\\1)' % macro, jac_eqs)
 
                 # Allocate jac array here, once, and initialize to zeros.
                 jac = np.zeros(
                     (len(self._model.odes), len(self._model.species)))
-                def jacobian(t, y, p):
-                    weave_inline(jac_eqs, ['jac', 't', 'y', 'p'],
-                                 extra_compile_args=extra_compile_args)
-                    return jac
 
-                # Manage distutils logging, as above for rhs.
-                with self._patch_distutils_logging:
-                    jacobian(0.0, self.initials[0], self.param_values[0])
+                if self._compiler == 'weave':
+                    # Substitute array refs with calls to the JAC1 macro
+                    jac_eqs = re.sub(r'\bjac\[(\d+), (\d+)\]',
+                                     r'JAC2(\1, \2)', jac_eqs)
+                    # Substitute calls to the Y1 and P1 macros
+                    for arr_name in ('y', 'p'):
+                        macro = arr_name.upper() + '1'
+                        jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
+                                         '%s(\\1)' % macro, jac_eqs)
 
+                    def jacobian(t, y, p):
+                        weave_inline(jac_eqs, ['jac', 't', 'y', 'p'],
+                                     extra_compile_args=extra_compile_args)
+                        return jac
+
+                    # Manage distutils logging, as above for rhs.
+                    with self._patch_distutils_logging:
+                        jacobian(0.0, self.initials[0], self.param_values[0])
+                else:
+                    jac_eqs = CYTHON_DECL + jac_eqs
+
+                    def jacobian(t, y, p):
+                        cython.inline(jac_eqs, quiet=True)
+                        return jac
+
+                    with _set_cflags_no_warnings(self._logger):
+                        jacobian(0.0, self.initials[0], self.param_values[0])
             else:
                 jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
 
@@ -338,6 +400,35 @@ class ScipyOdeSimulator(Simulator):
                 except (weave.build_tools.CompileError,
                         distutils.errors.CompileError, ImportError):
                     pass
+
+    @classmethod
+    def _test_cython(cls):
+        if not hasattr(cls, '_use_cython'):
+            cls._use_cython = False
+            if cython is None:
+                return
+            try:
+                cython.inline('x = 1', force=True, quiet=True)
+                cls._use_cython = True
+            except cython.Compiler.Errors.CompileError:
+                pass
+
+    @classmethod
+    def _autoselect_compiler(cls):
+        """ Auto-select equation backend """
+
+        # Try weave
+        cls._test_inline()
+        if cls._use_inline:
+            return 'weave'
+
+        # Try cython
+        cls._test_cython()
+        if cls._use_cython:
+            return 'cython'
+
+        # Default to python/lambdify
+        return 'python'
 
     def _eqn_substitutions(self, eqns):
         """String substitutions on the sympy C code for the ODE RHS and
@@ -456,6 +547,21 @@ def _patch_distutils_logging(base_logger):
         # Restore everything we overwrote.
         for (module, name), value in saved_symbols.items():
             setattr(module, name, value)
+
+
+@contextlib.contextmanager
+def _set_cflags_no_warnings(logger):
+    """ Suppress cython warnings by setting -w flag """
+    del_cflags = False
+    if 'CFLAGS' not in os.environ \
+            and not logger.isEnabledFor(EXTENDED_DEBUG):
+        del_cflags = True
+        os.environ['CFLAGS'] = '-w'
+    try:
+        yield
+    finally:
+        if del_cflags:
+            del os.environ['CFLAGS']
 
 
 class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
