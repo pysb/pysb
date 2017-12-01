@@ -143,10 +143,7 @@ class Simulator(object):
         if isinstance(initials_or_params, np.ndarray):
             return len(initials_or_params)
 
-        try:
-            first_entry = next(initials_or_params.values())  # Python 3
-        except TypeError:
-            first_entry = initials_or_params.values()[0]  # Python 2
+        first_entry = next(iter(initials_or_params.values()))
 
         try:
             return len(first_entry)  # First entry is iterable
