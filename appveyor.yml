@@ -26,9 +26,10 @@ install:
 
   # Majority of dependencies can be installed with Anaconda
   - conda install numpy scipy matplotlib sympy networkx nose h5py pandas theano
+    mkl=2017.0.3
 
   # Graphviz & PyGraphviz
-  - appveyor DownloadFile "http://graphviz.org/pub/graphviz/stable/windows/graphviz-2.38.zip" -FileName graphviz.zip
+  - appveyor DownloadFile "https://graphviz.gitlab.io/_pages/Download/windows/graphviz-2.38.zip" -FileName graphviz.zip
   - 7z x graphviz.zip -y > nul
   - set "PATH=%cd%\release\lib\release\dll;%PATH%"
   - if "%PYTHON_VERSION%"=="2.7" pip install https://www.dropbox.com/s/fixts2t9l082r2o/pygraphviz-1.3.1-cp27-none-win32.whl?dl=1
@@ -40,8 +41,8 @@ install:
   - set "BNGPATH=%cd%\BioNetGen-2.2.6-stable"
 
   # KaSim and KaSa
-  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4beta/KaSim.exe" -FileName KaSim.exe
-  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4beta/KaSa.exe" -FileName KaSa.exe
+  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/old-V4beta/KaSim.exe" -FileName KaSim.exe
+  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/old-V4beta/KaSa.exe" -FileName KaSa.exe
   - set "KAPPAPATH=%cd%"
 
   # StochKit
