@@ -270,6 +270,7 @@ def test_reaction_pattern_match_complex_pattern_ordering():
     assert rp2.matches(rp0)
 
 
+@with_model
 def test_concreteness():
     Monomer('A', ['s'], {'s': ['x']})
     assert not (A(s=1) % A(s=1)).is_concrete()

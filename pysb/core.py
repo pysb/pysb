@@ -18,11 +18,9 @@ except NameError:
     from imp import reload
 try:
     basestring
-    STRING_TYPES = (str, unicode)
 except NameError:
     # Under Python 3, do not pretend that bytes are a valid string
     basestring = str
-    STRING_TYPES = (basestring)
     long = int
 
 def Initial(*args):
@@ -413,7 +411,7 @@ class MonomerPattern(object):
         if len(self.site_conditions) != len(self.monomer.sites):
             return False
         for site_name, site_val in self.site_conditions.items():
-            if isinstance(site_val, STRING_TYPES):
+            if isinstance(site_val, basestring):
                 site_state = site_val
                 site_bond = None
             elif isinstance(site_val, collections.Iterable):
