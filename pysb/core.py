@@ -1872,7 +1872,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         try:
             return self[name]
         except KeyError as e:
-            raise AttributeError(e)
+            raise AttributeError("Model has no component '%s'" % name)
 
     def get(self, key, default=None):
         if isinstance(key, (int, long)):

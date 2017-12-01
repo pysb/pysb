@@ -19,8 +19,6 @@ def test_component_names_valid():
 
 @with_model
 def test_component_name_existing_attribute():
-    # _map is an attribute of ComponentSet, the superclass of Monomer
-    # Likewise, keys is a method of ComponentSet
     for name in ('_map', 'keys'):
         c = Monomer(name, _export=False)
         model.add_component(c)
