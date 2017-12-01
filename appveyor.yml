@@ -41,8 +41,8 @@ install:
   - set "BNGPATH=%cd%\BioNetGen-2.2.6-stable"
 
   # KaSim and KaSa
-  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4beta/KaSim.exe" -FileName KaSim.exe
-  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4beta/KaSa.exe" -FileName KaSa.exe
+  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/old-V4beta/KaSim.exe" -FileName KaSim.exe
+  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/old-V4beta/KaSa.exe" -FileName KaSa.exe
   - set "KAPPAPATH=%cd%"
 
   # StochKit
