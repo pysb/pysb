@@ -149,9 +149,6 @@ class InitialsSensitivity(object):
         if self._ic_params_of_interest_cache is None:
             self._ic_params_of_interest_cache = list(
                 (i[1].name for i in self._model.initial_conditions))
-            # remove source species
-            if '__source_0' in self._ic_params_of_interest_cache:
-                self._ic_params_of_interest_cache.remove('__source_0')
             self._ic_params_of_interest_cache = \
                 sorted(self._ic_params_of_interest_cache)
 

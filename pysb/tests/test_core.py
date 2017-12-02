@@ -167,15 +167,6 @@ def test_complex_pattern_equivalence_compartments():
     cp7 = (A() ** C1 % B() ** C2) ** C1
     _check_pattern_equivalence((cp5, cp7), equivalent=False)
 
-    # Test enable_synth_deg creates two initial conditions, one for each
-    # compartment
-    model.enable_synth_deg()
-    assert len(model.initial_conditions) == 2
-
-    # Check that enable_synth_deg is idempotent
-    model.enable_synth_deg()
-    assert len(model.initial_conditions) == 2
-
 
 @with_model
 def test_complex_pattern_equivalence_state():

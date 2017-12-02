@@ -14,8 +14,6 @@ class BngGenerator(object):
 
     def __init__(self, model, additional_initials=None, population_maps=None):
         self.model = model
-        if self.model.has_synth_deg():
-            self.model.enable_synth_deg()
         if additional_initials is None:
             additional_initials = []
         self._additional_initials = additional_initials
@@ -90,12 +88,9 @@ class BngGenerator(object):
             react_p = r.reactant_pattern
             prod_p = r.product_pattern
             if r.is_synth():
-                source_mp = self.model.monomers['__source']()
-                react_p = pysb.core.as_reaction_pattern(source_mp)
-                prod_p += source_mp
+                react_p = None
             if r.is_deg():
-                sink_mp = self.model.monomers['__sink']()
-                prod_p = pysb.core.as_reaction_pattern(sink_mp)
+                prod_p = None
             reactants_code = format_reactionpattern(react_p)
             products_code = format_reactionpattern(prod_p)
             arrow = '->'
@@ -182,6 +177,8 @@ def format_monomer_site(monomer, site):
     return ret
 
 def format_reactionpattern(rp, for_observable=False):
+    if rp is None:
+        return '0'
     if for_observable is False:
         delimiter = ' + '
     else:

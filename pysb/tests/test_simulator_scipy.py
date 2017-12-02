@@ -92,18 +92,18 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
     def test_y0_as_list(self):
         """Test y0 with list of initial conditions"""
         # Test the initials getter method before anything is changed
-        assert np.allclose(self.sim.initials[0][0:3],
+        assert np.allclose(self.sim.initials[0][0:2],
                            [ic[1].value for ic in
                             self.model.initial_conditions])
 
-        initials = [10, 20, 0, 0]
+        initials = [10, 20, 0]
         simres = self.sim.run(initials=initials)
         assert np.allclose(self.sim.initials[0], initials)
         assert np.allclose(simres.observables['A_free'][0], 10)
 
     def test_y0_as_ndarray(self):
         """Test y0 with numpy ndarray of initial conditions"""
-        simres = self.sim.run(initials=np.asarray([10, 20, 0, 0]))
+        simres = self.sim.run(initials=np.asarray([10, 20, 0]))
         assert np.allclose(simres.observables['A_free'][0], 10)
 
     def test_y0_as_dictionary_monomer_species(self):
@@ -111,7 +111,7 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run(initials={self.mon('A')(a=None): 10,
                                self.mon('B')(b=1) % self.mon('A')(a=1): 0,
                                self.mon('B')(b=None): 0})
-        assert np.allclose(self.sim.initials, [10, 0, 1, 0])
+        assert np.allclose(self.sim.initials, [10, 0, 0])
         assert np.allclose(simres.observables['A_free'][0], 10)
 
     def test_y0_as_dictionary_with_bound_species(self):
@@ -134,11 +134,11 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
 
     def test_param_values_as_list_ndarray(self):
         """Test param_values as a list and ndarray."""
-        param_values = [50, 60, 70, 0, 0, 1]
+        param_values = [50, 60, 70, 0, 0]
         self.sim.run(param_values=param_values)
         assert np.allclose(self.sim.param_values, param_values)
         # Same thing, but with a numpy array
-        param_values = np.asarray([55, 65, 75, 0, 0, 1])
+        param_values = np.asarray([55, 65, 75, 0, 0])
         self.sim.run(param_values=param_values)
         assert np.allclose(self.sim.param_values, param_values)
 
@@ -160,22 +160,24 @@ class TestScipySimulatorSequential(TestScipySimulatorBase):
     def test_sequential_runs(self):
         simres = self.sim.run()
 
-        new_initials = [10, 20, 30, 40]
+        new_initials = [10, 20, 30]
         simres = self.sim.run(initials=new_initials)
         assert np.allclose(simres.species[0], new_initials)
 
         new_param_values = {'kbindAB': 0}
         simres = self.sim.run(param_values=new_param_values)
         # No new AB_complex should be formed
-        assert np.allclose(simres.observables['AB_complex'], 40)
+        assert np.allclose(simres.observables['AB_complex'], 30)
         assert simres.nsims == 1
 
 
 class TestScipySimulatorMultiple(TestScipySimulatorBase):
     def test_initials_and_param_values_two_lists(self):
-        initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
-        param_values = [[55, 65, 75, 0, 0, 1],
-                        [90, 100, 110, 5, 6, 7]]
+        initials = [[10, 20, 30], [50, 60, 70]]
+        param_values = [[55, 65, 75, 0, 0],
+                        [90, 100, 110, 5, 6]]
+        import pysb.bng
+        pysb.bng.generate_equations(self.sim.model)
         simres = self.sim.run(initials=initials, param_values=param_values)
         assert np.allclose(simres.species[0][0], initials[0])
         assert np.allclose(simres.species[1][0], initials[1])
@@ -212,9 +214,9 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
     @raises(SimulatorException)
     def test_initials_and_param_values_differing_lengths(self):
         initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
-        param_values = [[55, 65, 75, 0, 0, 1],
-                        [90, 100, 110, 5, 6, 7],
-                        [90, 100, 110, 5, 6, 7]]
+        param_values = [[55, 65, 75, 0, 0],
+                        [90, 100, 110, 5, 6],
+                        [90, 100, 110, 5, 6]]
         self.sim.run(initials=initials, param_values=param_values)
 
 
