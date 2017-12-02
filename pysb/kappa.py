@@ -176,7 +176,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     (p_out, p_err) = p.communicate()
 
     if p.returncode:
-        raise KasimInterfaceError(p_out + '\n' + p_err)
+        raise KasimInterfaceError(
+            p_out.decode('utf8') + '\n' + p_err.decode('utf8'))
 
     # The simulation data, as a numpy array
     data = _parse_kasim_outfile(out_filename)
@@ -305,7 +306,8 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     (p_out, p_err) = p.communicate()
 
     if p.returncode:
-        raise KasaInterfaceError(p_out + '\n' + p_err)
+        raise KasaInterfaceError(
+            p_out.decode('utf8') + '\n' + p_err.decode('utf8'))
 
     # Try to create the graphviz objects from the .dot files created
     try:
