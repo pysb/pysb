@@ -195,7 +195,8 @@ class Component(object):
         This is typically only needed when deriving one model from another and
         it would be desirable to change a component's name in the derived
         model."""
-        self.model()._rename_component(self, new_name)
+        if self.model:
+            self.model()._rename_component(self, new_name)
         if self._export:
             SelfExporter.rename(self, new_name)
         self.name = new_name

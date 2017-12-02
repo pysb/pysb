@@ -35,6 +35,34 @@ def test_monomer_model():
 
 
 @with_model
+def test_monomer_rename_self_exporter():
+    Monomer('A').rename('B')
+    assert 'B' in model.monomers.keys()
+    assert 'A' not in model.monomers.keys()
+
+
+@with_model
+def test_monomer_rename_non_self_exported_component():
+    mon = Monomer('A', _export=False)
+    mon.rename('B')
+    assert mon.name == 'B'
+    model.add_component(mon)
+    mon.rename('C')
+    assert mon.name == 'C'
+    assert model.monomers['C'] == mon
+    assert model.monomers.keys() == ['C']
+
+
+def test_monomer_rename_non_self_exported_model():
+    model = Model(_export=False)
+    mon = Monomer('A', _export=False)
+    model.add_component(mon)
+    mon.rename('B')
+    assert model.monomers.keys() == ['B']
+    assert model.monomers['B'] == mon
+
+
+@with_model
 def test_initial():
     Monomer('A', ['s'])
     Parameter('A_0')
