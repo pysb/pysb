@@ -744,11 +744,9 @@ class ComplexPattern(object):
         kwargs = extract_site_conditions(conditions, **kwargs)
 
         # Ensure we don't have more than one of any Monomer in our patterns.
-        mp_monomer = lambda mp: id(mp.monomer)
-        patterns_sorted = sorted(self.monomer_patterns, key=mp_monomer)
-        pgroups = itertools.groupby(patterns_sorted, mp_monomer)
-        pcounts = [(monomer, sum(1 for mp in mps)) for monomer, mps in pgroups]
-        dup_monomers = [monomer.name for monomer, count in pcounts if count > 1]
+        mon_counts = collections.Counter(mp.monomer.name for mp in
+                                         self.monomer_patterns)
+        dup_monomers = [mon for mon, count in mon_counts.items() if count > 1]
         if dup_monomers:
             raise DuplicateMonomerError("ComplexPattern has duplicate "
                                         "Monomers: " + str(dup_monomers))

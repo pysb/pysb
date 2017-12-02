@@ -108,6 +108,12 @@ def test_monomerpattern():
     A = Monomer('A',sites=['a'],site_states={'a':['u','p']},_export=False)
     Aw = A(a=('u', ANY))
 
+
+@with_model
+def test_duplicate_monomer_error():
+    A = Monomer('A', ['a'])
+    assert_raises(DuplicateMonomerError, (A(a=1) % A(a=1)), a=2)
+
 @with_model
 def test_observable_constructor_with_monomer():
     A = Monomer('A', _export=False)
