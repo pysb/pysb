@@ -43,6 +43,7 @@ class CupSodaSimulator(Simulator):
 
     Parameters
     ----------
+
     model : pysb.Model
         Model to integrate.
     tspan : vector-like, optional
@@ -59,6 +60,7 @@ class CupSodaSimulator(Simulator):
         further details.
     **kwargs: dict, optional
         Extra keyword arguments, including:
+
         * ``gpu``: Index of GPU to run on (default: 0)
         * ``vol``: System volume; required if model encoded in extrinsic 
           (number) units (default: None)
@@ -79,6 +81,7 @@ class CupSodaSimulator(Simulator):
 
     Attributes
     ----------
+
     model : pysb.Model
         Model passed to the constructor.
     tspan : numpy.ndarray
@@ -110,6 +113,7 @@ class CupSodaSimulator(Simulator):
 
     Notes
     -----
+
     1. If `vol` is defined, species amounts and rate constants are assumed
        to be in number units and are automatically converted to concentration
        units before generating the cupSODA input files. The species
@@ -129,6 +133,7 @@ class CupSodaSimulator(Simulator):
     2. Petzold, L., 1983. Automatic selection of methods for solving stiff and
        nonstiff systems of ordinary differential equations. SIAM journal on
        scientific and statistical computing, 4(1), pp.136-148.
+
     """
 
     _supports = {'multi_initials': True, 'multi_param_values': True}
@@ -222,6 +227,7 @@ class CupSodaSimulator(Simulator):
         2. If neither `initials` nor `param_values` are defined in either 
            `__init__` or `run` a single simulation is run with the initial 
            concentrations and parameter values defined in the model.
+
         """
         super(CupSodaSimulator, self).run(tspan=tspan, initials=initials,
                                           param_values=param_values,
