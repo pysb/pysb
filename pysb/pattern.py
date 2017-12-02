@@ -524,17 +524,17 @@ class RulePatternMatcher(object):
     Search using a Monomer
 
     >>> rpm.match_reactants(AMito) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
         AMito(b=1) % mCytoC(b=1), kf20, kr20),
     Rule('produce_ACytoC_via_AMito', AMito(b=1) % mCytoC(b=1) >>
         AMito(b=None) + ACytoC(b=None), kc20),
-    Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) <>
+    Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) |
         AMito(b=1) % mSmac(b=1), kf21, kr21),
     Rule('produce_ASmac_via_AMito', AMito(b=1) % mSmac(b=1) >>
         AMito(b=None) + ASmac(b=None), kc21)]
 
     >>> rpm.match_products(mSmac) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) <>
+    [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) |
         AMito(b=1) % mSmac(b=1), kf21, kr21)]
 
     Search using a MonomerPattern
@@ -546,7 +546,7 @@ class RulePatternMatcher(object):
         AMito(b=None) + ASmac(b=None), kc21)]
 
     >>> rpm.match_rules(cSmac(b=1)) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) <>
+    [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
         cSmac(b=1) % XIAP(b=1), kf28, kr28)]
 
     Search using a ComplexPattern
@@ -557,7 +557,7 @@ class RulePatternMatcher(object):
 
     >>> rpm.match_rules(AMito(b=1) % mCytoC(b=1)) \
         # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
         AMito(b=1) % mCytoC(b=1), kf20, kr20),
     Rule('produce_ACytoC_via_AMito', AMito(b=1) % mCytoC(b=1) >>
         AMito(b=None) + ACytoC(b=None), kc20)]
@@ -568,7 +568,7 @@ class RulePatternMatcher(object):
     []
 
     >>> rpm.match_reactants(AMito() + mCytoC()) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
         AMito(b=1) % mCytoC(b=1), kf20, kr20)]
 
     """
@@ -696,23 +696,23 @@ class ReactionPatternMatcher(object):
     Search using a Monomer
 
     >>> rpm.match_products(mSmac) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (<>):
+    [Rxn (reversible):
         Reactants: {'__s15': mSmac(b=None), '__s45': AMito(b=None)}
         Products: {'__s47': AMito(b=1) % mSmac(b=1)}
         Rate: __s15*__s45*kf21 - __s47*kr21
-        Rules: [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) <>
+        Rules: [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) |
                 AMito(b=1) % mSmac(b=1), kf21, kr21)]]
 
     Search using a MonomerPattern
 
     >>> rpm.match_reactants(AMito(b=ANY)) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (>>):
+    [Rxn (one-way):
         Reactants: {'__s46': AMito(b=1) % mCytoC(b=1)}
         Products: {'__s45': AMito(b=None), '__s48': ACytoC(b=None)}
         Rate: __s46*kc20
         Rules: [Rule('produce_ACytoC_via_AMito', AMito(b=1) % mCytoC(b=1) >>
                 AMito(b=None) + ACytoC(b=None), kc20)],
-     Rxn (>>):
+     Rxn (one-way):
         Reactants: {'__s47': AMito(b=1) % mSmac(b=1)}
         Products: {'__s45': AMito(b=None), '__s49': ASmac(b=None)}
         Rate: __s47*kc21
@@ -720,17 +720,17 @@ class ReactionPatternMatcher(object):
                 AMito(b=None) + ASmac(b=None), kc21)]]
 
     >>> rpm.match_products(cSmac(b=ANY)) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (<>):
+    [Rxn (reversible):
         Reactants: {'__s7': XIAP(b=None), '__s51': cSmac(b=None)}
         Products: {'__s53': XIAP(b=1) % cSmac(b=1)}
         Rate: __s51*__s7*kf28 - __s53*kr28
-        Rules: [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) <>
+        Rules: [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
                 cSmac(b=1) % XIAP(b=1), kf28, kr28)]]
 
     Search using a ComplexPattern
 
     >>> rpm.match_reactants(AMito() % mSmac()) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (>>):
+    [Rxn (one-way):
         Reactants: {'__s47': AMito(b=1) % mSmac(b=1)}
         Products: {'__s45': AMito(b=None), '__s49': ASmac(b=None)}
         Rate: __s47*kc21
@@ -739,13 +739,13 @@ class ReactionPatternMatcher(object):
 
     >>> rpm.match_reactions(AMito(b=3) % mCytoC(b=3)) \
     # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (<>):
+    [Rxn (reversible):
         Reactants: {'__s14': mCytoC(b=None), '__s45': AMito(b=None)}
         Products: {'__s46': AMito(b=1) % mCytoC(b=1)}
         Rate: __s14*__s45*kf20 - __s46*kr20
-        Rules: [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+        Rules: [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
                 AMito(b=1) % mCytoC(b=1), kf20, kr20)],
-     Rxn (>>):
+     Rxn (one-way):
         Reactants: {'__s46': AMito(b=1) % mCytoC(b=1)}
         Products: {'__s45': AMito(b=None), '__s48': ACytoC(b=None)}
         Rate: __s46*kc20
@@ -847,8 +847,9 @@ class _Reaction(object):
     def __repr__(self):
         return 'Rxn (%s): \n    Reactants: %s\n    Products: %s\n    ' \
                'Rate: %s\n    Rules: %s' % (
-                    '<>' if self.reversible else ('<<' if self.reverse else
-                        '>>'),
+                    'reversible' if self.reversible else
+                    ('one-way [reverse]' if self.reverse else
+                        'one-way'),
                     self._repr_species_dict(self.reactants),
                     self._repr_species_dict(self.products),
                     self.rate,

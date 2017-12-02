@@ -75,8 +75,8 @@ def test_bidirectional_rules_collapse():
     Monomer('B')
     Initial(B(), Parameter('B_init', 0))
     Initial(A(), Parameter('A_init', 100))
-    Rule('Rule1', B() <> A(), Parameter('k3', 10), Parameter('k1', 1))
-    Rule('Rule2', A() <> B(), k1, Parameter('k2', 1))
+    Rule('Rule1', B() | A(), Parameter('k3', 10), Parameter('k1', 1))
+    Rule('Rule2', A() | B(), k1, Parameter('k2', 1))
     Rule('Rule3', B() >> A(), Parameter('k4', 5))
     generate_equations(model)
     ok_(len(model.reactions) == 4)
@@ -90,7 +90,7 @@ def test_bidirectional_rules():
     Monomer('A')
     Monomer('B')
     Initial(A(), Parameter('A_init', 100))
-    Rule('Rule1', A() <> B(), Parameter('k1', 1), Parameter('k2', 1))
+    Rule('Rule1', A() | B(), Parameter('k1', 1), Parameter('k2', 1))
     Rule('Rule2', B() >> A(), Parameter('k3', 10))
     Rule('Rule3', B() >> A(), Parameter('k4', 5))
     generate_equations(model)
@@ -106,7 +106,7 @@ def test_zero_order_synth_no_initials():
     Monomer('A')
     Monomer('B')
     Rule('Rule1', None >> A(), Parameter('ksynth', 100))
-    Rule('Rule2', A() <> B(), Parameter('kf', 10), Parameter('kr', 1))
+    Rule('Rule2', A() | B(), Parameter('kf', 10), Parameter('kr', 1))
     generate_equations(model)
 
 

@@ -86,7 +86,7 @@ def catalyze(enz, sub, prod, kf, kr, kc):
     S = sub(b=None)
     ES = enz(b=1) % sub(b=1)
     P = prod(b=None)
-    Rule(r1_name, E + S <> ES, kf, kr)
+    Rule(r1_name, E + S | ES, kf, kr)
     Rule(r2_name, ES >> E + P, kc)
 
 
@@ -98,7 +98,7 @@ def catalyze_convert(s1, s2, p, kf, kr, kc):
     B = s2(b=None)
     AB = s1(b=1) % s2(b=1)
     C = p(b=None)
-    Rule(r1_name, A + B <> AB, kf, kr)
+    Rule(r1_name, A + B | AB, kf, kr)
     Rule(r2_name, AB >> C, kc)
 
 
@@ -108,7 +108,7 @@ def inhibit(targ, inh, kf, kr):
     T = targ(b=None)
     I = inh(b=None)
     TI = targ(b=1) % inh(b=1)
-    Rule(r_name, T + I <> TI, kf, kr)
+    Rule(r_name, T + I | TI, kf, kr)
 
 
 # L + pR <--> L:pR --> DISC
@@ -183,7 +183,7 @@ catalyze(tBid, Bax, aBax, kf12, kr12, kc12)
 # aBax <-->  MBax 
 Parameter('kf13', transloc)
 Parameter('kr13', transloc)
-Rule('transloc_MBax_aBax', aBax(b=None) <> MBax(b=None), kf13, kr13)
+Rule('transloc_MBax_aBax', aBax(b=None) | MBax(b=None), kf13, kr13)
 
 # MBax + Bcl2 <-->  MBax:Bcl2  
 Parameter('kf14', 1e-06/v)
@@ -193,7 +193,7 @@ inhibit(MBax, Bcl2, kf14, kr14)
 # MBax + MBax <-->  Bax2
 Parameter('kf15', 1e-06/v*2)
 Parameter('kr15', 1e-03)
-Rule('dimerize_MBax_to_Bax2', MBax(b=None) + MBax(b=None) <> Bax2(b=None), kf15, kr15)
+Rule('dimerize_MBax_to_Bax2', MBax(b=None) + MBax(b=None) | Bax2(b=None), kf15, kr15)
 
 # Bax2 + Bcl2 <-->  Bax2:Bcl2  
 Parameter('kf16', 1e-06/v)
@@ -203,7 +203,7 @@ inhibit(Bax2, Bcl2, kf16, kr16)
 # Bax2 + Bax2 <-->  Bax4
 Parameter('kf17', 1e-06/v*2)
 Parameter('kr17', 1e-03)
-Rule('dimerize_Bax2_to_Bax4', Bax2(b=None) + Bax2(b=None) <> Bax4(b=None), kf17, kr17)
+Rule('dimerize_Bax2_to_Bax4', Bax2(b=None) + Bax2(b=None) | Bax4(b=None), kf17, kr17)
 
 # Bax4 + Bcl2 <-->  Bax4:Bcl2  
 Parameter('kf18', 1e-06/v)
@@ -231,7 +231,7 @@ catalyze(AMito, mSmac, ASmac, kf21, kr21, kc21)
 # ACytoC <-->  cCytoC
 Parameter('kf22', transloc)
 Parameter('kr22', transloc)
-Rule('transloc_cCytoC_ACytoC', ACytoC(b=None) <> cCytoC(b=None), kf22, kr22)
+Rule('transloc_cCytoC_ACytoC', ACytoC(b=None) | cCytoC(b=None), kf22, kr22)
 
 # Apaf + cCytoC <-->  Apaf:cCytoC --> aApaf + cCytoC
 Parameter('kf23', 5e-07)
@@ -242,7 +242,7 @@ catalyze(cCytoC, Apaf, aApaf, kf23, kr23, kc23)
 # aApaf + pC9 <-->  Apop
 Parameter('kf24', 5e-08)
 Parameter('kr24', 1e-03)
-Rule('bind_aApaf_pC9_as_Apop', aApaf(b=None) + pC9(b=None) <> Apop(b=None), kf24, kr24)
+Rule('bind_aApaf_pC9_as_Apop', aApaf(b=None) + pC9(b=None) | Apop(b=None), kf24, kr24)
 
 # Apop + pC3 <-->  Apop:pC3 --> Apop + C3
 Parameter('kf25', 5e-09)
@@ -253,7 +253,7 @@ catalyze(Apop, pC3, C3, kf25, kr25, kc25)
 # ASmac <-->  cSmac
 Parameter('kf26', transloc)
 Parameter('kr26', transloc)
-Rule('transloc_cSmac_ASmac', ASmac(b=None) <> cSmac(b=None), kf26, kr26)
+Rule('transloc_cSmac_ASmac', ASmac(b=None) | cSmac(b=None), kf26, kr26)
 
 # Apop + XIAP <-->  Apop:XIAP  
 Parameter('kf27', 2e-06)

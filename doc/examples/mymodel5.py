@@ -10,7 +10,7 @@ def catalyze(enz, sub, site, state1, state2, kf, kr, kc):   # function call
     S = sub({'b': None, site: state1})                      # define substrate state in function
     ES = enz(b=1) % sub({'b': 1, site: state1})             # define state of enzyme:substrate complex
     P = sub({'b': None, site: state2})                      # define state of product
-    Rule(r1_name, E + S <> ES, kf, kr)                      # rule for enzyme + substrate association (bidirectional)
+    Rule(r1_name, E + S | ES, kf, kr)                      # rule for enzyme + substrate association (bidirectional)
     Rule(r2_name, ES >> E + P, kc)                          # rule for enzyme:substrate dissociation  (unidirectional)
    
 # instantiate a model
@@ -26,7 +26,7 @@ Parameter('kr', 1.0e-03)
 Parameter('kc', 1.0)
 
 # OLD RULES
-# Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) <> C8(b=1) % Bid(b=1, S=None), *[kf, kr]) 
+# Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S=None) | C8(b=1) % Bid(b=1, S=None), *[kf, kr])
 # Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc)
 #
 # NEW RULES

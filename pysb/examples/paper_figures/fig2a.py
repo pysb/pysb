@@ -12,7 +12,7 @@ def catalyze(enz, e_site, sub, s_site, prod, klist):
 
     # Create the rules
     rb = Rule('bind_%s_%s' % (enz().monomer.name, sub().monomer.name),
-           enz({e_site:None}) + sub({s_site:None}) <>
+           enz({e_site:None}) + sub({s_site:None}) |
            enz({e_site:1}) % sub({s_site:1}),
            kf, kr)
     rc = Rule('catalyze_%s%s_to_%s' %
