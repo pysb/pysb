@@ -284,23 +284,20 @@ class BngConsole(BngBaseInterface):
                  category=DeprecationWarning,
                  stacklevel=2)
 
-        try:
-            # Generate BNGL file
-            if self.model:
-                with open(self.bng_filename, mode='w') as bng_file:
-                    bng_file.write(self.generator.get_content())
+        # Generate BNGL file
+        if self.model:
+            with open(self.bng_filename, mode='w') as bng_file:
+                bng_file.write(self.generator.get_content())
 
-            # Start BNG Console and load BNGL
-            self.console = pexpect.spawn('perl %s --console' %
-                                         pf.get_path('bng'),
-                                         cwd=self.base_directory,
-                                         timeout=timeout)
+        # Start BNG Console and load BNGL
+        self.console = pexpect.spawn('perl %s --console' %
+                                     pf.get_path('bng'),
+                                     cwd=self.base_directory,
+                                     timeout=timeout)
+        self._console_wait()
+        if self.model:
+            self.console.sendline('load %s' % self.bng_filename)
             self._console_wait()
-            if self.model:
-                self.console.sendline('load %s' % self.bng_filename)
-                self._console_wait()
-        except Exception as e:
-            raise BngInterfaceError(e)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
@@ -338,12 +335,8 @@ class BngConsole(BngBaseInterface):
         overwrite: bool, optional
             Overwrite existing network file, if any
         """
-        try:
-            self.action('generate_network', overwrite=overwrite)
-            bng_network = self.read_netfile()
-        except Exception as e:
-            raise BngInterfaceError(e)
-        return bng_network
+        self.action('generate_network', overwrite=overwrite)
+        return self.read_netfile()
 
     def action(self, action, **kwargs):
         """
@@ -437,41 +430,38 @@ class BngFileInterface(BngBaseInterface):
         self.command_queue.write('end actions\n')
         bng_commands = self.command_queue.getvalue()
 
-        try:
-            # Generate BNGL file
-            with open(self.bng_filename, 'w') as bng_file:
-                output = ''
-                if self.model and not reload_netfile:
-                    output += self.generator.get_content()
-                if reload_netfile:
-                    filename = reload_netfile if \
-                        isinstance(reload_netfile, basestring) \
-                        else self.net_filename
-                    output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
-                        % (filename, int(skip_file_actions))
-                output += bng_commands
-                self._logger.debug('BNG command file contents:\n\n' + output)
-                bng_file.write(output)
+        # Generate BNGL file
+        with open(self.bng_filename, 'w') as bng_file:
+            output = ''
+            if self.model and not reload_netfile:
+                output += self.generator.get_content()
+            if reload_netfile:
+                filename = reload_netfile if \
+                    isinstance(reload_netfile, basestring) \
+                    else self.net_filename
+                output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
+                    % (filename, int(skip_file_actions))
+            output += bng_commands
+            self._logger.debug('BNG command file contents:\n\n' + output)
+            bng_file.write(output)
 
-            # Reset the command queue, in case execute() is called again
-            self.command_queue.close()
-            self._init_command_queue()
+        # Reset the command queue, in case execute() is called again
+        self.command_queue.close()
+        self._init_command_queue()
 
-            p = subprocess.Popen(['perl', pf.get_path('bng'),
-                                  self.bng_filename],
-                                 cwd=self.base_directory,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-            for line in iter(p.stdout.readline, b''):
-                self._logger.debug(line[:-1])
-            (p_out, p_err) = p.communicate()
-            p_out = p_out.decode('utf-8')
-            p_err = p_err.decode('utf-8')
-            if p.returncode:
-                raise BngInterfaceError(p_out.rstrip("at line") + "\n" +
-                                        p_err.rstrip())
-        except Exception as e:
-            raise BngInterfaceError(e)
+        p = subprocess.Popen(['perl', pf.get_path('bng'),
+                              self.bng_filename],
+                             cwd=self.base_directory,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        for line in iter(p.stdout.readline, b''):
+            self._logger.debug(line[:-1])
+        (p_out, p_err) = p.communicate()
+        p_out = p_out.decode('utf-8')
+        p_err = p_err.decode('utf-8')
+        if p.returncode:
+            raise BngInterfaceError(p_out.rstrip("at line") + "\n" +
+                                    p_err.rstrip())
 
     def action(self, action, **kwargs):
         """
