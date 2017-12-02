@@ -857,7 +857,7 @@ class SimulationResult(object):
         Custom attributes can be stored in the SimulationResult's
         `custom_attrs` dictionary. Keys should be strings, values can be any
         picklable object. When saved to HDF5, these custom attributes will
-        be prefixed with usrattr_.
+        be prefixed with ``usrattr_``.
 
         Parameters
         ----------
@@ -878,6 +878,7 @@ class SimulationResult(object):
             and species trajectories when loaded back into PySB, but you may
             wish to include them for use with external software, or if you
             have complex expressions which take a long time to compute.
+
         """
         if h5py is None:
             raise Exception('Please install the h5py package for this feature')
