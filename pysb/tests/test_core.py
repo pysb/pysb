@@ -63,6 +63,15 @@ def test_monomer_rename_non_self_exported_model():
 
 
 @with_model
+def test_invalid_state():
+    Monomer('A', ['a', 'b'], {'a': ['a1', 'a2'], 'b': ['b1']})
+    # Specify invalid state in Monomer.__call__
+    assert_raises(ValueError, A, a='spam')
+    # Specify invalid state in MonomerPattern.__call__
+    assert_raises(ValueError, A(a='a1'), b='spam')
+
+
+@with_model
 def test_initial():
     Monomer('A', ['s'])
     Parameter('A_0')

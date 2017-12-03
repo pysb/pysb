@@ -302,6 +302,15 @@ class Monomer(Component):
         return value
 
 
+def _check_state(monomer, site, state):
+    """ Check a monomer site allows the specified state """
+    if state not in monomer.site_states[site]:
+        args = state, monomer.name, site, monomer.site_states[site]
+        template = "Invalid state choice '{}' in Monomer {}, site {}. Valid " \
+                   "state choices: {}"
+        raise ValueError(template.format(*args))
+
+
 class MonomerPattern(object):
 
     """
@@ -340,7 +349,6 @@ class MonomerPattern(object):
     state for that site, i.e. \"don't write, don't care\".
 
     """
-
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions
@@ -362,11 +370,13 @@ class MonomerPattern(object):
                  all(isinstance(s, int) for s in state):
                 continue
             elif isinstance(state, basestring):
+                _check_state(monomer, site, state)
                 continue
             elif isinstance(state, tuple) and \
                  isinstance(state[0], basestring) and \
                  (isinstance(state[1], int) or state[1] is WILD or \
                   state[1] is ANY):
+                _check_state(monomer, site, state[0])
                 continue
             elif state is ANY:
                 continue
