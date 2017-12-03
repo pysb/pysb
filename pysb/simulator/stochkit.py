@@ -215,8 +215,9 @@ class StochKitSimulator(Simulator):
         Run a simulation and returns the result (trajectories)
 
         .. note::
-            ``tspan``, ``initials`` and ``param_values`` values supplied to
-            this method will persist to future :func:`run` calls.
+            In early versions of the Simulator class, ``tspan``, ``initials``
+            and ``param_values`` supplied to this method persisted to future
+            :func:`run` calls. This is no longer the case.
 
         Parameters
         ----------
