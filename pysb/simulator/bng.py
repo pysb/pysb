@@ -100,7 +100,7 @@ class BngSimulator(Simulator):
                                          'spaced starting at t=0')
             additional_args['t_end'] = self.tspan[-1]
             additional_args['n_steps'] = len(self.tspan) - 1
-            model_additional_species = self.model.species
+            model_additional_species = self.initials_dict.keys()
         else:
             additional_args['sample_times'] = self.tspan
             model_additional_species = None

@@ -277,3 +277,28 @@ def test_reaction_pattern_match_complex_pattern_ordering():
     assert rp0.matches(rp1)
     assert rp1.matches(rp0)
     assert rp2.matches(rp0)
+
+
+@with_model
+def test_concreteness():
+    Monomer('A', ['s'], {'s': ['x']})
+    assert not (A(s=1) % A(s=1)).is_concrete()
+    assert not (A(s=('x', 1)) % A(s=1)).is_concrete()
+    assert (A(s=('x', 1)) % A(s=('x', 1))).is_concrete()
+    assert (A(s='x')).is_concrete()
+    assert not A().is_concrete()
+    assert not A(s=('x', ANY)).is_concrete()
+    assert not A(s=WILD).is_concrete()
+
+    Monomer('B', ['s'])
+    assert not B().is_concrete()
+    assert not B(s=ANY).is_concrete()
+    assert B(s=1).is_concrete()
+
+    Monomer('C')
+    assert C().is_concrete()
+
+    # Tests with compartments
+    Compartment('cell')
+    assert not C().is_concrete()
+    assert (C() ** cell).is_concrete()
