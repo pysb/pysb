@@ -1,6 +1,6 @@
 import collections
 from .core import ComplexPattern, MonomerPattern, Monomer, \
-    ReactionPattern, ANY, as_complex_pattern
+    ReactionPattern, ANY, as_complex_pattern, DanglingBondError
 import networkx as nx
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
@@ -12,7 +12,7 @@ except NameError:
     basestring = str
 
 
-def get_bonds_in_pattern(pat):
+def get_bonds_in_pattern(pat, as_set=True):
     """
     Return the set of integer bond numbers used in a pattern
 
@@ -20,11 +20,13 @@ def get_bonds_in_pattern(pat):
     ----------
     pat : ComplexPattern, MonomerPattern, or None
         A pattern from which bond numberings are extracted
+    as_set : bool
+        Return as a set if True, or as a list if False
 
     Returns
     -------
-    set
-        The set of bond numbers used in the supplied pattern
+    set or list
+        The set or list of bond numbers used in the supplied pattern
 
     Examples
     --------
@@ -41,7 +43,7 @@ def get_bonds_in_pattern(pat):
     >>> list(get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)))
     [1, 2]
     """
-    bonds_used = set()
+    bonds_used = list()
 
     def _get_bonds_in_monomer_pattern(mp):
         for sc in mp.site_conditions.values():
@@ -49,7 +51,7 @@ def get_bonds_in_pattern(pat):
                 bonds_used.add(sc)
             elif not isinstance(sc, basestring) and \
                     isinstance(sc, collections.Iterable):
-                [bonds_used.add(b) for b in sc if isinstance(b, int)]
+                [bonds_used.append(b) for b in sc if isinstance(b, int)]
 
     if pat is None:
         return bonds_used
@@ -61,7 +63,27 @@ def get_bonds_in_pattern(pat):
     else:
         raise ValueError('Unknown pattern type: %s' % type(pat))
 
-    return bonds_used
+    return set(bonds_used) if as_set else bonds_used
+
+
+def check_dangling_bonds(pattern):
+    """
+    Check for dangling bonds in a PySB ComplexPattern/ReactionPattern
+
+    Raises a DanglingBondError if a dangling bond is found
+    """
+    if isinstance(pattern, ReactionPattern):
+        for cp in pattern.complex_patterns:
+            check_dangling_bonds(cp)
+        return
+    bond_counts = collections.Counter(get_bonds_in_pattern(pattern,
+                                                           as_set=False))
+
+    dangling_bonds = [bond for bond, count in bond_counts.items()
+                      if count == 1]
+    if dangling_bonds:
+        raise DanglingBondError('Dangling bond(s) {} in {}'
+                                .format(dangling_bonds, pattern))
 
 
 def _match_graphs(pattern, candidate, exact):

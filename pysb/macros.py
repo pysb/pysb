@@ -574,7 +574,7 @@ def bind_complex(s1, site1, s2, site2, klist, m1=None, m2=None):
                         maxint = stateint
         match = 'N'
         for monomer in s2.monomer_patterns:
-            if m2 != None:
+            if m2 is not None:
                 if m2.site_conditions == monomer.site_conditions and m2.monomer.name == monomer.monomer.name:
                     match = 'Y'
             for site, stateint in monomer.site_conditions.items():

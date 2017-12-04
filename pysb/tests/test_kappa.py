@@ -195,7 +195,10 @@ def test_kappa_error():
     # Model with a dangling bond should raise a KasimInterfaceError
     Monomer('A', ['b'])
     Monomer('B', ['b'])
-    Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=None),
-         Parameter('k_A_binds_B', 1))
     Initial(A(b=None), Parameter('A_0', 100))
-    assert_raises(KasimInterfaceError, run_simulation, model, time=10)
+
+    # Can't model this as a PySB rule, since it would generate a
+    # DanglingBondError. Directly inject kappa code for rule instead.
+    assert_raises(KasimInterfaceError, run_simulation, model, time=10,
+                  perturbation="'A_binds_B' A(b),B(b) -> A(b!1),B(b) @ "
+                               "'k_A_binds_B'")
