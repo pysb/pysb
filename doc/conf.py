@@ -56,7 +56,7 @@ MOCK_MODULES = [ 'pandas', 'pygraphviz', 'sympy',  'sympy.parsing',
                  'sympy.printing', 'sympy.printing.mathml', 'numpy',
                  'scipy', 'scipy.integrate', 'scipy.constants', 'scipy.sparse',
                  'h5py', 'theano', 'theano.tensor', 'dateutil',
-                 'dateutil.parser']
+                 'dateutil.parser', 'networkx']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.MagicMock()
 sys.modules['sympy'].Symbol = type('Symbol', (object,), {})
