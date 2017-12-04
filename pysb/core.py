@@ -1867,12 +1867,13 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             return self._map[key]
 
     def __getattr__(self, name):
-        if name == '_map':
-            raise AttributeError()
         try:
             return self[name]
         except KeyError as e:
             raise AttributeError("Model has no component '%s'" % name)
+
+    def __setstate__(self, state):
+        self.__dict__ = state
 
     def get(self, key, default=None):
         if isinstance(key, (int, long)):
