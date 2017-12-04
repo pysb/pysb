@@ -1,12 +1,12 @@
-import pysb
 import os
 import pysb.pathfinder as pf
 from pysb.bng import BngFileInterface
 from pysb.importers.bngl import model_from_bngl, BnglImportError
-from pysb.importers.sbml import model_from_sbml
+from pysb.importers.sbml import model_from_sbml, model_from_biomodels
 import numpy
-from nose.tools import assert_raises_regexp
+from nose.tools import assert_raises_regexp, raises
 import warnings
+import mock
 
 
 def bngl_import_compare_simulations(bng_file, force=False,
@@ -141,3 +141,17 @@ def test_sbml_import_flat_model():
 
 def test_sbml_import_structured_model():
     model_from_sbml(_sbml_location('test_sbml_structured_SBML'), atomize=True)
+
+
+def _sbml_for_mocks(accession_no, mirror):
+    return _sbml_location('test_sbml_flat_SBML')
+
+
+@mock.patch('pysb.importers.sbml._download_biomodels', _sbml_for_mocks)
+def test_biomodels_import_with_mock():
+    model_from_biomodels('1')
+
+
+@raises(ValueError)
+def test_biomodels_invalid_mirror():
+    model_from_biomodels('1', mirror='spam')
