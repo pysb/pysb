@@ -22,6 +22,7 @@ before_install:
 - conda install --yes conda==4.3.21
 - conda install --yes -c omnia python="$TRAVIS_PYTHON_VERSION"
     numpy scipy matplotlib sympy networkx nose h5py pexpect pandas pygraphviz=1.3 theano
+    mock
 - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then pip install weave; fi
 - pip install python-coveralls
 - mkdir -p ~/.config/matplotlib
