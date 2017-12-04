@@ -7,6 +7,8 @@ import numpy
 from nose.tools import assert_raises_regexp, raises
 import warnings
 import mock
+import tempfile
+import shutil
 
 
 def bngl_import_compare_simulations(bng_file, force=False,
@@ -144,7 +146,11 @@ def test_sbml_import_structured_model():
 
 
 def _sbml_for_mocks(accession_no, mirror):
-    return _sbml_location('test_sbml_flat_SBML')
+    # Need to make a copy because import_from_biomodels deletes the SBML
+    # after import
+    _, filename = tempfile.mkstemp()
+    shutil.copy(_sbml_location('test_sbml_flat_SBML'), filename)
+    return filename
 
 
 @mock.patch('pysb.importers.sbml._download_biomodels', _sbml_for_mocks)
