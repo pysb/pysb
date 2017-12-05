@@ -1174,11 +1174,15 @@ class Rule(Component):
 
     def is_synth(self):
         """Return a bool indicating whether this is a synthesis rule."""
-        return len(self.reactant_pattern.complex_patterns) == 0
+        return len(self.reactant_pattern.complex_patterns) == 0 or \
+            (self.is_reversible and
+             len(self.product_pattern.complex_patterns) == 0)
 
     def is_deg(self):
         """Return a bool indicating whether this is a degradation rule."""
-        return len(self.product_pattern.complex_patterns) == 0
+        return len(self.product_pattern.complex_patterns) == 0 or \
+            (self.is_reversible and
+             len(self.reactant_pattern.complex_patterns) == 0)
 
     def __repr__(self):
         ret = '%s(%s, %s, %s' % \

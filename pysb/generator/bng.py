@@ -87,9 +87,9 @@ class BngGenerator(object):
             label = r.name + ':'
             react_p = r.reactant_pattern
             prod_p = r.product_pattern
-            if r.is_synth():
+            if not react_p.complex_patterns:
                 react_p = None
-            if r.is_deg():
+            if not prod_p.complex_patterns:
                 prod_p = None
             reactants_code = format_reactionpattern(react_p)
             products_code = format_reactionpattern(prod_p)
