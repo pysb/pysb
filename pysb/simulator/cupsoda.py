@@ -13,19 +13,16 @@ import logging
 from pysb.logging import EXTENDED_DEBUG
 import shutil
 from pysb.pathfinder import get_path
+import sympy
 
 try:
     import pandas as pd
 except ImportError:
     pd = None
 try:
-    import pycuda.autoinit
     import pycuda.driver as cuda
-
-    use_pycuda = True
 except ImportError:
-    use_pycuda = False
-    pass
+    cuda = None
 
 
 class CupSodaSimulator(Simulator):
@@ -311,15 +308,16 @@ class CupSodaSimulator(Simulator):
             default_threads_per_block = 32
             bytes_per_float = 4
             memory_per_thread = (self._len_species + 1) * bytes_per_float
-            if not use_pycuda:
+            if cuda is None:
                 threads_per_block = default_threads_per_block
             else:
+                cuda.init()
                 device = cuda.Device(self.gpu)
                 attrs = device.get_attributes()
                 shared_memory_per_block = attrs[
-                    pycuda.driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
+                    cuda.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
                 upper_limit_threads_per_block = attrs[
-                    pycuda.driver.device_attribute.MAX_THREADS_PER_BLOCK]
+                    cuda.device_attribute.MAX_THREADS_PER_BLOCK]
                 max_threads_per_block = min(
                     shared_memory_per_block / memory_per_thread,
                     upper_limit_threads_per_block)
@@ -327,6 +325,10 @@ class CupSodaSimulator(Simulator):
                                         default_threads_per_block)
             n_blocks = int(
                 np.ceil(1. * len(self.param_values) / threads_per_block))
+            self._logger.debug('n_blocks set to {} (used pycuda: {})'.format(
+                n_blocks, cuda is not None
+            ))
+        self.n_blocks = n_blocks
         return n_blocks
 
     @n_blocks.setter
@@ -462,8 +464,8 @@ class CupSodaSimulator(Simulator):
         par_vals = self.param_values[:, rate_mask]
         rate_order = []
         for rxn in self._model.reactions:
-            rate_args.append([arg for arg in rxn['rate'].args if
-                              not re.match("_*s", str(arg))])
+            rate_args.append([arg for arg in rxn['rate'].atoms(sympy.Symbol) if
+                              not arg.name.startswith('__s')])
             reactants = len(rxn['reactants'])
             rate_order.append(reactants)
         output = 0.01 * len(par_vals)
