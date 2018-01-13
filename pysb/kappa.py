@@ -65,8 +65,12 @@ SimulationResult = namedtuple('SimulationResult',
 
 def run_simulation(model, time=10000, points=200, cleanup=True,
                    output_prefix=None, output_dir=None, flux_map=False,
-                   perturbation=None, seed=None, verbose=False):
+                   perturbation=None, seed=None, verbose=False,
+                   pre4syntax=False):
     """Runs the given model using KaSim and returns the parsed results.
+
+    By default, Kappa 4 syntax is used. To use Kappa 3, use the pre4syntax
+    argument.
 
     Parameters
     ----------
@@ -108,6 +112,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         deterministic behaviour (e.g. for testing)
     verbose : boolean
         Whether to pass the output of KaSim through to stdout/stderr.
+    pre4syntax : boolean
+        True to use kappa version 3 syntax, False for kappa 4 or higher.
 
     Returns
     -------
@@ -128,7 +134,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     the flux map graphically see :func:`run_static_analysis` (notes section).
     """
 
-    gen = KappaGenerator(model)
+    gen = KappaGenerator(model, pre4syntax=pre4syntax)
 
     if output_prefix is None:
         output_prefix = 'tmpKappa_%s_' % model.name
@@ -157,8 +163,13 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         # If desired, add instructions to the kappa file to generate the
         # flux map:
         if flux_map:
-            kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
-                             fm_filename)
+            if pre4syntax:
+                kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
+                                 fm_filename)
+            else:
+                kappa_file.write('%%mod: [true] do $DIN "%s" [true];\n' %
+                                 fm_filename)
+
         # If any perturbation language code has been passed in, add it to
         # the Kappa file:
         if perturbation:
@@ -209,8 +220,11 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
 
 def run_static_analysis(model, influence_map=False, contact_map=False,
                         cleanup=True, output_prefix=None, output_dir=None,
-                        verbose=False):
+                        verbose=False, pre4syntax=False):
     """Run static analysis (KaSa) on to get the contact and influence maps.
+
+    By default, Kappa 4 syntax is used. To use Kappa 3, use the pre4syntax
+    argument.
 
     If neither influence_map nor contact_map are set to True, then a ValueError
     is raised.
@@ -236,6 +250,8 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         an Exception is thrown.
     verbose : boolean
         Whether to pass the output of KaSa through to stdout/stderr.
+    pre4syntax : boolean
+        True to use kappa version 3 syntax, False for kappa 4 or higher.
 
     Returns
     -------
@@ -268,7 +284,7 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         raise ValueError('Either contact_map or influence_map (or both) must '
                          'be set to True in order to perform static analysis.')
 
-    gen = KappaGenerator(model, _warn_no_ic=False)
+    gen = KappaGenerator(model, pre4syntax=pre4syntax, _warn_no_ic=False)
 
     if output_prefix is None:
         output_prefix = 'tmpKappa_%s_' % model.name
@@ -444,3 +460,29 @@ def _parse_kasim_outfile(out_filename):
         raise Exception("problem parsing KaSim outfile: " + str(e))
 
     return recarr
+
+
+class KappaDot(pysb.MonomerPattern):
+    """
+    Represents a Null agent in Kappa 4; ignored in Kappa 3
+
+    Agent order is conserved in Kappa 4. This KappaDot will be needed in
+    situations like:
+
+    .. code-block:: none
+
+       // Agent A spawns a copy of agent B
+       A(),. -> A(),B() @ 'r'
+
+    This would be specified in PySB like:
+
+    .. code-block:: python
+
+       Rule('spawnB', A() + KappaDot() >> A() + B(), r)
+
+     """
+    def __init__(self):
+        dot_monomer = pysb.Monomer('__kappadot__', _export=False)
+        super(KappaDot, self).__init__(dot_monomer,
+                                       site_conditions={},
+                                       compartment=None)

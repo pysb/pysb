@@ -1,7 +1,8 @@
 import pysb
 import sympy
-from re import sub
 import warnings
+from sympy.printing import StrPrinter
+from sympy.core import S
 
 # Alias basestring under Python 3 for forwards compatibility
 try:
@@ -12,10 +13,12 @@ except NameError:
 class KappaGenerator(object):
 
     # Dialect can be either 'complx' or 'kasim' (default)
-    def __init__(self, model, dialect='kasim', _warn_no_ic=True):
+    def __init__(self, model, dialect='kasim', pre4syntax=False,
+                 _warn_no_ic=True):
         self.model = model
         self.__content = None
         self.dialect = dialect
+        self.pre4syntax = pre4syntax
         self._warn_no_ic = _warn_no_ic
 
     def get_content(self):
@@ -39,42 +42,32 @@ class KappaGenerator(object):
         self.generate_species()
 
     def generate_parameters(self):
-        names = [x.name for x in self.model.parameters] + \
-                [x.name for x in self.model.expressions]
         for p in self.model.parameters:
             self.__content += "%%var: '%s' %e\n" % (p.name, p.value)
         for e in self.model.expressions:
             sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
-            str_expr = str(expression_to_muparser(e))
+            str_expr = str(expression_to_muparser(e,
+                                                  pre4syntax=self.pre4syntax))
             for n in sym_names:
                 str_expr = str_expr.replace(n,"'%s'"%n)
             self.__content += "%%var: '%s' %s\n" % (e.name, str_expr)
         self.__content += "\n"
 
-    #def generate_compartments(self):
-    #    self.__content += "begin compartments\n"
-    #    for c in self.model.compartments:
-    #        if c.parent is None:
-    #            parent_name = ''
-    #        else:
-    #            parent_name = c.parent.name
-    #        self.__content += ("  %s  %d  %f  %s\n" %
-    #                          (c.name, c.dimension, c.size, parent_name))
-    #    self.__content += "end compartments\n\n"
-
     def generate_molecule_types(self):
         for m in self.model.monomers:
-            site_code = ','.join([format_monomer_site(m, s) for s in m.sites])
+            site_code = ','.join([
+                format_monomer_site(m, s, pre4syntax=self.pre4syntax)
+                for s in m.sites])
             self.__content += "%%agent: %s(%s)\n" % (m.name, site_code)
         self.__content += "\n"
 
     def generate_reaction_rules(self):
-        # +1 for the colon
-        #max_length = max(len(r.name) for r in self.model.rules) + 1
         for r in self.model.rules:
             label = "'" + r.name + "'"
-            reactants_code = format_reactionpattern(r.reactant_pattern)
-            products_code  = format_reactionpattern(r.product_pattern)
+            reactants_code = format_reactionpattern(r.reactant_pattern,
+                                                    pre4syntax=self.pre4syntax)
+            products_code = format_reactionpattern(r.product_pattern,
+                                                   pre4syntax=self.pre4syntax)
             arrow = '->'
 
             if isinstance(r.rate_forward,pysb.core.Expression) and \
@@ -114,17 +107,12 @@ class KappaGenerator(object):
             return
         for obs in self.model.observables:
             name = "'" + obs.name + "'"
-            observable_code = format_reactionpattern(obs.reaction_pattern)
-            # In the near future (KaSim 4.0), the observable syntax will
-            # require pipe characters around the expression. However, for the
-            # time being we'll stick with the old syntax for backwards
-            # compatibility
-            #if self.dialect == 'kasim':
-            #    self.__content += ("%%obs: %s |%s|\n") % \
-            #                      (name, observable_code)
-            #else:
-            #    self.__content += ("%%obs: %s %s\n") % (name, observable_code)
-            self.__content += ("%%obs: %s %s\n") % (name, observable_code)
+            observable_code = format_reactionpattern(
+                obs.reaction_pattern, pre4syntax=self.pre4syntax)
+            if self.pre4syntax:
+                self.__content += "%%obs: %s %s\n" % (name, observable_code)
+            else:
+                self.__content += "%%obs: %s |%s|\n" % (name, observable_code)
 
         self.__content += "\n"
 
@@ -132,7 +120,7 @@ class KappaGenerator(object):
         if self._warn_no_ic and not self.model.initial_conditions:
             warnings.warn("Warning: No initial conditions.")
 
-        species_codes = [format_complexpattern(cp)
+        species_codes = [format_complexpattern(cp, pre4syntax=self.pre4syntax)
                          for cp, param in self.model.initial_conditions]
         #max_length = max(len(code) for code in species_codes)
         for i, code in enumerate(species_codes):
@@ -150,36 +138,103 @@ class KappaGenerator(object):
         self.__content += "\n"
 
 
-def format_monomer_site(monomer, site):
+def format_monomer_site(monomer, site, pre4syntax=True):
     ret = site
     if site in monomer.site_states:
-        for state in monomer.site_states[site]:
-            ret += '~' + state
+        if pre4syntax:
+            for state in monomer.site_states[site]:
+                ret += '~' + state
+        else:
+            ret += '{%s}' % ' '.join(monomer.site_states[site])
     return ret
 
-def format_reactionpattern(rp):
-    return ','.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
-def format_complexpattern(cp):
-    ret = ','.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
+def format_reactionpattern(rp, pre4syntax=True):
+    if not pre4syntax and not rp.complex_patterns:
+        return '.'
+    return ','.join(filter(None,
+                           [format_complexpattern(cp, pre4syntax=pre4syntax)
+                            for cp in rp.complex_patterns]))
+
+
+def format_complexpattern(cp, pre4syntax=True):
+    ret = ','.join(filter(None,
+                          [format_monomerpattern(mp, pre4syntax=pre4syntax)
+                           for mp in cp.monomer_patterns]))
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)
     return ret
 
-def format_monomerpattern(mp):
+
+def format_monomerpattern(mp, pre4syntax=True):
+    from pysb.kappa import KappaDot
+    if isinstance(mp, KappaDot):
+        return None if pre4syntax else '.'
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))
-    site_pattern_code = ','.join([format_site_condition(site, state)
+    site_pattern_code = ','.join([format_site_condition(site, state,
+                                                        pre4syntax=pre4syntax)
                                   for (site, state) in site_conditions])
     ret = '%s(%s)' % (mp.monomer.name, site_pattern_code)
     if mp.compartment is not None:
         ret = '%s@%s' % (ret, mp.compartment.name)
     return ret
 
-def format_site_condition(site, state):
+
+def format_site_condition(site, state, pre4syntax=True):
+    if pre4syntax:
+        return _format_site_condition_kappa3(site, state)
+    else:
+        return _format_site_condition_kappa4(site, state)
+
+
+def _format_site_condition_kappa4(site, state):
     # If the state/bond is unspecified
-    if state == None:
+    if state is None:
+        state_code = '[.]'
+    # If there is a bond number
+    elif isinstance(state, int):
+        state_code = '[%s]' % state
+    # If there is a lists of bonds to the site (not supported by Kappa)
+    elif isinstance(state, list):
+        raise KappaException("Kappa generator does not support multiple bonds "
+                             "to a single site.")
+    # Site with state
+    elif isinstance(state, basestring):
+        state_code = '{%s}[.]' % state
+    # Site with state and a bond
+    elif isinstance(state, tuple):
+        # If the bond is ANY
+        if state[1] == pysb.ANY:
+            state_code = '{%s}[_]' % state[0]
+        # If the bond is WILD
+        elif state[1] == pysb.WILD:
+            state_code = '{%s}[#]' % state[0]
+        # If the bond is a number
+        elif type(state[1]) == int:
+            state_code = '{%s}[%s]' % state
+        # If it's something else, raise an Exception
+        else:
+            raise KappaException("Kappa generator has encountered an unknown "
+                                 "element in a site state/bond tuple: (%s, %s)"
+                                 % state)
+    # Site bound to ANY
+    elif state == pysb.ANY:
+        state_code = '[_]'
+    # Site bound to WILD
+    elif state == pysb.WILD:
+        state_code = '[#]'
+    # Something else
+    else:
+        raise KappaException("Kappa generator has encountered an unknown "
+                             "element in a rule pattern site condition.")
+    return '%s%s' % (site, state_code)
+
+
+def _format_site_condition_kappa3(site, state):
+    # If the state/bond is unspecified
+    if state is None:
         state_code = ''
     # If there is a bond number
     elif isinstance(state, int):
@@ -187,7 +242,7 @@ def format_site_condition(site, state):
     # If there is a lists of bonds to the site (not supported by Kappa)
     elif isinstance(state, list):
         raise KappaException("Kappa generator does not support multiple bonds "
-                              "to a single site.")
+                             "to a single site.")
     # Site with state
     elif isinstance(state, basestring):
         state_code = '~' + state
@@ -216,22 +271,82 @@ def format_site_condition(site, state):
     # Something else
     else:
         raise KappaException("Kappa generator has encountered an unknown "
-                        "element in a rule pattern site condition.")
+                             "element in a rule pattern site condition.")
     return '%s%s' % (site, state_code)
 
-def expression_to_muparser(expression):
-    """Render the Expression as a Kappa compatible string."""
-    # sympy.printing.sstr is the preferred way to render an Expression as a
-    # string (rather than, e.g., str(Expression.expr) or repr(Expression.expr).
-    # Note: "For large expressions where speed is a concern, use the setting
-    # order='none'"
-    code = sympy.printing.sstr(expression.expr, order='none')
-    code = code.replace('\n @', '')
-    code = code.replace('**', '^')
-    # kasim syntax cannot handle Fortran scientific notation (must use 'e'
-    # instead of 'd')
-    code = sub('(?<=[0-9])d', 'e', code)
-    return code
+
+class KappaPrinter(StrPrinter):
+    def __init__(self, **settings):
+        super(KappaPrinter, self).__init__(settings)
+
+    def _print_Piecewise(self, expr):
+        if expr.args[-1][1] is not sympy.true:
+            raise NotImplementedError('Piecewise statements are only '
+                                      'supported if convertible to Kappa '
+                                      'ternary statements')
+
+        if_stmt = self._print(expr.args[-1][0])
+        for pos in range(len(expr.args) - 2, -1, -1):
+            if_stmt = '{} [?] {} [:] {}'.format(
+                self._print(expr.args[pos][1]),
+                self._print(expr.args[pos][0]),
+                if_stmt
+            )
+
+        return if_stmt
+
+    def _print_Pow(self, expr, rational=False):
+        """ Adapted from sympy/printing/str.py """
+        if expr.exp is S.Half and not rational:
+            return "[sqrt](%s)" % self._print(expr.base)
+
+        if expr.is_commutative:
+            if -expr.exp is S.Half and not rational:
+                # Note: Don't test "expr.exp == -S.Half" here, because that
+                # will match -0.5, which we don't want.
+                return "1/[sqrt](%s)" % self._print(expr.base)
+
+        return super(KappaPrinter, self)._print_Pow(expr, rational)\
+            .replace('**', '^')
+
+    def _print_Pi(self, expr):
+        return '[pi]'
+
+    def _print_Function(self, expr):
+        """ Adapted from sympy/printing/str.py """
+        if (expr.func in (sympy.log, sympy.exp, sympy.sin, sympy.cos,
+                         sympy.tan) and len(expr.args) == 1):
+            func_name = '[{}]'.format(expr.func.__name__)
+        elif expr.func is sympy.Mod and len(expr.args) == 2:
+            return '{} [mod] {}'.format(*map(self._print, expr.args))
+        else:
+            func_name = expr.func.__name__
+        return "{}({})".format(func_name, self.stringify(expr.args, ", "))
+
+    def _print_Max(self, expr):
+        """ Adapted from sympy/printing/cxxcode.py """
+        if len(expr.args) == 1:
+            return self._print(expr.args[0])
+        return "[max] {} {}".format(
+            self._print(expr.args[0]), self._print(sympy.Max(*expr.args[1:])))
+
+    def _print_Min(self, expr):
+        """ Adapted from sympy/printing/cxxcode.py """
+        if len(expr.args) == 1:
+            return self._print(expr.args[0])
+        return "[min] {} {}".format(
+            self._print(expr.args[0]), self._print(sympy.Min(*expr.args[1:])))
+
+
+def expression_to_muparser(expression, pre4syntax=False):
+    """Render the Expression as a muparser-compatible string."""
+
+    if pre4syntax and expression.expr.atoms(sympy.Piecewise):
+        raise ValueError('Kappa 4.0 or higher required for Piecewise '
+                         'expression support')
+
+    return KappaPrinter(order='none').doprint(expression.expr)
+
 
 class KappaException(Exception):
     pass

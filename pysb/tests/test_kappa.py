@@ -2,6 +2,7 @@ from pysb.testing import *
 from pysb import *
 from pysb.kappa import *
 import networkx as nx
+import sympy
 
 _KAPPA_SEED = 123456
 
@@ -32,6 +33,18 @@ def test_kappa_expressions():
     Parameter('kr',0.1)
     Parameter('num_A',1000)
     Expression('kf',1e-5/two)
+    Expression('test_sqrt', -1 + sympy.sqrt(1 + two))
+    Expression('test_pi', sympy.pi)
+    Expression('test_log', sympy.log(two))
+    Expression('test_exp', sympy.exp(two))
+    Expression('test_sin', sympy.sin(two))
+    Expression('test_cos', sympy.cos(two))
+    Expression('test_tan', sympy.tan(two))
+    Expression('test_max', sympy.Max(two, kr, 2.0))
+    Expression('test_min', sympy.Min(two, kr, 2.0))
+    Expression('test_mod', sympy.Mod(10, two))
+    Expression('test_piecewise', sympy.Piecewise((0.0, two < 400.0),
+                                                 (1.0, True)))
     Initial(A(site=('u')),num_A)
     Rule('dimerize_fwd',
          A(site='u') + A(site='u') >> A(site=('u', 1)) % A(site=('u',1)), kf)
@@ -183,7 +196,8 @@ def test_influence_map_kasa():
 def test_unicode_strs():
     Monomer(u'A', [u'b'], {u'b':[u'y', u'n']})
     Monomer(u'B')
-    Rule(u'rule1', A(b=u'y') >> B(), Parameter(u'k', 1))
+    Rule(u'rule1', A(b=u'y') + KappaDot() >> KappaDot() + B(),
+         Parameter(u'k', 1))
     Initial(A(b=u'y'), Parameter(u'A_0', 100))
     Observable(u'B_', B())
     npts = 200
