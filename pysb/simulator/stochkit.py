@@ -151,8 +151,8 @@ class StochKitSimulator(Simulator):
             # Export model file
             stoch_xml = StochKitExporter(self._model).export(
                 self.initials[i], self.param_values[i])
-            self._logger.log(EXTENDED_DEBUG, 'StochKit XML:\n' + stoch_xml)
-            with open(fname, 'w') as f:
+            self._logger.log(EXTENDED_DEBUG, 'StochKit XML:\n%s' % stoch_xml)
+            with open(fname, 'wt') as f:
                 f.write(stoch_xml)
 
             # Assemble the argument list
