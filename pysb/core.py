@@ -668,7 +668,7 @@ class ComplexPattern(object):
                 bond_num = None
                 if state_or_bond is WILD:
                     continue
-                elif isinstance(state_or_bond, (str, unicode)):
+                elif isinstance(state_or_bond, basestring):
                     state = state_or_bond
                 elif isinstance(state_or_bond, collections.Iterable) and len(
                         state_or_bond) == 2:
