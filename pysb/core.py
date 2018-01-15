@@ -1994,7 +1994,11 @@ class KeywordMeta(type):
     def __str__(cls):
         return repr(cls)
 
-class Keyword(object): __metaclass__ = KeywordMeta
+
+# Define Keyword class with KeywordMeta metaclass in a Python 2 and 3
+# compatible way
+class Keyword(KeywordMeta("KeywordMetaBase", (object, ), {})):
+    pass
 
 # The keywords.
 

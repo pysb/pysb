@@ -5,6 +5,11 @@ import networkx as nx
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 import numpy as np
+try:
+    basestring
+except NameError:
+    # Under Python 3, do not pretend that bytes are a valid string
+    basestring = str
 
 
 def get_bonds_in_pattern(pat):
@@ -42,7 +47,7 @@ def get_bonds_in_pattern(pat):
         for sc in mp.site_conditions.values():
             if isinstance(sc, int):
                 bonds_used.add(sc)
-            elif not isinstance(sc, (str, unicode)) and \
+            elif not isinstance(sc, basestring) and \
                     isinstance(sc, collections.Iterable):
                 [bonds_used.add(b) for b in sc if isinstance(b, int)]
 
