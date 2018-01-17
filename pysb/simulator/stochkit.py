@@ -73,14 +73,14 @@ class StochKitSimulator(Simulator):
     A_total trajectory for first run
 
     >>> print(simulation_result.observables[0]['A_total']) \
-        #doctest: +ELLIPSIS
-    [ 1.  0.  0.  0.  0.]
+        #doctest: +NORMALIZE_WHITESPACE
+    [1.  0.  0.  0.  0.]
 
     A_total trajectory for second run
 
     >>> print(simulation_result.observables[1]['A_total']) \
         #doctest: +SKIP
-    [ 1.  1.  1.  0.  0.]
+    [1.  1.  1.  0.  0.]
 
     For further information on retrieving trajectories (species,
     observables, expressions over time) from the ``simulation_result``

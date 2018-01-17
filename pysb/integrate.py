@@ -215,7 +215,7 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     >>> numpy.set_printoptions(precision=4)
     >>> yfull = odesolve(model, linspace(0, 40, 10))
     >>> print(yfull['A_total'])            #doctest: +NORMALIZE_WHITESPACE
-    [ 1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
+    [1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
     0.7158]
 
     Obtain a view on a returned record array which uses an atomic data-type and
@@ -236,11 +236,11 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     (10, 6)
     >>> print(yarray.dtype)
     float64
-    >>> print(yarray[0:4, 1:3])
-    [[  0.0000e+00   0.0000e+00]
-     [  2.1672e-05   1.0093e-01]
-     [  1.6980e-05   1.4943e-01]
-     [  1.4502e-05   1.8209e-01]]
+    >>> print(yarray[0:4, 1:3])            #doctest: +NORMALIZE_WHITESPACE
+    [[0.0000e+00   0.0000e+00]
+     [2.1672e-05   1.0093e-01]
+     [1.6980e-05   1.4943e-01]
+     [1.4502e-05   1.8209e-01]]
 
     """
     integrator_options['integrator'] = integrator
