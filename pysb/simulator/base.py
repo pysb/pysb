@@ -157,7 +157,7 @@ class Simulator(object):
         except SimulatorException:
             # Network free simulators
             if self._initials:
-                return len(self._initials.values()[0])
+                return len(list(self._initials.values())[0])
             else:
                 return 1
 
@@ -852,7 +852,7 @@ class SimulationResult(object):
         """
         if self._yfull is None:
             sp_names = ['__s%d' % i for i in range(len(self._model.species))]
-            yfull_dtype = zip(sp_names, itertools.repeat(float))
+            yfull_dtype = list(zip(sp_names, itertools.repeat(float)))
             if len(self._model.observables):
                 yfull_dtype += self._yobs[0].dtype.descr
             if len(self._model.expressions_dynamic()):
@@ -888,7 +888,7 @@ class SimulationResult(object):
         if self.nsims == 1 and self.squeeze:
             idx = pd.Index(times, name='time')
         else:
-            idx = pd.MultiIndex.from_tuples(zip(sim_ids, times),
+            idx = pd.MultiIndex.from_tuples(list(zip(sim_ids, times)),
                                             names=['simulation', 'time'])
         simdata = self.all
         if not isinstance(simdata, np.ndarray):
