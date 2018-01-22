@@ -80,17 +80,13 @@ def get_bonds_in_pattern(pat):
     Examples
     --------
 
-    These examples convert the set to a list for testing purposes only (sets
-    print differently on Python 2 vs Python 3). This is not necessary for
-    end users.
-
     >>> A = Monomer('A', ['b1', 'b2'], _export=False)
-    >>> list(get_bonds_in_pattern(A(b1=None, b2=None)))
-    []
-    >>> list(get_bonds_in_pattern(A(b1=1) % A(b2=1)))
-    [1]
-    >>> list(get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)))
-    [1, 2]
+    >>> get_bonds_in_pattern(A(b1=None, b2=None)) == set()
+    True
+    >>> get_bonds_in_pattern(A(b1=1) % A(b2=1)) == {1}
+    True
+    >>> get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)) == {1, 2}
+    True
     """
     return set(get_half_bonds_in_pattern(pat))
 
