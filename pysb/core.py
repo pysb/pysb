@@ -1509,7 +1509,7 @@ class Model(object):
         return cset_all
 
     @property
-    def comps(self):
+    def components(self):
         return self.all_components()
 
     def parameters_rules(self):
