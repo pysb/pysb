@@ -668,7 +668,7 @@ class ComplexPattern(object):
                 bond_num = None
                 if state_or_bond is WILD:
                     continue
-                elif isinstance(state_or_bond, (str, unicode)):
+                elif isinstance(state_or_bond, basestring):
                     state = state_or_bond
                 elif isinstance(state_or_bond, collections.Iterable) and len(
                         state_or_bond) == 2:
@@ -1889,7 +1889,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         return [c for c in self]
 
     def items(self):
-        return zip(self.keys(), self)
+        return list(zip(self.keys(), self))
 
     def index(self, c):
         # We can implement this in O(1) ourselves, whereas the Sequence mixin
@@ -1994,7 +1994,11 @@ class KeywordMeta(type):
     def __str__(cls):
         return repr(cls)
 
-class Keyword(object): __metaclass__ = KeywordMeta
+
+# Define Keyword class with KeywordMeta metaclass in a Python 2 and 3
+# compatible way
+class Keyword(KeywordMeta("KeywordMetaBase", (object, ), {})):
+    pass
 
 # The keywords.
 

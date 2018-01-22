@@ -1023,8 +1023,8 @@ def catalyze_complex(enzyme, e_site, substrate, s_site, product, klist, m1=None,
             #If the given binding site is only present in one monomer in the complex:
         if m1==None:
             #Build up ComplexPattern for use in rule (with state of given binding site specified).
-            s1complexpatub = specsitesdict.keys()[0]({site1:None})
-            s1complexpatb = specsitesdict.keys()[0]({site1:50})
+            s1complexpatub = list(specsitesdict.keys())[0]({site1:None})
+            s1complexpatb = list(specsitesdict.keys())[0]({site1:50})
             for monomer in s1.monomer_patterns:
                 if monomer not in specsitesdict.keys():
                     s1complexpatub %= monomer
@@ -2320,3 +2320,4 @@ def assemble_chain_sequential_base(base, basesite, subunit, site1, site2, max_si
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
+
