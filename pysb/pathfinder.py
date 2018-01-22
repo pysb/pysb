@@ -1,9 +1,12 @@
 import os
+import sys
+import sysconfig
 
 _path_config = {
     'bng': {
         'name': 'BioNetGen',
         'executable': 'BNG2.pl',
+        'batch_file': 'BNG2.bat',
         'env_var': 'BNGPATH',
         'search_paths': {
             'posix': ('/usr/local/share/BioNetGen', ),
@@ -121,6 +124,15 @@ def get_path(prog_name):
                                 path_conf['name'],
                                 _get_executable(prog_name)))
 
+    # If this is anaconda, check the anaconda binary dir
+    if _is_anaconda():
+        try:
+            _path_cache[prog_name] = _validate_path(prog_name,
+                                                    _get_anaconda_bindir())
+            return _path_cache[prog_name]
+        except ValueError:
+            pass
+
     # Check default paths for this operating system
     if os.name not in path_conf['search_paths'].keys():
         raise Exception('No default path is known for %s on your '
@@ -172,6 +184,33 @@ def set_path(prog_name, full_path):
     _path_cache[prog_name] = _validate_path(prog_name, full_path)
 
 
+def _is_anaconda():
+    """ Identify if this is an anaconda environment """
+    return 'conda' in sys.version
+
+
+def _get_anaconda_bindir():
+    """ Get the binary path from python build time (for anaconda) """
+    # Is this an anaconda virtual environment?
+    conda_env = os.environ.get('CONDA_PREFIX', None)
+    if conda_env:
+        return os.path.join(conda_env, 'Scripts' if os.name == 'nt' else 'bin')
+
+    # Otherwise, use the default anaconda bin directory
+    bindir = sysconfig.get_config_var('BINDIR')
+    if os.name == 'nt':
+        # bindir doesn't point to scripts directory on Windows
+        return os.path.join(bindir, 'Scripts')
+    else:
+        return bindir
+
+def _get_batch_file(prog_name):
+    try:
+        return _path_config[prog_name]['batch_file']
+    except KeyError:
+        return None
+
+
 def _get_executable(prog_name):
     executable = _path_config[prog_name]['executable']
     if isinstance(executable, str):
@@ -193,6 +232,15 @@ def _validate_path(prog_name, full_path):
                          full_path)
 
     if not os.path.isfile(full_path):
+        # On anaconda, check batch file on Windows, if applicable
+        batch_file = _get_batch_file(prog_name)
+        if _is_anaconda() and os.name == 'nt' and batch_file:
+            try:
+                return _validate_path(prog_name,
+                                      os.path.join(full_path, batch_file))
+            except ValueError:
+                pass
+
         # It's a directory, try appending the executable name
         return _validate_path(prog_name, os.path.join(full_path,
                                                       _get_executable(

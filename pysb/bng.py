@@ -290,8 +290,11 @@ class BngConsole(BngBaseInterface):
                 bng_file.write(self.generator.get_content())
 
         # Start BNG Console and load BNGL
-        self.console = pexpect.spawn('perl %s --console' %
-                                     pf.get_path('bng'),
+        bng_path = pf.get_path('bng')
+        bng_exec_path = '%s --console' % bng_path
+        if not bng_path.endswith('.bat'):
+            bng_exec_path = 'perl %s' % bng_exec_path
+        self.console = pexpect.spawn(bng_exec_path,
                                      cwd=self.base_directory,
                                      timeout=timeout)
         self._console_wait()
@@ -449,8 +452,11 @@ class BngFileInterface(BngBaseInterface):
         self.command_queue.close()
         self._init_command_queue()
 
-        p = subprocess.Popen(['perl', pf.get_path('bng'),
-                              self.bng_filename],
+        bng_exec_args = [pf.get_path('bng'), self.bng_filename]
+        if not bng_exec_args[0].endswith('.bat'):
+            bng_exec_args.insert(0, 'perl')
+
+        p = subprocess.Popen(bng_exec_args,
                              cwd=self.base_directory,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)

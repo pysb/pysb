@@ -1508,6 +1508,10 @@ class Model(object):
             cset_all |= cset
         return cset_all
 
+    @property
+    def components(self):
+        return self.all_components()
+
     def parameters_rules(self):
         """Return a ComponentSet of the parameters used in rules."""
         # rate_reverse is None for irreversible rules, so we'll need to filter those out
@@ -1861,6 +1865,15 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             return self._elements[key]
         else:
             return self._map[key]
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as e:
+            raise AttributeError("Model has no component '%s'" % name)
+
+    def __setstate__(self, state):
+        self.__dict__ = state
 
     def get(self, key, default=None):
         if isinstance(key, (int, long)):
