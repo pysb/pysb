@@ -16,8 +16,8 @@ from pysb.logging import get_logger, EXTENDED_DEBUG
 
 BIOMODELS_REGEX = re.compile(r'(BIOMD|MODEL)[0-9]{10}')
 BIOMODELS_URLS = {
-    'EBI': 'http://www.ebi.ac.uk/biomodels-main/download?mid={}',
-    'Caltech': 'http://biomodels.caltech.edu/download?mid={}'
+    'ebi': 'http://www.ebi.ac.uk/biomodels-main/download?mid={}',
+    'caltech': 'http://biomodels.caltech.edu/download?mid={}'
 }
 
 
@@ -176,7 +176,7 @@ def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
 
 
 def model_from_biomodels(accession_no, force=False, cleanup=True,
-                         mirror='EBI', **kwargs):
+                         mirror='ebi', **kwargs):
     """
     Create a PySB Model based on a BioModels SBML model
 
@@ -209,7 +209,7 @@ def model_from_biomodels(accession_no, force=False, cleanup=True,
         Delete temporary directory on completion if True. Set to False for
         debugging purposes.
     mirror : str
-        Which BioModels mirror to use, either 'EBI' or 'Caltech'
+        Which BioModels mirror to use, either 'ebi' or 'caltech'
     **kwargs: kwargs
         Keyword arguments to pass on to :func:`sbml_translator`
 
