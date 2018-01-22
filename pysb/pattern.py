@@ -12,43 +12,37 @@ except NameError:
     basestring = str
 
 
-def get_bonds_in_pattern(pat, as_set=True):
+def get_half_bonds_in_pattern(pat):
     """
-    Return the set of integer bond numbers used in a pattern
+    Return the list of integer bond numbers used in a pattern
+
+    To return as a set, use :func:`get_bonds_in_pattern`.
 
     Parameters
     ----------
     pat : ComplexPattern, MonomerPattern, or None
         A pattern from which bond numberings are extracted
-    as_set : bool
-        Return as a set if True, or as a list if False
 
     Returns
     -------
-    set or list
-        The set or list of bond numbers used in the supplied pattern
+    list
+        Bond numbers used in the supplied pattern
 
     Examples
     --------
 
-    These examples convert the set to a list for testing purposes only (sets
-    print differently on Python 2 vs Python3). In general, this should not be
-    necessary.
-
     >>> A = Monomer('A', ['b1', 'b2'], _export=False)
-    >>> list(get_bonds_in_pattern(A(b1=None, b2=None)))
+    >>> get_half_bonds_in_pattern(A(b1=None, b2=None))
     []
-    >>> list(get_bonds_in_pattern(A(b1=1) % A(b2=1)))
-    [1]
-    >>> list(get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)))
-    [1, 2]
+    >>> get_half_bonds_in_pattern(A(b1=1) % A(b2=1))
+    [1, 1]
     """
     bonds_used = list()
 
     def _get_bonds_in_monomer_pattern(mp):
         for sc in mp.site_conditions.values():
             if isinstance(sc, int):
-                bonds_used.add(sc)
+                bonds_used.append(sc)
             elif not isinstance(sc, basestring) and \
                     isinstance(sc, collections.Iterable):
                 [bonds_used.append(b) for b in sc if isinstance(b, int)]
@@ -63,7 +57,42 @@ def get_bonds_in_pattern(pat, as_set=True):
     else:
         raise ValueError('Unknown pattern type: %s' % type(pat))
 
-    return set(bonds_used) if as_set else bonds_used
+    return bonds_used
+
+
+def get_bonds_in_pattern(pat):
+    """
+    Return the set of integer bond numbers used in a pattern
+
+    To return as a list (with duplicates), use
+    :func:`get_half_bonds_in_pattern`
+
+    Parameters
+    ----------
+    pat : ComplexPattern, MonomerPattern, or None
+        A pattern from which bond numberings are extracted
+
+    Returns
+    -------
+    set
+        Bond numbers used in the supplied pattern
+
+    Examples
+    --------
+
+    These examples convert the set to a list for testing purposes only (sets
+    print differently on Python 2 vs Python 3). This is not necessary for
+    end users.
+
+    >>> A = Monomer('A', ['b1', 'b2'], _export=False)
+    >>> list(get_bonds_in_pattern(A(b1=None, b2=None)))
+    []
+    >>> list(get_bonds_in_pattern(A(b1=1) % A(b2=1)))
+    [1]
+    >>> list(get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)))
+    [1, 2]
+    """
+    return set(get_half_bonds_in_pattern(pat))
 
 
 def check_dangling_bonds(pattern):
@@ -76,8 +105,7 @@ def check_dangling_bonds(pattern):
         for cp in pattern.complex_patterns:
             check_dangling_bonds(cp)
         return
-    bond_counts = collections.Counter(get_bonds_in_pattern(pattern,
-                                                           as_set=False))
+    bond_counts = collections.Counter(get_half_bonds_in_pattern(pattern))
 
     dangling_bonds = [bond for bond, count in bond_counts.items()
                       if count == 1]
