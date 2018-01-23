@@ -103,39 +103,26 @@ def load_params(fname):
     return parmsff
 
 
-def read_dot(filename, use=None):
-    """ Read a graphviz dot file using pydot or pygraphviz
+def read_dot(filename):
+    """ Read a graphviz dot file using pydot
 
     Parameters
     ----------
     filename: str
         A DOT (graphviz) filename
-    use: str, optional
-        Networkx backend to use for loading dot files, either 'pydot',
-        'pygraphviz', or None (which tries pydot, then pygraphviz)
 
     Returns
     -------
     MultiGraph
         A networkx MultiGraph file
     """
-    if use is None or use == 'pydot':
-        try:
-            import pydot
-            pydot_graph = pydot.graph_from_dot_file(filename)[0]
-            return _from_pydot(pydot_graph)
-        except ImportError:
-            if use == 'pydot':
-                raise
-
     try:
-        return read_dot_pygraphviz(filename)
+        import pydot
+        pydot_graph = pydot.graph_from_dot_file(filename)[0]
+        return _from_pydot(pydot_graph)
     except ImportError:
-        if use == 'pygraphviz':
-            raise
-        else:
-            raise ImportError('Either the pydot or pygraphviz library is '
-                              'required to read .dot files')
+        raise ImportError('Importing graphviz files requires the pydot '
+                          'library')
 
 
 def _from_pydot(P):

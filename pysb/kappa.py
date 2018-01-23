@@ -124,14 +124,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     If flux_map is True, returns an instance of SimulationResult, a namedtuple
     with two members, `timecourse` and `flux_map`. The `timecourse` field
     contains the simulation ndarray, and the `flux_map` field is an instance of
-    a networkx MultiGraph containing the flux map. The flux map can be rendered
-    as a PNG as follows (example requires pygraphviz)::
-
-        from networkx.drawing.nx_agraph import view_pygraphviz
-        view_pygraphviz(fluxmap)
-
-    For further information, see the networkx documenation:
-    https://networkx.github.io/documentation/latest/reference/drawing.html
+    a networkx MultiGraph containing the flux map. For details on viewing
+    the flux map graphically see :func:`run_static_analysis` (notes section).
     """
 
     gen = KappaGenerator(model)
@@ -195,7 +189,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
                 raise
             else:
                 warnings.warn(
-                        "neither pydot nor pygraphviz could be "
+                        "The pydot library could not be "
                         "imported, so no MultiGraph "
                         "object returned (returning None); flux map "
                         "dot file available at %s" % fm_filename)
@@ -250,6 +244,23 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     of a networkx MultiGraph. If the either the contact_map or influence_map
     argument to the function is False, the corresponding entry in the
     StaticAnalysisResult returned by the function will be None.
+
+    Notes
+    -----
+    To view a networkx file graphically, use `draw_network`::
+
+        import networkx as nx
+        nx.draw_networkx(g, with_labels=True)
+
+    You can use `graphviz_layout` to use graphviz for layout (requires pydot
+    library)::
+
+        import networkx as nx
+        pos = nx.drawing.nx_pydot.graphviz_layout(g, prog='dot')
+        nx.draw_networkx(g, pos, with_labels=True)
+
+    For further information, see the networkx documentation on visualization:
+    https://networkx.github.io/documentation/latest/reference/drawing.html
     """
 
     # Make sure the user has asked for an output!
@@ -319,7 +330,7 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
             raise
         else:
             warnings.warn(
-                    "neither pydot nor pygraphviz could be "
+                    "The pydot library could not be "
                     "imported, so no MultiGraph "
                     "object returned (returning None); "
                     "contact/influence maps available at %s" %
@@ -347,17 +358,10 @@ def contact_map(model, **kwargs):
 
     Returns
     -------
-    networkx MultiGraph object containing the contact map.
-    The contact map can be rendered as a PNG using the dot as follows
-    (example requires pygraphviz)::
-
-        from networkx.drawing.nx_agraph import view_pygraphviz
-        view_pygraphviz(contact_map)
-
-    For further information, see the networkx documenation:
-    https://networkx.github.io/documentation/latest/reference/drawing.html
+    networkx MultiGraph object containing the contact map. For details on
+    viewing the contact map graphically see :func:`run_static_analysis` (notes
+    section).
     """
-
     kasa_result = run_static_analysis(model, influence_map=False,
                                     contact_map=True, **kwargs)
     return kasa_result.contact_map
@@ -376,15 +380,9 @@ def influence_map(model, **kwargs):
 
     Returns
     -------
-    networkx MultiGraph object containing the influence map.
-    The influence map can be rendered as a PNG as follows (example requires
-    pygraphviz)::
-
-        from networkx.drawing.nx_agraph import view_pygraphviz
-        view_pygraphviz(influence_map)
-
-    For further information, see the networkx documenation:
-    https://networkx.github.io/documentation/latest/reference/drawing.html
+    networkx MultiGraph object containing the influence map. For details on
+    viewing the influence map graphically see :func:`run_static_analysis`
+    (notes section).
     """
 
     kasa_result = run_static_analysis(model, influence_map=True,
