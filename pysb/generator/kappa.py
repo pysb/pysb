@@ -13,12 +13,10 @@ except NameError:
 class KappaGenerator(object):
 
     # Dialect can be either 'complx' or 'kasim' (default)
-    def __init__(self, model, dialect='kasim', pre4syntax=False,
-                 _warn_no_ic=True):
+    def __init__(self, model, dialect='kasim', _warn_no_ic=True):
         self.model = model
         self.__content = None
         self.dialect = dialect
-        self.pre4syntax = pre4syntax
         self._warn_no_ic = _warn_no_ic
 
     def get_content(self):
@@ -46,8 +44,7 @@ class KappaGenerator(object):
             self.__content += "%%var: '%s' %e\n" % (p.name, p.value)
         for e in self.model.expressions:
             sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
-            str_expr = str(expression_to_muparser(e,
-                                                  pre4syntax=self.pre4syntax))
+            str_expr = str(expression_to_muparser(e))
             for n in sym_names:
                 str_expr = str_expr.replace(n,"'%s'"%n)
             self.__content += "%%var: '%s' %s\n" % (e.name, str_expr)
@@ -56,7 +53,7 @@ class KappaGenerator(object):
     def generate_molecule_types(self):
         for m in self.model.monomers:
             site_code = ','.join([
-                format_monomer_site(m, s, pre4syntax=self.pre4syntax)
+                format_monomer_site(m, s)
                 for s in m.sites])
             self.__content += "%%agent: %s(%s)\n" % (m.name, site_code)
         self.__content += "\n"
@@ -64,10 +61,8 @@ class KappaGenerator(object):
     def generate_reaction_rules(self):
         for r in self.model.rules:
             label = "'" + r.name + "'"
-            reactants_code = format_reactionpattern(r.reactant_pattern,
-                                                    pre4syntax=self.pre4syntax)
-            products_code = format_reactionpattern(r.product_pattern,
-                                                   pre4syntax=self.pre4syntax)
+            reactants_code = format_reactionpattern(r.reactant_pattern)
+            products_code = format_reactionpattern(r.product_pattern)
             arrow = '->'
 
             if isinstance(r.rate_forward,pysb.core.Expression) and \
@@ -107,12 +102,8 @@ class KappaGenerator(object):
             return
         for obs in self.model.observables:
             name = "'" + obs.name + "'"
-            observable_code = format_reactionpattern(
-                obs.reaction_pattern, pre4syntax=self.pre4syntax)
-            if self.pre4syntax:
-                self.__content += "%%obs: %s %s\n" % (name, observable_code)
-            else:
-                self.__content += "%%obs: %s |%s|\n" % (name, observable_code)
+            observable_code = format_reactionpattern(obs.reaction_pattern)
+            self.__content += "%%obs: %s |%s|\n" % (name, observable_code)
 
         self.__content += "\n"
 
@@ -120,7 +111,7 @@ class KappaGenerator(object):
         if self._warn_no_ic and not self.model.initial_conditions:
             warnings.warn("Warning: No initial conditions.")
 
-        species_codes = [format_complexpattern(cp, pre4syntax=self.pre4syntax)
+        species_codes = [format_complexpattern(cp)
                          for cp, param in self.model.initial_conditions]
         #max_length = max(len(code) for code in species_codes)
         for i, code in enumerate(species_codes):
@@ -138,43 +129,37 @@ class KappaGenerator(object):
         self.__content += "\n"
 
 
-def format_monomer_site(monomer, site, pre4syntax=True):
+def format_monomer_site(monomer, site):
     ret = site
     if site in monomer.site_states:
-        if pre4syntax:
-            for state in monomer.site_states[site]:
-                ret += '~' + state
-        else:
-            ret += '{%s}' % ' '.join(monomer.site_states[site])
+        ret += '{%s}' % ' '.join(monomer.site_states[site])
     return ret
 
 
-def format_reactionpattern(rp, pre4syntax=True):
-    if not pre4syntax and not rp.complex_patterns:
+def format_reactionpattern(rp):
+    if not rp.complex_patterns:
         return '.'
     return ','.join(filter(None,
-                           [format_complexpattern(cp, pre4syntax=pre4syntax)
+                           [format_complexpattern(cp)
                             for cp in rp.complex_patterns]))
 
 
-def format_complexpattern(cp, pre4syntax=True):
-    ret = ','.join(filter(None,
-                          [format_monomerpattern(mp, pre4syntax=pre4syntax)
-                           for mp in cp.monomer_patterns]))
+def format_complexpattern(cp):
+    ret = ','.join(filter(None, [format_monomerpattern(mp)
+                                 for mp in cp.monomer_patterns]))
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)
     return ret
 
 
-def format_monomerpattern(mp, pre4syntax=True):
+def format_monomerpattern(mp):
     from pysb.kappa import KappaDot
     if isinstance(mp, KappaDot):
-        return None if pre4syntax else '.'
+        return '.'
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))
-    site_pattern_code = ','.join([format_site_condition(site, state,
-                                                        pre4syntax=pre4syntax)
+    site_pattern_code = ','.join([format_site_condition(site, state)
                                   for (site, state) in site_conditions])
     ret = '%s(%s)' % (mp.monomer.name, site_pattern_code)
     if mp.compartment is not None:
@@ -182,14 +167,7 @@ def format_monomerpattern(mp, pre4syntax=True):
     return ret
 
 
-def format_site_condition(site, state, pre4syntax=True):
-    if pre4syntax:
-        return _format_site_condition_kappa3(site, state)
-    else:
-        return _format_site_condition_kappa4(site, state)
-
-
-def _format_site_condition_kappa4(site, state):
+def format_site_condition(site, state):
     # If the state/bond is unspecified
     if state is None:
         state_code = '[.]'
@@ -225,49 +203,6 @@ def _format_site_condition_kappa4(site, state):
     # Site bound to WILD
     elif state == pysb.WILD:
         state_code = '[#]'
-    # Something else
-    else:
-        raise KappaException("Kappa generator has encountered an unknown "
-                             "element in a rule pattern site condition.")
-    return '%s%s' % (site, state_code)
-
-
-def _format_site_condition_kappa3(site, state):
-    # If the state/bond is unspecified
-    if state is None:
-        state_code = ''
-    # If there is a bond number
-    elif isinstance(state, int):
-        state_code = '!' + str(state)
-    # If there is a lists of bonds to the site (not supported by Kappa)
-    elif isinstance(state, list):
-        raise KappaException("Kappa generator does not support multiple bonds "
-                             "to a single site.")
-    # Site with state
-    elif isinstance(state, basestring):
-        state_code = '~' + state
-    # Site with state and a bond
-    elif isinstance(state, tuple):
-        # If the bond is ANY
-        if state[1] == pysb.ANY:
-            state_code = '~%s!_' % state[0]
-        # If the bond is WILD
-        elif state[1] == pysb.WILD:
-            state_code = '~%s?' % state[0]
-        # If the bond is a number
-        elif type(state[1]) == int:
-            state_code = '~%s!%s' % state
-        # If it's something else, raise an Exception
-        else:
-            raise KappaException("Kappa generator has encountered an unknown "
-                                 "element in a site state/bond tuple: (%s, %s)"
-                                 % state)
-    # Site bound to ANY
-    elif state == pysb.ANY:
-        state_code = '!_'
-    # Site bound to WILD
-    elif state == pysb.WILD:
-        state_code = '?'
     # Something else
     else:
         raise KappaException("Kappa generator has encountered an unknown "
@@ -341,12 +276,8 @@ class KappaPrinter(StrPrinter):
             self._print(expr.args[0]), self._print(sympy.Min(*expr.args[1:])))
 
 
-def expression_to_muparser(expression, pre4syntax=False):
+def expression_to_muparser(expression):
     """Render the Expression as a muparser-compatible string."""
-
-    if pre4syntax and expression.expr.atoms(sympy.Piecewise):
-        raise ValueError('Kappa 4.0 or higher required for Piecewise '
-                         'expression support')
 
     return KappaPrinter(order='none').doprint(expression.expr)
 

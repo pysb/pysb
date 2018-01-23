@@ -65,12 +65,8 @@ SimulationResult = namedtuple('SimulationResult',
 
 def run_simulation(model, time=10000, points=200, cleanup=True,
                    output_prefix=None, output_dir=None, flux_map=False,
-                   perturbation=None, seed=None, verbose=False,
-                   pre4syntax=False):
+                   perturbation=None, seed=None, verbose=False):
     """Runs the given model using KaSim and returns the parsed results.
-
-    By default, Kappa 4 syntax is used. To use Kappa 3, use the pre4syntax
-    argument.
 
     Parameters
     ----------
@@ -112,8 +108,6 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         deterministic behaviour (e.g. for testing)
     verbose : boolean
         Whether to pass the output of KaSim through to stdout/stderr.
-    pre4syntax : boolean
-        True to use kappa version 3 syntax, False for kappa 4 or higher.
 
     Returns
     -------
@@ -134,7 +128,7 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     the flux map graphically see :func:`run_static_analysis` (notes section).
     """
 
-    gen = KappaGenerator(model, pre4syntax=pre4syntax)
+    gen = KappaGenerator(model)
 
     if output_prefix is None:
         output_prefix = 'tmpKappa_%s_' % model.name
@@ -163,12 +157,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         # If desired, add instructions to the kappa file to generate the
         # flux map:
         if flux_map:
-            if pre4syntax:
-                kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
-                                 fm_filename)
-            else:
-                kappa_file.write('%%mod: [true] do $DIN "%s" [true];\n' %
-                                 fm_filename)
+            kappa_file.write('%%mod: [true] do $DIN "%s" [true];\n' %
+                             fm_filename)
 
         # If any perturbation language code has been passed in, add it to
         # the Kappa file:
@@ -220,11 +210,8 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
 
 def run_static_analysis(model, influence_map=False, contact_map=False,
                         cleanup=True, output_prefix=None, output_dir=None,
-                        verbose=False, pre4syntax=False):
+                        verbose=False):
     """Run static analysis (KaSa) on to get the contact and influence maps.
-
-    By default, Kappa 4 syntax is used. To use Kappa 3, use the pre4syntax
-    argument.
 
     If neither influence_map nor contact_map are set to True, then a ValueError
     is raised.
@@ -250,8 +237,6 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         an Exception is thrown.
     verbose : boolean
         Whether to pass the output of KaSa through to stdout/stderr.
-    pre4syntax : boolean
-        True to use kappa version 3 syntax, False for kappa 4 or higher.
 
     Returns
     -------
@@ -284,7 +269,7 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
         raise ValueError('Either contact_map or influence_map (or both) must '
                          'be set to True in order to perform static analysis.')
 
-    gen = KappaGenerator(model, pre4syntax=pre4syntax, _warn_no_ic=False)
+    gen = KappaGenerator(model, _warn_no_ic=False)
 
     if output_prefix is None:
         output_prefix = 'tmpKappa_%s_' % model.name
