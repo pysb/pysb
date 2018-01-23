@@ -321,3 +321,10 @@ def test_concreteness():
     Compartment('cell')
     assert not C().is_concrete()
     assert (C() ** cell).is_concrete()
+
+
+@with_model
+def test_dangling_bond():
+    Monomer('A', ['a'])
+    Parameter('kf', 1.0)
+    assert_raises(DanglingBondError, as_reaction_pattern, A(a=1) % A(a=None))

@@ -895,6 +895,8 @@ class ReactionPattern(object):
 
     def __init__(self, complex_patterns):
         self.complex_patterns = complex_patterns
+        from pysb.pattern import check_dangling_bonds
+        check_dangling_bonds(self)
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
@@ -1994,6 +1996,9 @@ class RedundantSiteConditionsError(ValueError):
             ("Site conditions may be specified as EITHER keyword arguments "
              "OR a single dict"))
 
+
+class DanglingBondError(ValueError):
+    pass
 
 # Some light infrastructure for defining symbols that act like "keywords", i.e.
 # they are immutable singletons that stringify to their own name. Regular old
