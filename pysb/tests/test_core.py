@@ -4,10 +4,29 @@ from functools import partial
 import itertools
 
 
+@with_model
 def test_component_names_valid():
     for name in 'a', 'B', 'AbC', 'dEf', '_', '_7', '__a01b__999x_x___':
-        c = Component(name, _export=False)
+        c = Monomer(name, _export=False)
         eq_(c.name, name)
+        # Before the component is added, we should not be able to find it
+        assert not hasattr(model.components, name)
+        # Add the element to a model and try to access it as attribute and item
+        model.add_component(c)
+        assert_equal(model.components[name], c)
+        assert_equal(getattr(model.components, name), c)
+
+
+@with_model
+def test_component_name_existing_attribute():
+    for name in ('_map', 'keys'):
+        c = Monomer(name, _export=False)
+        model.add_component(c)
+        # When using an existing attribute name like_map, we should get able to
+        # get it as an item, but not as an attribute
+        assert_equal(model.components[name], c)
+        assert_not_equal(getattr(model.components, name), c)
+
 
 def test_component_names_invalid():
     for name in 'a!', '!B', 'A!bC~`\\', '_!', '_!7', '__a01b  999x_x___!':

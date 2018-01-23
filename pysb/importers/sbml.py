@@ -15,7 +15,10 @@ except ImportError:
 from pysb.logging import get_logger, EXTENDED_DEBUG
 
 BIOMODELS_REGEX = re.compile(r'(BIOMD|MODEL)[0-9]{10}')
-BIOMODELS_URL = 'http://www.ebi.ac.uk/biomodels-main/download?mid={}'
+BIOMODELS_URLS = {
+    'ebi': 'http://www.ebi.ac.uk/biomodels-main/download?mid={}',
+    'caltech': 'http://biomodels.caltech.edu/download?mid={}'
+}
 
 
 class SbmlTranslationError(Exception):
@@ -172,7 +175,8 @@ def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
             shutil.rmtree(tmpdir)
 
 
-def model_from_biomodels(accession_no, force=False, cleanup=True, **kwargs):
+def model_from_biomodels(accession_no, force=False, cleanup=True,
+                         mirror='ebi', **kwargs):
     """
     Create a PySB Model based on a BioModels SBML model
 
@@ -204,6 +208,8 @@ def model_from_biomodels(accession_no, force=False, cleanup=True, **kwargs):
     cleanup : bool
         Delete temporary directory on completion if True. Set to False for
         debugging purposes.
+    mirror : str
+        Which BioModels mirror to use, either 'ebi' or 'caltech'
     **kwargs: kwargs
         Keyword arguments to pass on to :func:`sbml_translator`
 
@@ -211,8 +217,8 @@ def model_from_biomodels(accession_no, force=False, cleanup=True, **kwargs):
     --------
 
     >>> from pysb.importers.sbml import model_from_biomodels
-    >>> model = model_from_biomodels('1')
-    >>> print(model) #doctest: +ELLIPSIS
+    >>> model = model_from_biomodels('1')           #doctest: +SKIP
+    >>> print(model)                                #doctest: +SKIP
     <Model 'pysb' (monomers: 12, rules: 17, parameters: 37, expressions: 0, ...
     """
     logger = get_logger(__name__, log_level=kwargs.get('verbose'))
@@ -223,7 +229,7 @@ def model_from_biomodels(accession_no, force=False, cleanup=True, **kwargs):
             raise ValueError('accession_no must be an integer or a BioModels '
                              'accession number (BIOMDxxxxxxxxxx)')
     logger.info('Importing model {} to PySB'.format(accession_no))
-    filename, headers = urlretrieve(BIOMODELS_URL.format(accession_no))
+    filename = _download_biomodels(accession_no, mirror=mirror)
     try:
         return model_from_sbml(filename, force=force, cleanup=cleanup,
                                **kwargs)
@@ -232,3 +238,13 @@ def model_from_biomodels(accession_no, force=False, cleanup=True, **kwargs):
             os.remove(filename)
         except OSError:
             pass
+
+
+def _download_biomodels(accession_no, mirror):
+    try:
+        url_fmt = BIOMODELS_URLS[mirror]
+    except KeyError:
+        raise ValueError('Unknown Biomodels mirror: "{}". Choices are: {}'
+                         .format(mirror, BIOMODELS_URLS.keys()))
+    filename, _ = urlretrieve(url_fmt.format(accession_no))
+    return filename
