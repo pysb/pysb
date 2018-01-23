@@ -13,24 +13,14 @@ General
 
 * Do you support Python 3?
 
-    **Yes, with one caveat, which will be fixed in the next release**. PySB
-    currently uses the `<>` operator for reversible rules, e.g.::
+    **Yes**. The current release of PySB supports Python 3.6 and
+    Python 2.7. Other Python 3.x releases are not explicitly tested.
 
-       Rule('bindA', A(b=None) + A(b=None) <> A(b=1) % A(b=1), kf, kr)
-
-    PySB "overloads" this operator from base Python, but this operator
-    (originally "not equals", a synonym for `!=`) was removed in Python 3.
-    Thus, to use Python 3 with the current PySB release, you will have to
-    write the above rule as the following::
-
-        Rule('bindA', A(b=None) + A(b=None) != A(b=1) % A(b=1), kf, kr)
-
-    However, following discussions among the core team, we have decided to
-    replace the `<>` reversible rule operator in the next release of PySB
-    with |. Thus, from the next release, reversible rules will be written
-    as follows::
-
-        Rule('bindA', A(b=None) + A(b=None) | A(b=1) % A(b=1), kf, kr)
+    In PySB version 1.5 and earlier, the `<>` operator was used for
+    reversible rules. `<>` is pending deprecation from PySB, and does not
+    work at all in Python 3. All new models should use `|` as the reversible
+    rule operator. Previous models should be upgraded if compatibility
+    with future PySB versions is required.
 
 Rule and Reaction Rate Laws
 ===========================
