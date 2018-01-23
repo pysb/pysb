@@ -312,6 +312,9 @@ class KappaPrinter(StrPrinter):
     def _print_Pi(self, expr):
         return '[pi]'
 
+    def _print_Exp1(self, expr):
+        return '[E]'
+
     def _print_Function(self, expr):
         """ Adapted from sympy/printing/str.py """
         if (expr.func in (sympy.log, sympy.exp, sympy.sin, sympy.cos,

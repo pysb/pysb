@@ -35,6 +35,7 @@ def test_kappa_expressions():
     Expression('kf',1e-5/two)
     Expression('test_sqrt', -1 + sympy.sqrt(1 + two))
     Expression('test_pi', sympy.pi)
+    Expression('test_e', sympy.E)
     Expression('test_log', sympy.log(two))
     Expression('test_exp', sympy.exp(two))
     Expression('test_sin', sympy.sin(two))
