@@ -465,9 +465,17 @@ class KappaDot(pysb.MonomerPattern):
 
        Rule('spawnB', A() + KappaDot() >> A() + B(), r)
 
+    KappaDot is ignored when using the BioNetGen interface (it is exported as
+    the null species `0`).
      """
     def __init__(self):
         dot_monomer = pysb.Monomer('__kappadot__', _export=False)
         super(KappaDot, self).__init__(dot_monomer,
                                        site_conditions={},
                                        compartment=None)
+
+    def __repr__(self):
+        return 'KappaDot()'
+
+    def __str__(self):
+        return repr(self)

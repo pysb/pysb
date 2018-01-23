@@ -3,6 +3,7 @@ import warnings
 import pysb
 import sympy
 from sympy.printing import StrPrinter
+from pysb.kappa import KappaDot
 
 # Alias basestring under Python 3 for forwards compatibility
 try:
@@ -194,6 +195,8 @@ def format_complexpattern(cp):
     return ret
 
 def format_monomerpattern(mp):
+    if isinstance(mp, KappaDot):
+        return '0'
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))

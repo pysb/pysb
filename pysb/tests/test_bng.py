@@ -1,6 +1,7 @@
 from pysb.testing import *
 from pysb import *
 from pysb.bng import *
+from pysb.kappa import KappaDot
 import os
 import unittest
 
@@ -16,6 +17,19 @@ def test_generate_network():
     Parameter('k', 1)
     Rule('degrade', A() >> None, k)
     ok_(generate_network(model))
+
+
+@with_model
+def test_ignore_kappa_dot():
+    Monomer('A', ['b'])
+    Monomer('B')
+    Parameter('k', 1)
+    Parameter('A_0', 1)
+    Initial(A(b=None), A_0)
+    Initial(A(b=1) % A(b=1), A_0)
+    Rule('synth', KappaDot() >> A(b=None), k)
+    Rule('degrade', A(b=1) % A(b=1) >> KappaDot() + A(b=None), k)
+    generate_network(model)
 
 
 @unittest.skipIf(os.name == 'nt', 'BNG Console does not work on Windows')
