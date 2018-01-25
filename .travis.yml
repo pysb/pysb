@@ -20,7 +20,7 @@ before_install:
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda install --yes -c conda-forge python="$TRAVIS_PYTHON_VERSION"
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
-    pydot coveralls mock
+    pydot coveralls mock cython
 - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then pip install weave; fi
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
