@@ -4,8 +4,14 @@ import pysb.core
 import inspect
 import numpy
 import io
+import networkx as nx
+from networkx.drawing.nx_agraph import read_dot as read_dot_pygraphviz
+try:
+    basestring
+except NameError:
+    basestring = str
 
-__all__ = ['alias_model_components', 'rules_using_parameter']
+__all__ = ['alias_model_components', 'rules_using_parameter', 'read_dot']
 
 
 def alias_model_components(model=None):
@@ -95,3 +101,121 @@ def load_params(fname):
     for i in temparr:
         parmsff[i[0]] = i[1]
     return parmsff
+
+
+def read_dot(filename):
+    """ Read a graphviz dot file using pydot
+
+    Parameters
+    ----------
+    filename: str
+        A DOT (graphviz) filename
+
+    Returns
+    -------
+    MultiGraph
+        A networkx MultiGraph file
+    """
+    try:
+        import pydot
+        pydot_graph = pydot.graph_from_dot_file(filename)[0]
+        return _from_pydot(pydot_graph)
+    except ImportError:
+        raise ImportError('Importing graphviz files requires the pydot '
+                          'library')
+
+
+def _from_pydot(P):
+    """Return a NetworkX graph from a Pydot graph.
+
+    Using this patched version until networkx issue is resolved, which fixes
+    .dot file support using PyDot:
+    https://github.com/networkx/networkx/issues/2832
+
+    Parameters
+    ----------
+
+    P : Pydot graph
+      A graph created with Pydot
+
+    Returns
+    -------
+    G : NetworkX multigraph
+        A MultiGraph or MultiDiGraph.
+
+    Examples
+    --------
+    >>> K5 = nx.complete_graph(5)
+    >>> A = nx.nx_pydot.to_pydot(K5)
+    >>> G = nx.nx_pydot.from_pydot(A) # return MultiGraph
+
+    # make a Graph instead of MultiGraph
+    >>> G = nx.Graph(nx.nx_pydot.from_pydot(A))
+
+    """
+    if P.get_strict(None):  # pydot bug: get_strict() shouldn't take argument
+        multiedges = False
+    else:
+        multiedges = True
+
+    if P.get_type() == 'graph':  # undirected
+        if multiedges:
+            N = nx.MultiGraph()
+        else:
+            N = nx.Graph()
+    else:
+        if multiedges:
+            N = nx.MultiDiGraph()
+        else:
+            N = nx.DiGraph()
+
+    # assign defaults
+    name = P.get_name().strip('"')
+    if name != '':
+        N.name = name
+
+    # add nodes, attributes to N.node_attr
+    for p in P.get_node_list():
+        n = p.get_name().strip('"')
+        if n in ('node', 'graph', 'edge'):
+            continue
+        N.add_node(n, **{k: v.strip('"')
+                         for k, v in p.get_attributes().items()})
+
+    # add edges
+    for e in P.get_edge_list():
+        u = e.get_source()
+        v = e.get_destination()
+        attr = {k: v.strip('"') for k, v in e.get_attributes().items()}
+        s = []
+        d = []
+
+        if isinstance(u, basestring):
+            s.append(u.strip('"'))
+        else:
+            for unodes in u['nodes']:
+                s.append(unodes.strip('"'))
+
+        if isinstance(v, basestring):
+            d.append(v.strip('"'))
+        else:
+            for vnodes in v['nodes']:
+                d.append(vnodes.strip('"'))
+
+        for source_node in s:
+            for destination_node in d:
+                N.add_edge(source_node, destination_node, **attr)
+
+    # add default attributes for graph, nodes, edges
+    pattr = {k: v.strip('"') for k, v in P.get_attributes().items()}
+    if pattr:
+        N.graph['graph'] = pattr
+    try:
+        N.graph['node'] = P.get_node_defaults()[0]
+    except:  # IndexError,TypeError:
+        pass  # N.graph['node']={}
+    try:
+        N.graph['edge'] = P.get_edge_defaults()[0]
+    except:  # IndexError,TypeError:
+        pass  # N.graph['edge']={}
+    return N

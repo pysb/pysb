@@ -89,7 +89,7 @@ class ScipyOdeSimulator(Simulator):
     >>> simulation_result = sim.run()
     >>> print(simulation_result.observables['A_total']) \
         #doctest: +NORMALIZE_WHITESPACE
-    [ 1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
+    [1.      0.899   0.8506  0.8179  0.793   0.7728  0.7557  0.7408  0.7277
     0.7158]
 
     For further information on retrieving trajectories (species,
