@@ -58,6 +58,8 @@ _pysb_doctest_suppress_modelexistswarning = True
 
 def _complex_pattern_label(cp):
     """Return a string label for a ComplexPattern."""
+    if cp is None:
+        return ''
     mp_labels = [_monomer_pattern_label(mp) for mp in cp.monomer_patterns]
     return ''.join(mp_labels)
 

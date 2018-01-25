@@ -3,6 +3,7 @@ from pysb import *
 from pysb.kappa import *
 import networkx as nx
 import sympy
+from pysb.core import as_complex_pattern
 
 _KAPPA_SEED = 123456
 
@@ -197,12 +198,26 @@ def test_influence_map_kasa():
 def test_unicode_strs():
     Monomer(u'A', [u'b'], {u'b':[u'y', u'n']})
     Monomer(u'B')
-    Rule(u'rule1', A(b=u'y') + KappaDot() >> KappaDot() + B(),
+    Rule(u'rule1', A(b=u'y') + None >> None + B(),
          Parameter(u'k', 1))
     Initial(A(b=u'y'), Parameter(u'A_0', 100))
     Observable(u'B_', B())
     npts = 200
     kres = run_simulation(model, time=100, points=npts, seed=_KAPPA_SEED)
+
+
+@with_model
+def test_none_in_rxn_pat():
+    Monomer('A')
+    Monomer('B')
+    Rule('rule1', A() + None >> None + B(), Parameter('k', 1))
+    Initial(A(), Parameter('A_0', 100))
+    Observable('B_', B())
+    npts = 200
+    kres = run_simulation(model, time=100, points=npts, seed=_KAPPA_SEED)
+
+    # check that rule1's reaction pattern parses with ComplexPatterns
+    as_complex_pattern(A()) + None >> None + as_complex_pattern(B())
 
 
 @with_model

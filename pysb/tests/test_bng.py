@@ -1,9 +1,9 @@
 from pysb.testing import *
 from pysb import *
 from pysb.bng import *
-from pysb.kappa import KappaDot
 import os
 import unittest
+from pysb.core import as_complex_pattern
 
 
 @with_model
@@ -17,19 +17,6 @@ def test_generate_network():
     Parameter('k', 1)
     Rule('degrade', A() >> None, k)
     ok_(generate_network(model))
-
-
-@with_model
-def test_ignore_kappa_dot():
-    Monomer('A', ['b'])
-    Monomer('B')
-    Parameter('k', 1)
-    Parameter('A_0', 1)
-    Initial(A(b=None), A_0)
-    Initial(A(b=1) % A(b=1), A_0)
-    Rule('synth', KappaDot() >> A(b=None), k)
-    Rule('degrade', A(b=1) % A(b=1) >> KappaDot() + A(b=None), k)
-    generate_network(model)
 
 
 @unittest.skipIf(os.name == 'nt', 'BNG Console does not work on Windows')
@@ -171,6 +158,16 @@ def test_unicode_strs():
     Monomer(u'A', [u'b'], {u'b':[u'y', u'n']})
     Monomer(u'B')
     Rule(u'rule1', A(b=u'y') >> B(), Parameter(u'k', 1))
+    Initial(A(b=u'y'), Parameter(u'A_0', 100))
+    generate_equations(model)
+
+
+@with_model
+def test_none_in_rxn_pat():
+    Monomer(u'A', [u'b'], {u'b': [u'y', u'n']})
+    Monomer(u'B')
+    Rule(u'rule1', A(b=u'y') + None >> None + B(),
+         Parameter(u'k', 1))
     Initial(A(b=u'y'), Parameter(u'A_0', 100))
     generate_equations(model)
 

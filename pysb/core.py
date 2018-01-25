@@ -467,8 +467,18 @@ class MonomerPattern(object):
             return ReactionPattern([ComplexPattern([self], None), ComplexPattern([other], None)])
         if isinstance(other, ComplexPattern):
             return ReactionPattern([ComplexPattern([self], None), other])
-        elif other == None:
-            return as_reaction_pattern(self)
+        elif other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns.append(None)
+            return rp
+        else:
+            return NotImplemented
+
+    def __radd__(self, other):
+        if other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns = [None] + rp.complex_patterns
+            return rp
         else:
             return NotImplemented
 
@@ -809,14 +819,23 @@ class ComplexPattern(object):
             site_map[site].site_conditions[site] = condition
         return cp
 
-
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
             return ReactionPattern([self, other])
         elif isinstance(other, MonomerPattern):
             return ReactionPattern([self, ComplexPattern([other], None)])
-        elif other == None:
-            return as_reaction_pattern(self)
+        elif other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns.append(None)
+            return rp
+        else:
+            return NotImplemented
+
+    def __radd__(self, other):
+        if other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns = [None] + rp.complex_patterns
+            return rp
         else:
             return NotImplemented
 

@@ -3,7 +3,6 @@ import warnings
 import pysb
 import sympy
 from sympy.printing import StrPrinter
-from pysb.kappa import KappaDot
 
 # Alias basestring under Python 3 for forwards compatibility
 try:
@@ -187,6 +186,8 @@ def format_reactionpattern(rp, for_observable=False):
     return delimiter.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
 def format_complexpattern(cp):
+    if cp is None:
+        return '0'
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)
@@ -195,8 +196,6 @@ def format_complexpattern(cp):
     return ret
 
 def format_monomerpattern(mp):
-    if isinstance(mp, KappaDot):
-        return '0'
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))

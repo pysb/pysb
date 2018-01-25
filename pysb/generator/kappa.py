@@ -145,6 +145,8 @@ def format_reactionpattern(rp):
 
 
 def format_complexpattern(cp):
+    if cp is None:
+        return '.'
     ret = ','.join(filter(None, [format_monomerpattern(mp)
                                  for mp in cp.monomer_patterns]))
     if cp.compartment is not None:
@@ -153,9 +155,6 @@ def format_complexpattern(cp):
 
 
 def format_monomerpattern(mp):
-    from pysb.kappa import KappaDot
-    if isinstance(mp, KappaDot):
-        return '.'
     # sort sites in the same order given in the original Monomer
     site_conditions = sorted(mp.site_conditions.items(),
                              key=lambda x: mp.monomer.sites.index(x[0]))

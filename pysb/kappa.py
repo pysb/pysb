@@ -445,37 +445,3 @@ def _parse_kasim_outfile(out_filename):
         raise Exception("problem parsing KaSim outfile: " + str(e))
 
     return recarr
-
-
-class KappaDot(pysb.MonomerPattern):
-    """
-    Represents a Null agent in Kappa 4; ignored in Kappa 3
-
-    Agent order is conserved in Kappa 4. This KappaDot will be needed in
-    situations like:
-
-    .. code-block:: none
-
-       // Agent A spawns a copy of agent B
-       A(),. -> A(),B() @ 'r'
-
-    This would be specified in PySB like:
-
-    .. code-block:: python
-
-       Rule('spawnB', A() + KappaDot() >> A() + B(), r)
-
-    KappaDot is ignored when using the BioNetGen interface (it is exported as
-    the null species `0`).
-     """
-    def __init__(self):
-        dot_monomer = pysb.Monomer('__kappadot__', _export=False)
-        super(KappaDot, self).__init__(dot_monomer,
-                                       site_conditions={},
-                                       compartment=None)
-
-    def __repr__(self):
-        return 'KappaDot()'
-
-    def __str__(self):
-        return repr(self)
