@@ -1,10 +1,8 @@
 from ez_setup import use_setuptools
 use_setuptools()
 from setuptools import setup
-
 import versioneer
 
-import sys, os, subprocess, re
 
 def main():
 
@@ -29,7 +27,7 @@ def main():
           install_requires=['numpy', 'scipy', 'sympy', 'networkx'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
-                         'pandas', 'theano', 'h5py', 'mock'],
+                         'pandas', 'theano', 'h5py', 'mock', 'cython'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
@@ -45,6 +43,7 @@ def main():
             'Topic :: Scientific/Engineering :: Mathematics',
             ],
           )
+
 
 if __name__ == '__main__':
     main()
