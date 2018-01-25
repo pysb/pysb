@@ -3,7 +3,7 @@ sudo: required
 dist: trusty
 python:
 - '2.7'
-- '3.5'
+- '3.6'
 addons:
     apt:
         sources:
@@ -18,13 +18,10 @@ before_install:
 - chmod +x miniconda.sh
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
-# Install conda 4.3.21 to avoid conda/weave issue (see #297 discussion)
-- conda install --yes conda==4.3.21
-- conda install --yes -c omnia python="$TRAVIS_PYTHON_VERSION"
-    numpy scipy matplotlib sympy networkx nose h5py pexpect pandas pygraphviz=1.3 theano
-    mock
+- conda install --yes -c conda-forge python="$TRAVIS_PYTHON_VERSION"
+    numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
+    pydot coveralls mock
 - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then pip install weave; fi
-- pip install python-coveralls
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
 - wget "http://www.csb.pitt.edu/Faculty/Faeder/wp-content/uploads/2017/04/BioNetGen-2.2.6-stable_Linux.tar.gz"

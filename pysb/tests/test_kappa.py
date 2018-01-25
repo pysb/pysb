@@ -1,7 +1,7 @@
 from pysb.testing import *
 from pysb import *
 from pysb.kappa import *
-import pygraphviz as pgv
+import networkx as nx
 
 _KAPPA_SEED = 123456
 
@@ -70,7 +70,7 @@ def test_flux_map():
     ok_(simdata['time'][0] == 0)
     ok_(sorted(simdata['time'])[-1] == 10)
     fluxmap = res.flux_map
-    ok_(isinstance(fluxmap, pgv.AGraph))
+    ok_(isinstance(fluxmap, nx.MultiGraph))
 
 
 @with_model
@@ -106,7 +106,7 @@ def test_run_static_analysis_cmap():
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
     res = run_static_analysis(model, contact_map=True, influence_map=False)
-    ok_(isinstance(res.contact_map, pgv.AGraph))
+    ok_(isinstance(res.contact_map, nx.MultiGraph))
     ok_(res.influence_map is None)
 
 
@@ -126,7 +126,7 @@ def test_run_static_analysis_imap():
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
     res = run_static_analysis(model, contact_map=False, influence_map=True)
-    ok_(isinstance(res.influence_map, pgv.AGraph))
+    ok_(isinstance(res.influence_map, nx.MultiGraph))
     ok_(res.contact_map is None)
 
 
@@ -146,8 +146,8 @@ def test_run_static_analysis_both():
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
     res = run_static_analysis(model, contact_map=True, influence_map=True)
-    ok_(isinstance(res.influence_map, pgv.AGraph))
-    ok_(isinstance(res.contact_map, pgv.AGraph))
+    ok_(isinstance(res.influence_map, nx.MultiGraph))
+    ok_(isinstance(res.contact_map, nx.MultiGraph))
 
 
 @with_model
@@ -158,7 +158,7 @@ def test_contact_map():
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
     res = contact_map(model, cleanup=True)
-    ok_(isinstance(res, pgv.AGraph))
+    ok_(isinstance(res, nx.MultiGraph))
 
 
 @with_model
@@ -176,7 +176,7 @@ def test_influence_map_kasa():
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
     res = influence_map(model, cleanup=True)
-    ok_(isinstance(res, pgv.AGraph))
+    ok_(isinstance(res, nx.MultiGraph))
 
 
 @with_model

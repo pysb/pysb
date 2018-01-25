@@ -4,8 +4,8 @@ environment:
   matrix:
     - PYTHON_VERSION: 2.7
       MINICONDA: C:\Miniconda
-    - PYTHON_VERSION: 3.4
-      MINICONDA: C:\Miniconda3
+    - PYTHON_VERSION: 3.6
+      MINICONDA: C:\Miniconda36
 
 init:
   - "ECHO %PYTHON_VERSION% %MINICONDA%"
@@ -25,15 +25,13 @@ install:
   - activate test-environment
 
   # Majority of dependencies can be installed with Anaconda
-  - conda install numpy scipy matplotlib sympy networkx nose h5py pandas theano
-    mkl=2017.0.3 mock
+  - conda install -c conda-forge "numpy>=1.14" scipy matplotlib sympy
+    networkx nose h5py pandas theano mkl pydot mock
 
   # Graphviz & PyGraphviz
   - appveyor DownloadFile "https://graphviz.gitlab.io/_pages/Download/windows/graphviz-2.38.zip" -FileName graphviz.zip
   - 7z x graphviz.zip -y > nul
   - set "PATH=%cd%\release\lib\release\dll;%PATH%"
-  - if "%PYTHON_VERSION%"=="2.7" pip install https://www.dropbox.com/s/fixts2t9l082r2o/pygraphviz-1.3.1-cp27-none-win32.whl?dl=1
-  - if "%PYTHON_VERSION%"=="3.4" pip install https://www.dropbox.com/s/g51cnau5nlww9fc/pygraphviz-1.3.1-cp34-none-win32.whl?dl=1
 
   # BioNetGen
   - appveyor DownloadFile "http://www.csb.pitt.edu/Faculty/Faeder/wp-content/uploads/2017/04/BioNetGen-2.2.6-stable2_Windows.zip" -FileName BioNetGen.zip
