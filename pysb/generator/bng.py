@@ -186,6 +186,8 @@ def format_reactionpattern(rp, for_observable=False):
     return delimiter.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
 def format_complexpattern(cp):
+    if cp is None:
+        return '0'
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)

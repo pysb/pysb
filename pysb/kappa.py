@@ -157,8 +157,9 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
         # If desired, add instructions to the kappa file to generate the
         # flux map:
         if flux_map:
-            kappa_file.write('%%mod: [true] do $FLUX "%s" [true]\n' %
+            kappa_file.write('%%mod: [true] do $DIN "%s" [true];\n' %
                              fm_filename)
+
         # If any perturbation language code has been passed in, add it to
         # the Kappa file:
         if perturbation:
