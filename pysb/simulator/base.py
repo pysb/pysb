@@ -916,7 +916,7 @@ class SimulationResult(object):
 
     def observable(self, pattern):
         """
-        Calculate an observable "on demand" - without adding to model
+        Calculate a pattern's trajectories without adding to model
 
         Normally, observables are added in advance to a model. If a new
         observable is required, previously it was necessary to re-run the
@@ -928,6 +928,8 @@ class SimulationResult(object):
         with the SimulationResult's internal copy of the model by name. This
         method only works on simulations which calculate species
         trajectories (i.e. it will not work on network-free simulations).
+
+        Raises a ValueError if the pattern does not match at least one species.
 
         Parameters
         ----------
@@ -997,16 +999,25 @@ class SimulationResult(object):
             raise ValueError('No species match the supplied observable '
                              'pattern')
 
-        return self.dataframe.iloc[:, obs_matches.keys()].multiply(
-            obs_matches.values()).sum(axis=1)
+        return self.dataframe.iloc[:, list(obs_matches.keys())].multiply(
+            list(obs_matches.values())).sum(axis=1)
 
     def _update_monomer_pattern(self, pattern):
+        """ Update a pattern's monomer objects to use internal model
+
+        Internal function for in-place update of a pattern to replace its
+        monomers with those from SimulationResult's model, matching by name.
+
+        Raises ValueError if no monomer with the specified name is in the
+        model.
+        """
         mon_name = pattern.monomer.name
         try:
             new_mon = self._model.monomers[mon_name]
         except KeyError:
             raise ValueError('There was no monomer called "{}" in the model '
-                             '"{}" at the time of simulation')
+                             '"{}" at the time of simulation'.format(
+                                mon_name, self._model.name))
         pattern.monomer = new_mon
 
     @property
