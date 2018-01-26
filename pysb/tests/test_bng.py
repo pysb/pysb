@@ -3,6 +3,7 @@ from pysb import *
 from pysb.bng import *
 import os
 import unittest
+from pysb.core import as_complex_pattern
 
 
 @with_model
@@ -75,8 +76,8 @@ def test_bidirectional_rules_collapse():
     Monomer('B')
     Initial(B(), Parameter('B_init', 0))
     Initial(A(), Parameter('A_init', 100))
-    Rule('Rule1', B() <> A(), Parameter('k3', 10), Parameter('k1', 1))
-    Rule('Rule2', A() <> B(), k1, Parameter('k2', 1))
+    Rule('Rule1', B() | A(), Parameter('k3', 10), Parameter('k1', 1))
+    Rule('Rule2', A() | B(), k1, Parameter('k2', 1))
     Rule('Rule3', B() >> A(), Parameter('k4', 5))
     generate_equations(model)
     ok_(len(model.reactions) == 4)
@@ -90,7 +91,7 @@ def test_bidirectional_rules():
     Monomer('A')
     Monomer('B')
     Initial(A(), Parameter('A_init', 100))
-    Rule('Rule1', A() <> B(), Parameter('k1', 1), Parameter('k2', 1))
+    Rule('Rule1', A() | B(), Parameter('k1', 1), Parameter('k2', 1))
     Rule('Rule2', B() >> A(), Parameter('k3', 10))
     Rule('Rule3', B() >> A(), Parameter('k4', 5))
     generate_equations(model)
@@ -106,7 +107,18 @@ def test_zero_order_synth_no_initials():
     Monomer('A')
     Monomer('B')
     Rule('Rule1', None >> A(), Parameter('ksynth', 100))
-    Rule('Rule2', A() <> B(), Parameter('kf', 10), Parameter('kr', 1))
+    Rule('Rule2', A() | B(), Parameter('kf', 10), Parameter('kr', 1))
+    generate_equations(model)
+
+
+@with_model
+def test_reversible_synth_deg():
+    Monomer('A')
+    Parameter('k_synth', 2.0)
+    Parameter('k_deg', 1.0)
+    Rule('synth_deg', A() | None, k_deg, k_synth)
+    assert synth_deg.is_synth()
+    assert synth_deg.is_deg()
     generate_equations(model)
 
 
@@ -146,6 +158,16 @@ def test_unicode_strs():
     Monomer(u'A', [u'b'], {u'b':[u'y', u'n']})
     Monomer(u'B')
     Rule(u'rule1', A(b=u'y') >> B(), Parameter(u'k', 1))
+    Initial(A(b=u'y'), Parameter(u'A_0', 100))
+    generate_equations(model)
+
+
+@with_model
+def test_none_in_rxn_pat():
+    Monomer(u'A', [u'b'], {u'b': [u'y', u'n']})
+    Monomer(u'B')
+    Rule(u'rule1', A(b=u'y') + None >> None + B(),
+         Parameter(u'k', 1))
     Initial(A(b=u'y'), Parameter(u'A_0', 100))
     generate_equations(model)
 

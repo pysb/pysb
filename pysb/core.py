@@ -195,7 +195,8 @@ class Component(object):
         This is typically only needed when deriving one model from another and
         it would be desirable to change a component's name in the derived
         model."""
-        self.model()._rename_component(self, new_name)
+        if self.model:
+            self.model()._rename_component(self, new_name)
         if self._export:
             SelfExporter.rename(self, new_name)
         self.name = new_name
@@ -301,6 +302,15 @@ class Monomer(Component):
         return value
 
 
+def _check_state(monomer, site, state):
+    """ Check a monomer site allows the specified state """
+    if state not in monomer.site_states[site]:
+        args = state, monomer.name, site, monomer.site_states[site]
+        template = "Invalid state choice '{}' in Monomer {}, site {}. Valid " \
+                   "state choices: {}"
+        raise ValueError(template.format(*args))
+
+
 class MonomerPattern(object):
 
     """
@@ -339,7 +349,6 @@ class MonomerPattern(object):
     state for that site, i.e. \"don't write, don't care\".
 
     """
-
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions
@@ -361,11 +370,13 @@ class MonomerPattern(object):
                  all(isinstance(s, int) for s in state):
                 continue
             elif isinstance(state, basestring):
+                _check_state(monomer, site, state)
                 continue
             elif isinstance(state, tuple) and \
                  isinstance(state[0], basestring) and \
                  (isinstance(state[1], int) or state[1] is WILD or \
                   state[1] is ANY):
+                _check_state(monomer, site, state[0])
                 continue
             elif state is ANY:
                 continue
@@ -407,8 +418,39 @@ class MonomerPattern(object):
         Return a bool indicating whether the pattern is 'site-concrete'.
 
         'Site-concrete' means all sites have specified conditions."""
-        # assume __init__ did a thorough enough job of error checking that this is is all we need to do
-        return len(self.site_conditions) == len(self.monomer.sites)
+        if len(self.site_conditions) != len(self.monomer.sites):
+            return False
+        for site_name, site_val in self.site_conditions.items():
+            if isinstance(site_val, basestring):
+                site_state = site_val
+                site_bond = None
+            elif isinstance(site_val, collections.Iterable):
+                site_state, site_bond = site_val
+            elif isinstance(site_val, int):
+                site_bond = site_val
+                site_state = None
+            else:
+                site_bond = site_val
+                site_state = None
+
+            if site_bond is ANY or site_bond is WILD:
+                return False
+            if site_state is None and site_name in \
+                    self.monomer.site_states.keys():
+                return False
+
+        return True
+
+    def _as_graph(self):
+        """
+        Convert MonomerPattern to networkx graph, caching the result
+
+        See :func:`ComplexPattern._as_graph` for implementation details
+        """
+        if self._graph is None:
+            self._graph = as_complex_pattern(self)._as_graph()
+
+        return self._graph
 
     def _as_graph(self):
         """
@@ -436,8 +478,18 @@ class MonomerPattern(object):
             return ReactionPattern([ComplexPattern([self], None), ComplexPattern([other], None)])
         if isinstance(other, ComplexPattern):
             return ReactionPattern([ComplexPattern([self], None), other])
-        elif other == None:
-            return as_reaction_pattern(self)
+        elif other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns.append(None)
+            return rp
+        else:
+            return NotImplemented
+
+    def __radd__(self, other):
+        if other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns = [None] + rp.complex_patterns
+            return rp
         else:
             return NotImplemented
 
@@ -453,8 +505,15 @@ class MonomerPattern(object):
     def __rrshift__(self, other):
         return build_rule_expression(other, self, False)
 
-    def __ne__(self, other):
+    def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ne__(self, other):
+        warnings.warn("'<>' for reversible rules will be removed in a future "
+                      "version of PySB. Use '|' instead.",
+                      PendingDeprecationWarning,
+                      stacklevel=2)
+        return self.__or__(other)
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
@@ -630,7 +689,7 @@ class ComplexPattern(object):
                 bond_num = None
                 if state_or_bond is WILD:
                     continue
-                elif isinstance(state_or_bond, (str, unicode)):
+                elif isinstance(state_or_bond, basestring):
                     state = state_or_bond
                 elif isinstance(state_or_bond, collections.Iterable) and len(
                         state_or_bond) == 2:
@@ -736,11 +795,9 @@ class ComplexPattern(object):
         kwargs = extract_site_conditions(conditions, **kwargs)
 
         # Ensure we don't have more than one of any Monomer in our patterns.
-        mp_monomer = lambda mp: id(mp.monomer)
-        patterns_sorted = sorted(self.monomer_patterns, key=mp_monomer)
-        pgroups = itertools.groupby(patterns_sorted, mp_monomer)
-        pcounts = [(monomer, sum(1 for mp in mps)) for monomer, mps in pgroups]
-        dup_monomers = [monomer.name for monomer, count in pcounts if count > 1]
+        mon_counts = collections.Counter(mp.monomer.name for mp in
+                                         self.monomer_patterns)
+        dup_monomers = [mon for mon, count in mon_counts.items() if count > 1]
         if dup_monomers:
             raise DuplicateMonomerError("ComplexPattern has duplicate "
                                         "Monomers: " + str(dup_monomers))
@@ -773,14 +830,23 @@ class ComplexPattern(object):
             site_map[site].site_conditions[site] = condition
         return cp
 
-
     def __add__(self, other):
         if isinstance(other, ComplexPattern):
             return ReactionPattern([self, other])
         elif isinstance(other, MonomerPattern):
             return ReactionPattern([self, ComplexPattern([other], None)])
-        elif other == None:
-            return as_reaction_pattern(self)
+        elif other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns.append(None)
+            return rp
+        else:
+            return NotImplemented
+
+    def __radd__(self, other):
+        if other is None:
+            rp = as_reaction_pattern(self)
+            rp.complex_patterns = [None] + rp.complex_patterns
+            return rp
         else:
             return NotImplemented
 
@@ -808,8 +874,15 @@ class ComplexPattern(object):
     def __rrshift__(self, other):
         return build_rule_expression(other, self, False)
 
-    def __ne__(self, other):
+    def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ne__(self, other):
+        warnings.warn("'<>' for reversible rules will be removed in a future "
+                      "version of PySB. Use '|' instead.",
+                      PendingDeprecationWarning,
+                      stacklevel=2)
+        return self.__or__(other)
 
     def __pow__(self, other):
         if isinstance(other, Compartment):
@@ -852,6 +925,8 @@ class ReactionPattern(object):
 
     def __init__(self, complex_patterns):
         self.complex_patterns = complex_patterns
+        from pysb.pattern import check_dangling_bonds
+        check_dangling_bonds(self)
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
@@ -870,9 +945,15 @@ class ReactionPattern(object):
     def __rrshift__(self, other):
         return build_rule_expression(other, self, False)
 
-    def __ne__(self, other):
-        """Reversible reaction"""
+    def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ne__(self, other):
+        warnings.warn("'<>' for reversible rules will be removed in a future "
+                      "version of PySB. Use '|' instead.",
+                      PendingDeprecationWarning,
+                      stacklevel=2)
+        return self.__or__(other)
 
     def __repr__(self):
         if len(self.complex_patterns):
@@ -920,7 +1001,7 @@ class RuleExpression(object):
         self.is_reversible = is_reversible
 
     def __repr__(self):
-        operator = '<>' if self.is_reversible else '>>'
+        operator = '|' if self.is_reversible else '>>'
         return '%s %s %s' % (repr(self.reactant_pattern), operator,
                              repr(self.product_pattern))
 
@@ -1125,11 +1206,15 @@ class Rule(Component):
 
     def is_synth(self):
         """Return a bool indicating whether this is a synthesis rule."""
-        return len(self.reactant_pattern.complex_patterns) == 0
+        return len(self.reactant_pattern.complex_patterns) == 0 or \
+            (self.is_reversible and
+             len(self.product_pattern.complex_patterns) == 0)
 
     def is_deg(self):
         """Return a bool indicating whether this is a degradation rule."""
-        return len(self.product_pattern.complex_patterns) == 0
+        return len(self.product_pattern.complex_patterns) == 0 or \
+            (self.is_reversible and
+             len(self.reactant_pattern.complex_patterns) == 0)
 
     def __repr__(self):
         ret = '%s(%s, %s, %s' % \
@@ -1343,9 +1428,6 @@ class Model(object):
         List of all complexes which can be produced by the model, starting from
         the initial conditions and successively applying the rules. Each 
         ComplexPattern is concrete.
-    odes : list of sympy.Expr
-        Mathematical expressions describing the time derivative of the amount of
-        each species, as generated by the rules.
     reactions : list of dict
         Structures describing each possible unidirectional reaction that can be
         produced by the model. Each structure stores the name of the rule that
@@ -1457,6 +1539,10 @@ class Model(object):
         for cset in self.all_component_sets():
             cset_all |= cset
         return cset_all
+
+    @property
+    def components(self):
+        return self.all_components()
 
     def parameters_rules(self):
         """Return a ComponentSet of the parameters used in rules."""
@@ -1681,23 +1767,8 @@ class Model(object):
 
     def enable_synth_deg(self):
         """Add components needed to support synthesis and degradation rules."""
-        if self.monomers.get('__source') is None:
-            self.add_component(Monomer('__source', _export=False))
-        if self.monomers.get('__sink') is None:
-            self.add_component(Monomer('__sink', _export=False))
-        if self.parameters.get('__source_0') is None:
-            self.add_component(Parameter('__source_0', 1.0, _export=False))
-
-        source_cp = as_complex_pattern(self.monomers['__source']())
-        if self.compartments:
-            for c in self.compartments:
-                source_cp_cpt = source_cp ** c
-                if not any(source_cp_cpt.is_equivalent_to(other_cp) for
-                           other_cp, value in self.initial_conditions):
-                    self.initial(source_cp_cpt, self.parameters['__source_0'])
-        else:
-            if not any(source_cp.is_equivalent_to(other_cp) for other_cp, value in self.initial_conditions):
-                self.initial(source_cp, self.parameters['__source_0'])
+        warnings.warn('This function is no longer needed, and no longer has '
+                      'any effect.', DeprecationWarning)
 
     def reset_equations(self):
         """Clear out fields generated by bng.generate_equations or the like."""
@@ -1827,6 +1898,15 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         else:
             return self._map[key]
 
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as e:
+            raise AttributeError("Model has no component '%s'" % name)
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+
     def get(self, key, default=None):
         if isinstance(key, (int, long)):
             raise ValueError("get is undefined for integer arguments, use []"
@@ -1854,7 +1934,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         return [c for c in self]
 
     def items(self):
-        return zip(self.keys(), self)
+        return list(zip(self.keys(), self))
 
     def index(self, c):
         # We can implement this in O(1) ourselves, whereas the Sequence mixin
@@ -1947,6 +2027,9 @@ class RedundantSiteConditionsError(ValueError):
              "OR a single dict"))
 
 
+class DanglingBondError(ValueError):
+    pass
+
 # Some light infrastructure for defining symbols that act like "keywords", i.e.
 # they are immutable singletons that stringify to their own name. Regular old
 # classes almost fit the bill, except that their __str__ method prepends the
@@ -1959,7 +2042,11 @@ class KeywordMeta(type):
     def __str__(cls):
         return repr(cls)
 
-class Keyword(object): __metaclass__ = KeywordMeta
+
+# Define Keyword class with KeywordMeta metaclass in a Python 2 and 3
+# compatible way
+class Keyword(KeywordMeta("KeywordMetaBase", (object, ), {})):
+    pass
 
 # The keywords.
 

@@ -4,10 +4,29 @@ from functools import partial
 import itertools
 
 
+@with_model
 def test_component_names_valid():
     for name in 'a', 'B', 'AbC', 'dEf', '_', '_7', '__a01b__999x_x___':
-        c = Component(name, _export=False)
+        c = Monomer(name, _export=False)
         eq_(c.name, name)
+        # Before the component is added, we should not be able to find it
+        assert not hasattr(model.components, name)
+        # Add the element to a model and try to access it as attribute and item
+        model.add_component(c)
+        assert_equal(model.components[name], c)
+        assert_equal(getattr(model.components, name), c)
+
+
+@with_model
+def test_component_name_existing_attribute():
+    for name in ('_map', 'keys'):
+        c = Monomer(name, _export=False)
+        model.add_component(c)
+        # When using an existing attribute name like_map, we should get able to
+        # get it as an item, but not as an attribute
+        assert_equal(model.components[name], c)
+        assert_not_equal(getattr(model.components, name), c)
+
 
 def test_component_names_invalid():
     for name in 'a!', '!B', 'A!bC~`\\', '_!', '_!7', '__a01b  999x_x___!':
@@ -32,6 +51,43 @@ def test_monomer_model():
     ok_(A in model.monomers)
     ok_(A in model.all_components())
     ok_(A not in model.all_components() - model.monomers)
+
+
+@with_model
+def test_monomer_rename_self_exporter():
+    Monomer('A').rename('B')
+    assert 'B' in model.monomers.keys()
+    assert 'A' not in model.monomers.keys()
+
+
+@with_model
+def test_monomer_rename_non_self_exported_component():
+    mon = Monomer('A', _export=False)
+    mon.rename('B')
+    assert mon.name == 'B'
+    model.add_component(mon)
+    mon.rename('C')
+    assert mon.name == 'C'
+    assert model.monomers['C'] == mon
+    assert model.monomers.keys() == ['C']
+
+
+def test_monomer_rename_non_self_exported_model():
+    model = Model(_export=False)
+    mon = Monomer('A', _export=False)
+    model.add_component(mon)
+    mon.rename('B')
+    assert model.monomers.keys() == ['B']
+    assert model.monomers['B'] == mon
+
+
+@with_model
+def test_invalid_state():
+    Monomer('A', ['a', 'b'], {'a': ['a1', 'a2'], 'b': ['b1']})
+    # Specify invalid state in Monomer.__call__
+    assert_raises(ValueError, A, a='spam')
+    # Specify invalid state in MonomerPattern.__call__
+    assert_raises(ValueError, A(a='a1'), b='spam')
 
 
 @with_model
@@ -79,6 +135,12 @@ def test_monomer_as_complex_pattern():
 def test_monomerpattern():
     A = Monomer('A',sites=['a'],site_states={'a':['u','p']},_export=False)
     Aw = A(a=('u', ANY))
+
+
+@with_model
+def test_duplicate_monomer_error():
+    A = Monomer('A', ['a'])
+    assert_raises(DuplicateMonomerError, (A(a=1) % A(a=1)), a=2)
 
 @with_model
 def test_observable_constructor_with_monomer():
@@ -167,15 +229,6 @@ def test_complex_pattern_equivalence_compartments():
     cp7 = (A() ** C1 % B() ** C2) ** C1
     _check_pattern_equivalence((cp5, cp7), equivalent=False)
 
-    # Test enable_synth_deg creates two initial conditions, one for each
-    # compartment
-    model.enable_synth_deg()
-    assert len(model.initial_conditions) == 2
-
-    # Check that enable_synth_deg is idempotent
-    model.enable_synth_deg()
-    assert len(model.initial_conditions) == 2
-
 
 @with_model
 def test_complex_pattern_equivalence_state():
@@ -243,3 +296,35 @@ def test_reaction_pattern_match_complex_pattern_ordering():
     assert rp0.matches(rp1)
     assert rp1.matches(rp0)
     assert rp2.matches(rp0)
+
+
+@with_model
+def test_concreteness():
+    Monomer('A', ['s'], {'s': ['x']})
+    assert not (A(s=1) % A(s=1)).is_concrete()
+    assert not (A(s=('x', 1)) % A(s=1)).is_concrete()
+    assert (A(s=('x', 1)) % A(s=('x', 1))).is_concrete()
+    assert (A(s='x')).is_concrete()
+    assert not A().is_concrete()
+    assert not A(s=('x', ANY)).is_concrete()
+    assert not A(s=WILD).is_concrete()
+
+    Monomer('B', ['s'])
+    assert not B().is_concrete()
+    assert not B(s=ANY).is_concrete()
+    assert B(s=1).is_concrete()
+
+    Monomer('C')
+    assert C().is_concrete()
+
+    # Tests with compartments
+    Compartment('cell')
+    assert not C().is_concrete()
+    assert (C() ** cell).is_concrete()
+
+
+@with_model
+def test_dangling_bond():
+    Monomer('A', ['a'])
+    Parameter('kf', 1.0)
+    assert_raises(DanglingBondError, as_reaction_pattern, A(a=1) % A(a=None))

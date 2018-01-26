@@ -26,6 +26,7 @@ Contents:
 
    installation
    tutorial
+   faq
    modules/index
    useful_references
 

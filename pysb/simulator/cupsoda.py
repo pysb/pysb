@@ -13,19 +13,16 @@ import logging
 from pysb.logging import EXTENDED_DEBUG
 import shutil
 from pysb.pathfinder import get_path
+import sympy
 
 try:
     import pandas as pd
 except ImportError:
     pd = None
 try:
-    import pycuda.autoinit
     import pycuda.driver as cuda
-
-    use_pycuda = True
 except ImportError:
-    use_pycuda = False
-    pass
+    cuda = None
 
 
 class CupSodaSimulator(Simulator):
@@ -43,6 +40,7 @@ class CupSodaSimulator(Simulator):
 
     Parameters
     ----------
+
     model : pysb.Model
         Model to integrate.
     tspan : vector-like, optional
@@ -59,6 +57,7 @@ class CupSodaSimulator(Simulator):
         further details.
     **kwargs: dict, optional
         Extra keyword arguments, including:
+
         * ``gpu``: Index of GPU to run on (default: 0)
         * ``vol``: System volume; required if model encoded in extrinsic 
           (number) units (default: None)
@@ -79,6 +78,7 @@ class CupSodaSimulator(Simulator):
 
     Attributes
     ----------
+
     model : pysb.Model
         Model passed to the constructor.
     tspan : numpy.ndarray
@@ -110,6 +110,7 @@ class CupSodaSimulator(Simulator):
 
     Notes
     -----
+
     1. If `vol` is defined, species amounts and rate constants are assumed
        to be in number units and are automatically converted to concentration
        units before generating the cupSODA input files. The species
@@ -129,6 +130,7 @@ class CupSodaSimulator(Simulator):
     2. Petzold, L., 1983. Automatic selection of methods for solving stiff and
        nonstiff systems of ordinary differential equations. SIAM journal on
        scientific and statistical computing, 4(1), pp.136-148.
+
     """
 
     _supports = {'multi_initials': True, 'multi_param_values': True}
@@ -222,6 +224,7 @@ class CupSodaSimulator(Simulator):
         2. If neither `initials` nor `param_values` are defined in either 
            `__init__` or `run` a single simulation is run with the initial 
            concentrations and parameter values defined in the model.
+
         """
         super(CupSodaSimulator, self).run(tspan=tspan, initials=initials,
                                           param_values=param_values,
@@ -305,15 +308,16 @@ class CupSodaSimulator(Simulator):
             default_threads_per_block = 32
             bytes_per_float = 4
             memory_per_thread = (self._len_species + 1) * bytes_per_float
-            if not use_pycuda:
+            if cuda is None:
                 threads_per_block = default_threads_per_block
             else:
+                cuda.init()
                 device = cuda.Device(self.gpu)
                 attrs = device.get_attributes()
                 shared_memory_per_block = attrs[
-                    pycuda.driver.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
+                    cuda.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
                 upper_limit_threads_per_block = attrs[
-                    pycuda.driver.device_attribute.MAX_THREADS_PER_BLOCK]
+                    cuda.device_attribute.MAX_THREADS_PER_BLOCK]
                 max_threads_per_block = min(
                     shared_memory_per_block / memory_per_thread,
                     upper_limit_threads_per_block)
@@ -321,6 +325,10 @@ class CupSodaSimulator(Simulator):
                                         default_threads_per_block)
             n_blocks = int(
                 np.ceil(1. * len(self.param_values) / threads_per_block))
+            self._logger.debug('n_blocks set to {} (used pycuda: {})'.format(
+                n_blocks, cuda is not None
+            ))
+        self.n_blocks = n_blocks
         return n_blocks
 
     @n_blocks.setter
@@ -406,11 +414,6 @@ class CupSodaSimulator(Simulator):
             if self.vol:
                 mx0 = mx0.copy()
                 mx0 /= (N_A * self.vol)
-                # Set the concentration of __source() to 1
-                for i, sp in enumerate(self._model.species):
-                    if str(sp) == '__source()':
-                        mx0[:, i] = 1.
-                        break
             for i in range(n_sims):
                 line = ""
                 for j in range(self._len_species):
@@ -461,12 +464,9 @@ class CupSodaSimulator(Simulator):
         par_vals = self.param_values[:, rate_mask]
         rate_order = []
         for rxn in self._model.reactions:
-            rate_args.append([arg for arg in rxn['rate'].args if
-                              not re.match("_*s", str(arg))])
-            reactants = 0
-            for i in rxn['reactants']:
-                if not str(self._model.species[i]) == '__source()':
-                    reactants += 1
+            rate_args.append([arg for arg in rxn['rate'].atoms(sympy.Symbol) if
+                              not arg.name.startswith('__s')])
+            reactants = len(rxn['reactants'])
             rate_order.append(reactants)
         output = 0.01 * len(par_vals)
         output = int(output) if output > 1 else 1

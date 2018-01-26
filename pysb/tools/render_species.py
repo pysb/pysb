@@ -27,7 +27,10 @@ from __future__ import print_function
 import sys
 import os
 import re
-import pygraphviz
+try:
+    import pygraphviz
+except ImportError:
+    pygraphviz = None
 import pysb.bng
 
 # Alias basestring under Python 3 for forwards compatibility
@@ -56,6 +59,9 @@ def run(model):
 
 
 def render_species_as_dot(species_list, graph_name=""):
+    if pygraphviz is None:
+        raise ImportError('pygraphviz library is required to run this '
+                          'function')
     graph = pygraphviz.AGraph(name="%s species" % graph_name, rankdir="LR",
                               fontname='Arial')
     graph.edge_attr.update(fontname='Arial', fontsize=8)

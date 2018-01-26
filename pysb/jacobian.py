@@ -68,7 +68,7 @@ class JacobianGenerator(object):
     def generate_variables(self):
         self.emit("VARIABLE")
         self.indent()
-        obs_names = self.model.observable_groups.keys()
+        obs_names = list(self.model.observable_groups.keys())
         for obs_group in self.make_groups(obs_names, 5):
             self.emit(', '.join(obs_group) + ' AS NOTYPE')
         var_names = ['s%d' % i for i in range(len(self.model.species))]
@@ -79,7 +79,7 @@ class JacobianGenerator(object):
     def generate_equations(self):
         self.emit("EQUATION")
         self.indent()
-        obs_names = self.model.observable_groups.keys()
+        obs_names = list(self.model.observable_groups.keys())
         obs_exprs = [' + '.join('%g * s%s' % g for g in self.model.observable_groups[name]) for name in obs_names]
         for obs in zip(obs_names, obs_exprs):
             self.emit('%s = %s;' % obs)

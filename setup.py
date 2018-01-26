@@ -1,21 +1,12 @@
 from ez_setup import use_setuptools
 use_setuptools()
 from setuptools import setup
-import setuptools.command.build_py
-
 import versioneer
 
-import sys, os, subprocess, re
-
-class build_py(setuptools.command.build_py.build_py):
-    # Simplest way to use a specific list of fixers. Note use_2to3_fixers will
-    # be ignored.
-    fixer_names = ['lib2to3.fixes.fix_ne']
 
 def main():
 
-    cmdclass = {'build_py': build_py}
-    cmdclass.update(versioneer.get_cmdclass())
+    cmdclass = versioneer.get_cmdclass()
 
     setup(name='pysb',
           version=versioneer.get_version(),
@@ -36,9 +27,8 @@ def main():
           install_requires=['numpy', 'scipy', 'sympy', 'networkx'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
-                         'pandas', 'theano', 'h5py'],
+                         'pandas', 'theano', 'h5py', 'mock', 'cython'],
           cmdclass=cmdclass,
-          use_2to3=True,
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
             'Development Status :: 5 - Production/Stable',
@@ -53,6 +43,7 @@ def main():
             'Topic :: Scientific/Engineering :: Mathematics',
             ],
           )
+
 
 if __name__ == '__main__':
     main()

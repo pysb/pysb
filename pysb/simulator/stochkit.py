@@ -73,14 +73,14 @@ class StochKitSimulator(Simulator):
     A_total trajectory for first run
 
     >>> print(simulation_result.observables[0]['A_total']) \
-        #doctest: +ELLIPSIS
-    [ 1.  0.  0.  0.  0.]
+        #doctest: +NORMALIZE_WHITESPACE
+    [1.  0.  0.  0.  0.]
 
     A_total trajectory for second run
 
     >>> print(simulation_result.observables[1]['A_total']) \
         #doctest: +SKIP
-    [ 1.  1.  1.  0.  0.]
+    [1.  1.  1.  0.  0.]
 
     For further information on retrieving trajectories (species,
     observables, expressions over time) from the ``simulation_result``
@@ -151,8 +151,8 @@ class StochKitSimulator(Simulator):
             # Export model file
             stoch_xml = StochKitExporter(self._model).export(
                 self.initials[i], self.param_values[i])
-            self._logger.log(EXTENDED_DEBUG, 'StochKit XML:\n' + stoch_xml)
-            with open(fname, 'w') as f:
+            self._logger.log(EXTENDED_DEBUG, 'StochKit XML:\n%s' % stoch_xml)
+            with open(fname, 'wt') as f:
                 f.write(stoch_xml)
 
             # Assemble the argument list
@@ -215,8 +215,9 @@ class StochKitSimulator(Simulator):
         Run a simulation and returns the result (trajectories)
 
         .. note::
-            ``tspan``, ``initials`` and ``param_values`` values supplied to
-            this method will persist to future :func:`run` calls.
+            In early versions of the Simulator class, ``tspan``, ``initials``
+            and ``param_values`` supplied to this method persisted to future
+            :func:`run` calls. This is no longer the case.
 
         Parameters
         ----------

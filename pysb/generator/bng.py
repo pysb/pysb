@@ -14,8 +14,6 @@ class BngGenerator(object):
 
     def __init__(self, model, additional_initials=None, population_maps=None):
         self.model = model
-        if self.model.has_synth_deg():
-            self.model.enable_synth_deg()
         if additional_initials is None:
             additional_initials = []
         self._additional_initials = additional_initials
@@ -89,13 +87,10 @@ class BngGenerator(object):
             label = r.name + ':'
             react_p = r.reactant_pattern
             prod_p = r.product_pattern
-            if r.is_synth():
-                source_mp = self.model.monomers['__source']()
-                react_p = pysb.core.as_reaction_pattern(source_mp)
-                prod_p += source_mp
-            if r.is_deg():
-                sink_mp = self.model.monomers['__sink']()
-                prod_p = pysb.core.as_reaction_pattern(sink_mp)
+            if not react_p.complex_patterns:
+                react_p = None
+            if not prod_p.complex_patterns:
+                prod_p = None
             reactants_code = format_reactionpattern(react_p)
             products_code = format_reactionpattern(prod_p)
             arrow = '->'
@@ -182,6 +177,8 @@ def format_monomer_site(monomer, site):
     return ret
 
 def format_reactionpattern(rp, for_observable=False):
+    if rp is None:
+        return '0'
     if for_observable is False:
         delimiter = ' + '
     else:
@@ -189,6 +186,8 @@ def format_reactionpattern(rp, for_observable=False):
     return delimiter.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
 def format_complexpattern(cp):
+    if cp is None:
+        return '0'
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)

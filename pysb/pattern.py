@@ -1,15 +1,22 @@
 import collections
 from .core import ComplexPattern, MonomerPattern, Monomer, \
-    ReactionPattern, WILD, as_complex_pattern
+    ReactionPattern, ANY, as_complex_pattern, DanglingBondError
 import networkx as nx
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 import numpy as np
+try:
+    basestring
+except NameError:
+    # Under Python 3, do not pretend that bytes are a valid string
+    basestring = str
 
 
-def get_bonds_in_pattern(pat):
+def get_half_bonds_in_pattern(pat):
     """
-    Return the set of integer bond numbers used in a pattern
+    Return the list of integer bond numbers used in a pattern
+
+    To return as a set, use :func:`get_bonds_in_pattern`.
 
     Parameters
     ----------
@@ -18,33 +25,27 @@ def get_bonds_in_pattern(pat):
 
     Returns
     -------
-    set
-        The set of bond numbers used in the supplied pattern
+    list
+        Bond numbers used in the supplied pattern
 
     Examples
     --------
 
-    These examples convert the set to a list for testing purposes only (sets
-    print differently on Python 2 vs Python3). In general, this should not be
-    necessary.
-
     >>> A = Monomer('A', ['b1', 'b2'], _export=False)
-    >>> list(get_bonds_in_pattern(A(b1=None, b2=None)))
+    >>> get_half_bonds_in_pattern(A(b1=None, b2=None))
     []
-    >>> list(get_bonds_in_pattern(A(b1=1) % A(b2=1)))
-    [1]
-    >>> list(get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)))
-    [1, 2]
+    >>> get_half_bonds_in_pattern(A(b1=1) % A(b2=1))
+    [1, 1]
     """
-    bonds_used = set()
+    bonds_used = list()
 
     def _get_bonds_in_monomer_pattern(mp):
         for sc in mp.site_conditions.values():
             if isinstance(sc, int):
-                bonds_used.add(sc)
-            elif not isinstance(sc, (str, unicode)) and \
+                bonds_used.append(sc)
+            elif not isinstance(sc, basestring) and \
                     isinstance(sc, collections.Iterable):
-                [bonds_used.add(b) for b in sc if isinstance(b, int)]
+                [bonds_used.append(b) for b in sc if isinstance(b, int)]
 
     if pat is None:
         return bonds_used
@@ -59,13 +60,63 @@ def get_bonds_in_pattern(pat):
     return bonds_used
 
 
+def get_bonds_in_pattern(pat):
+    """
+    Return the set of integer bond numbers used in a pattern
+
+    To return as a list (with duplicates), use
+    :func:`get_half_bonds_in_pattern`
+
+    Parameters
+    ----------
+    pat : ComplexPattern, MonomerPattern, or None
+        A pattern from which bond numberings are extracted
+
+    Returns
+    -------
+    set
+        Bond numbers used in the supplied pattern
+
+    Examples
+    --------
+
+    >>> A = Monomer('A', ['b1', 'b2'], _export=False)
+    >>> get_bonds_in_pattern(A(b1=None, b2=None)) == set()
+    True
+    >>> get_bonds_in_pattern(A(b1=1) % A(b2=1)) == {1}
+    True
+    >>> get_bonds_in_pattern(A(b1=1) % A(b1=2, b2=1) % A(b1=2)) == {1, 2}
+    True
+    """
+    return set(get_half_bonds_in_pattern(pat))
+
+
+def check_dangling_bonds(pattern):
+    """
+    Check for dangling bonds in a PySB ComplexPattern/ReactionPattern
+
+    Raises a DanglingBondError if a dangling bond is found
+    """
+    if isinstance(pattern, ReactionPattern):
+        for cp in pattern.complex_patterns:
+            check_dangling_bonds(cp)
+        return
+    bond_counts = collections.Counter(get_half_bonds_in_pattern(pattern))
+
+    dangling_bonds = [bond for bond, count in bond_counts.items()
+                      if count == 1]
+    if dangling_bonds:
+        raise DanglingBondError('Dangling bond(s) {} in {}'
+                                .format(dangling_bonds, pattern))
+
+
 def _match_graphs(pattern, candidate, exact, count):
     """ Compare two pattern graphs for isomorphism """
     node_matcher = categorical_node_match('id', default=None)
     if exact:
         match = nx.is_isomorphic(pattern._as_graph(),
-                                candidate._as_graph(),
-                                node_match=node_matcher)
+                                 candidate._as_graph(),
+                                 node_match=node_matcher)
         return 1 if count else match
     else:
         gm = GraphMatcher(
@@ -239,8 +290,8 @@ class SpeciesPatternMatcher(object):
     Search using a MonomerPattern (ANY and WILD keywords can be used)
 
     >>> spm.match(Bax4(b=WILD))
-    [Bax4(b=1) % Bcl2(b=1), Bax4(b=1) % Mito(b=1)]
-    >>> spm.match(Bcl2(b=WILD))
+    [Bax4(b=None), Bax4(b=1) % Bcl2(b=1), Bax4(b=1) % Mito(b=1)]
+    >>> spm.match(Bcl2(b=ANY))
     [Bax2(b=1) % Bcl2(b=1), Bax4(b=1) % Bcl2(b=1), Bcl2(b=1) % MBax(b=1)]
 
     Search using a ComplexPattern
@@ -270,9 +321,9 @@ class SpeciesPatternMatcher(object):
     >>> spm2.match(A(a='u'))
     [A(a='u')]
     >>> spm2.match(A(a=('u', ANY)))
-    [A(a='u'), A(a=('u', 1)) % A(a=('u', 1))]
-    >>> spm2.match(A(a=('u', WILD)))
     [A(a=('u', 1)) % A(a=('u', 1))]
+    >>> spm2.match(A(a=('u', WILD)))
+    [A(a='u'), A(a=('u', 1)) % A(a=('u', 1))]
     """
     def __init__(self, model, species=None):
         self.model = model
@@ -378,20 +429,20 @@ class SpeciesPatternMatcher(object):
         # If pattern is a Monomer and we don't need match counts, we're done
         if isinstance(pattern, Monomer) and not counts:
             return shortlist_indexes if index else shortlist
-        else:
-            matches = collections.OrderedDict() if counts else []
-            for idx, sp in enumerate(shortlist):
-                val = match_complex_pattern(
-                    as_complex_pattern(pattern), sp, exact=exact, count=counts
-                )
-                if val:
-                    key = shortlist_indexes[idx] if index else sp
-                    if counts:
-                        matches[key] = val
-                    else:
-                        matches.append(key)
 
-            return matches
+        matches = collections.OrderedDict() if counts else []
+        for idx, sp in enumerate(shortlist):
+            val = match_complex_pattern(
+                as_complex_pattern(pattern), sp, exact=exact, count=counts
+            )
+            if val:
+                key = shortlist_indexes[idx] if index else sp
+                if counts:
+                    matches[key] = val
+                else:
+                    matches.append(key)
+
+        return matches
 
     def _species_containing_monomers(self, monomer_list, num_mon_pats=None):
         """
@@ -409,15 +460,15 @@ class SpeciesPatternMatcher(object):
         -------
         Model species containing all of the monomers in the list
         """
-        sp_indexes = sorted(set.intersection(*[self._species_cache[mon] for
-                                             mon in monomer_list]))
+        sp_indexes = set.intersection(*[self._species_cache[mon] for mon in
+                                        monomer_list])
         if num_mon_pats:
             retval = zip(*[(self.species[sp], sp) for sp in sp_indexes
                            if len(self.species[sp].monomer_patterns)
                            == num_mon_pats])
             return retval if retval else ((), ())
         else:
-            return [self.species[sp] for sp in sp_indexes], sp_indexes
+            return [self.species[sp] for sp in sp_indexes], list(sp_indexes)
 
     def rule_firing_species(self, rules_to_consider=None,
                             include_reverse=True):
@@ -550,17 +601,17 @@ class RulePatternMatcher(object):
     Search using a Monomer
 
     >>> rpm.match_reactants(AMito) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
         AMito(b=1) % mCytoC(b=1), kf20, kr20),
     Rule('produce_ACytoC_via_AMito', AMito(b=1) % mCytoC(b=1) >>
         AMito(b=None) + ACytoC(b=None), kc20),
-    Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) <>
+    Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) |
         AMito(b=1) % mSmac(b=1), kf21, kr21),
     Rule('produce_ASmac_via_AMito', AMito(b=1) % mSmac(b=1) >>
         AMito(b=None) + ASmac(b=None), kc21)]
 
     >>> rpm.match_products(mSmac) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) <>
+    [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) |
         AMito(b=1) % mSmac(b=1), kf21, kr21)]
 
     Search using a MonomerPattern
@@ -572,7 +623,7 @@ class RulePatternMatcher(object):
         AMito(b=None) + ASmac(b=None), kc21)]
 
     >>> rpm.match_rules(cSmac(b=1)) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) <>
+    [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
         cSmac(b=1) % XIAP(b=1), kf28, kr28)]
 
     Search using a ComplexPattern
@@ -583,7 +634,7 @@ class RulePatternMatcher(object):
 
     >>> rpm.match_rules(AMito(b=1) % mCytoC(b=1)) \
         # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
         AMito(b=1) % mCytoC(b=1), kf20, kr20),
     Rule('produce_ACytoC_via_AMito', AMito(b=1) % mCytoC(b=1) >>
         AMito(b=None) + ACytoC(b=None), kc20)]
@@ -594,7 +645,7 @@ class RulePatternMatcher(object):
     []
 
     >>> rpm.match_reactants(AMito() + mCytoC()) # doctest:+NORMALIZE_WHITESPACE
-    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+    [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
         AMito(b=1) % mCytoC(b=1), kf20, kr20)]
 
     """
@@ -722,41 +773,41 @@ class ReactionPatternMatcher(object):
     Search using a Monomer
 
     >>> rpm.match_products(mSmac) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (<>):
+    [Rxn (reversible):
         Reactants: {'__s15': mSmac(b=None), '__s45': AMito(b=None)}
         Products: {'__s47': AMito(b=1) % mSmac(b=1)}
         Rate: __s15*__s45*kf21 - __s47*kr21
-        Rules: [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) <>
+        Rules: [Rule('bind_mSmac_AMito', AMito(b=None) + mSmac(b=None) |
                 AMito(b=1) % mSmac(b=1), kf21, kr21)]]
 
     Search using a MonomerPattern
 
-    >>> rpm.match_reactants(AMito(b=WILD)) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (>>):
+    >>> rpm.match_reactants(AMito(b=ANY)) # doctest:+NORMALIZE_WHITESPACE
+    [Rxn (one-way):
         Reactants: {'__s46': AMito(b=1) % mCytoC(b=1)}
         Products: {'__s45': AMito(b=None), '__s48': ACytoC(b=None)}
         Rate: __s46*kc20
         Rules: [Rule('produce_ACytoC_via_AMito', AMito(b=1) % mCytoC(b=1) >>
                 AMito(b=None) + ACytoC(b=None), kc20)],
-     Rxn (>>):
+     Rxn (one-way):
         Reactants: {'__s47': AMito(b=1) % mSmac(b=1)}
         Products: {'__s45': AMito(b=None), '__s49': ASmac(b=None)}
         Rate: __s47*kc21
         Rules: [Rule('produce_ASmac_via_AMito', AMito(b=1) % mSmac(b=1) >>
                 AMito(b=None) + ASmac(b=None), kc21)]]
 
-    >>> rpm.match_products(cSmac(b=WILD)) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (<>):
+    >>> rpm.match_products(cSmac(b=ANY)) # doctest:+NORMALIZE_WHITESPACE
+    [Rxn (reversible):
         Reactants: {'__s7': XIAP(b=None), '__s51': cSmac(b=None)}
         Products: {'__s53': XIAP(b=1) % cSmac(b=1)}
         Rate: __s51*__s7*kf28 - __s53*kr28
-        Rules: [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) <>
+        Rules: [Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
                 cSmac(b=1) % XIAP(b=1), kf28, kr28)]]
 
     Search using a ComplexPattern
 
     >>> rpm.match_reactants(AMito() % mSmac()) # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (>>):
+    [Rxn (one-way):
         Reactants: {'__s47': AMito(b=1) % mSmac(b=1)}
         Products: {'__s45': AMito(b=None), '__s49': ASmac(b=None)}
         Rate: __s47*kc21
@@ -765,13 +816,13 @@ class ReactionPatternMatcher(object):
 
     >>> rpm.match_reactions(AMito(b=3) % mCytoC(b=3)) \
     # doctest:+NORMALIZE_WHITESPACE
-    [Rxn (<>):
+    [Rxn (reversible):
         Reactants: {'__s14': mCytoC(b=None), '__s45': AMito(b=None)}
         Products: {'__s46': AMito(b=1) % mCytoC(b=1)}
         Rate: __s14*__s45*kf20 - __s46*kr20
-        Rules: [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) <>
+        Rules: [Rule('bind_mCytoC_AMito', AMito(b=None) + mCytoC(b=None) |
                 AMito(b=1) % mCytoC(b=1), kf20, kr20)],
-     Rxn (>>):
+     Rxn (one-way):
         Reactants: {'__s46': AMito(b=1) % mCytoC(b=1)}
         Products: {'__s45': AMito(b=None), '__s48': ACytoC(b=None)}
         Rate: __s46*kc20
@@ -873,8 +924,9 @@ class _Reaction(object):
     def __repr__(self):
         return 'Rxn (%s): \n    Reactants: %s\n    Products: %s\n    ' \
                'Rate: %s\n    Rules: %s' % (
-                    '<>' if self.reversible else ('<<' if self.reverse else
-                        '>>'),
+                    'reversible' if self.reversible else
+                    ('one-way [reverse]' if self.reverse else
+                        'one-way'),
                     self._repr_species_dict(self.reactants),
                     self._repr_species_dict(self.products),
                     self.rate,
