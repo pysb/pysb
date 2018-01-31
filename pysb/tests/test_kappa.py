@@ -231,3 +231,19 @@ def test_kappa_error():
     assert_raises(KasimInterfaceError, run_simulation, model, time=10,
                   perturbation="'A_binds_B' A(b),B(b) -> A(b!1),B(b) @ "
                                "'k_A_binds_B'")
+
+
+@with_model
+def test_kappa_two_ghost_agents():
+    Monomer('A')
+    Monomer('M')
+    Parameter('k', 3.0)
+    Rule('synthesize_A_and_B', M() + None + None >> M() + A() + A(), k)
+    Initial(M(), Parameter('M_0', 1000))
+    Observable('A_', A())
+
+    # check the ReactionPattern.__radd__ version
+    rp = None + (None + A())
+    assert len(rp.complex_patterns) == 3
+
+    run_simulation(model, time=100, points=100, seed=_KAPPA_SEED)
