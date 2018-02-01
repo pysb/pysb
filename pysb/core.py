@@ -452,17 +452,6 @@ class MonomerPattern(object):
 
         return self._graph
 
-    def _as_graph(self):
-        """
-        Convert MonomerPattern to networkx graph, caching the result
-
-        See :func:`ComplexPattern._as_graph` for implementation details
-        """
-        if self._graph is None:
-            self._graph = as_complex_pattern(self)._as_graph()
-
-        return self._graph
-
     def __call__(self, conditions=None, **kwargs):
         """Build a new MonomerPattern with updated site conditions. Can be used
         to obtain a shallow copy by passing an empty argument list."""
