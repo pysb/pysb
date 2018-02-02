@@ -45,13 +45,23 @@ def bngl_import_compare_simulations(bng_file, force=False,
                               rtol=1e-8)
 
 
+def _bng_validate_directory():
+    """ Location of BNG's validation models directory"""
+    bng_exec = os.path.realpath(pf.get_path('bng'))
+    if bng_exec.endswith('.bat'):
+        conda_prefix = os.environ.get('CONDA_PREFIX')
+        if conda_prefix:
+            return os.path.join(conda_prefix, 'share\\bionetgen\\Validate')
+
+    return os.path.join(os.path.dirname(bng_exec), 'Validate')
+
+
 def _bngl_location(filename):
     """
     Gets the location of one of BioNetGen's validation model files in BNG's
     Validate directory.
     """
-    bng_dir = os.path.dirname(os.path.realpath(pf.get_path('bng')))
-    bngl_file = os.path.join(bng_dir, 'Validate', filename + '.bngl')
+    bngl_file = os.path.join(_bng_validate_directory(), filename + '.bngl')
     return bngl_file
 
 
@@ -60,9 +70,8 @@ def _sbml_location(filename):
     Gets the location of one of BioNetGen's validation SBML files in BNG's
     Validate/INPUT_FILES directory.
     """
-    bng_dir = os.path.dirname(os.path.realpath(pf.get_path('bng')))
-    sbml_file = os.path.join(bng_dir, 'Validate/INPUT_FILES', filename +
-                             '.xml')
+    sbml_file = os.path.join(
+        _bng_validate_directory(), 'INPUT_FILES', filename + '.xml')
     return sbml_file
 
 

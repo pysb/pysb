@@ -3,8 +3,9 @@ import sys
 import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
-from pysb.simulator import ScipyOdeSimulator, SimulatorException
+from pysb.simulator import ScipyOdeSimulator
 from pysb.examples import robertson, earm_1_0
+import unittest
 
 
 class TestScipySimulatorBase(object):
@@ -53,32 +54,6 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         """Test vode."""
         simres = self.sim.run()
         assert simres._nsims == 1
-
-    def test_vode_jac_solver_run(self):
-        """Test vode and analytic jacobian."""
-        args = {'model': self.model,
-                'tspan': self.time,
-                'integrator': 'vode',
-                'use_analytic_jacobian': True}
-        solver_vode_jac = ScipyOdeSimulator(**args)
-        res1 = solver_vode_jac.run()
-        # Test again with analytic jacobian
-        if solver_vode_jac._compiler != 'python':
-            sim = ScipyOdeSimulator(compiler='python', **args)
-            simres = sim.run()
-            assert simres.species.shape[0] == args['tspan'].shape[0]
-            assert np.allclose(res1.dataframe, simres.dataframe)
-
-        # Test again using theano
-        solver = ScipyOdeSimulator(compiler='theano', **args)
-        simres = solver.run()
-        assert np.allclose(res1.dataframe, simres.dataframe)
-
-        # Test again using cython (if original was not cython)
-        if solver_vode_jac._compiler != 'cython':
-            solver = ScipyOdeSimulator(compiler='cython', **args)
-            simres = solver.run()
-            assert np.allclose(res1.dataframe, simres.dataframe)
 
     def test_lsoda_solver_run(self):
         """Test lsoda."""
@@ -173,6 +148,39 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
 
     def test_result_dataframe(self):
         df = self.sim.run().dataframe
+
+
+class TestScipyOdeCompilerTests(TestScipySimulatorBase):
+    """Test vode and analytic jacobian with different compiler backends"""
+    def setUp(self):
+        super(TestScipyOdeCompilerTests, self).setUp()
+        self.args = {'model': self.model,
+                     'tspan': self.time,
+                     'integrator': 'vode',
+                     'use_analytic_jacobian': True}
+
+        self.python_sim = ScipyOdeSimulator(compiler='python', **self.args)
+        self.python_res = self.python_sim.run()
+
+    def test_cython(self):
+        sim = ScipyOdeSimulator(compiler='cython', **self.args)
+        simres = sim.run()
+        assert simres.species.shape[0] == self.args['tspan'].shape[0]
+        assert np.allclose(self.python_res.dataframe, simres.dataframe)
+
+    def test_theano(self):
+        sim = ScipyOdeSimulator(compiler='theano', **self.args)
+        simres = sim.run()
+        assert simres.species.shape[0] == self.args['tspan'].shape[0]
+        assert np.allclose(self.python_res.dataframe, simres.dataframe)
+
+    @unittest.skipIf(sys.version_info.major >= 3, 'weave not available for '
+                                                  'Python 3')
+    def test_weave(self):
+        sim = ScipyOdeSimulator(compiler='weave', **self.args)
+        simres = sim.run()
+        assert simres.species.shape[0] == self.args['tspan'].shape[0]
+        assert np.allclose(self.python_res.dataframe, simres.dataframe)
 
 
 class TestScipySimulatorSequential(TestScipySimulatorBase):

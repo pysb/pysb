@@ -55,6 +55,7 @@ _path_config = {
             'posix': 'ssa',
             'nt': 'ssa.exe'
         },
+        'batch_file': 'ssa.bat',
         'env_var': 'STOCHKITPATH',
         'search_paths': {
             'posix': ('/usr/local/share/StochKit', ),
@@ -67,22 +68,13 @@ _path_config = {
             'posix': 'tau_leaping',
             'nt': 'tau_leaping.exe'
         },
+        'batch_file': 'tau_leaping.bat',
         'env_var': 'STOCHKITPATH',
         'search_paths': {
             'posix': ('/usr/local/share/StochKit',),
             'nt': ('c:/Program Files/StochKit',)
         }
-    },
-    'atomizer': {
-        'name': 'Atomizer',
-        'executable': 'sbmlTranslator',
-        'batch_file': 'sbmlTranslator.bat',
-        'env_var': 'ATOMIZERPATH',
-        'search_paths': {
-            'posix': ('/usr/local/share/BioNetGen/bin',),
-            'nt': ('c:/Program Files/BioNetGen/bin',)
-        }
-    },
+    }
 }
 _path_cache = {}
 

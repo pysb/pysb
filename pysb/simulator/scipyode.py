@@ -13,9 +13,9 @@ try:
 except ImportError:
     theano = None
 try:
-    import cython
+    import Cython
 except ImportError:
-    cython = None
+    Cython = None
 from sympy.printing.lambdarepr import lambdarepr
 import distutils
 import pysb.bng
@@ -198,13 +198,13 @@ class ScipyOdeSimulator(Simulator):
             ydot = np.zeros(len(self.model.species))
 
             if self._compiler == 'cython':
-                if not cython:
+                if not Cython:
                     raise ImportError('Cython library is not installed')
                 code_eqs = CYTHON_DECL + code_eqs
 
                 def rhs(t, y, p):
                     # note that the evaluated code sets ydot as a side effect
-                    cython.inline(code_eqs, quiet=True)
+                    Cython.inline(code_eqs, quiet=True)
 
                     return ydot
 
@@ -319,7 +319,7 @@ class ScipyOdeSimulator(Simulator):
                     jac_eqs = CYTHON_DECL + jac_eqs
 
                     def jacobian(t, y, p):
-                        cython.inline(jac_eqs, quiet=True)
+                        Cython.inline(jac_eqs, quiet=True)
                         return jac
 
                     with _set_cflags_no_warnings(self._logger):
@@ -405,12 +405,12 @@ class ScipyOdeSimulator(Simulator):
     def _test_cython(cls):
         if not hasattr(cls, '_use_cython'):
             cls._use_cython = False
-            if cython is None:
+            if Cython is None:
                 return
             try:
-                cython.inline('x = 1', force=True, quiet=True)
+                Cython.inline('x = 1', force=True, quiet=True)
                 cls._use_cython = True
-            except cython.Compiler.Errors.CompileError:
+            except Cython.Compiler.Errors.CompileError:
                 pass
 
     @classmethod

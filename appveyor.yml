@@ -3,14 +3,18 @@ build: false
 environment:
   matrix:
     - PYTHON_VERSION: 2.7
-      MINICONDA: C:\Miniconda
+      MINICONDA: C:\Miniconda-x64
     - PYTHON_VERSION: 3.6
-      MINICONDA: C:\Miniconda36
+      MINICONDA: C:\Miniconda36-x64
 
 init:
   - "ECHO %PYTHON_VERSION% %MINICONDA%"
 
 install:
+  # https://stackoverflow.com/questions/13596407/errors-while-building-installing-c-module-for-python-2-7
+  - if "%PYTHON_VERSION%"=="2.7" (copy "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvars64.bat" "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvarsamd64.bat")
+  - if "%PYTHON_VERSION%"=="2.7" (copy "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvars64.bat" "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\amd64\vcvarsamd64.bat")
+
   # Issues have been encountered with installing numpy and scipy on
   # AppVeyor e.g.
   # http://tjelvarolsson.com/blog/how-to-continuously-test-your-python-code-on-windows-using-appveyor/
@@ -27,27 +31,9 @@ install:
   # Majority of dependencies can be installed with Anaconda
   - conda install -c conda-forge "numpy>=1.14" scipy matplotlib sympy
     networkx nose h5py pandas theano mkl pydot mock cython
+  - if "%PYTHON_VERSION%"=="2.7" (conda install -c conda-forge weave)
 
-  # Graphviz & PyGraphviz
-  - appveyor DownloadFile "https://graphviz.gitlab.io/_pages/Download/windows/graphviz-2.38.zip" -FileName graphviz.zip
-  - 7z x graphviz.zip -y > nul
-  - set "PATH=%cd%\release\lib\release\dll;%PATH%"
-
-  # BioNetGen
-  - appveyor DownloadFile "http://www.csb.pitt.edu/Faculty/Faeder/wp-content/uploads/2017/04/BioNetGen-2.2.6-stable2_Windows.zip" -FileName BioNetGen.zip
-  - 7z x BioNetGen.zip -y > nul
-  - set "BNGPATH=%cd%\BioNetGen-2.2.6-stable"
-  - set "ATOMIZERPATH=%BNGPATH%\bin"
-
-  # KaSim and KaSa
-  - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4.0rc1/Kappapp.and.CLI.for.Windows.zip" -FileName Kappa.zip
-  - 7z x Kappa.zip -y > nul
-  - set "KAPPAPATH=%cd%\KappaBin\bin"
-
-  # StochKit
-  - appveyor DownloadFile "https://downloads.sourceforge.net/project/stochkit/StochKit2/StochKit2.0.10/StochKit2.0.10_WINDOWS_LITE.zip" -FileName stochkit.zip
-  - 7z x stochkit.zip -y > nul
-  - set "STOCHKITPATH=%cd%\StochKit2.0.10_WINDOWS_LITE"
+  - conda install -c alubbock graphviz bionetgen atomizer kappa stochkit-lite
 
   # Build PySB
   - python setup.py build --build-lib=build/lib
