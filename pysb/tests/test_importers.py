@@ -50,7 +50,7 @@ def _bngl_location(filename):
     Gets the location of one of BioNetGen's validation model files in BNG's
     Validate directory.
     """
-    bng_dir = os.path.dirname(pf.get_path('bng'))
+    bng_dir = os.path.dirname(os.path.realpath(pf.get_path('bng')))
     bngl_file = os.path.join(bng_dir, 'Validate', filename + '.bngl')
     return bngl_file
 
@@ -60,7 +60,7 @@ def _sbml_location(filename):
     Gets the location of one of BioNetGen's validation SBML files in BNG's
     Validate/INPUT_FILES directory.
     """
-    bng_dir = os.path.dirname(pf.get_path('bng'))
+    bng_dir = os.path.dirname(os.path.realpath(pf.get_path('bng')))
     sbml_file = os.path.join(bng_dir, 'Validate/INPUT_FILES', filename +
                              '.xml')
     return sbml_file

@@ -4,14 +4,6 @@ dist: trusty
 python:
 - '2.7'
 - '3.6'
-addons:
-    apt:
-        sources:
-            - avsm
-        packages:
-            - ocaml-nox
-            - opam
-            - aspcud
 before_install:
 - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
     -O miniconda.sh
@@ -24,29 +16,8 @@ before_install:
 - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then pip install weave; fi
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
-- wget "http://www.csb.pitt.edu/Faculty/Faeder/wp-content/uploads/2017/04/BioNetGen-2.2.6-stable_Linux.tar.gz"
-    -O bionetgen.tar.gz
-- tar xzf bionetgen.tar.gz
-- export BNGPATH=`pwd`/BioNetGen-2.2.6-stable
-# First install ocamlfind via opam (needed to build KaSim/KaSa)
-- opam init -a git://github.com/ocaml/opam-repository && eval $(opam config env)
-- opam install -y conf-which base-bytes
-- opam install -y ocamlbuild yojson result
-# Install KaSim/KaSa
-- git clone https://github.com/Kappa-Dev/KaSim.git
-- cd KaSim
-# KaSim version 4.0
-- git checkout v4.0rc1
-- make all
-- export KAPPAPATH=`pwd`
-- cd ../
-# Install StochKit
-- wget https://github.com/StochSS/StochKit/archive/master.zip -O StochKit.zip
-- unzip -q -d $HOME StochKit.zip
-- export STOCHKITPATH=$HOME/StochKit-master
-- cd $STOCHKITPATH
-- ./install.sh >/dev/null 2>&1
-- cd $TRAVIS_BUILD_DIR
+# Install BioNetGen, Kappa, StochKit and Atomizer
+- conda install --yes -c alubbock kappa stochkit bionetgen atomizer
 install:
   python setup.py build --build-lib=build/lib
 script:

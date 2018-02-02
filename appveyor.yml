@@ -37,6 +37,7 @@ install:
   - appveyor DownloadFile "http://www.csb.pitt.edu/Faculty/Faeder/wp-content/uploads/2017/04/BioNetGen-2.2.6-stable2_Windows.zip" -FileName BioNetGen.zip
   - 7z x BioNetGen.zip -y > nul
   - set "BNGPATH=%cd%\BioNetGen-2.2.6-stable"
+  - set "ATOMIZERPATH=%BNGPATH%\bin"
 
   # KaSim and KaSa
   - appveyor DownloadFile "https://github.com/Kappa-Dev/KaSim/releases/download/v4.0rc1/Kappapp.and.CLI.for.Windows.zip" -FileName Kappa.zip
