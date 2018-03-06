@@ -918,9 +918,7 @@ class SimulationResult(object):
         """
         Calculate a pattern's trajectories without adding to model
 
-        Normally, observables are added in advance to a model. If a new
-        observable is required, previously it was necessary to re-run the
-        simulation. This method can calculate observables on demand using
+        This method calculates an observable "on demand" using
         any supplied MonomerPattern or ComplexPattern against the simulation
         result, without re-running the simulation.
 
@@ -945,38 +943,35 @@ class SimulationResult(object):
         Examples
         --------
 
+        >>> from pysb import ANY
         >>> from pysb.examples import earm_1_0
         >>> from pysb.simulator import ScipyOdeSimulator
         >>> simres = ScipyOdeSimulator(earm_1_0.model, tspan=range(5)).run()
-
-        A traditional observable is calculated at the time of simulation, and
-        can be accessed using simres.observables or simres.dataframe:
-
-        >>> simres.dataframe.loc[:, 'cSmac_total']
-        time
-        0    0.000000e+00
-        1    2.392967e-81
-        2    1.451962e-74
-        3    4.312044e-72
-        4    1.198874e-69
-        Name: cSmac_total, dtype: float64
-
-        If we hadn't added this observable to the model before simulation,
-        we can calculate it (or any other observable pattern) based on the
-        simulation result. Note that we create an alias "m" to access model
-        monomers, just for convenience. In this case, the "on demand"
-        observable give the same result as the pre-calculated one.
-
         >>> m = earm_1_0.model.monomers
-        >>> simres.observable(m.cSmac())
+
+        Observable of bound Bid:
+
+        >>> simres.observable(m.Bid(b=ANY))
         time
         0    0.000000e+00
-        1    2.392967e-81
-        2    1.451962e-74
-        3    4.312044e-72
-        4    1.198874e-69
+        1    1.190933e-12
+        2    2.768582e-11
+        3    1.609716e-10
+        4    5.320530e-10
+        dtype: float64
+
+        Observable of AMito bound to mCytoC:
+
+        >>> simres.observable(m.AMito(b=1) % m.mCytoC(b=1))
+        time
+        0    0.000000e+00
+        1    1.477319e-77
+        2    1.669917e-71
+        3    5.076939e-69
+        4    1.157400e-66
         dtype: float64
         """
+
         # Adjust the supplied pattern's monomer objects to match the
         # simulationresult's internal model
         if isinstance(pattern, MonomerPattern):
