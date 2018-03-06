@@ -84,8 +84,11 @@ def sbml_translator(input_file,
         BNGL output filename
     """
     logger = get_logger(__name__, log_level=verbose)
-    sbmltrans_bin = os.path.join(os.path.dirname(pf.get_path('bng')),
-                                 'bin/sbmlTranslator')
+    bng_path = os.path.realpath(pf.get_path('bng'))
+    sbmltrans_bin = os.path.join(
+        os.path.dirname(bng_path),
+        'sbmlTranslator' if bng_path.endswith('.bat') else 'bin/sbmlTranslator'
+    )
     sbmltrans_args = [sbmltrans_bin, '-i', input_file]
     if output_file is None:
         output_file = os.path.splitext(input_file)[0] + '.bngl'
