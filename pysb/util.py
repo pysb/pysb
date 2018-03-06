@@ -5,7 +5,6 @@ import inspect
 import numpy
 import io
 import networkx as nx
-from networkx.drawing.nx_agraph import read_dot as read_dot_pygraphviz
 try:
     basestring
 except NameError:
