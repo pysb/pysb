@@ -55,6 +55,7 @@ _path_config = {
             'posix': 'ssa',
             'nt': 'ssa.exe'
         },
+        'batch_file': 'ssa.bat',
         'env_var': 'STOCHKITPATH',
         'search_paths': {
             'posix': ('/usr/local/share/StochKit', ),
@@ -67,12 +68,13 @@ _path_config = {
             'posix': 'tau_leaping',
             'nt': 'tau_leaping.exe'
         },
+        'batch_file': 'tau_leaping.bat',
         'env_var': 'STOCHKITPATH',
         'search_paths': {
             'posix': ('/usr/local/share/StochKit',),
             'nt': ('c:/Program Files/StochKit',)
         }
-    },
+    }
 }
 _path_cache = {}
 

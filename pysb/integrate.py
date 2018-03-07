@@ -222,8 +222,8 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     integer indexing (note that the view's data buffer is shared with the
     original array so there is no extra memory cost):
 
-    >>> print(yfull.shape)
-    (10,)
+    >>> yfull.shape == (10, )
+    True
     >>> print(yfull.dtype)                 #doctest: +NORMALIZE_WHITESPACE
     [('__s0', '<f8'), ('__s1', '<f8'), ('__s2', '<f8'), ('A_total', '<f8'),
     ('B_total', '<f8'), ('C_total', '<f8')]
@@ -232,8 +232,8 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
       ...
     IndexError: too many indices...
     >>> yarray = yfull.view(float).reshape(len(yfull), -1)
-    >>> print(yarray.shape)
-    (10, 6)
+    >>> yarray.shape == (10, 6)
+    True
     >>> print(yarray.dtype)
     float64
     >>> print(yarray[0:4, 1:3])            #doctest: +NORMALIZE_WHITESPACE

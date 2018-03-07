@@ -111,8 +111,7 @@ class InitialsSensitivity(object):
       [ 0.      0.      0.      0.    ]
       [ 5.0243  5.0243  0.      0.    ]
       [-4.5381 -4.5381  0.      0.    ]]
-    >>> sens.create_boxplot_and_heatplot() #doctest: +ELLIPSIS
-    <matplotlib.figure.Figure object ...>
+    >>> sens.create_boxplot_and_heatplot() #doctest: +SKIP
     """
 
     def __init__(self, solver, values_to_sample, objective_function,
