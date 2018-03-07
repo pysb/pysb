@@ -892,7 +892,6 @@ class ComplexPattern(object):
         return ret
 
 
-
 class ReactionPattern(object):
 
     """
@@ -922,7 +921,15 @@ class ReactionPattern(object):
             return ReactionPattern(self.complex_patterns + [ComplexPattern([other], None)])
         elif isinstance(other, ComplexPattern):
             return ReactionPattern(self.complex_patterns + [other])
-        elif other == None:
+        elif other is None:
+            self.complex_patterns.append(None)
+            return self
+        else:
+            return NotImplemented
+
+    def __radd__(self, other):
+        if other is None:
+            self.complex_patterns = [None] + self.complex_patterns
             return self
         else:
             return NotImplemented
