@@ -500,7 +500,7 @@ class MonomerPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -869,7 +869,7 @@ class ComplexPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -947,7 +947,7 @@ class ReactionPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
