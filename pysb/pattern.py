@@ -307,7 +307,6 @@ class SpeciesPatternMatcher(object):
     >>> A = Monomer('A', ['a'], {'a': ['u', 'p']}, _export=False)
     >>> model.add_component(A)
     >>> species = [                                                     \
-            A(a=None),                                                  \
             A(a='u'),                                                   \
             A(a=1) % A(a=1),                                            \
             A(a=('u', 1)) % A(a=('u', 1)),                              \
@@ -316,7 +315,7 @@ class SpeciesPatternMatcher(object):
     >>> model.species = [as_complex_pattern(sp) for sp in species]
     >>> spm2 = SpeciesPatternMatcher(model)
     >>> spm2.match(A()) # doctest:+NORMALIZE_WHITESPACE
-    [A(a=None), A(a='u'), A(a=1) % A(a=1), A(a=('u', 1)) % A(a=('u', 1)),
+    [A(a='u'), A(a=1) % A(a=1), A(a=('u', 1)) % A(a=('u', 1)),
      A(a=('p', 1)) % A(a=('p', 1))]
     >>> spm2.match(A(a='u'))
     [A(a='u')]

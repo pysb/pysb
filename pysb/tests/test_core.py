@@ -1,7 +1,7 @@
 from pysb.testing import *
 from pysb.core import *
 from functools import partial
-import itertools
+from nose.tools import assert_raises
 
 
 @with_model
@@ -333,3 +333,9 @@ def test_dangling_bond():
 @with_model
 def test_expression_type():
     assert_raises(ValueError, Expression, 'A', 1)
+
+
+@with_model
+def test_call_site_as_none():
+    Monomer('A', ['a'], {'a': ['x', 'y']})
+    assert_raises(ValueError, A, a=None)
