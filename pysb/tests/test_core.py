@@ -328,3 +328,8 @@ def test_dangling_bond():
     Monomer('A', ['a'])
     Parameter('kf', 1.0)
     assert_raises(DanglingBondError, as_reaction_pattern, A(a=1) % A(a=None))
+
+
+@with_model
+def test_expression_type():
+    assert_raises(ValueError, Expression, 'A', 1)

@@ -214,7 +214,10 @@ class BnglBuilder(Builder):
             except KeyError:
                 return self.model.expressions[rate_law_name]
         elif rl.get('type') == 'Function':
-            return self.model.expressions[rl.get('name')]
+            try:
+                return self.model.expressions[rl.get('name')]
+            except KeyError:
+                return self.model.parameters[rl.get('name')]
         else:
             self._warn_or_except('Rate law %s has unknown type %s' %
                                  (rl.get('id'), rl.get('type')))
@@ -312,7 +315,10 @@ class BnglBuilder(Builder):
                                                           expr_text,
                                                           ex.message))
             expr_namespace[expr_name] = expr_val
-            self.expression(expr_name, expr_val)
+            if isinstance(expr_val, (float, int)):
+                self.parameter(expr_name, expr_val)
+            else:
+                self.expression(expr_name, expr_val)
 
     def _parse_bng_xml(self):
         self.model.name = self._x.get(_ns('id'))
