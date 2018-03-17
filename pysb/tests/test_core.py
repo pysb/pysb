@@ -328,3 +328,13 @@ def test_dangling_bond():
     Monomer('A', ['a'])
     Parameter('kf', 1.0)
     assert_raises(DanglingBondError, as_reaction_pattern, A(a=1) % A(a=None))
+
+
+@with_model
+def test_invalid_site_name():
+    assert_raises(ValueError, Monomer, 'A', ['1'])
+
+
+@with_model
+def test_invalid_state_value():
+    assert_raises(ValueError, Monomer, 'A', ['a'], {'a': ['_', 'a']})
