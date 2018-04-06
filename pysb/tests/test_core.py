@@ -333,3 +333,14 @@ def test_dangling_bond():
 @with_model
 def test_expression_type():
     assert_raises(ValueError, Expression, 'A', 1)
+
+
+@with_model
+def test_synth_requires_concrete():
+    Monomer('A', ['s'], {'s': ['a', 'b']})
+    Parameter('kA', 1.0)
+
+    # These synthesis products are not concrete (site "s" not specified),
+    # so they should raise a ValueError
+    assert_raises(ValueError, Rule, 'r1', None >> A(), kA)
+    assert_raises(ValueError, Rule, 'r2', A() | None, kA, kA)
