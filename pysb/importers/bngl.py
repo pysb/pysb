@@ -6,6 +6,7 @@ import xml.etree.ElementTree
 import re
 from sympy.parsing.sympy_parser import parse_expr
 import warnings
+import numbers
 
 
 def _ns(tag_string):
@@ -315,7 +316,7 @@ class BnglBuilder(Builder):
                                                           expr_text,
                                                           ex.message))
             expr_namespace[expr_name] = expr_val
-            if isinstance(expr_val, (float, int)):
+            if isinstance(expr_val, numbers.Number):
                 self.parameter(expr_name, expr_val)
             else:
                 self.expression(expr_name, expr_val)
