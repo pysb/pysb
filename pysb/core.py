@@ -500,7 +500,7 @@ class MonomerPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -869,7 +869,7 @@ class ComplexPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -947,7 +947,7 @@ class ReactionPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -1354,6 +1354,9 @@ class Expression(Component, sympy.Symbol):
 
     def __init__(self, name, expr, _export=True):
         Component.__init__(self, name, _export)
+        if not isinstance(expr, sympy.Expr):
+            raise ValueError('An Expression can only be created from a '
+                             'sympy.Expr object')
         self.expr = expr
 
     def expand_expr(self, expand_observables=False):

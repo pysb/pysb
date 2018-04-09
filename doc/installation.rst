@@ -30,47 +30,31 @@ Option 1: Install PySB natively on your computer
 
    Anaconda has a simple graphical installer which can be downloaded from
    https://www.continuum.io/downloads - select your operating system
-   and download the **Python 2.7 version**. The default installer options
-   are usually appropriate.
+   and download the 64 bit version. Both Python 2.7 and 3.6 are supported. The
+   default installer options are usually appropriate.
 
-   .. note::
-       **Windows users:** If you are unsure whether to use the 32-bit or
-       64-bit installer, press the Windows Start button, search for “About
-       your PC”, and under “System type” it will specify 32-bit operating
-       system or 64-bit operating system
+2. **Install PySB**
 
-2. (Windows only) **Install perl**
-
-   Press the Windows Start button, search for “command prompt”, and select
-   it/press enter. Then enter the following at the prompt:
-
-       :command:`conda install --yes perl`
-
-   Use the command prompt when you need to type commands in a terminal.
-
-3. **Install BioNetGen**
-
-   Download BioNetGen from here:
-   http://bionetgen.org/index.php/BioNetGen_Distributions
-
-   Extract the download, rename the unzipped ``BioNetGen-x.y.z`` folder
-   to just ``BioNetGen`` and move it into ``/usr/local/share`` (Mac or
-   Linux) or ``C:\Program Files`` (Windows). If you would like to put it
-   somewhere else, set the ``BNGPATH`` environment variable to the full
-   path to the ``BioNetGen-x.y.z`` folder.
-
-4. **Install PySB**
-
-   The installation is very straightforward with ``pip`` - type the
+   The installation is very straightforward with ``conda`` - type the
    following in a terminal:
 
-       :command:`pip install pysb`
+       :command:`conda install -c alubbock pysb`
 
    .. note::
-       **Mac users:** To open a terminal on a Mac, open Spotlight search
-       (press command key and space), type ``terminal`` and press enter.
+        You may wish to use the Anaconda prompt, which sets up the Anaconda
+        paths automatically, rather than the standard command prompt or
+        terminal on your operating system. Otherwise, you may have to use the
+        full path to the ``conda`` command each time, and may end up using
+        the system version of Python, rather than the Anaconda one.
 
-5. **Start Python and PySB**
+   .. note::
+        You can also install PySB using ``pip``, but in that case you will
+        need to manually install `BioNetGen`_ into the default path for your
+        platform (/usr/local/share/BioNetGen on Mac and Linux, c:\\Program
+        Files\\BioNetGen on Windows), or set the `BNGPATH` environment
+        variable to the BioNetGen path on your machine.
+
+3. **Start Python and PySB**
 
    If you installed Python using `Anaconda`_ on Windows, search for and select
    ``IPython`` from your Start Menu (Windows). Otherwise, open a terminal
@@ -86,6 +70,19 @@ Recommended additional software
 
 The following software is not required for the basic operation of PySB, but
 provides extra capabilities and features when installed.
+
+* `cython`_ or `weave`_
+  Cython is a package for compiling Python code into C code on the fly. It
+  is used by :class:`pysb.simulator.ScipyOdeSimulator` to greatly improve the
+  speed of ODE integration. PySB will detect and use Cython automatically,
+  if available. To install with Anaconda, type
+  :command:`conda install cython`.
+  With pip, type :command:`pip install cython`.
+
+  Weave performs the same job as Cython, and is slightly faster in some
+  circumstances. It is only available on Python 2. To install with Anaconda,
+  type :command:`conda install -c conda-forge weave`. With pip, type
+  :command:`pip install weave`.
 
 * `matplotlib`_
 
@@ -125,6 +122,9 @@ provides extra capabilities and features when installed.
   where you install it, you will need to rename the file to strip out the
   version and operating system information so that you have just ``KaSim.exe``
   (Windows) or ``KaSim`` (Mac or Linux).
+
+  On Anaconda, Kappa can be installed with
+  :command:`conda install -c alubbock kappa`.
 
 Option 2: Docker container with PySB and Jupyter Notebook
 ----------------------------------------------------------
@@ -207,3 +207,5 @@ https://github.com/jupyter/docker-stacks/tree/master/scipy-notebook
 .. _matplotlib: http://matplotlib.org/
 .. _BioNetGen: http://www.bionetgen.org/
 .. _Perl: http://www.perl.org/
+.. _Cython: http://cython.org/
+.. _weave: https://pypi.python.org/pypi/weave
