@@ -43,10 +43,7 @@ class KappaGenerator(object):
         for p in self.model.parameters:
             self.__content += "%%var: '%s' %e\n" % (p.name, p.value)
         for e in self.model.expressions:
-            sym_names = [x.name for x in e.expr.atoms(sympy.Symbol)]
             str_expr = str(expression_to_muparser(e))
-            for n in sym_names:
-                str_expr = str_expr.replace(n,"'%s'"%n)
             self.__content += "%%var: '%s' %s\n" % (e.name, str_expr)
         self.__content += "\n"
 
@@ -273,6 +270,9 @@ class KappaPrinter(StrPrinter):
             return self._print(expr.args[0])
         return "[min] {} {}".format(
             self._print(expr.args[0]), self._print(sympy.Min(*expr.args[1:])))
+
+    def _print_Parameter(self, expr):
+        return "'{}'".format(expr.name)
 
 
 def expression_to_muparser(expression):
