@@ -400,6 +400,14 @@ class ScipyOdeSimulator(Simulator):
                 except (weave.build_tools.CompileError,
                         distutils.errors.CompileError, ImportError):
                     pass
+                except ValueError as e:
+                    if len(e.args) == 1 and \
+                                        e.args[0] == "Symbol table not found":
+                        get_logger(__name__).debug(
+                            "'ValueError: Symbol table not found' "
+                            "encountered; weave compiler is not functional")
+                    else:
+                        raise
 
     @classmethod
     def _test_cython(cls):
@@ -412,6 +420,13 @@ class ScipyOdeSimulator(Simulator):
                 cls._use_cython = True
             except Cython.Compiler.Errors.CompileError:
                 pass
+            except ValueError as e:
+                if len(e.args) == 1 and e.args[0] == "Symbol table not found":
+                    get_logger(__name__).debug(
+                        "'ValueError: Symbol table not found' "
+                        "encountered; Cython compiler is not functional")
+                else:
+                    raise
 
     @classmethod
     def _autoselect_compiler(cls):
