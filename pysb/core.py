@@ -1354,6 +1354,9 @@ class Expression(Component, sympy.Symbol):
 
     def __init__(self, name, expr, _export=True):
         Component.__init__(self, name, _export)
+        if not isinstance(expr, sympy.Expr):
+            raise ValueError('An Expression can only be created from a '
+                             'sympy.Expr object')
         self.expr = expr
 
     def expand_expr(self, expand_observables=False):
