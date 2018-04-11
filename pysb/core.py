@@ -1200,6 +1200,15 @@ class Rule(Component):
         self.move_connected = move_connected
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
+        # Check synthesis products are concrete
+        if self.is_synth():
+            rp = self.reactant_pattern if self.is_reversible else \
+                self.product_pattern
+            for cp in rp.complex_patterns:
+                if not cp.is_concrete():
+                    raise ValueError('Product {} of synthesis rule {} is not '
+                                     'concrete'.format(cp, self.name))
+
     def is_synth(self):
         """Return a bool indicating whether this is a synthesis rule."""
         return len(self.reactant_pattern.complex_patterns) == 0 or \
