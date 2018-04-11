@@ -339,3 +339,13 @@ def test_expression_type():
 def test_call_site_as_none():
     Monomer('A', ['a'], {'a': ['x', 'y']})
     assert_raises(ValueError, A, a=None)
+
+@with_model
+def test_synth_requires_concrete():
+    Monomer('A', ['s'], {'s': ['a', 'b']})
+    Parameter('kA', 1.0)
+
+    # These synthesis products are not concrete (site "s" not specified),
+    # so they should raise a ValueError
+    assert_raises(ValueError, Rule, 'r1', None >> A(), kA)
+    assert_raises(ValueError, Rule, 'r2', A() | None, kA, kA)
