@@ -362,7 +362,7 @@ class MonomerPattern(object):
         invalid_sites = []
         for (site, state) in site_conditions.items():
             # pass through to next iteration if state type is ok
-            if state == None:
+            if state is None and site not in monomer.site_states:
                 continue
             elif isinstance(state, int):
                 continue
@@ -384,13 +384,13 @@ class MonomerPattern(object):
                 continue
             invalid_sites.append(site)
         if invalid_sites:
-            raise Exception("Invalid state value for sites: " +
-                            '; '.join(['%s=%s' % (s,str(site_conditions[s]))
+            raise ValueError("Invalid state value for sites: " +
+                             '; '.join(['%s=%s' % (s, str(site_conditions[s]))
                                        for s in invalid_sites]))
 
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
-            raise Exception("compartment is not a Compartment object")
+            raise ValueError("compartment is not a Compartment object")
 
         self.monomer = monomer
         self.site_conditions = site_conditions
