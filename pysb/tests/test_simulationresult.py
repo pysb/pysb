@@ -1,10 +1,16 @@
 from pysb.simulator import ScipyOdeSimulator, BngSimulator
 from pysb.simulator.base import SimulationResult
-from pysb.examples import tyson_oscillator, robertson, expression_observables
+from pysb.examples import tyson_oscillator, robertson, \
+    expression_observables, earm_1_3, bax_pore_sequential, bax_pore, \
+    bngwiki_egfr_simple
+from pysb.bng import generate_equations
 import numpy as np
 import tempfile
-from nose.tools import assert_raises
+from nose.tools import assert_raises, raises
 import warnings
+from pysb.pattern import SpeciesPatternMatcher
+import collections
+import pandas as pd
 
 
 def test_simres_dataframe():
@@ -40,6 +46,54 @@ def test_simres_dataframe():
 
     assert df2.shape == (len(tspan1) + len(tspan3),
                          len(model.species) + len(model.observables))
+
+
+def test_simres_observable():
+    """ Test on demand observable evaluation """
+    models = [tyson_oscillator.model, robertson.model,
+              expression_observables.model, earm_1_3.model,
+              bax_pore_sequential.model, bax_pore.model,
+              bngwiki_egfr_simple.model]
+    for model in models:
+        generate_equations(model)
+        spm = SpeciesPatternMatcher(model)
+        for obs in model.observables:
+            dyn_obs = spm.match(pattern=obs.reaction_pattern, index=True,
+                                counts=True)
+
+            # Need to sort by species numerical order for comparison purposes
+            dyn_obs = collections.OrderedDict(sorted(dyn_obs.items()))
+
+            dyn_species = list(dyn_obs.keys())
+
+            if obs.match == 'species':
+                dyn_coeffs = [1] * len(dyn_obs)
+            else:
+                dyn_coeffs = list(dyn_obs.values())
+
+            assert dyn_species == obs.species
+            assert dyn_coeffs == obs.coefficients
+
+
+class TestSimulationResultEarm13(object):
+    def setUp(self):
+        self.model = earm_1_3.model
+        self.tspan = np.linspace(0, 100, 101)
+        self.sim = ScipyOdeSimulator(self.model, tspan=self.tspan)
+        self.simres = self.sim.run()
+
+    @raises(ValueError)
+    def test_dynamic_observable_nonpattern(self):
+        self.simres.observable('cSmac')
+
+    @raises(ValueError)
+    def test_match_nonexistent_pattern(self):
+        m = self.model.monomers
+        self.simres.observable(m.cSmac() % m.Bid())
+
+    def test_on_demand_observable(self):
+        m = self.model.monomers
+        assert isinstance(self.simres.observable(m.cSmac()), pd.Series)
 
 
 def test_save_load():

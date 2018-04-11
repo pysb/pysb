@@ -367,7 +367,7 @@ class MonomerPattern(object):
         invalid_sites = []
         for (site, state) in site_conditions.items():
             # pass through to next iteration if state type is ok
-            if state == None:
+            if state is None and site not in monomer.site_states:
                 continue
             elif isinstance(state, int):
                 continue
@@ -389,13 +389,13 @@ class MonomerPattern(object):
                 continue
             invalid_sites.append(site)
         if invalid_sites:
-            raise Exception("Invalid state value for sites: " +
-                            '; '.join(['%s=%s' % (s,str(site_conditions[s]))
+            raise ValueError("Invalid state value for sites: " +
+                             '; '.join(['%s=%s' % (s, str(site_conditions[s]))
                                        for s in invalid_sites]))
 
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
-            raise Exception("compartment is not a Compartment object")
+            raise ValueError("compartment is not a Compartment object")
 
         self.monomer = monomer
         self.site_conditions = site_conditions
@@ -505,7 +505,7 @@ class MonomerPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -874,7 +874,7 @@ class ComplexPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -952,7 +952,7 @@ class ReactionPattern(object):
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
-                      PendingDeprecationWarning,
+                      DeprecationWarning,
                       stacklevel=2)
         return self.__or__(other)
 
@@ -1205,6 +1205,15 @@ class Rule(Component):
         self.move_connected = move_connected
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
+        # Check synthesis products are concrete
+        if self.is_synth():
+            rp = self.reactant_pattern if self.is_reversible else \
+                self.product_pattern
+            for cp in rp.complex_patterns:
+                if not cp.is_concrete():
+                    raise ValueError('Product {} of synthesis rule {} is not '
+                                     'concrete'.format(cp, self.name))
+
     def is_synth(self):
         """Return a bool indicating whether this is a synthesis rule."""
         return len(self.reactant_pattern.complex_patterns) == 0 or \
@@ -1359,6 +1368,9 @@ class Expression(Component, sympy.Symbol):
 
     def __init__(self, name, expr, _export=True):
         Component.__init__(self, name, _export)
+        if not isinstance(expr, sympy.Expr):
+            raise ValueError('An Expression can only be created from a '
+                             'sympy.Expr object')
         self.expr = expr
 
     def expand_expr(self, expand_observables=False):

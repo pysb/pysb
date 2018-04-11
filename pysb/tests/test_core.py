@@ -1,7 +1,7 @@
 from pysb.testing import *
 from pysb.core import *
 from functools import partial
-import itertools
+from nose.tools import assert_raises
 
 
 @with_model
@@ -343,3 +343,26 @@ def test_invalid_state_value():
 @with_model
 def test_valid_state_values():
     Monomer('A', ['a'], {'a': ['_1', '_b', '_', '_a', 'a']})
+
+
+@with_model
+def test_expression_type():
+    assert_raises(ValueError, Expression, 'A', 1)
+
+
+@with_model
+def test_call_site_as_none():
+    Monomer('A', ['a'], {'a': ['x', 'y']})
+    assert_raises(ValueError, A, a=None)
+
+
+@with_model
+def test_synth_requires_concrete():
+    Monomer('A', ['s'], {'s': ['a', 'b']})
+    Parameter('kA', 1.0)
+
+    # These synthesis products are not concrete (site "s" not specified),
+    # so they should raise a ValueError
+    assert_raises(ValueError, Rule, 'r1', None >> A(), kA)
+    assert_raises(ValueError, Rule, 'r2', A() | None, kA, kA)
+

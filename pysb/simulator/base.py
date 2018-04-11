@@ -13,7 +13,7 @@ from datetime import datetime
 import dateutil.parser
 import copy
 from warnings import warn
-import sys
+from pysb.pattern import SpeciesPatternMatcher
 try:
     basestring
 except NameError:
@@ -913,6 +913,107 @@ class SimulationResult(object):
         if not self._model.observables:
             raise ValueError('Model has no observables')
         return self._squeeze_output(self._yobs)
+
+    def observable(self, pattern):
+        """
+        Calculate a pattern's trajectories without adding to model
+
+        This method calculates an observable "on demand" using
+        any supplied MonomerPattern or ComplexPattern against the simulation
+        result, without re-running the simulation.
+
+        Note that the monomers within the supplied pattern are reconciled
+        with the SimulationResult's internal copy of the model by name. This
+        method only works on simulations which calculate species
+        trajectories (i.e. it will not work on network-free simulations).
+
+        Raises a ValueError if the pattern does not match at least one species.
+
+        Parameters
+        ----------
+        pattern: pysb.MonomerPattern or pysb.ComplexPattern
+            An observable pattern to match
+
+        Returns
+        -------
+        pandas.Series
+            Series containing the simulation trajectories for the specified
+            observable
+
+        Examples
+        --------
+
+        >>> from pysb import ANY
+        >>> from pysb.examples import earm_1_0
+        >>> from pysb.simulator import ScipyOdeSimulator
+        >>> simres = ScipyOdeSimulator(earm_1_0.model, tspan=range(5)).run()
+        >>> m = earm_1_0.model.monomers
+
+        Observable of bound Bid:
+
+        >>> simres.observable(m.Bid(b=ANY))
+        time
+        0    0.000000e+00
+        1    1.190933e-12
+        2    2.768582e-11
+        3    1.609716e-10
+        4    5.320530e-10
+        dtype: float64
+
+        Observable of AMito bound to mCytoC:
+
+        >>> simres.observable(m.AMito(b=1) % m.mCytoC(b=1))
+        time
+        0    0.000000e+00
+        1    1.477319e-77
+        2    1.669917e-71
+        3    5.076939e-69
+        4    1.157400e-66
+        dtype: float64
+        """
+
+        # Adjust the supplied pattern's monomer objects to match the
+        # simulationresult's internal model
+        if isinstance(pattern, MonomerPattern):
+            self._update_monomer_pattern(pattern)
+        elif isinstance(pattern, ComplexPattern):
+            for mp in pattern.monomer_patterns:
+                self._update_monomer_pattern(mp)
+        else:
+            raise ValueError('The pattern must be a MonomerPattern or '
+                             'ComplexPattern')
+
+        if self._y is None:
+            raise ValueError('On demand observables can only be calculated '
+                             'on simulations with species trajectories')
+
+        obs_matches = SpeciesPatternMatcher(self._model).match(
+            pattern, index=True, counts=True)
+
+        if not obs_matches:
+            raise ValueError('No species match the supplied observable '
+                             'pattern')
+
+        return self.dataframe.iloc[:, list(obs_matches.keys())].multiply(
+            list(obs_matches.values())).sum(axis=1)
+
+    def _update_monomer_pattern(self, pattern):
+        """ Update a pattern's monomer objects to use internal model
+
+        Internal function for in-place update of a pattern to replace its
+        monomers with those from SimulationResult's model, matching by name.
+
+        Raises ValueError if no monomer with the specified name is in the
+        model.
+        """
+        mon_name = pattern.monomer.name
+        try:
+            new_mon = self._model.monomers[mon_name]
+        except KeyError:
+            raise ValueError('There was no monomer called "{}" in the model '
+                             '"{}" at the time of simulation'.format(
+                                mon_name, self._model.name))
+        pattern.monomer = new_mon
 
     @property
     def expressions(self):

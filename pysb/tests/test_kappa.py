@@ -275,3 +275,18 @@ def test_kappa_stateless_generator_fxns():
     format_complexpattern(A(b=('_1', 1)) % B(b=1))
     format_monomerpattern(A(b=1))
     format_site_condition('b', '_2')
+
+
+@with_model
+def test_kappa_parameter_name_overlap():
+    Parameter('avogadro', 6.022e23)
+    Parameter('cell_volume', 2.25e-12)
+    Parameter('cell_volume_fraction', 0.001)
+    Expression('stochastic', avogadro * cell_volume * cell_volume_fraction)
+
+    Monomer('A', ['b'])
+    Initial(A(b=None), Parameter('A_0', 100))
+    Rule('deg_A', A(b=None) >> None, stochastic)
+    Observable('A_', A())
+    run_simulation(model, time=100, points=100, seed=_KAPPA_SEED)
+
