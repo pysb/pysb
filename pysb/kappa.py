@@ -12,7 +12,6 @@ specified in one of three ways:
 """
 
 from __future__ import print_function as _
-import pysb
 import pysb.pathfinder as pf
 from pysb.generator.kappa import KappaGenerator
 import os
@@ -24,11 +23,14 @@ import shutil
 import warnings
 from collections import namedtuple
 from pysb.util import read_dot
+import pysb.logging
 
 try:
     from future_builtins import zip
 except ImportError:
     pass
+
+logger = pysb.logging.get_logger(__name__)
 
 
 def set_kappa_path(path):
@@ -153,17 +155,19 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     # Generate the Kappa model code from the PySB model and write it to
     # the Kappa file:
     with open(kappa_filename, 'w') as kappa_file:
-        kappa_file.write(gen.get_content())
+        file_data = gen.get_content()
         # If desired, add instructions to the kappa file to generate the
         # flux map:
         if flux_map:
-            kappa_file.write('%%mod: [true] do $DIN "%s" [true];\n' %
-                             fm_filename)
+            file_data += '%%mod: [true] do $DIN "%s" [true];\n' % fm_filename
 
         # If any perturbation language code has been passed in, add it to
         # the Kappa file:
         if perturbation:
-            kappa_file.write('\n%s\n' % perturbation)
+            file_data += '\n%s\n' % perturbation
+
+        logger.debug('Kappa file contents:\n\n' + file_data)
+        kappa_file.write(file_data)
 
     # Run KaSim
     kasim_path = pf.get_path('kasim')
@@ -305,7 +309,9 @@ def run_static_analysis(model, influence_map=False, contact_map=False,
     # Generate the Kappa model code from the PySB model and write it to
     # the Kappa file:
     with open(kappa_filename, 'w') as kappa_file:
-        kappa_file.write(gen.get_content())
+        file_data = gen.get_content()
+        logger.debug('Kappa file contents:\n\n' + file_data)
+        kappa_file.write(file_data)
 
     # Run KaSa using the given args
     kasa_path = pf.get_path('kasa')
