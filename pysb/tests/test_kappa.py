@@ -1,6 +1,9 @@
 from pysb.testing import *
 from pysb import *
 from pysb.kappa import *
+from pysb.generator.kappa import format_monomer_site, \
+    format_reactionpattern, format_complexpattern, format_monomerpattern, \
+    format_site_condition
 import networkx as nx
 import sympy
 from pysb.core import as_complex_pattern
@@ -247,3 +250,28 @@ def test_kappa_two_ghost_agents():
     assert len(rp.complex_patterns) == 3
 
     run_simulation(model, time=100, points=100, seed=_KAPPA_SEED)
+
+
+@with_model
+def test_kappa_state_values():
+    Monomer('A', ['a'], {'a': ['_', '_1', '_2', '_a', 'a']})
+    Parameter('k', 1.0)
+    Rule('a_synth', None >> A(a='_2'), k)
+    Observable('A_', A())
+
+    run_simulation(model, time=100, points=100, seed=_KAPPA_SEED)
+
+
+@with_model
+def test_kappa_stateless_generator_fxns():
+    Monomer('A', ['b'], {'b': ['_1', '_2']})
+    Monomer('B', ['b'])
+    Rule('A_binds_B', A(b='_1') + B(b=None) >> A(b=('_1', 1)) % B(b=1),
+         Parameter('k_A_binds_B', 1))
+    Observable('AB', A(b=1) % B(b=1))
+
+    format_monomer_site(A, 'a')
+    format_reactionpattern(A(b='_1') + B(b=None))
+    format_complexpattern(A(b=('_1', 1)) % B(b=1))
+    format_monomerpattern(A(b=1))
+    format_site_condition('b', '_2')

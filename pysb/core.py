@@ -162,9 +162,10 @@ class Component(object):
         Containing model.
 
     """
+    _VARIABLE_NAME_REGEX = re.compile(r'[_a-z][_a-z0-9]*\Z', re.IGNORECASE)
 
     def __init__(self, name, _export=True):
-        if not re.match(r'[_a-z][_a-z0-9]*\Z', name, re.IGNORECASE):
+        if not self._VARIABLE_NAME_REGEX.match(name):
             raise InvalidComponentNameError(name)
         self.name = name
         self.model = None  # to be set in Model.add_component
@@ -236,9 +237,6 @@ class Monomer(Component):
     underscores followed by a letter. Any remaining characters must be
     alphanumeric or underscores.
     """
-    SITE_NAME_REGEX = re.compile('^_*[a-zA-Z][a-zA-Z0-9_]*$')
-    STATE_VAL_REGEX = re.compile('^_*[a-zA-Z0-9][a-zA-Z0-9_]*$')
-
     def __init__(self, name, sites=None, site_states=None, _export=True):
         Component.__init__(self, name, _export)
 
@@ -257,7 +255,7 @@ class Monomer(Component):
         # ensure no duplicate sites and validate each site name
         sites_seen = {}
         for site in sites:
-            if not re.match(self.SITE_NAME_REGEX, site):
+            if not self._VARIABLE_NAME_REGEX.match(site):
                 raise ValueError('Invalid site name: ' + str(site))
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
@@ -273,7 +271,7 @@ class Monomer(Component):
         # ensure site_states values are all strings
         invalid_sites = [site for (site, states) in site_states.items()
                          if not all([isinstance(s, basestring)
-                                     and re.match(self.STATE_VAL_REGEX, s)
+                                     and self._VARIABLE_NAME_REGEX.match(s)
                                      for s in states])]
         if invalid_sites:
             raise ValueError("Invalid or non-string state values in "

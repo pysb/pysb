@@ -337,4 +337,9 @@ def test_invalid_site_name():
 
 @with_model
 def test_invalid_state_value():
-    assert_raises(ValueError, Monomer, 'A', ['a'], {'a': ['_', 'a']})
+    assert_raises(ValueError, Monomer, 'A', ['a'], {'a': ['1', 'a']})
+
+
+@with_model
+def test_valid_state_values():
+    Monomer('A', ['a'], {'a': ['_1', '_b', '_', '_a', 'a']})
