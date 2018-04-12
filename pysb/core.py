@@ -173,18 +173,20 @@ class Component(object):
             self._do_export()
 
         # Try to find calling module by walking the stack
-        modules = []
+        self._modules = []
+        self._function = None
         # We assume we're dealing with Component subclasses here
-        frame = inspect.currentframe().f_back.f_back
+        frame = inspect.currentframe().f_back
         while frame is not None:
             mod_name = frame.f_globals['__name__']
             if mod_name in ['IPython.core.interactiveshell', '__main__']:
                 break
-            if mod_name not in ['pysb.core', 'pysb.macros']:
-                modules.append(mod_name)
+            if mod_name not in ['pysb.core', 'pysb.macros'] and not \
+                    mod_name.startswith('importlib.'):
+                self._modules.append(mod_name)
+                if self._function is None:
+                    self._function = frame.f_code.co_name
             frame = frame.f_back
-
-        self._modules = tuple(reversed(modules))
 
     def __getstate__(self):
         # clear the weakref to parent model (restored in Model.__setstate__)
@@ -1558,6 +1560,13 @@ class Model(object):
         -------
         list
             List of module names where model Components are defined
+
+        Examples
+        --------
+
+        >>> from pysb.examples.earm_1_0 import model
+        >>> 'pysb.examples.earm_1_0' in model.modules
+        True
         """
         all_components = self.components
         if not all_components:
@@ -1976,7 +1985,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         --------
 
         >>> from pysb.examples.earm_1_0 import model
-        >>> from pysb.pattern import Name, Pattern, Module
+        >>> from pysb.pattern import Name, Pattern, Module, Function
         >>> m = model.monomers
 
         Find parameters exactly equal to 10000:
@@ -2027,8 +2036,17 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         >>> len(model.parameters.filter(~Name('^kf')))
         60
 
-        Get components defined in the "Inhibit" function:
-        >>> model.components.filter(Module('Inhibit'))
+        Get components not defined in this module (file). In this case,
+        everything is defined in one file, but for multi-file models this
+        becomes more useful:
+        >>> model.components.filter(~Module('^pysb.examples.earm_1_0$'))
+        ComponentSet([
+         ])
+
+        Count the number of rules defined in the 'catalyze' function:
+        >>> len(model.rules.filter(Function('^catalyze$')))
+        24
+
         """
         return ComponentSet(c for c in self if filter_predicate(c))
 

@@ -130,8 +130,20 @@ class Module(FilterPredicate):
         self.regex = regex
 
     def __call__(self, component):
-        print([m for m in component._modules])
         return any(re.search(self.regex, m) for m in component._modules)
+
+
+class Function(FilterPredicate):
+    """
+    Predicate to filter a ComponentSet by function
+
+    See :func:`pysb.core.ComponentSet.filter` for examples.
+    """
+    def __init__(self, regex):
+        self.regex = regex
+
+    def __call__(self, component):
+        return re.search(self.regex, component._function)
 
 
 def get_half_bonds_in_pattern(pat):
