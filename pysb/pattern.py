@@ -1,15 +1,123 @@
 import collections
 from .core import ComplexPattern, MonomerPattern, Monomer, \
-    ReactionPattern, ANY, as_complex_pattern, DanglingBondError
+    ReactionPattern, ANY, as_complex_pattern, DanglingBondError, Rule
 import networkx as nx
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 import numpy as np
+from abc import ABCMeta, abstractmethod
+import re
 try:
     basestring
 except NameError:
     # Under Python 3, do not pretend that bytes are a valid string
     basestring = str
+
+
+class FilterPredicate(object):
+    """
+    Base class for building predicates
+
+    For use with :func:`pysb.core.ComponentSet.filter`.
+    """
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def __call__(self, component):
+        pass
+
+    def __and__(self, other):
+        return _AndPredicate(self, other)
+
+    def __or__(self, other):
+        return _OrPredicate(self, other)
+
+    def __invert__(self):
+        return _NotPredicate(self)
+
+
+class _AndPredicate(FilterPredicate):
+    """ Combine two predicates with AND. Used by FilterPredicate. """
+    def __init__(self, pred1, pred2):
+        self.pred1 = pred1
+        self.pred2 = pred2
+
+    def __call__(self, component):
+        return self.pred1(component) and self.pred2(component)
+
+    def __repr__(self):
+        return '{} & {}'.format(self.pred1.__repr__(), self.pred2.__repr__())
+
+
+class _OrPredicate(FilterPredicate):
+    """ Combine two predicates with OR. Used by FilterPredicate. """
+    def __init__(self, pred1, pred2):
+        self.pred1 = pred1
+        self.pred2 = pred2
+
+    def __call__(self, component):
+        return self.pred1(component) or self.pred2(component)
+
+    def __repr__(self):
+        return '{} | {}'.format(self.pred1.__repr__(), self.pred2.__repr__())
+
+
+class _NotPredicate(FilterPredicate):
+    """ Negate a predicate with NOT. Used by FilterPredicate"""
+    def __init__(self, pred):
+        self.pred = pred
+
+    def __call__(self, component):
+        return not self.pred(component)
+
+    def __repr__(self):
+        return '~{}'.format(self.pred.__repr__())
+
+
+class Name(FilterPredicate):
+    """
+    Predicate to filter a ComponentSet by regular expression name match
+
+    See :func:`pysb.core.ComponentSet.filter` for examples.
+    """
+    def __init__(self, regex):
+        self.regex = regex
+
+    def __call__(self, component):
+        return re.search(self.regex, component.name) is not None
+
+    def __repr__(self):
+        return '{}(\'{}\')'.format(self.__class__.__name__, self.regex)
+
+
+class Pattern(FilterPredicate):
+    """
+    Predicate to filter a ComponentSet by pattern matching
+
+    See :func:`pysb.core.ComponentSet.filter` for examples.
+    """
+    def __init__(self, pattern):
+        self.pattern = as_complex_pattern(pattern)
+
+    def __call__(self, component):
+        if isinstance(component, (Monomer, MonomerPattern, ComplexPattern)):
+            return match_complex_pattern(self.pattern,
+                                         as_complex_pattern(component))
+        elif isinstance(component, Rule):
+            if not isinstance(self.pattern, ComplexPattern):
+                raise ValueError(
+                    'Cannot currently compare {} to rules'.format(
+                        self.pattern.__class__.__name__))
+
+            return any(match_complex_pattern(self.pattern, cp) for cp in
+                       (component.reactant_pattern.complex_patterns +
+                        component.product_pattern.complex_patterns))
+        else:
+            raise ValueError('Cannot apply pattern to {}'.format(
+                             component.__class__.__name__))
+
+    def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__, self.pattern)
 
 
 def get_half_bonds_in_pattern(pat):

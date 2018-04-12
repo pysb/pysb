@@ -1960,36 +1960,18 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         else:
             return test_attr == tester
 
-    def filter(self, name=None, pattern=None, module_name=None, value=None,
-               fwd_rate=None, rev_rate=None):
+    def filter(self, filter_predicate):
         """
-        Filter a ComponentSet using supplied arguments
-
-        All arguments default to None, which means "do not filter". Thus,
-        calling this function with no arguments will return a ComponentSet
-        with the same Components as the original. All filters are applied to
-        match components (logical AND).
+        Filter a ComponentSet using a predicate or set of predicates
 
         Parameters
         ----------
-        name: str, optional
-            A regular expression pattern used to match Components' names
-        pattern: Monomer or MonomerPattern or ComplexPattern
-            A pattern to filter components (works on ComponentSets
-            containing Monomers, MonomerPatterns, or ComplexPatterns)
-        module_name: str, optional
-            A module name, which corresponds to the function or module (
-            file) name in which the component was defined
-        value: float or callable, optional
-            A numeric value or callable to match against Parameter values.
-            If callable, the function should take a single numeric argument
-            and return a boolean (True where match occurred).
-        fwd_rate: float or callable, optional
-            A numeric value or callable to match against Rule forward rates.
-            If callable, the function should take a single numeric argument
-            and return a boolean (True where match occurred).
-        rev_rate: float or callable, optional
-            Defined analogously to fwd_rate, but for Rule reverse rates.
+        filter_predicate: callable or pysb.pattern.FilterPredicate
+            A predicate (condition) to test each Component in the
+            ComponentSet against. This can either be an anonymous "lambda"
+            function or a subclass of pysb.pattern.FilterPredicate. For
+            lambda functions, the argument is a single Component and return
+            value is a boolean indicating a match or not.
 
         Returns
         -------
@@ -2001,130 +1983,58 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         --------
 
         >>> from pysb.examples.earm_1_0 import model
+        >>> from pysb.pattern import Name, Pattern
         >>> m = model.monomers
 
         Find parameters exactly equal to 10000:
-        >>> model.parameters.filter(value=1e4)  # doctest:+NORMALIZE_WHITESPACE
+        >>> model.parameters.filter(lambda c: c.value == 1e4)  \
+            # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
          Parameter('pC3_0', 10000.0),
          Parameter('pC6_0', 10000.0),
         ])
 
-        Find rules with a forward rate < 1e-8:
-        >>> model.rules.filter(fwd_rate=lambda rate: rate < 1e-8) \
+        Find rules with a forward rate < 1e-8, using a custom function:
+        >>> model.rules.filter(lambda c: c.rate_forward.value < 1e-8) \
             # doctest: +NORMALIZE_WHITESPACE
         ComponentSet([
          Rule('bind_pC3_Apop', Apop(b=None) + pC3(b=None) | Apop(b=1) %
                 pC3(b=1), kf25, kr25),
         ])
 
+        We can also use some built in predicates for more complex matching
+        scenarios, including combining multiple predicates.
+
         Find rules with a name beginning with "inhibit" that contain cSmac:
-        >>> model.rules.filter(name='^inhibit', pattern=m.cSmac()) \
+        >>> model.rules.filter(Name('^inhibit') & Pattern(m.cSmac())) \
             # doctest: +NORMALIZE_WHITESPACE
         ComponentSet([
          Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
                 cSmac(b=1) % XIAP(b=1), kf28, kr28),
         ])
-        """
-        from pysb.pattern import match_complex_pattern
-        new_cset = []
-        for c in self:
-            if name is not None and not re.search(name, c.name):
-                continue
-            if module_name is not None and module_name not in c._modules:
-                continue
-            if value is not None and \
-                    not self._test_attribute_equal(value, c.value):
-                continue
-            if fwd_rate is not None and \
-                    not self._test_attribute_equal(fwd_rate,
-                                                   c.rate_forward.value):
-                continue
-            if rev_rate is not None and \
-                    not (self._test_attribute_equal(rev_rate,
-                                                    c.rate_reverse.value)
-                    if c.rate_reverse is not None else False):
-                continue
-            if pattern is not None:
-                test_pat = as_complex_pattern(pattern)
-                if isinstance(c, (Monomer, MonomerPattern, ComplexPattern)):
-                    if not match_complex_pattern(test_pat,
-                                                 as_complex_pattern(c)):
-                        continue
-                elif isinstance(c, Rule):
-                    if not isinstance(test_pat, ComplexPattern):
-                        raise ValueError(
-                            'Cannot currently compare {} to rules'.format(
-                                pattern.__class__.__name__))
 
-                    if not any(match_complex_pattern(test_pat, cp) for cp in
-                               (c.reactant_pattern.complex_patterns +
-                                       c.product_pattern.complex_patterns)):
-                        continue
-                else:
-                    raise ValueError('Cannot apply pattern to {}'.format(
-                        c.__class__.__name__))
-
-            new_cset.append(c)
-
-        return ComponentSet(new_cset)
-
-    def apply(self, *args, **kwargs):
-        """
-        Update a set of Components using a callable or arguments
-
-        Either supply a single callable, which is called with each component as
-        a single argument, or a list of keyword arguments to update on each
-        component (whose values can be numerical or callable). Note that
-        Components are updated in place - they are not copied.
-
-        Returns
-        -------
-        ComponentSet
-            Returns the original ComponentSet (self), after the updates are
-            applied
-
-        Examples
-        --------
-
-        >>> from pysb.examples.earm_1_0 import model
-
-        Double the values of parameters kc1, kc3 and kc5:
-
-        >>> model.parameters.filter(name='^kc(1|3|5)$').apply(        \
-                value=lambda val: val* 2)  # doctest: +NORMALIZE_WHITESPACE
+        Find rules with any form of Bax (i.e. Bax, aBax, mBax):
+        >>> model.rules.filter(Pattern(m.Bax) | Pattern(m.aBax) | \
+                Pattern(m.MBax)) # doctest: +NORMALIZE_WHITESPACE
         ComponentSet([
-            Parameter('kc1', 2e-05),
-            Parameter('kc3', 2.0),
-            Parameter('kc5', 2.0),
-        ])
+         Rule('bind_Bax_tBid', tBid(b=None) + Bax(b=None) |
+              tBid(b=1) % Bax(b=1), kf12, kr12),
+         Rule('produce_aBax_via_tBid', tBid(b=1) % Bax(b=1) >>
+              tBid(b=None) + aBax(b=None), kc12),
+         Rule('transloc_MBax_aBax', aBax(b=None) |
+              MBax(b=None), kf13, kr13),
+         Rule('inhibit_MBax_by_Bcl2', MBax(b=None) + Bcl2(b=None) |
+              MBax(b=1) % Bcl2(b=1), kf14, kr14),
+         Rule('dimerize_MBax_to_Bax2', MBax(b=None) + MBax(b=None) |
+              Bax2(b=None), kf15, kr15),
+         ])
+
+        Count the number of parameter that don't start with kf (note the ~
+        negation operator):
+        >>> len(model.parameters.filter(~Name('^kf')))
+        60
         """
-        if len(args) > 1 or \
-                (len(args) == 1 and len(kwargs) > 0) or \
-                (len(args) == 0 and len(kwargs) == 0):
-            raise ValueError('Either supply a single callable positional '
-                             'argument, or keyword arguments.')
-
-        if len(args) == 1:
-            if not callable(args[0]):
-                raise ValueError('Positional argument must be callable')
-
-            for c in self:
-                args[0](c)
-
-        # We have a list of kwargs to update properties
-        for c in self:
-            for attr_name, attr_val in kwargs.items():
-                if not hasattr(c, attr_name):
-                    raise ValueError('Component {} has no attribute {}'
-                                     .format(c.name, attr_name))
-                if callable(attr_val):
-                    new_val = attr_val(getattr(c, attr_name))
-                else:
-                    new_val = attr_val
-                setattr(c, attr_name, new_val)
-
-        return self
+        return ComponentSet(c for c in self if filter_predicate(c))
 
     def iterkeys(self):
         for c in self:
