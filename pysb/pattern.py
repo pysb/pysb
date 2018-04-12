@@ -92,7 +92,7 @@ class Name(FilterPredicate):
 
 class Pattern(FilterPredicate):
     """
-    Predicate to filter a ComponentSet by pattern matching
+    Predicate to filter a ComponentSet by matching a ComplexPattern
 
     See :func:`pysb.core.ComponentSet.filter` for examples.
     """
@@ -118,6 +118,20 @@ class Pattern(FilterPredicate):
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.pattern)
+
+
+class Module(FilterPredicate):
+    """
+    Predicate to filter a ComponentSet by pattern
+
+    See :func:`pysb.core.ComponentSet.filter` for examples.
+    """
+    def __init__(self, regex):
+        self.regex = regex
+
+    def __call__(self, component):
+        print([m for m in component._modules])
+        return any(re.search(self.regex, m) for m in component._modules)
 
 
 def get_half_bonds_in_pattern(pat):

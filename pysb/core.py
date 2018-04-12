@@ -1953,13 +1953,6 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         except KeyError:
             return default
 
-    @staticmethod
-    def _test_attribute_equal(tester, test_attr):
-        if callable(tester):
-            return tester(test_attr)
-        else:
-            return test_attr == tester
-
     def filter(self, filter_predicate):
         """
         Filter a ComponentSet using a predicate or set of predicates
@@ -1983,7 +1976,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         --------
 
         >>> from pysb.examples.earm_1_0 import model
-        >>> from pysb.pattern import Name, Pattern
+        >>> from pysb.pattern import Name, Pattern, Module
         >>> m = model.monomers
 
         Find parameters exactly equal to 10000:
@@ -2033,6 +2026,9 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         negation operator):
         >>> len(model.parameters.filter(~Name('^kf')))
         60
+
+        Get components defined in the "Inhibit" function:
+        >>> model.components.filter(Module('Inhibit'))
         """
         return ComponentSet(c for c in self if filter_predicate(c))
 
