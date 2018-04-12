@@ -3,7 +3,7 @@ import sympy
 import warnings
 from sympy.printing import StrPrinter
 from sympy.core import S
-
+from pysb.export import CompartmentsNotSupported
 # Alias basestring under Python 3 for forwards compatibility
 try:
     basestring
@@ -14,6 +14,8 @@ class KappaGenerator(object):
 
     # Dialect can be either 'complx' or 'kasim' (default)
     def __init__(self, model, dialect='kasim', _warn_no_ic=True):
+        if model.compartments:
+            raise CompartmentsNotSupported()
         self.model = model
         self.__content = None
         self.dialect = dialect
