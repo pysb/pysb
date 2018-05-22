@@ -3,13 +3,15 @@
 #define num_species {n_species}
 #define NPARAM {n_params}
 #define NREACT {n_reactions}
+#define NREACT_MIN_ONE NREACT-1
 
 __constant__ int stoch_matrix[]={{
 {stoch}
 }};
 
+{stoch2}
 
-__device__ void propensities(int *y, float *h, int tid, float *param_arry)
+__device__ void propensities(int *y, float *h, float *param_arry)
 {{
 {hazards}
 }}
@@ -21,10 +23,12 @@ __device__ void stoichiometry(int *y, int r){{
     }}
 }}
 
+{update}
 
-__device__ int sample(int nr, float* a, float u){{
+
+__device__ int sample(float* a, float u){{
     int i = 0;
-    for(;i < nr - 1 && u > a[i]; i++){{
+    for(;i < NREACT_MIN_ONE && u > a[i]; i++){{
         u -= a[i];
         }}
     return i;
@@ -34,7 +38,7 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* tim
                                     const float* param_values){{
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    //curandState randState;
+//    curandState randState;
     curandStateMRG32k3a randState;
     curand_init(clock64(), tid, 0, &randState);
     float t = time[0] ;
@@ -43,51 +47,46 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* tim
     float a0 = 0.0f;
     int k = 0;
     int y[num_species];
-    float A[NREACT];
+    float A[NREACT] = {{0.0}};
     float param_arry[NPARAM];
 
     for(int i=0; i<NPARAM; i++){{
         param_arry[i] = param_values[tid*NPARAM + i];
         }}
 
-    // start first step
-    for(int i=0; i<NREACT; i++){{
-        A[i] = 0;
-        }}
-
+    // init species array per thread
     for(int i=0; i<num_species; i++){{
         y[i] = species_matrix[tid*num_species + i];
         }}
 
-    propensities( y, A , tid, param_arry);
-
-    for(int i=0; i<NREACT; i++){{
-        a0 += A[i];
-        }}
-
+    // calculate initial propensities
+    propensities(y, A, param_arry);
+    for(int j=0; j<NREACT; j++){{
+        a0 += A[j];
+    }}
     // beginning of loop
     for(int i=0; i<NRESULTS;){{
-        if(t>=time[i]){{
+        if (t<time[i]){{
+            r1 =  curand_uniform(&randState);
+            r2 =  curand_uniform(&randState);
+            k = sample(A, a0*r1);
+//            stoichiometry(y, k);
+            stoichiometry2(y, k);
+            propensities(y, A, param_arry);
+            a0 = 0;
+            // summing up propensities
+            for(int j=0; j<NREACT; j++)
+                a0 += A[j];
+            t += -__logf(r2)/a0;
+            }}
+       else {{
             for(int j=0; j<num_species; j++){{
                 result[tid*NRESULTS*num_species + i*num_species + j] = y[j];
                 }}
             i++;
             }}
-        else{{
-            r1 =  curand_uniform(&randState);
-            r2 =  curand_uniform(&randState);
-            k = sample(NREACT, A, a0*r1);
-            stoichiometry( y ,k );
-            propensities( y, A, tid , param_arry);
-            a0 = 0;
-            // summing up propensities
-            for(int j=0; j<NREACT; j++)
-                a0 += A[j];
-
-
-            t += -__logf(r2)/a0;
-            }}
         }}
+
     return;
     }}
 //*/
@@ -96,8 +95,8 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, float* star
                                    float* result_time, const float* param_values){{
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    //curandState randState;
-    curandStateMRG32k3a randState;
+    curandState randState;
+//    curandStateMRG32k3a randState;
     curand_init(clock64(), tid, 0, &randState);
     float start_t = start_time[tid] ;
 
@@ -107,38 +106,31 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, float* star
     float a0 = 0;
     int k = 0;
     int y[num_species];
-    int ylast[num_species];
 
     float param_arry[NPARAM];
 
     for(int i=0; i<NPARAM; i++){{
         param_arry[i] = param_values[tid*NPARAM + i];
         }}
-    float A[NREACT];
+    float A[NREACT] = {{0.0}};
 
-    // start first step
-    for(int i=0; i<NREACT; i++){{
-        A[i] = 0;
-        }}
-
+    // init species
     for(int i=0; i<num_species; i++){{
         y[i] = species_matrix[tid*num_species + i];
         }}
-
-    propensities( y, A, tid , param_arry);
-
-    for(int i=0; i<NREACT; i++){{
-        a0 += A[i];
-        }}
-
+    // calculate initial propensities
+    propensities(y, A, param_arry);
+    for(int j=0; j<NREACT; j++){{
+        a0 += A[j];
+    }}
     // beginning of loop
     while (start_t < end_time){{
 //        __syncthreads();
         r1 =  curand_uniform(&randState);
         r2 =  curand_uniform(&randState);
-        k = sample(NREACT, A, a0*r1);
-        stoichiometry( y ,k );
-        propensities( y, A, tid , param_arry);
+        k = sample(A, a0*r1);
+        stoichiometry2( y ,k );
+        propensities( y, A, param_arry);
         a0 = 0;
         // summing up propensities
         for(int j=0; j<NREACT; j++){{
