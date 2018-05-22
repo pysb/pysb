@@ -107,6 +107,40 @@ class GPUSimulator(Simulator):
         """
         p = re.compile('\s')
         stoich_matrix = (_rhs(self._model) + _lhs(self._model)).T
+
+        all_reactions = []
+        for rxn_number, rxn in enumerate(stoich_matrix.T):
+            changes = []
+            for index, change in enumerate(rxn):
+                if change != 0:
+                    changes.append([index, change])
+            all_reactions.append(changes)
+
+        stoch2 = ''
+        update = "__device__ void stoichiometry2(int *y, int r){"
+        temp = """
+        {2} (r=={0}){{
+        for (int i=0; i<{1}; i++){{
+            y[rxn_{0}[i][0]] += rxn_{0}[i][1];
+            }}
+        return;
+        }}
+        """
+
+        for n, rxn in enumerate(all_reactions):
+            rxn_str = ', '.join(str(i) for j in rxn for i in j)
+            if n == 0:
+                switch = 'if'
+            else:
+                switch = 'else if'
+
+            update += temp.format(n, len(rxn), switch)
+            stoch2 += "__constant__ int rxn_{}[{}][2]={{{}}};\n".format(
+                n, len(rxn), rxn_str
+            )
+
+        update += '\n};'
+
         params_names = [g.name for g in self._model.parameters]
         _reaction_number = len(self._model.reactions)
 
@@ -169,7 +203,10 @@ class GPUSimulator(Simulator):
                                          n_params=self._parameter_number,
                                          n_reactions=_reaction_number,
                                          hazards=hazards_string,
-                                         stoch=stoich_string, )
+                                         stoch=stoich_string,
+                                         stoch2=stoch2,
+                                         update=update,
+                                         )
         if self._precision == np.float64:
             cs_string = cs_string.replace('float', 'double')
             cs_string = cs_string.replace('cuda_uniform',
@@ -309,7 +346,7 @@ class GPUSimulator(Simulator):
             param_values = np.zeros((num_particles, len(nominal_values)),
                                     dtype=self._precision)
             param_values[:, :] = nominal_values
-            self.param_values = param_values
+        self.param_values = param_values
 
         if initials is None:
             # Run simulation using same initial conditions
@@ -333,13 +370,15 @@ class GPUSimulator(Simulator):
             self._threads = 128
         else:
             self._threads = threads
+        size_params = param_values.shape[0]
 
-        if len(param_values) % self._threads == 0:
-            self._blocks = len(param_values) / self._threads
+        if size_params % self._threads == 0:
+            self._blocks = size_params / self._threads
         else:
-            self._blocks = len(param_values) / self._threads + 1
+            self._blocks = size_params / self._threads + 1
 
         self._total_threads = self._blocks * self._threads
+
         self._logger.info("Starting {} simulations".format(number_sim))
 
         timer_start = time.time()
