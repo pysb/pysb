@@ -367,7 +367,7 @@ class MonomerPattern(object):
         invalid_sites = []
         for (site, state) in site_conditions.items():
             # pass through to next iteration if state type is ok
-            if state is None and site not in monomer.site_states:
+            if state is None:
                 continue
             elif isinstance(state, int):
                 continue

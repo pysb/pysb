@@ -306,6 +306,7 @@ def test_concreteness():
     assert (A(s=('x', 1)) % A(s=('x', 1))).is_concrete()
     assert (A(s='x')).is_concrete()
     assert not A().is_concrete()
+    assert not A(s=None).is_concrete()
     assert not A(s=('x', ANY)).is_concrete()
     assert not A(s=WILD).is_concrete()
 
@@ -351,12 +352,6 @@ def test_expression_type():
 
 
 @with_model
-def test_call_site_as_none():
-    Monomer('A', ['a'], {'a': ['x', 'y']})
-    assert_raises(ValueError, A, a=None)
-
-
-@with_model
 def test_synth_requires_concrete():
     Monomer('A', ['s'], {'s': ['a', 'b']})
     Parameter('kA', 1.0)
@@ -365,4 +360,13 @@ def test_synth_requires_concrete():
     # so they should raise a ValueError
     assert_raises(ValueError, Rule, 'r1', None >> A(), kA)
     assert_raises(ValueError, Rule, 'r2', A() | None, kA, kA)
+
+
+@with_model
+def test_rulepattern_match_none_against_state():
+    Monomer('A', ['phospho'], {'phospho': ['u', 'p']})
+
+    # A(phospho=None) should match unbound A regardless of phospho state,
+    # so this should be a valid rule pattern
+    A(phospho=None) + A(phospho=None) >> A(phospho=1) % A(phospho=1)
 
