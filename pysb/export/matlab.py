@@ -171,7 +171,9 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-from pysb.export import Exporter, pad
+from pysb.export import Exporter, pad, ExpressionsNotSupported, \
+    CompartmentsNotSupported
+
 
 class MatlabExporter(Exporter):
     """A class for returning the ODEs for a given PySB model for use in
@@ -190,6 +192,11 @@ class MatlabExporter(Exporter):
             String containing the MATLAB code for an implementation of the
             model's ODEs.
         """
+        if self.model.expressions:
+            raise ExpressionsNotSupported()
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
+
         output = StringIO()
         pysb.bng.generate_equations(self.model)
 

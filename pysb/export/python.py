@@ -70,8 +70,8 @@ An example usage pattern for the standalone Robertson model, once generated::
 import pysb
 import pysb.bng
 import sympy
-import textwrap
-from pysb.export import Exporter, pad
+from pysb.export import Exporter, pad, ExpressionsNotSupported, \
+    CompartmentsNotSupported
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -92,6 +92,10 @@ class PythonExporter(Exporter):
         string
             String containing the standalone Python code.
         """
+        if self.model.expressions:
+            raise ExpressionsNotSupported()
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
 
         output = StringIO()
         pysb.bng.generate_equations(self.model)
