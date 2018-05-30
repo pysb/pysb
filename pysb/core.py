@@ -2048,7 +2048,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         24
 
         """
-        return ComponentSet(c for c in self if filter_predicate(c))
+        return ComponentSet(filter(filter_predicate, self))
 
     def iterkeys(self):
         for c in self:

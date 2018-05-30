@@ -37,7 +37,12 @@ class FilterPredicate(object):
 
 
 class _AndPredicate(FilterPredicate):
-    """ Combine two predicates with AND. Used by FilterPredicate. """
+    """
+    Logical conjunction of two predicates.
+
+    This class is not generally used directly -- it exists to support operator overloading
+    in the base FilterPredicate class.
+    """
     def __init__(self, pred1, pred2):
         self.pred1 = pred1
         self.pred2 = pred2
@@ -50,7 +55,12 @@ class _AndPredicate(FilterPredicate):
 
 
 class _OrPredicate(FilterPredicate):
-    """ Combine two predicates with OR. Used by FilterPredicate. """
+    """
+    Logical disjunction of two predicates.
+
+    This class is not generally used directly -- it exists to support operator overloading
+    in the base FilterPredicate class.
+    """
     def __init__(self, pred1, pred2):
         self.pred1 = pred1
         self.pred2 = pred2
@@ -63,7 +73,12 @@ class _OrPredicate(FilterPredicate):
 
 
 class _NotPredicate(FilterPredicate):
-    """ Negate a predicate with NOT. Used by FilterPredicate"""
+    """
+    Logical negation of a predicate.
+
+    This class is not generally used directly -- it exists to support operator overloading
+    in the base FilterPredicate class.
+    """
     def __init__(self, pred):
         self.pred = pred
 
@@ -76,9 +91,10 @@ class _NotPredicate(FilterPredicate):
 
 class Name(FilterPredicate):
     """
-    Predicate to filter a ComponentSet by regular expression name match
+    Predicate to filter a ComponentSet by regular expression name search
 
-    See :func:`pysb.core.ComponentSet.filter` for examples.
+    Note that this uses re.search which matches anywhere in the component name.
+    Use ^ to explicitly anchor the match to the beginning.
     """
     def __init__(self, regex):
         self.regex = regex
@@ -122,9 +138,7 @@ class Pattern(FilterPredicate):
 
 class Module(FilterPredicate):
     """
-    Predicate to filter a ComponentSet by pattern
-
-    See :func:`pysb.core.ComponentSet.filter` for examples.
+    Predicate to filter a ComponentSet by module where components are defined
     """
     def __init__(self, regex):
         self.regex = regex
@@ -135,9 +149,7 @@ class Module(FilterPredicate):
 
 class Function(FilterPredicate):
     """
-    Predicate to filter a ComponentSet by function
-
-    See :func:`pysb.core.ComponentSet.filter` for examples.
+    Predicate to filter a ComponentSet by function where components are defined
     """
     def __init__(self, regex):
         self.regex = regex
