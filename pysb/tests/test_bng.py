@@ -178,3 +178,11 @@ def test_sympy_parameter_keyword():
     Parameter('deg', 10)  # deg is a sympy function
     Rule('Rule1', A() >> None, deg)
     generate_equations(model)
+
+
+@with_model
+def test_log():
+    Monomer('A')
+    Expression('expr1', sympy.log(100))
+    Rule('Rule1', None >> A(), expr1)
+    generate_equations(model)
