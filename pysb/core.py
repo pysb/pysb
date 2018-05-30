@@ -162,9 +162,10 @@ class Component(object):
         Containing model.
 
     """
+    _VARIABLE_NAME_REGEX = re.compile(r'[_a-z][_a-z0-9]*\Z', re.IGNORECASE)
 
     def __init__(self, name, _export=True):
-        if not re.match(r'[_a-z][_a-z0-9]*\Z', name, re.IGNORECASE):
+        if not self._VARIABLE_NAME_REGEX.match(name):
             raise InvalidComponentNameError(name)
         self.name = name
         self.model = None  # to be set in Model.add_component
@@ -203,7 +204,6 @@ class Component(object):
 
 
 class Monomer(Component):
-
     """
     Model component representing a protein or other molecule.
 
@@ -233,8 +233,10 @@ class Monomer(Component):
     a dict following the same layout as the kwargs may be passed as the first
     and only positional argument instead.
 
+    Site names and state values must start with a letter, or one or more
+    underscores followed by a letter. Any remaining characters must be
+    alphanumeric or underscores.
     """
-
     def __init__(self, name, sites=None, site_states=None, _export=True):
         Component.__init__(self, name, _export)
 
@@ -250,27 +252,30 @@ class Monomer(Component):
                isinstance(sites, basestring):
             raise ValueError("sites must be a list of strings")
 
-        # ensure no duplicate sites
+        # ensure no duplicate sites and validate each site name
         sites_seen = {}
         for site in sites:
+            if not self._VARIABLE_NAME_REGEX.match(site):
+                raise ValueError('Invalid site name: ' + str(site))
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
         sites_dup = [site for site, count in sites_seen.items() if count > 1]
         if sites_dup:
-            raise Exception("Duplicate sites specified: " + str(sites_dup))
+            raise ValueError("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
         unknown_sites = [site for site in site_states if not site in sites_seen]
         if unknown_sites:
-            raise Exception("Unknown sites in site_states: " +
-                            str(unknown_sites))
+            raise ValueError("Unknown sites in site_states: " +
+                             str(unknown_sites))
         # ensure site_states values are all strings
         invalid_sites = [site for (site, states) in site_states.items()
-                              if not all([isinstance(s, basestring)
-                                          for s in states])]
+                         if not all([isinstance(s, basestring)
+                                     and self._VARIABLE_NAME_REGEX.match(s)
+                                     for s in states])]
         if invalid_sites:
-            raise Exception("Non-string state values in site_states for "
-                            "sites: " + str(invalid_sites))
+            raise ValueError("Invalid or non-string state values in "
+                             "site_states for sites: " + str(invalid_sites))
 
         self.sites = list(sites)
         self.site_states = site_states

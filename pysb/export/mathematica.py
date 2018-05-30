@@ -108,8 +108,9 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-from math import floor, log
-from pysb.export import Exporter
+from pysb.export import Exporter, ExpressionsNotSupported, \
+    CompartmentsNotSupported
+
 
 class MathematicaExporter(Exporter):
     """A class for returning the ODEs for a given PySB model for use in
@@ -128,6 +129,10 @@ class MathematicaExporter(Exporter):
         string
             String containing the Mathematica code for the model's ODEs.
         """
+        if self.model.expressions:
+            raise ExpressionsNotSupported()
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
 
         output = StringIO()
         pysb.bng.generate_equations(self.model)

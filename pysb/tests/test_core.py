@@ -332,6 +332,21 @@ def test_dangling_bond():
 
 
 @with_model
+def test_invalid_site_name():
+    assert_raises(ValueError, Monomer, 'A', ['1'])
+
+
+@with_model
+def test_invalid_state_value():
+    assert_raises(ValueError, Monomer, 'A', ['a'], {'a': ['1', 'a']})
+
+
+@with_model
+def test_valid_state_values():
+    Monomer('A', ['a'], {'a': ['_1', '_b', '_', '_a', 'a']})
+
+
+@with_model
 def test_expression_type():
     assert_raises(ValueError, Expression, 'A', 1)
 
@@ -354,3 +369,4 @@ def test_rulepattern_match_none_against_state():
     # A(phospho=None) should match unbound A regardless of phospho state,
     # so this should be a valid rule pattern
     A(phospho=None) + A(phospho=None) >> A(phospho=1) % A(phospho=1)
+

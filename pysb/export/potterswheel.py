@@ -69,7 +69,9 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-from pysb.export import Exporter
+from pysb.export import Exporter, ExpressionsNotSupported, \
+    CompartmentsNotSupported
+
 
 class PottersWheelExporter(Exporter):
     """A class for returning the PottersWheel equivalent for a given PySB model.
@@ -87,6 +89,10 @@ class PottersWheelExporter(Exporter):
         string
             String containing the PottersWheel code for the ODEs.
         """
+        if self.model.expressions:
+            raise ExpressionsNotSupported()
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
 
         output = StringIO()
         pysb.bng.generate_equations(self.model)
