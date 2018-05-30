@@ -182,7 +182,7 @@ def test_sympy_parameter_keyword():
 
 
 @with_model
-def test_bng_log_expr():
+def test_log():
     Monomer('A')
     Expression('expr1', sympy.log(100))
     Rule('Rule1', None >> A(), expr1)
