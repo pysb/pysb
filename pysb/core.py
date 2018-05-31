@@ -173,6 +173,22 @@ class Component(object):
         if self._export:
             self._do_export()
 
+        # Try to find calling module by walking the stack
+        self._modules = []
+        self._function = None
+        # We assume we're dealing with Component subclasses here
+        frame = inspect.currentframe().f_back
+        while frame is not None:
+            mod_name = frame.f_globals['__name__']
+            if mod_name in ['IPython.core.interactiveshell', '__main__']:
+                break
+            if mod_name not in ['pysb.core', 'pysb.macros'] and not \
+                    mod_name.startswith('importlib.'):
+                self._modules.append(mod_name)
+                if self._function is None:
+                    self._function = frame.f_code.co_name
+            frame = frame.f_back
+
     def __getstate__(self):
         # clear the weakref to parent model (restored in Model.__setstate__)
         state = self.__dict__.copy()
@@ -1540,6 +1556,28 @@ class Model(object):
         # return self for "model = model.reload()" idiom, until a better solution can be found
         return SelfExporter.default_model
 
+    @property
+    def modules(self):
+        """
+        Return the set of Python modules where Components are defined
+
+        Returns
+        -------
+        list
+            List of module names where model Components are defined
+
+        Examples
+        --------
+
+        >>> from pysb.examples.earm_1_0 import model
+        >>> 'pysb.examples.earm_1_0' in model.modules
+        True
+        """
+        all_components = self.components
+        if not all_components:
+            return []
+        return sorted(set.union(*[set(c._modules) for c in all_components]))
+
     def all_component_sets(self):
         """Return a list of all ComponentSet objects."""
         set_names = [t.__name__.lower() + 's' for t in Model._component_types]
@@ -1928,6 +1966,94 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             return self[key]
         except KeyError:
             return default
+
+    def filter(self, filter_predicate):
+        """
+        Filter a ComponentSet using a predicate or set of predicates
+
+        Parameters
+        ----------
+        filter_predicate: callable or pysb.pattern.FilterPredicate
+            A predicate (condition) to test each Component in the
+            ComponentSet against. This can either be an anonymous "lambda"
+            function or a subclass of pysb.pattern.FilterPredicate. For
+            lambda functions, the argument is a single Component and return
+            value is a boolean indicating a match or not.
+
+        Returns
+        -------
+        ComponentSet
+            A ComponentSet containing Components matching all of the
+            supplied filters
+
+        Examples
+        --------
+
+        >>> from pysb.examples.earm_1_0 import model
+        >>> from pysb.pattern import Name, Pattern, Module, Function
+        >>> m = model.monomers
+
+        Find parameters exactly equal to 10000:
+        >>> model.parameters.filter(lambda c: c.value == 1e4)  \
+            # doctest:+NORMALIZE_WHITESPACE
+        ComponentSet([
+         Parameter('pC3_0', 10000.0),
+         Parameter('pC6_0', 10000.0),
+        ])
+
+        Find rules with a forward rate < 1e-8, using a custom function:
+        >>> model.rules.filter(lambda c: c.rate_forward.value < 1e-8) \
+            # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('bind_pC3_Apop', Apop(b=None) + pC3(b=None) | Apop(b=1) %
+                pC3(b=1), kf25, kr25),
+        ])
+
+        We can also use some built in predicates for more complex matching
+        scenarios, including combining multiple predicates.
+
+        Find rules with a name beginning with "inhibit" that contain cSmac:
+        >>> model.rules.filter(Name('^inhibit') & Pattern(m.cSmac())) \
+            # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
+                cSmac(b=1) % XIAP(b=1), kf28, kr28),
+        ])
+
+        Find rules with any form of Bax (i.e. Bax, aBax, mBax):
+        >>> model.rules.filter(Pattern(m.Bax) | Pattern(m.aBax) | \
+                Pattern(m.MBax)) # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('bind_Bax_tBid', tBid(b=None) + Bax(b=None) |
+              tBid(b=1) % Bax(b=1), kf12, kr12),
+         Rule('produce_aBax_via_tBid', tBid(b=1) % Bax(b=1) >>
+              tBid(b=None) + aBax(b=None), kc12),
+         Rule('transloc_MBax_aBax', aBax(b=None) |
+              MBax(b=None), kf13, kr13),
+         Rule('inhibit_MBax_by_Bcl2', MBax(b=None) + Bcl2(b=None) |
+              MBax(b=1) % Bcl2(b=1), kf14, kr14),
+         Rule('dimerize_MBax_to_Bax2', MBax(b=None) + MBax(b=None) |
+              Bax2(b=None), kf15, kr15),
+         ])
+
+        Count the number of parameter that don't start with kf (note the ~
+        negation operator):
+        >>> len(model.parameters.filter(~Name('^kf')))
+        60
+
+        Get components not defined in this module (file). In this case,
+        everything is defined in one file, but for multi-file models this
+        becomes more useful:
+        >>> model.components.filter(~Module('^pysb.examples.earm_1_0$'))
+        ComponentSet([
+         ])
+
+        Count the number of rules defined in the 'catalyze' function:
+        >>> len(model.rules.filter(Function('^catalyze$')))
+        24
+
+        """
+        return ComponentSet(filter(filter_predicate, self))
 
     def iterkeys(self):
         for c in self:
