@@ -180,6 +180,7 @@ def test_sympy_parameter_keyword():
     generate_equations(model)
 
 
+@with_model
 def test_log():
     Monomer('A')
     Expression('expr1', sympy.log(100))
