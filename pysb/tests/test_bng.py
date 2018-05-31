@@ -27,10 +27,9 @@ def test_simulate_network_console():
     Initial(A(), A_0)
     Parameter('k', 1)
     Rule('degrade', A() >> None, k)
-    # Suppress network overwrite warning from simulate command
-    with BngConsole(model, suppress_warnings=True) as bng:
-        bng.generate_network(overwrite=True)
-        bng.action('simulate', method='ssa', t_end=20000, n_steps=100)
+    with BngConsole(model) as bng:
+        bng.generate_network()
+        bng.action('simulate', method='ssa', t_end=20000, n_steps=100, netfile='pysb.net')
 
 
 @with_model
@@ -178,6 +177,13 @@ def test_sympy_parameter_keyword():
     Initial(A(), Parameter('A_0', 100))
     Parameter('deg', 10)  # deg is a sympy function
     Rule('Rule1', A() >> None, deg)
+    generate_equations(model)
+
+
+def test_log():
+    Monomer('A')
+    Expression('expr1', sympy.log(100))
+    Rule('Rule1', None >> A(), expr1)
     generate_equations(model)
 
 

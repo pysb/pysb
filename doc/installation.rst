@@ -143,7 +143,8 @@ Install Docker and the PySB software stack
 1. **Install Docker**
 
    To use PySB with Docker, first you'll need to install Docker, which can be
-   obtained from http://www.docker.com.
+   obtained from https://www.docker.com/community-edition#/download (Windows
+    and Mac). Linux users should use their package manager (e.g. ``apt-get``).
 
 2. **Download the PySB software stack from the Docker Hub**
 
@@ -158,7 +159,7 @@ Install Docker and the PySB software stack
    Start the Docker container with the following command (on Linux, the command
    may need to be prefixed with ``sudo``):
 
-       :command:`docker run -d -p 8888:8888 pysb/pysb`
+       :command:`docker run -it --rm -p 8888:8888 pysb/pysb`
 
    This starts the PySB Docker container with Jupyter notebook and connects it
    to port 8888.
@@ -170,8 +171,8 @@ Install Docker and the PySB software stack
    Jupyter notebook logo. Several example and tutorial notebooks are included
    to get you started.
 
-Important notes
-^^^^^^^^^^^^^^^
+Important notes for Docker installations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To see graphics from matplotlib within the Jupyter Notebook, you'll need to
 set the following option in your notebooks before calling any plot commands:
@@ -190,7 +191,7 @@ further information on the options available for the container (such
 as sharing a directory with the host computer to preserve notebooks,
 setting a password and more). Documentation from the Jupyter project is
 available at
-https://github.com/jupyter/docker-stacks/tree/master/scipy-notebook
+https://hub.docker.com/r/jupyter/scipy-notebook/
 
 .. _Anaconda: https://www.continuum.io/downloads
 .. _Docker: http://www.docker.org/

@@ -272,6 +272,10 @@ class BngPrinter(StrPrinter):
         return super(BngPrinter, self)._print_Pow(expr, rational)\
             .replace('**', '^')
 
+    def _print_log(self, expr):
+        # BNG doesn't accept "log", only "ln".
+        return 'ln' + "(%s)" % self.stringify(expr.args, ", ")
+
 
 def expression_to_muparser(expression):
     """Render the Expression as a muparser-compatible string."""
