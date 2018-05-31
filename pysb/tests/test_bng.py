@@ -3,7 +3,7 @@ from pysb import *
 from pysb.bng import *
 import os
 import unittest
-from pysb.core import as_complex_pattern
+from nose.tools import assert_raises_regexp
 
 
 @with_model
@@ -186,3 +186,19 @@ def test_log():
     Expression('expr1', sympy.log(100))
     Rule('Rule1', None >> A(), expr1)
     generate_equations(model)
+
+
+@with_model
+def test_bng_error():
+    Monomer('A', ['a'], {'a': ['s1', 's2']})
+    Parameter('A_0', 100)
+    Initial(A(a='s1'), A_0)
+    Parameter('kf', 1)
+    # The following rule does not specify A's site on the RHS, so should generate a BNG error
+    Rule('r1', A(a='s1') >> A(), kf)
+    assert_raises_regexp(
+        BngInterfaceError,
+        'Molecule created in reaction rule: Component\(s\) a missing from molecule A\(\)',
+        generate_equations,
+        model
+    )

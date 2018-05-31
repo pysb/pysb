@@ -460,13 +460,24 @@ class BngFileInterface(BngBaseInterface):
                              cwd=self.base_directory,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
+
+        # output lines as DEBUG, unless a warning or error is encountered
+        capture_error = False
+        captured_error_lines = []
         for line in iter(p.stdout.readline, b''):
-            self._logger.debug(line[:-1])
-        (p_out, p_err) = p.communicate()
-        p_out = p_out.decode('utf-8')
+            line = line[:-1].decode('utf-8')
+            if line.startswith('ERROR:'):
+                capture_error = True
+            if capture_error:
+                captured_error_lines.append(line)
+
+            self._logger.debug(line)
+
+        # p_out is already consumed, so only get p_err
+        (_, p_err) = p.communicate()
         p_err = p_err.decode('utf-8')
-        if p.returncode:
-            raise BngInterfaceError(p_out.rstrip("at line") + "\n" +
+        if p.returncode or captured_error_lines:
+            raise BngInterfaceError('\n'.join(captured_error_lines) + "\n" +
                                     p_err.rstrip())
 
     def action(self, action, **kwargs):
