@@ -9,8 +9,8 @@ for :py:mod:`pysb.export`.
 
 import pysb
 import pysb.bng
-from pysb.export import Exporter
-import sympy
+from pysb.export import Exporter, ExpressionsNotSupported, \
+    CompartmentsNotSupported
 from sympy.printing.mathml import MathMLPrinter
 import itertools
 import textwrap
@@ -83,6 +83,7 @@ def get_species_annotation(meta_id, cp):
     output += get_annotation_postamble()
     return indent(output, 16)
 
+
 class SbmlExporter(Exporter):
     """A class for returning the SBML for a given PySB model.
 
@@ -98,6 +99,10 @@ class SbmlExporter(Exporter):
         string
             String containing the SBML output.
         """
+        if self.model.expressions:
+            raise ExpressionsNotSupported()
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
 
         output = StringIO()
         pysb.bng.generate_equations(self.model)

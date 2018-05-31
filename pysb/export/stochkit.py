@@ -7,7 +7,7 @@ library with permission from author Brian Drawert.
 For information on how to use the model exporters, see the documentation
 for :py:mod:`pysb.export`.
 """
-from pysb.export import Exporter
+from pysb.export import Exporter, CompartmentsNotSupported
 from pysb.core import as_complex_pattern, Expression, Parameter
 from pysb.bng import generate_equations
 import numpy as np
@@ -122,6 +122,9 @@ class StochKitExporter(Exporter):
         string
             The model in StochKit2 XML format
         """
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
+
         generate_equations(self.model)
         document = etree.Element("Model")
 
