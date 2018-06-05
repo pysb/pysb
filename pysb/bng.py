@@ -445,8 +445,11 @@ class BngFileInterface(BngBaseInterface):
                 output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
                     % (filename, int(skip_file_actions))
             output += bng_commands
-            self._logger.debug('BNG command file contents:\n\n' + output)
             bng_file.write(output)
+            lines = output.split('\n')
+            line_number_format = 'L{{:0{}d}}  {{}}'.format(int(numpy.ceil(numpy.log10(len(lines)))))
+            output = '\n'.join(line_number_format.format(ln + 1, line) for ln, line in enumerate(lines))
+            self._logger.debug('BNG command file contents:\n' + output)
 
         # Reset the command queue, in case execute() is called again
         self.command_queue.close()
