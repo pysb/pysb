@@ -64,8 +64,9 @@ Parameter('kr32', 0.08)
 for flip_m, kf, kr, reversible in (zip(flip_monomers, (kf31,kf32), (kr31,kr32), (False,True))):
     rule = Rule('RLFADD_%s_Binding' % flip_m.name, FADD (rf=ANY, fe=None) + flip_m (fe=None, ee=None) | FADD (rf=ANY, fe=1) % flip_m (fe=1, ee=None), kf, kr)
     if reversible is False:
-        rule.is_reversible = False;
-        rule.rate_reverse = None;
+        rule.is_reversible = False
+        rule.rule_expression.is_reversible = False
+        rule.rate_reverse = None
 
 pC8_HomoD   = pC8 (fe=ANY, ee=1, D384='U') % pC8   (fe=ANY, ee=1, D384='U')
 pC8_HeteroD = pC8 (fe=ANY, ee=1, D384='U') % flipL (fe=ANY, ee=1, D384='U')
@@ -87,8 +88,9 @@ Parameter('kr35', 1)
 for flip_m, kf, kr, reversible in (zip(flip_monomers, (kf34,kf35), (kr34,kr35), (False,True))):
     rule = Rule('RLFADD_C8_%s_Binding' % flip_m.name, pC8 (fe=ANY, ee=None, D384='U') + flip_m (fe=ANY, ee=None) | pC8 (fe=ANY, ee=1, D384='U') % flip_m (fe=ANY, ee=1), kf, kr)
     if reversible is False:
-        rule.is_reversible = False;
-        rule.rate_reverse = None;
+        rule.is_reversible = False
+        rule.rule_expression.is_reversible = False
+        rule.rate_reverse = None
 
 Parameter('kc36', 0.223046e-3)
 #Homodimer catalyses Homodimer ?: no p18 is released. Only this "cleaved" p43 homoD is the product that will transform into a p18 + L:R:FADD in later reaction.
