@@ -106,7 +106,7 @@ class PythonExporter(Exporter):
         code_eqs = '\n'.join(['ydot[%d] = %s;' %
                                  (i, sympy.ccode(self.model.odes[i]))
                               for i in range(len(self.model.odes))])
-        code_eqs = re.sub(r's(\d+)',
+        code_eqs = re.sub(r'__s(\d+)',
                           lambda m: 'y[%s]' % (int(m.group(1))), code_eqs)
         for i, p in enumerate(self.model.parameters):
             code_eqs = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, code_eqs)
@@ -118,7 +118,6 @@ class PythonExporter(Exporter):
         output.write("# exported from PySB model '%s'\n" % self.model.name)
         output.write(pad(r"""
             import numpy
-            import weave
             import scipy.integrate
             import collections
             import itertools
@@ -128,8 +127,11 @@ class PythonExporter(Exporter):
             _use_inline = False
             # try to inline a C statement to see if inline is functional
             try:
+                import weave
                 weave.inline('int i;', force=1)
                 _use_inline = True
+            except ImportError:
+                pass
             except distutils.errors.CompileError:
                 pass
 
@@ -214,8 +216,8 @@ class PythonExporter(Exporter):
                     self.y = numpy.empty((len(tspan), len(self.y0)))
                     if len(self.observables):
                         self.yobs = numpy.ndarray(len(tspan),
-                                        zip((obs.name for obs in self.observables),
-                                            itertools.repeat(float)))
+                                        list(zip((obs.name for obs in self.observables),
+                                            itertools.repeat(float))))
                     else:
                         self.yobs = numpy.ndarray((len(tspan), 0))
                     self.yobs_view = self.yobs.view(float).reshape(len(self.yobs),

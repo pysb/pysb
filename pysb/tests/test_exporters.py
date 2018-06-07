@@ -19,8 +19,9 @@ def test_export():
 
 def check_convert(model, format):
     """ Test exporters run without error """
+    exported_file = None
     try:
-        export.export(model, format)
+        exported_file = export.export(model, format)
     except export.ExpressionsNotSupported:
         pass
     except export.CompartmentsNotSupported:
@@ -34,3 +35,8 @@ def check_convert(model, format):
             pass
         else:
             raise
+
+    if exported_file is not None:
+        if format == 'python':
+            # linspace arguments picked to avoid VODE warning
+            exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n', {'_use_inline': False})
