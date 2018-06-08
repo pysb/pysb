@@ -33,6 +33,8 @@ install:
     networkx nose h5py pandas theano mkl pydot mock cython
   - if "%PYTHON_VERSION%"=="2.7" (conda install -c conda-forge weave)
 
+  - conda install -c SBMLTeam python-libsbml
+
   - conda install -c alubbock graphviz bionetgen atomizer kappa stochkit-lite
 
   # Build PySB
