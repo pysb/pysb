@@ -13,6 +13,7 @@ try:
     import roadrunner
 except ImportError:
     roadrunner = None
+from nose.plugins.skip import SkipTest
 
 
 def test_export():
@@ -50,7 +51,7 @@ def check_convert(model, format):
         elif format == 'sbml':
             # Skip the simulation comparison if roadrunner not available
             if roadrunner is None:
-                return
+                raise SkipTest("SBML Simulation test skipped (requires roadrunner)")
 
             roadrunner.Logger.setLevel(roadrunner.Logger.LOG_ERROR)
             # Simulate SBML using roadrunner
