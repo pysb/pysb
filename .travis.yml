@@ -16,6 +16,7 @@ before_install:
     pydot coveralls mock cython
 - if [[ $PYVER == 2.7 ]]; then pip install weave; fi
 - conda install --yes -c SBMLTeam python-libsbml
+- pip install libroadrunner
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
 # Install BioNetGen, Kappa, StochKit and Atomizer

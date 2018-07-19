@@ -1615,9 +1615,19 @@ class Model(object):
         # intersect with original parameter list to retain ordering
         return self.parameters & cset
 
+    def parameters_expressions(self):
+        cset = ComponentSet()
+        for expr in self.expressions:
+            for sym in expr.expand_expr().free_symbols:
+                if sym in self.parameters:
+                    cset.add(sym)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
     def parameters_unused(self):
         """Return a ComponentSet of unused parameters."""
-        cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
+        cset_used = (self.parameters_rules() | self.parameters_initial_conditions() |
+                     self.parameters_compartments() | self.parameters_expressions())
         return self.parameters - cset_used
 
 #     def expressions_constant(self):

@@ -8,6 +8,7 @@ import pysb
 import pysb.bng
 from pysb.export import Exporter
 from sympy.printing.mathml import MathMLPrinter
+from xml.dom.minidom import Document
 try:
     import libsbml
 except ImportError:
@@ -21,47 +22,63 @@ class MathMLContentPrinter(MathMLPrinter):
         ci.appendChild(self.dom.createTextNode(sym.name))
         return ci
 
-
-def print_mathml(expr, **settings):
-    return MathMLContentPrinter(settings).doprint(expr)
+    def to_xml(self, expr):
+        # Preferably this should use a public API, but as that doesn't exist...
+        return self._print(expr)
 
 
 def _check(value):
-    """If 'value' is None, prints an error message constructed using
-    'message' and then exits with status code 1.  If 'value' is an integer,
-    it assumes it is a libSBML return status code.  If the code value is
-    LIBSBML_OPERATION_SUCCESS, returns without further action; if it is not,
-    prints an error message constructed using 'message' along with text from
-    libSBML explaining the meaning of the code, and exits with status code 1.
     """
-    if value is None:
+    Validate a libsbml return value
+
+    Raises ValueError if 'value' is a libsbml error code or None.
+    """
+    if type(value) is int and value != libsbml.LIBSBML_OPERATION_SUCCESS:
+        raise ValueError(
+            'Error encountered converting to SBML. '
+            'LibSBML returned error code {}: "{}"'.format(
+                value,
+                libsbml.OperationReturnValue_toString(value).strip()
+            )
+        )
+    elif value is None:
         raise ValueError('LibSBML returned a null value')
-    elif type(value) is int:
-        if value == libsbml.LIBSBML_OPERATION_SUCCESS:
-            return
-        else:
-            err_msg = 'Error encountered converting to SBML. ' \
-                      + 'LibSBML returned error code ' + str(value) + ': "' \
-                      + libsbml.OperationReturnValue_toString(value).strip() + '"'
-            raise ValueError(err_msg)
-    else:
-        return
 
 
-def _mathml_expr_call(expr, as_ast=False):
-    mathstr = '<apply><ci>{}</ci>'.format(expr.name)
+def _add_ci(x_doc, x_parent, name):
+    """ Add <ci>name</ci> element to <x_parent> within x_doc """
+    ci = x_doc.createElement('ci')
+    ci.appendChild(x_doc.createTextNode(name))
+    x_parent.appendChild(ci)
+
+
+def _xml_to_ast(x_element):
+    """ Wrap MathML fragment with <math> tag and convert to libSBML AST """
+    x_doc = Document()
+    x_mathml = x_doc.createElement('math')
+    x_mathml.setAttribute('xmlns', 'http://www.w3.org/1998/Math/MathML')
+
+    x_mathml.appendChild(x_element)
+    x_doc.appendChild(x_mathml)
+
+    mathml_ast = libsbml.readMathMLFromString(x_doc.toxml())
+    _check(mathml_ast)
+    return mathml_ast
+
+
+def _mathml_expr_call(expr):
+    """ Generate an XML <apply> expression call """
+    x_doc = Document()
+    x_apply = x_doc.createElement('apply')
+    x_doc.appendChild(x_apply)
+
+    _add_ci(x_doc, x_apply, expr.name)
     for sym in expr.expand_expr(expand_observables=True).free_symbols:
         if isinstance(sym, pysb.Expression):
             continue
-        mathstr += '<ci>{}</ci>'.format(sym.name if isinstance(sym, pysb.Parameter) else sym)
-    mathstr += '</apply>'
-    if not as_ast:
-        return mathstr
-    mathstr = "<?xml version='1.0' encoding='UTF-8'?>" \
-          "<math xmlns='http://www.w3.org/1998/Math/MathML'>{}</math>".format(mathstr)
-    rate_mathml = libsbml.readMathMLFromString(mathstr)
-    _check(rate_mathml)
-    return rate_mathml
+        _add_ci(x_doc, x_apply, sym.name if isinstance(sym, pysb.Parameter) else str(sym))
+
+    return x_apply
 
 
 class SbmlExporter(Exporter):
@@ -71,9 +88,9 @@ class SbmlExporter(Exporter):
     basic functionality for all exporters.
     """
     def __init__(self, *args, **kwargs):
-        super(SbmlExporter, self).__init__(*args, **kwargs)
         if not libsbml:
             raise ImportError('The SbmlExporter requires the libsbml python package')
+        super(SbmlExporter, self).__init__(*args, **kwargs)
 
     def _sympy_to_sbmlast(self, sympy_expr, wrap_lambda=False):
         """
@@ -81,28 +98,31 @@ class SbmlExporter(Exporter):
 
         wrap_lambda indicates whether the expression should be converted into a mathml lambda function
         """
-        mathml = print_mathml(sympy_expr)
+        mathml = MathMLContentPrinter().to_xml(sympy_expr)
 
         if wrap_lambda:
-            # For function definitions
-            args = ''
+            # For function definitions, wrap in <lambda> block
+            x_doc = Document()
+            x_lambda = x_doc.createElement('lambda')
+            x_doc.appendChild(x_lambda)
             for sym in sympy_expr.free_symbols:
-                if isinstance(sym, pysb.Expression):
+                if isinstance(sym, (pysb.Expression, pysb.Observable)):
                     continue
-                args += '<bvar><ci> {} </ci></bvar>'.format(sym.name if isinstance(sym, pysb.Parameter) else sym)
-            mathml = '<lambda>{}{}</lambda>'.format(args, mathml)
+                x_bvar = x_doc.createElement('bvar')
+                x_lambda.appendChild(x_bvar)
+                _add_ci(x_doc, x_bvar, sym.name if isinstance(sym, pysb.Parameter) else str(sym))
+            x_lambda.appendChild(mathml)
+            mathml = x_lambda
         else:
             # For rates expressions with <apply> wrapper, but not within the function definitions block
-            for expr in self.model.expressions:
-                mathml = mathml.replace('<ci>{}</ci>'.format(expr.name), _mathml_expr_call(expr))
+            for x_ci in mathml.getElementsByTagName('ci'):
+                expr_name = x_ci.firstChild.nodeValue
+                if expr_name not in self.model.expressions.keys():
+                    continue
+                x_parent = x_ci.parentNode
+                x_parent.replaceChild(_mathml_expr_call(self.model.expressions[expr_name]), x_ci)
 
-        mathml = "<?xml version='1.0' encoding='UTF-8'?>" \
-                 "<math xmlns='http://www.w3.org/1998/Math/MathML'>{}</math>".format(
-            mathml,
-        )
-        rate_mathml = libsbml.readMathMLFromString(mathml)
-        _check(rate_mathml)
-        return rate_mathml
+        return _xml_to_ast(mathml)
 
     def convert(self, level=(3, 2)):
         """
@@ -170,7 +190,7 @@ class SbmlExporter(Exporter):
                 ia = smodel.createInitialAssignment()
                 _check(ia)
                 _check(ia.setSymbol('__s{}'.format(sp_idx)))
-                _check(ia.setMath(_mathml_expr_call(param, as_ast=True)))
+                _check(ia.setMath(_xml_to_ast(_mathml_expr_call(param))))
                 initial_concs[sp_idx] = None
             else:
                 initial_concs[sp_idx] = param.value
@@ -205,8 +225,13 @@ class SbmlExporter(Exporter):
                 _check(sp.setInitialAmount(initial_concs[i]))
 
         # Parameters
+        params_only_initials = (self.model.parameters_initial_conditions() -
+                                self.model.parameters_rules() -
+                                self.model.parameters_compartments() -
+                                self.model.parameters_expressions())
+
         for i, param in enumerate(self.model.parameters):
-            if param in self.model.parameters_initial_conditions():
+            if param in params_only_initials:
                 continue
             p = smodel.createParameter()
             _check(p)

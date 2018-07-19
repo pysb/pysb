@@ -6,6 +6,13 @@ Based on code submitted in a PR by @keszybz in pysb/pysb#113
 """
 from pysb.tests.test_examples import get_example_models, expected_exceptions
 from pysb import export
+from pysb.simulator import ScipyOdeSimulator
+import numpy as np
+import pandas as pd
+try:
+    import roadrunner
+except ImportError:
+    roadrunner = None
 
 
 def test_export():
@@ -31,9 +38,7 @@ def check_convert(model, format):
         # will treat any of these "expected" exceptions as a success.
         model_base_name = model.name.rsplit('.', 1)[1]
         exception_class = expected_exceptions.get(model_base_name)
-        if exception_class and isinstance(e, exception_class):
-            pass
-        else:
+        if not exception_class or not isinstance(e, exception_class):
             raise
 
     if exported_file is not None:
@@ -42,3 +47,25 @@ def check_convert(model, format):
             exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n', {'_use_inline': False})
         elif format == 'pysb_flat':
             exec(exported_file, {'__name__': model.name})
+        elif format == 'sbml':
+            # Skip the simulation comparison if roadrunner not available
+            if roadrunner is None:
+                return
+
+            roadrunner.Logger.setLevel(roadrunner.Logger.LOG_ERROR)
+            # Simulate SBML using roadrunner
+            rr = roadrunner.RoadRunner(exported_file)
+            rr_result = rr.simulate(0, 10, 100)
+
+            # Simulate original using PySB
+            df = ScipyOdeSimulator(model).run(tspan=np.linspace(0, 10, 100)).dataframe
+
+            for sp_idx in range(len(model.species)):
+                rr_sp = rr_result[:, sp_idx + 1]
+                py_sp = df.iloc[:, sp_idx]
+                is_close = np.allclose(rr_sp, py_sp, rtol=1e-4)
+                if not is_close:
+                    print(pd.DataFrame(dict(rr=rr_sp, pysb=py_sp)))
+                    raise ValueError('Model {}, species __s{} trajectories do not match:'.format(
+                        model.name, sp_idx))
+
