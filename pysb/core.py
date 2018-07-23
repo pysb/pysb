@@ -2005,6 +2005,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         >>> m = model.monomers
 
         Find parameters exactly equal to 10000:
+
         >>> model.parameters.filter(lambda c: c.value == 1e4)  \
             # doctest:+NORMALIZE_WHITESPACE
         ComponentSet([
@@ -2013,6 +2014,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         ])
 
         Find rules with a forward rate < 1e-8, using a custom function:
+
         >>> model.rules.filter(lambda c: c.rate_forward.value < 1e-8) \
             # doctest: +NORMALIZE_WHITESPACE
         ComponentSet([
@@ -2024,6 +2026,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         scenarios, including combining multiple predicates.
 
         Find rules with a name beginning with "inhibit" that contain cSmac:
+
         >>> model.rules.filter(Name('^inhibit') & Pattern(m.cSmac())) \
             # doctest: +NORMALIZE_WHITESPACE
         ComponentSet([
@@ -2032,6 +2035,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         ])
 
         Find rules with any form of Bax (i.e. Bax, aBax, mBax):
+
         >>> model.rules.filter(Pattern(m.Bax) | Pattern(m.aBax) | \
                 Pattern(m.MBax)) # doctest: +NORMALIZE_WHITESPACE
         ComponentSet([
@@ -2049,17 +2053,20 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
 
         Count the number of parameter that don't start with kf (note the ~
         negation operator):
+
         >>> len(model.parameters.filter(~Name('^kf')))
         60
 
         Get components not defined in this module (file). In this case,
         everything is defined in one file, but for multi-file models this
         becomes more useful:
+
         >>> model.components.filter(~Module('^pysb.examples.earm_1_0$'))
         ComponentSet([
          ])
 
         Count the number of rules defined in the 'catalyze' function:
+
         >>> len(model.rules.filter(Function('^catalyze$')))
         24
 
