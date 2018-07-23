@@ -27,7 +27,8 @@ def main():
           install_requires=['numpy', 'scipy', 'sympy', 'networkx'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
-                         'pandas', 'theano', 'h5py', 'mock', 'cython'],
+                         'pandas', 'theano', 'h5py', 'mock', 'cython',
+                         'libsbml', 'roadrunner'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
