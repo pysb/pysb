@@ -275,6 +275,27 @@ class SbmlExporter(Exporter):
             rate_mathml = self._sympy_to_sbmlast(reaction['rate'])
             _check(rate.setMath(rate_mathml))
 
+        # Observables
+        for i, observable in enumerate(self.model.observables):
+            # create an observable "parameter"
+            obs = smodel.createParameter()
+            _check(obs)
+            _check(obs.setId('__obs{}'.format(i)))
+            _check(obs.setName(observable.name))
+            _check(obs.setConstant(False))
+
+            # create an assignment rule which assigns the observable expression to the parameter
+            obs_rule = smodel.createAssignmentRule()
+
+            _check(obs_rule)
+            _check(obs_rule.setVariable(obs.getId()))
+
+            obs_mathml = self._sympy_to_sbmlast(observable.expand_obs())
+            _check(obs_rule.setMath(obs_mathml))
+
+
+
+
         # Apply any requested level/version conversion
         if level != (3, 2):
             prop = libsbml.ConversionProperties(libsbml.SBMLNamespaces(*level))
