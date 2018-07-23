@@ -1616,6 +1616,7 @@ class Model(object):
         return self.parameters & cset
 
     def parameters_expressions(self):
+        """Return a ComponentSet of expression parameters."""
         cset = ComponentSet()
         for expr in self.expressions:
             for sym in expr.expand_expr().free_symbols:
