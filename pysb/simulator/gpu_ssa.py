@@ -1,14 +1,17 @@
 from __future__ import print_function
 
+#
 try:
+    import pycuda
+    import pycuda.autoinit
     import pycuda as cuda
-    from pycuda.driver import init as pycuda_init
     import pycuda.compiler
     import pycuda.tools as tools
     import pycuda.driver as driver
     import pycuda.gpuarray as gpuarray
 except ImportError:
     pycuda = None
+
 import re
 import numpy as np
 import os
@@ -70,7 +73,7 @@ class GPUSimulator(Simulator):
             raise SimulatorException('pycuda library was not found and is '
                                      'required for {}'.format(
                 self.__class__.__name__))
-        pycuda_init()
+
         generate_equations(self._model)
         self._precision = precision
         self.tout = None
@@ -78,9 +81,7 @@ class GPUSimulator(Simulator):
         self.verbose = verbose
 
         # private attribute
-        self._blocks = None
         self._threads = 32
-        self._total_threads = 0
         self._parameter_number = len(self._model.parameters)
         self._n_species = len(self._model.species)
         self._n_reactions = len(self._model.reactions)
@@ -92,11 +93,6 @@ class GPUSimulator(Simulator):
         self._ssa = None
         self._ssa_all = None
 
-        device = os.getenv("CUDA_DEVICE")
-        if device is None:
-            self._device = 0
-        else:
-            self._device = int(device)
         if verbose:
             setup_logger(logging.INFO)
         self._logger.info("Initialized GPU class")
@@ -116,31 +112,6 @@ class GPUSimulator(Simulator):
                     changes.append([index, change])
             all_reactions.append(changes)
 
-        stoch2 = ''
-        update = "__device__ void stoichiometry2(int *y, int r){"
-        temp = """
-        {2} (r=={0}){{
-        for (int i=0; i<{1}; i++){{
-            y[rxn_{0}[i][0]] += rxn_{0}[i][1];
-            }}
-        return;
-        }}
-        """
-
-        for n, rxn in enumerate(all_reactions):
-            rxn_str = ', '.join(str(i) for j in rxn for i in j)
-            if n == 0:
-                switch = 'if'
-            else:
-                switch = 'else if'
-
-            update += temp.format(n, len(rxn), switch)
-            stoch2 += "__constant__ int rxn_{}[{}][2]={{{}}};\n".format(
-                n, len(rxn), rxn_str
-            )
-
-        update += '\n};'
-
         params_names = [g.name for g in self._model.parameters]
         _reaction_number = len(self._model.reactions)
 
@@ -149,7 +120,7 @@ class GPUSimulator(Simulator):
         r_lim = self._n_reactions - 1
         for i in range(0, self._n_reactions):
             for j in range(0, len(stoich_matrix)):
-                stoich_string += "\t%s" % repr(stoich_matrix[j][i])
+                stoich_string += "%s" % repr(stoich_matrix[j][i])
                 if not (i == l_lim and j == r_lim):
                     stoich_string += ','
             stoich_string += '\n'
@@ -204,8 +175,6 @@ class GPUSimulator(Simulator):
                                          n_reactions=_reaction_number,
                                          hazards=hazards_string,
                                          stoch=stoich_string,
-                                         stoch2=stoch2,
-                                         update=update,
                                          )
         if self._precision == np.float64:
             cs_string = cs_string.replace('float', 'double')
@@ -220,9 +189,17 @@ class GPUSimulator(Simulator):
             self._logger.info("Output cuda file to ssa_cuda_code.cu")
             with open("ssa_cuda_code.cu", "w") as source_file:
                 source_file.write(code)
-        self.compile_ssa(code)
+        nvcc_bin = get_path('nvcc')
+        self._logger.debug("Compiling CUDA code")
+        self._kernel = pycuda.compiler.SourceModule(code, nvcc=nvcc_bin,
+                                                    no_extern_c=True,
+                                                    keep=True)
 
-    def _run(self, start_time, end_time, params, initials):
+        self._ssa = self._kernel.get_function("Gillespie_one_step")
+        self._ssa_all = self._kernel.get_function("Gillespie_all_steps")
+        self._logger.debug("Compiled CUDA code")
+
+    def _run(self, start_time, end_time, params, initials, threads, blocks):
         """
 
         Parameters
@@ -235,7 +212,10 @@ class GPUSimulator(Simulator):
             param_values for simulation
         initials : list_like
             initial conditions to pass to model
-
+        threads : int
+            Number of threads per block
+        blocks : int
+            Number of blocks per gpu
         Returns
         -------
 
@@ -249,38 +229,36 @@ class GPUSimulator(Simulator):
 
         n_simulations = len(params)
 
-        # set up parameters to GPU
-        param = np.zeros((self._total_threads, self._parameter_number),
-                         dtype=self._precision)
-        for i in range(len(params)):
-            for j in range(self._parameter_number):
-                param[i][j] = params[i][j]
-        param_array = gpuarray.to_gpu(param)
+        total_threads = blocks * threads
 
-        # set up species matrix, initial conditions
-        species_matrix = self._create_gpu_init(initials=initials)
+        param_array_gpu = gpuarray.to_gpu(
+            self._create_gpu_array(params, total_threads, self._precision)
+        )
 
-        # allocate space on GPU for results
-        species_matrix_gpu = gpuarray.to_gpu(species_matrix)
+        species_matrix_gpu = gpuarray.to_gpu(
+            self._create_gpu_array(initials, total_threads, np.int32)
+        )
 
         result = driver.managed_zeros(
-            shape=(self._total_threads, self._n_species),
+            shape=(total_threads, self._n_species),
             dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
         )
 
         # place starting time on GPU
-        start_time = np.array(start_time, dtype=self._precision)
-        start_time_gpu = gpuarray.to_gpu(start_time)
+        start_time_gpu = gpuarray.to_gpu(
+            np.array(start_time, dtype=self._precision)
+        )
 
         # allocate and upload time to GPU
-        last_time = np.zeros(n_simulations, dtype=self._precision)
-        last_time_gpu = gpuarray.to_gpu(last_time)
+        last_time_gpu = gpuarray.to_gpu(
+            np.zeros(n_simulations, dtype=self._precision)
+        )
 
         # run single step
         self._ssa(species_matrix_gpu, result, start_time_gpu, end_time,
-                  last_time_gpu, param_array,
-                  block=(self._threads, 1, 1),
-                  grid=(self._blocks, 1))
+                  last_time_gpu, param_array_gpu,
+                  block=(threads, 1, 1),
+                  grid=(blocks, 1))
 
         # Wait for kernel completion before host access
         pycuda.autoinit.context.synchronize()
@@ -292,7 +270,7 @@ class GPUSimulator(Simulator):
 
         return result, current_time
 
-    def _run_all(self, timepoints, params, initial_conditions):
+    def _run_all(self, timepoints, params, initials, threads, blocks):
 
         # compile kernel and send parameters to GPU
         if self._step_0:
@@ -301,38 +279,38 @@ class GPUSimulator(Simulator):
         if self.verbose:
             self._print_verbose(self._ssa_all)
 
-        param = np.zeros((self._total_threads, self._parameter_number),
-                         dtype=self._precision)
-        for i in range(len(params)):
-            for j in range(self._parameter_number):
-                param[i][j] = params[i][j]
-        param_array = gpuarray.to_gpu(param)
+        total_threads = int(blocks * threads)
 
-        n_simulations = len(params)
-        n_results = np.int32(len(timepoints))
+        param_array_gpu = gpuarray.to_gpu(
+            self._create_gpu_array(params, total_threads, self._precision)
+        )
 
-        species_matrix = self._create_gpu_init(initials=initial_conditions)
-        species_matrix_gpu = gpuarray.to_gpu(species_matrix)
-
-        # allocate space on GPU for results
-        result = driver.managed_zeros(
-            shape=(self._total_threads, len(timepoints), self._n_species),
-            dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
+        species_matrix_gpu = gpuarray.to_gpu(
+            self._create_gpu_array(initials, total_threads, np.int32)
         )
 
         # allocate and upload time to GPU
-        time_points = np.array(timepoints, dtype=self._precision)
-        time_points_gpu = gpuarray.to_gpu(time_points)
+        time_points_gpu = gpuarray.to_gpu(
+            np.array(timepoints, dtype=self._precision)
+        )
+
+        # allocate space on GPU for results
+        result = driver.managed_zeros(
+            shape=(total_threads, len(timepoints), self._n_species),
+            dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
+        )
 
         # perform simulation
-        self._ssa_all(species_matrix_gpu, result, time_points_gpu, n_results,
-                      param_array,
-                      block=(self._threads, 1, 1), grid=(self._blocks, 1)
-                      )
+        self._ssa_all(species_matrix_gpu, result, time_points_gpu,
+                      np.int32(len(timepoints)), param_array_gpu,
+                      block=(threads, 1, 1), grid=(blocks, 1))
 
         # Wait for kernel completion before host access
         pycuda.autoinit.context.synchronize()
+
         # retrieve and store results, only keeping n_simulations
+        # actual simulations we will return
+        n_simulations = len(params)
         return result[:n_simulations, :, :]
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
@@ -360,29 +338,20 @@ class GPUSimulator(Simulator):
         if tspan is None:
             tspan = self.tspan
 
-        tout = len(param_values) * [None]
-        for n in range(len(param_values)):
-            tout[n] = tspan
-
+        tout = [tspan for _ in range(len(param_values))]
         t_out = np.array(tspan, dtype=self._precision)
 
         if threads is None:
-            self._threads = 128
-        else:
-            self._threads = threads
+            threads = self._threads
+
         size_params = param_values.shape[0]
 
-        if size_params % self._threads == 0:
-            self._blocks = size_params / self._threads
-        else:
-            self._blocks = size_params / self._threads + 1
-
-        self._total_threads = self._blocks * self._threads
+        blocks = self.get_blocks(size_params, threads)
 
         self._logger.info("Starting {} simulations".format(number_sim))
 
         timer_start = time.time()
-        result = self._run_all(t_out, param_values, initials)
+        result = self._run_all(t_out, param_values, initials, threads, blocks)
         timer_end = time.time()
         self._logger.info("{} simulations "
                           "in {}s".format(number_sim, timer_end - timer_start))
@@ -414,43 +383,37 @@ class GPUSimulator(Simulator):
         if tspan is None:
             tspan = self.tspan
         tspan = np.array(tspan, dtype=self._precision)
-        tout = len(param_values) * [None]
+        tout = [tspan for _ in range(len(param_values))]
 
-        for n in range(len(param_values)):
-            tout[n] = tspan
         t_out = np.array(tout, dtype=self._precision)
         len_time = len(tspan)
 
         if threads is None:
-            self._threads = 128
-        else:
-            self._threads = int(threads)
+            threads = self._threads
 
-        if len(param_values) % self._threads == 0:
-            self._blocks = len(param_values) / self._threads
-        else:
-            self._blocks = len(param_values) / self._threads + 1
+        size_params = param_values.shape[0]
 
-        self._total_threads = self._blocks * self._threads
+        blocks = self.get_blocks(size_params, threads)
 
         n_simulations = len(param_values)
 
-        final_result = np.zeros(
-            (n_simulations, len_time, self._n_species),
-            dtype=np.int32)
+        final_result = np.zeros((n_simulations, len_time, self._n_species),
+                                dtype=np.int32)
         start_array = initials
         final_result[:, 0, :] = start_array
         start_time = t_out[:, 0]
         timer_start = time.time()
+
+        # loops through each step
         for n, i in enumerate(tspan):
             if verbose:
                 self._logger.info('{} out of {}'.format(n, len_time))
-
             if n == 0:
                 continue
+
             end = i
             result, end_time = self._run(start_time, end, param_values,
-                                         start_array)
+                                         start_array, threads, blocks)
             t_out[:, n] = i
             start_time = end_time
             # print(i, start_time)
@@ -462,28 +425,8 @@ class GPUSimulator(Simulator):
 
         return SimulationResult(self, tout, final_result)
 
-    def compile_ssa(self, code):
-        """ compile the SSA code
-
-        Parameters
-        ----------
-        code : str
-            code to compile
-
-
-        """
-        nvcc_bin = get_path('nvcc')
-        self._logger.debug("Compiling CUDA code")
-        self._kernel = pycuda.compiler.SourceModule(code, nvcc=nvcc_bin,
-                                                    no_extern_c=True)
-
-        self._ssa = self._kernel.get_function("Gillespie_one_step")
-        self._ssa_all = self._kernel.get_function("Gillespie_all_steps")
-        self._logger.debug("Compiled CUDA code")
-
     def _print_verbose(self, code):
         self._logger.info("threads = {}".format(self._threads))
-        self._logger.info("blocks  = {}".format(self._blocks))
 
         self._logger.debug("Local memory  = {}".format(code.local_size_bytes))
         self._logger.debug("shared memory = {}".format(code.shared_size_bytes))
@@ -503,11 +446,24 @@ class GPUSimulator(Simulator):
         self._compile(self._code)
         self._step_0 = False
 
-    def _create_gpu_init(self, initials):
+    def _create_gpu_array(self, values, total_threads, prec):
 
         # Create species matrix on GPU
         # will make according to number of total threads, not n_simulations
-        species_matrix = np.zeros((self._total_threads, self._n_species),
+        gpu_array = np.zeros((total_threads, values.shape[1]), dtype=prec)
+        # Filling species matrix
+        # Note that this might not fill entire array that was created.
+        # The rest of the array will be zeros to fill up GPU.
+        for i in range(len(values)):
+            for j in range(values.shape[1]):
+                gpu_array[i, j] = values[i, j]
+        return gpu_array
+
+    def _create_gpu_init(self, initials, total_threads):
+
+        # Create species matrix on GPU
+        # will make according to number of total threads, not n_simulations
+        species_matrix = np.zeros((total_threads, self._n_species),
                                   dtype=np.int32)
         # Filling species matrix
         # Note that this might not fill entire array that was created.
@@ -516,6 +472,13 @@ class GPUSimulator(Simulator):
             for j in range(self._n_species):
                 species_matrix[i][j] = initials[i][j]
         return species_matrix
+
+    @staticmethod
+    def get_blocks(n_params, threads):
+        if n_params % threads == 0:
+            return int(n_params / threads)
+        else:
+            return int(n_params / threads) + 1
 
     @staticmethod
     def get_gpu_settings(parameters):

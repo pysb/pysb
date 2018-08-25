@@ -9,21 +9,22 @@ __constant__ int stoch_matrix[]={{
 {stoch}
 }};
 
-{stoch2}
+
+extern "C" {{
+
 
 __device__ void propensities(int *y, float *h, float *param_arry)
 {{
 {hazards}
 }}
 
-extern "C"{{
+
 __device__ void stoichiometry(int *y, int r){{
     for(int i=0; i<num_species; i++){{
         y[i]+=stoch_matrix[r*num_species+ i];
     }}
 }}
 
-{update}
 
 
 __device__ int sample(float* a, float u){{
@@ -33,13 +34,15 @@ __device__ int sample(float* a, float u){{
         }}
     return i;
 }}
-///*
+
+
+
 __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* time, int NRESULTS,
                                     const float* param_values){{
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
-//    curandState randState;
-    curandStateMRG32k3a randState;
+    curandState randState;
+//    curandStateMRG32k3a randState;
     curand_init(clock64(), tid, 0, &randState);
     float t = time[0] ;
     float r1 = 0.0f;
@@ -70,8 +73,7 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* tim
             r1 =  curand_uniform(&randState);
             r2 =  curand_uniform(&randState);
             k = sample(A, a0*r1);
-//            stoichiometry(y, k);
-            stoichiometry2(y, k);
+            stoichiometry(y, k);
             propensities(y, A, param_arry);
             a0 = 0;
             // summing up propensities
@@ -87,10 +89,9 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result, float* tim
             }}
         }}
 
-    return;
     }}
-//*/
-///*
+
+
 __global__ void Gillespie_one_step(int* species_matrix, int* result, float* start_time, float end_time,
                                    float* result_time, const float* param_values){{
 
@@ -129,7 +130,7 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, float* star
         r1 =  curand_uniform(&randState);
         r2 =  curand_uniform(&randState);
         k = sample(A, a0*r1);
-        stoichiometry2( y ,k );
+        stoichiometry( y ,k );
         propensities( y, A, param_arry);
         a0 = 0;
         // summing up propensities
@@ -145,7 +146,6 @@ __global__ void Gillespie_one_step(int* species_matrix, int* result, float* star
         result[tid*num_species +  j] = y[j];
         }}
     result_time[tid] = start_t;
-    return;
     }}
 
-}}
+}} // extern c close
