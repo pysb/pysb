@@ -92,37 +92,11 @@ class SbmlExporter(Exporter):
             raise ImportError('The SbmlExporter requires the libsbml python package')
         super(SbmlExporter, self).__init__(*args, **kwargs)
 
-    def _sympy_to_sbmlast(self, sympy_expr, wrap_lambda=False):
+    def _sympy_to_sbmlast(self, sympy_expr):
         """
         Convert a sympy expression to the AST format used by libsbml
-
-        wrap_lambda indicates whether the expression should be converted into a mathml lambda function
         """
-        mathml = MathMLContentPrinter().to_xml(sympy_expr)
-
-        if wrap_lambda:
-            # For function definitions, wrap in <lambda> block
-            x_doc = Document()
-            x_lambda = x_doc.createElement('lambda')
-            x_doc.appendChild(x_lambda)
-            for sym in sympy_expr.free_symbols:
-                if isinstance(sym, (pysb.Expression, pysb.Observable)):
-                    continue
-                x_bvar = x_doc.createElement('bvar')
-                x_lambda.appendChild(x_bvar)
-                _add_ci(x_doc, x_bvar, sym.name if isinstance(sym, pysb.Parameter) else str(sym))
-            x_lambda.appendChild(mathml)
-            mathml = x_lambda
-        else:
-            # For rates expressions with <apply> wrapper, but not within the function definitions block
-            for x_ci in mathml.getElementsByTagName('ci'):
-                expr_name = x_ci.firstChild.nodeValue
-                if expr_name not in self.model.expressions.keys():
-                    continue
-                x_parent = x_ci.parentNode
-                x_parent.replaceChild(_mathml_expr_call(self.model.expressions[expr_name]), x_ci)
-
-        return _xml_to_ast(mathml)
+        return _xml_to_ast(MathMLContentPrinter().to_xml(sympy_expr))
 
     def convert(self, level=(3, 2)):
         """
@@ -180,7 +154,7 @@ class SbmlExporter(Exporter):
             # create an observable "parameter"
             e = smodel.createParameter()
             _check(e)
-            _check(e.setId('__expr{}'.format(i)))
+            _check(e.setId(expr.name))
             _check(e.setName(expr.name))
             _check(e.setConstant(False))
 
@@ -201,7 +175,8 @@ class SbmlExporter(Exporter):
                 ia = smodel.createInitialAssignment()
                 _check(ia)
                 _check(ia.setSymbol('__s{}'.format(sp_idx)))
-                _check(ia.setMath(_xml_to_ast(_mathml_expr_call(param))))
+                init_mathml = self._sympy_to_sbmlast(param.expand_expr(expand_observables=True))
+                _check(ia.setMath(init_mathml))
                 initial_concs[sp_idx] = None
             else:
                 initial_concs[sp_idx] = param.value
