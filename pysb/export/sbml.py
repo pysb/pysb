@@ -176,11 +176,22 @@ class SbmlExporter(Exporter):
             _check(c.setConstant(True))
 
         # Expressions
-        for expr in self.model.expressions:
-            f = smodel.createFunctionDefinition()
-            _check(f)
-            _check(f.setId(expr.name))
-            _check(f.setMath(self._sympy_to_sbmlast(expr.expand_expr(expand_observables=True), wrap_lambda=True)))
+        for i, expr in enumerate(self.model.expressions):
+            # create an observable "parameter"
+            e = smodel.createParameter()
+            _check(e)
+            _check(e.setId('__expr{}'.format(i)))
+            _check(e.setName(expr.name))
+            _check(e.setConstant(False))
+
+            # create an assignment rule which assigns the expression to the parameter
+            expr_rule = smodel.createAssignmentRule()
+
+            _check(expr_rule)
+            _check(expr_rule.setVariable(e.getId()))
+
+            expr_mathml = self._sympy_to_sbmlast(expr.expand_expr(expand_observables=True))
+            _check(expr_rule.setMath(expr_mathml))
 
         # Initial values/assignments
         initial_concs = [0.0] * len(self.model.species)
