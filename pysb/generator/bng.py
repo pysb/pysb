@@ -1,6 +1,7 @@
 import inspect
 import warnings
 import pysb
+from pysb.core import is_state_bond_tuple
 import sympy
 from sympy.printing import StrPrinter
 
@@ -226,12 +227,15 @@ def format_site_condition(site, state):
         state_code = '~' + state
     # state AND single bond
     elif isinstance(state, tuple):
-        # bond is wildcard (zero or more unspecified bonds)
-        if state[1] == pysb.WILD:
-            state = (state[0], '?')
-        elif state[1] == pysb.ANY:
-            state = (state[0], '+')
-        state_code = '~%s!%s' % state
+        if is_state_bond_tuple(state):
+            # bond is wildcard (zero or more unspecified bonds)
+            if state[1] == pysb.WILD:
+                state = (state[0], '?')
+            elif state[1] == pysb.ANY:
+                state = (state[0], '+')
+            state_code = '~%s!%s' % state
+        else:
+            return ','.join(format_site_condition(site, s) for s in state)
     # one or more unspecified bonds
     elif state is pysb.ANY:
         state_code = '!+'
@@ -241,7 +245,8 @@ def format_site_condition(site, state):
     elif state is pysb.WILD:
         state_code = '!?'
     else:
-        raise Exception("BNG generator has encountered an unknown element in a rule pattern site condition.")
+        raise ValueError("BNG generator has encountered an unknown element in "
+                         "a rule pattern site condition.")
     return '%s%s' % (site, state_code)
 
 def warn_caller(message):

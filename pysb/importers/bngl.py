@@ -10,6 +10,7 @@ import pysb.logging
 import collections
 import numbers
 import os
+import math
 
 
 def _ns(tag_string):
@@ -39,6 +40,8 @@ class BnglBuilder(Builder):
             self._x = xml.etree.ElementTree.parse('%s.xml' %
                                                   con.base_filename)\
                                            .getroot().find(_ns('{0}model'))
+
+        self.model.name = os.path.splitext(os.path.basename(filename))[0]
         self._force = force
         self._model_env = {}
         self._renamed_states = collections.defaultdict(dict)
@@ -63,7 +66,7 @@ class BnglBuilder(Builder):
 
         # Quick security check on the expression
         if re.match(r'^[\w\s()/+\-._*]*$', expression):
-            return eval(expression, {}, self._model_env)
+            return eval(expression, {'ln': math.log}, self._model_env)
         else:
             self._warn_or_except('Security check on expression "%s" failed' %
                                  expression)
@@ -88,34 +91,45 @@ class BnglBuilder(Builder):
         for mon in species_xml.iterfind(_ns('{0}ListOfMolecules/{0}Molecule')):
             mon_name = mon.get('name')
             mon_obj = self.model.monomers[mon_name]
-            mon_states = {}
+            mon_states = collections.defaultdict(list)
             for comp in mon.iterfind(_ns('{0}ListOfComponents/{0}Component')):
+                # BioNetGen component (state) labels are not supported yet
+                if 'label' in comp.attrib.keys():
+                    self._warn_or_except('BioNetGen component/state labels '
+                                         'are not yet supported in PySB')
+
                 state_nm = comp.get('name')
                 bonds = comp.get('numberOfBonds')
                 if bonds == "0":
-                    mon_states[state_nm] = None
+                    last_bond = None
                 elif bonds == "?":
-                    mon_states[state_nm] = WILD
+                    last_bond = WILD
                 elif bonds == "+":
-                    mon_states[state_nm] = ANY
+                    last_bond = ANY
                 else:
                     bond_list = bond_ids[comp.get('id')]
                     assert int(bonds) == len(bond_list)
                     if len(bond_list) == 1:
-                        mon_states[state_nm] = bond_list[0]
+                        last_bond = bond_list[0]
                     else:
-                        mon_states[state_nm] = bond_list
+                        last_bond = bond_list
                 state = comp.get('state')
                 if state:
                     # If we changed the state string, use the updated version
                     state = self._renamed_states.get(mon_name, {}).get(
                         state, state)
-                    if mon_states[state_nm]:
+                    if last_bond:
                         # Site has a bond and a state
-                        mon_states[state_nm] = (state, mon_states[state_nm])
+                        mon_states[state_nm].append((state, last_bond))
                     else:
                         # Site only has a state, no bond
-                        mon_states[state_nm] = state
+                        mon_states[state_nm].append(state)
+                else:
+                    mon_states[state_nm].append(last_bond)
+
+            mon_states = {k: tuple(v) if len(v) > 1 else v[0]
+                          for k, v in mon_states.items()}
+
             mon_cpt = self.model.compartments.get(mon.get('compartment'))
             mon_pats.append(MonomerPattern(mon_obj, mon_states, mon_cpt))
         return mon_pats
@@ -125,7 +139,7 @@ class BnglBuilder(Builder):
                                       '{0}MoleculeType')):
             mon_name = m.get('id')
             sites = []
-            states = collections.defaultdict(list)
+            states = collections.defaultdict(dict)
             for ctype in m.iterfind(_ns('{0}ListOfComponentTypes/'
                                         '{0}ComponentType')):
                 c_name = ctype.get('id')
@@ -135,13 +149,15 @@ class BnglBuilder(Builder):
                     for s in states_list.iterfind(_ns('{}AllowedState')):
                         state = s.get('id')
                         if re.match('[0-9]*$', state):
-                            new_state = '_' + state
-                            while new_state in states[c_name]:
-                                new_state = '_' + new_state
-                            self._renamed_states[mon_name][state] = \
-                                new_state
-                            state = new_state
-                        states[c_name].append(state)
+                            if state not in states[c_name]:
+                                new_state = '_' + state
+                                while new_state in states[c_name].values():
+                                    new_state = '_' + new_state
+                                states[c_name][state] = new_state
+                                self._renamed_states[mon_name][state] = \
+                                    new_state
+                        else:
+                            states[c_name][state] = state
                     if self._renamed_states[mon_name]:
                         self._log.info('Monomer "{}" states were renamed as '
                                        'follows: {}'.format(
@@ -149,7 +165,9 @@ class BnglBuilder(Builder):
                             self._renamed_states[mon_name])
                         )
             try:
-                self.monomer(mon_name, sites, states)
+                self.monomer(mon_name, sites,
+                             {c_name: statedict.values() for c_name, statedict
+                              in states.items()})
             except Exception as e:
                 if str(e).startswith('Duplicate sites specified'):
                     self._warn_or_except('Molecule %s has multiple '
@@ -164,7 +182,14 @@ class BnglBuilder(Builder):
             p_name = p.get('id')
             if p.get('type') == 'Constant':
                 p_value = p.get('value').replace('10^', '1e')
-                self.parameter(name=p_name, value=p_value)
+                try:
+                    self.parameter(name=p_name, value=p_value)
+                except ValueError:
+                    # Despite the "Constant" label, some constant expressions
+                    # appear here e.g. ln(2)/120 in BNG's Repressilator model
+                    self.parameter(name=p_name,
+                                   value=self._eval_in_model_env(
+                                        p.get('value')))
             elif p.get('type') == 'ConstantExpression':
                 self.expression(name=p_name,
                                 expr=self._eval_in_model_env(p.get('value')))
@@ -354,7 +379,6 @@ class BnglBuilder(Builder):
                 self.expression(expr_name, expr_val)
 
     def _parse_bng_xml(self):
-        self.model.name = self._x.get(_ns('id'))
         self._parse_monomers()
         self._parse_parameters()
         self._parse_compartments()

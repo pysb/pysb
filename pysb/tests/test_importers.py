@@ -31,6 +31,10 @@ def bngl_import_compare_simulations(bng_file, force=False,
     """
     m = model_from_bngl(bng_file, force=force)
 
+    if sim_times is None:
+        # Skip simulation check
+        return
+
     # Simulate using the BNGL file directly
     with BngFileInterface(model=None) as bng:
         bng.action('readFile', file=bng_file, skip_actions=1)
@@ -100,6 +104,15 @@ def test_bngl_import_expected_passes_with_force():
             yield (bngl_import_compare_simulations, full_filename, True)
 
 
+def test_bngl_import_expected_passes_no_sim():
+    """ These models convert properly, but we cannot generate network """
+    for filename in ('blbr',
+                     'hybrid_test',  # Population maps are not converted
+                     'tlbr'):
+        full_filename = _bngl_location(filename)
+        yield (bngl_import_compare_simulations, full_filename, False, None)
+
+
 def test_bngl_import_expected_passes():
     for filename in ('CaOscillate_Func',
                      'continue',
@@ -124,7 +137,10 @@ def test_bngl_import_expected_passes():
                      'toy-jim',
                      'univ_synth',
                      'visualize',
-                     ):
+                     'Repressilator',
+                     'fceri_ji',
+                     'test_paramname',
+                     'tlmr'):
         full_filename = _bngl_location(filename)
         yield (bngl_import_compare_simulations, full_filename, False,
                REDUCED_PRECISION.get(filename, 1e-12))
@@ -134,24 +150,17 @@ def test_bngl_import_expected_errors():
     errtype = {'localfn': 'Function \w* is local',
                'ratelawtype': 'Rate law \w* has unknown type',
                'ratelawmissing': 'Rate law missing for rule',
+               'statelabels': 'BioNetGen component/state labels are not yet supported',
                'dupsites': 'Molecule \w* has multiple sites with the same name'
               }
     expected_errors = {'ANx': errtype['localfn'],
                        'CaOscillate_Sat': errtype['ratelawtype'],
-                       'Repressilator': errtype['dupsites'],
-                       'blbr': errtype['dupsites'],
-                       'fceri_ji': errtype['dupsites'],
-                       'heise': errtype['dupsites'],
-                       'hybrid_test': errtype['dupsites'],
+                       'heise': errtype['statelabels'],
                        'isingspin_energy': errtype['ratelawmissing'],
                        'isingspin_localfcn': errtype['localfn'],
-                       'localfunc': errtype['dupsites'],
+                       'localfunc': 'Species \$Trash\(\) is fixed',
                        'test_MM': errtype['ratelawtype'],
                        'test_sat': errtype['ratelawtype'],
-                       'test_fixed': errtype['dupsites'],
-                       'test_paramname': errtype['dupsites'],
-                       'tlbr': errtype['dupsites'],
-                       'tlmr': errtype['dupsites']
                        }
 
     for filename, errmsg in expected_errors.items():

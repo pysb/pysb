@@ -378,3 +378,19 @@ def test_rulepattern_match_none_against_state():
     # so this should be a valid rule pattern
     A(phospho=None) + A(phospho=None) >> A(phospho=1) % A(phospho=1)
 
+
+@with_model
+def test_duplicate_sites():
+    Monomer('A', ['a', 'a'])
+    Monomer('B', ['b', 'b'], {'b': ['u', 'p']})
+
+    assert not A(a=1).is_concrete()
+    assert A(a=(1, 2)).is_concrete()
+    assert A(a=(1, None)).is_concrete()
+
+    assert not B(b=('u', 1)).is_concrete()
+    assert B(b=('u', 'p')).is_concrete()
+    assert B(b=(('u', 1), ('u', 2))).is_concrete()
+
+    # Check _as_graph() works for duplicate sites
+    B(b=(('u', 1), ('u', 2)))._as_graph()
