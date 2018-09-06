@@ -176,6 +176,12 @@ class Builder(object):
         """Adds an initial condition to the Builder's model instance."""
         self.model.initial(*args)
 
+    def tag(self, *args, **kwargs):
+        """Adds a tag to the Builder's model instance."""
+        t = Tag(*args, _export=False, **kwargs)
+        self.model.add_component(t)
+        return t
+
     def __getitem__(self, index):
         """Returns the component with the given string index
         from the instance of the model contained by the Builder."""

@@ -2,6 +2,8 @@ from pysb.testing import *
 from pysb.core import *
 from functools import partial
 from nose.tools import assert_raises
+import operator
+import unittest
 
 
 @with_model
@@ -370,3 +372,33 @@ def test_rulepattern_match_none_against_state():
     # so this should be a valid rule pattern
     A(phospho=None) + A(phospho=None) >> A(phospho=1) % A(phospho=1)
 
+
+@with_model
+def test_tags():
+    Monomer('A', ['b'])
+    Tag('x')
+
+    # Use __matmul__ instead of @ for Python 2.7 support in tests
+    assert repr(x) == "Tag('x')"
+    assert repr(x.__matmul__(A()) % A()) == 'x @ A() % A()'
+    assert repr((A() % A()).__matmul__(x)) == 'A() % A() @ x'
+
+    # Postfix tags should auto-upgrade a MonomerPattern to a ComplexPattern
+    assert isinstance(A().__matmul__(x), ComplexPattern)
+
+    # Trying to extend a tagged complex should fail - the tag should always
+    # be specified last
+    assert_raises(ValueError, operator.mod, (A(b=1) % A(b=1)).__matmul__(x),
+                  A(b=1))
+
+    Observable('o1', A(b=None))
+
+    # Create an expression containing a tag
+    Expression('e_no_tag', o1 ** 2)
+    Expression('e_tag', o1(x) ** 2)
+
+    # Test tag defined in rate but not in rule expression
+    assert_raises(ValueError, Rule, 'r1', None >> A(b=None), e_tag)
+
+    # Test tag defined in rule expression but not in rate
+    Rule('r2', None >> A(b=None).__matmul__(x), e_no_tag)

@@ -15,7 +15,6 @@ import shutil
 import collections
 import pysb.pathfinder as pf
 from pysb.logging import get_logger, EXTENDED_DEBUG
-import logging
 
 try:
     from cStringIO import StringIO
@@ -733,6 +732,13 @@ def generate_equations(model, cleanup=True, verbose=False, **kwargs):
 def _parse_netfile(model, lines):
     """ Parse species, rxns and groups from a BNGL net file """
     try:
+        while 'begin parameters' not in next(lines):
+            pass
+        while True:
+            line = next(lines)
+            if 'end parameters' in line: break
+            _parse_parameter(model, line)
+
         while 'begin species' not in next(lines):
             pass
         model.species = []
@@ -768,6 +774,67 @@ def _parse_netfile(model, lines):
         pass
 
 
+def _parse_parameter(model, line):
+    index, pname, pval, hash, ptype = line.strip().split()
+    par_names = model.components.keys()
+    if pname not in par_names:
+        if ptype == 'Constant':
+            try:
+                p = pysb.core.Parameter(pname, pval, _export=False)
+            except ValueError:
+                p = pysb.core.Parameter(pname,
+                                        eval(pval.replace('^', '**')),
+                                        _export=False)
+            model._derived_parameters.add(p)
+        elif ptype == 'ConstantExpression':
+            pval = _fix_booleans(pval)
+            p = pysb.core.Expression(pname, sympy.sympify(pval),
+                                     _export=False)
+            model._derived_expressions.add(p)
+        else:
+            raise ValueError('Unknown type {} for parameter {}'.format(
+                ptype, pname))
+
+
+_RE_NUMBER = '\d+(?:\.\d+)?'
+_RE_EQUAL_INEQ = '{0}\s*([<>]=?|!=|==)\s*{0}'.format(_RE_NUMBER)
+_RE_AND = '({0})\s*&&\s*({0})'.format(_RE_NUMBER)
+_RE_OR = '({0})\s*\|\|\s*({0})'.format(_RE_NUMBER)
+_RE_NUMBER_PARENS = '\(\s*({0})\s*\)'.format(_RE_NUMBER)
+
+
+def _fix_booleans(pval):
+    """ Evaluate boolean expressions to integers
+
+    Inequalities (e.g. "(0>1)") don't parse to integers in sympy, so expressions
+    from BNG like "(1>0)*10" cause a sympy parse error. To avoid this, we
+    replace the boolean expressions using a regex before calling sympy.
+    """
+    while True:
+        orig = pval
+
+        for match in re.finditer(_RE_OR, pval):
+            pval = pval.replace(
+                match.group(0),
+                '1' if float(match.group(1)) or float(match.group(2)) else '0'
+            )
+        for match in re.finditer(_RE_AND, pval):
+            pval = pval.replace(
+                match.group(0),
+                '1' if float(match.group(1)) and float(match.group(2)) else '0'
+            )
+        for match in re.finditer(_RE_EQUAL_INEQ, pval):
+            pval = pval.replace(
+                match.group(0),
+                '1' if eval(match.group(0)) else '0'
+            )
+        for match in re.finditer(_RE_NUMBER_PARENS, pval):
+            pval = pval.replace(match.group(0), match.group(1))
+
+        if orig == pval:
+            return pval
+
+
 def _parse_species(model, line):
     """Parse a 'species' line from a BNGL net file."""
     index, species, value = line.strip().split()
@@ -779,7 +846,7 @@ def _parse_species(model, line):
     for ms in monomer_strings:
         monomer_name, site_strings, monomer_compartment_name = \
             re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
-        site_conditions = {}
+        site_conditions = collections.defaultdict(list)
         if len(site_strings):
             for ss in site_strings.split(','):
                 # FIXME this should probably be done with regular expressions
@@ -803,7 +870,9 @@ def _parse_species(model, line):
                     site_name, condition = ss.split('~')
                 else:
                     site_name, condition = ss, None
-                site_conditions[site_name] = condition
+                site_conditions[site_name].append(condition)
+        site_conditions = {k: v[0] if len(v) == 1 else tuple(v)
+                           for k, v in site_conditions.items()}
         monomer = model.monomers[monomer_name]
         monomer_compartment = model.compartments.get(monomer_compartment_name)
         # Compartment prefix notation in BNGL means "assign this compartment to
@@ -834,7 +903,8 @@ def _parse_reaction(model, line, reaction_cache):
     is_reverse = tuple(bool(i) for i in is_reverse)
     r_names = ['__s%d' % r for r in reactants]
     rate_param = [model.parameters.get(r) or model.expressions.get(r) or
-                  float(r) for r in rate]
+                  model._derived_parameters.get(r) or
+                  model._derived_expressions.get(r) or float(r) for r in rate]
     combined_rate = sympy.Mul(*[sympy.S(t) for t in r_names + rate_param])
     reaction = {
         'reactants': reactants,

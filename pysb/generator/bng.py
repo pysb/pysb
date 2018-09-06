@@ -98,8 +98,10 @@ class BngGenerator(object):
                 arrow = '<->'
             self.__content += ("  %-" + str(max_length) + "s  %s %s %s    %s") % \
                 (label, reactants_code, arrow, products_code, r.rate_forward.name)
+            self.__content += _tags_in_rate(r.rate_forward)
             if r.is_reversible:
                 self.__content += ', %s' % r.rate_reverse.name
+                self.__content += _tags_in_rate(r.rate_reverse)
             if r.delete_molecules:
                 self.__content += ' DeleteMolecules'
             if r.move_connected:
@@ -126,7 +128,7 @@ class BngGenerator(object):
         max_length = max(len(e.name) for e in exprs) + 2
         self.__content += "begin functions\n"
         for i, e in enumerate(exprs):
-            signature = e.name + '()'
+            signature = '{}({})'.format(e.name, ','.join(sorted([sym.name for sym in e.expr.atoms(pysb.Tag)])))
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % \
                 (signature, expression_to_muparser(e))
         self.__content += "end functions\n\n"
@@ -169,6 +171,15 @@ class BngGenerator(object):
         self.__content += 'end population maps\n\n'
 
 
+def _tags_in_rate(expr):
+    if not isinstance(expr, pysb.Expression):
+        return ''
+
+    tags = expr.tags()
+
+    return '({})'.format(', '.join([t.name for t in tags]))
+
+
 def format_monomer_site(monomer, site):
     ret = site
     if site in monomer.site_states:
@@ -191,6 +202,8 @@ def format_complexpattern(cp):
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)
+    if cp._tag:
+        ret = '%{}:{}'.format(cp._tag.name, ret)
     if cp.match_once:
         ret = '{MatchOnce}' + ret
     return ret
@@ -203,6 +216,8 @@ def format_monomerpattern(mp):
     ret = '%s(%s)' % (mp.monomer.name, site_pattern_code)
     if mp.compartment is not None:
         ret = '%s@%s' % (ret, mp.compartment.name)
+    if mp._tag:
+        ret = '{}%{}'.format(ret, mp._tag.name)
     return ret
 
 def format_site_condition(site, state):
