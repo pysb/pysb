@@ -6,6 +6,7 @@ for :py:mod:`pysb.export`.
 """
 import pysb
 import pysb.bng
+from sympy import sympify
 from pysb.export import Exporter
 from sympy.printing.mathml import MathMLPrinter
 from xml.dom.minidom import Document
@@ -175,7 +176,7 @@ class SbmlExporter(Exporter):
                 ia = smodel.createInitialAssignment()
                 _check(ia)
                 _check(ia.setSymbol('__s{}'.format(sp_idx)))
-                init_mathml = self._sympy_to_sbmlast(param.expand_expr(expand_observables=True))
+                init_mathml = self._sympy_to_sbmlast(sympify(param.name))
                 _check(ia.setMath(init_mathml))
                 initial_concs[sp_idx] = None
             else:
@@ -231,7 +232,7 @@ class SbmlExporter(Exporter):
             rxn = smodel.createReaction()
             _check(rxn)
             _check(rxn.setId('r{}'.format(i)))
-            _check(rxn.setName('r{}'.format(i)))
+            _check(rxn.setName(' + '.join(reaction['rule'])))
             _check(rxn.setReversible(reaction['reversible']))
 
             for sp in reaction['reactants']:
