@@ -288,6 +288,12 @@ class BngPrinter(StrPrinter):
     def _print_Exp1(self, expr):
         return '_e'
 
+    def _print_floor(self, expr):
+        return 'rint({} - 0.5)'.format(self._print(expr.args[0]))
+
+    def _print_ceiling(self, expr):
+        return '(rint({} + 1) - 1)'.format(self._print(expr.args[0]))
+
     def __make_lower(self, expr):
         """ Print a function with its name in lower case """
         return '{}({})'.format(

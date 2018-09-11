@@ -6,6 +6,7 @@ import unittest
 from nose.tools import assert_raises_regexp
 from pysb.generator.bng import BngPrinter
 import sympy
+import math
 
 
 @with_model
@@ -210,6 +211,20 @@ def _bng_print(expr):
     return BngPrinter(order='none').doprint(expr)
 
 
+def _rint(num):
+    """ This is how BNG/muparser does "rounding" """
+    return math.floor(num + 0.5)
+
+
+def test_bng_rounding():
+    """ Test Ceiling and Floor match BNG implementation of rounding """
+    x_sym = sympy.symbols('x')
+    for x in (-1.5, -1, -0.5, 0, 0.5, 1.0, 1.5):
+        for expr in (sympy.ceiling(x_sym), sympy.floor(x_sym)):
+            assert expr.subs({'x': x}) == eval(
+                _bng_print(expr), {}, {'rint': _rint, 'x': x})
+
+
 def test_bng_printer():
     # Constants
     assert _bng_print(sympy.pi) == '_pi'
@@ -240,7 +255,11 @@ def test_bng_printer():
     assert _bng_print(sympy.exp(x)) == 'exp(x)'
     assert _bng_print(sympy.sqrt(x)) == 'sqrt(x)'
 
-    # Others
+    # Rounding
     assert _bng_print(sympy.Abs(x)) == 'abs(x)'
+    assert _bng_print(sympy.floor(x)) == 'rint(x - 0.5)'
+    assert _bng_print(sympy.ceiling(x)) == '(rint(x + 1) - 1)'
+
+    # Min/max
     assert _bng_print(sympy.Min(x, y)) == 'min(x, y)'
     assert _bng_print(sympy.Max(x, y)) == 'max(x, y)'
