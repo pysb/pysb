@@ -272,6 +272,12 @@ class BngPrinter(StrPrinter):
         return super(BngPrinter, self)._print_Pow(expr, rational)\
             .replace('**', '^')
 
+    def _print_And(self, expr):
+        return super(BngPrinter, self)._print_And(expr).replace('&', '&&')
+
+    def _print_Or(self, expr):
+        return super(BngPrinter, self)._print_Or(expr).replace('|', '||')
+
     def _print_log(self, expr):
         # BNG doesn't accept "log", only "ln".
         return 'ln' + "(%s)" % self.stringify(expr.args, ", ")

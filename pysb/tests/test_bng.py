@@ -4,6 +4,8 @@ from pysb.bng import *
 import os
 import unittest
 from nose.tools import assert_raises_regexp
+from pysb.generator.bng import BngPrinter
+import sympy
 
 
 @with_model
@@ -202,3 +204,9 @@ def test_bng_error():
         generate_equations,
         model
     )
+
+
+def test_bng_printer():
+    sympy.symbols('x y')
+    assert BngPrinter(order='none').doprint(sympy.sympify('x & y')) == 'x && y'
+    assert BngPrinter(order='none').doprint(sympy.sympify('x | y')) == 'x || y'
