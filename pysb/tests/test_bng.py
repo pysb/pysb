@@ -206,7 +206,41 @@ def test_bng_error():
     )
 
 
+def _bng_print(expr):
+    return BngPrinter(order='none').doprint(expr)
+
+
 def test_bng_printer():
-    sympy.symbols('x y')
-    assert BngPrinter(order='none').doprint(sympy.sympify('x & y')) == 'x && y'
-    assert BngPrinter(order='none').doprint(sympy.sympify('x | y')) == 'x || y'
+    # Constants
+    assert _bng_print(sympy.pi) == '_pi'
+    assert _bng_print(sympy.E) == '_e'
+
+    x, y = sympy.symbols('x y')
+
+    # Binary functions
+    assert _bng_print(sympy.sympify('x & y')) == 'x && y'
+    assert _bng_print(sympy.sympify('x | y')) == 'x || y'
+
+    # Trig functions
+    assert _bng_print(sympy.sin(x)) == 'sin(x)'
+    assert _bng_print(sympy.cos(x)) == 'cos(x)'
+    assert _bng_print(sympy.tan(x)) == 'tan(x)'
+    assert _bng_print(sympy.asin(x)) == 'asin(x)'
+    assert _bng_print(sympy.acos(x)) == 'acos(x)'
+    assert _bng_print(sympy.atan(x)) == 'atan(x)'
+    assert _bng_print(sympy.sinh(x)) == 'sinh(x)'
+    assert _bng_print(sympy.cosh(x)) == 'cosh(x)'
+    assert _bng_print(sympy.tanh(x)) == 'tanh(x)'
+    assert _bng_print(sympy.asinh(x)) == 'asinh(x)'
+    assert _bng_print(sympy.acosh(x)) == 'acosh(x)'
+    assert _bng_print(sympy.atanh(x)) == 'atanh(x)'
+
+    # Logs and powers
+    assert _bng_print(sympy.log(x)) == 'ln(x)'
+    assert _bng_print(sympy.exp(x)) == 'exp(x)'
+    assert _bng_print(sympy.sqrt(x)) == 'sqrt(x)'
+
+    # Others
+    assert _bng_print(sympy.Abs(x)) == 'abs(x)'
+    assert _bng_print(sympy.Min(x, y)) == 'min(x, y)'
+    assert _bng_print(sympy.Max(x, y)) == 'max(x, y)'

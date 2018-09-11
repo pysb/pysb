@@ -282,6 +282,24 @@ class BngPrinter(StrPrinter):
         # BNG doesn't accept "log", only "ln".
         return 'ln' + "(%s)" % self.stringify(expr.args, ", ")
 
+    def _print_Pi(self, expr):
+        return '_pi'
+
+    def _print_Exp1(self, expr):
+        return '_e'
+
+    def __make_lower(self, expr):
+        """ Print a function with its name in lower case """
+        return '{}({})'.format(
+            self._print(expr.func).lower(),
+            self._print(expr.args[0] if len(expr.args) == 1 else
+                        ', '.join([self._print(a) for a in expr.args]))
+        )
+
+    _print_Abs = __make_lower
+    _print_Min = __make_lower
+    _print_Max = __make_lower
+
 
 def expression_to_muparser(expression):
     """Render the Expression as a muparser-compatible string."""
