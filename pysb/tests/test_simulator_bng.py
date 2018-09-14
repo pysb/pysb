@@ -62,6 +62,16 @@ class TestBngSimulator(object):
     def test_bng_pla(self):
         self.sim.run(n_runs=5, method='pla', seed=_BNG_SEED)
 
+    def test_tout_matches_tspan(self):
+        # Linearly spaced, starting from 0
+        assert all(self.sim.run(tspan=[0, 10, 20]).tout[0] == [0, 10, 20])
+        # Non-linearly spaced, starting from 0
+        assert all(self.sim.run(tspan=[0, 10, 30]).tout[0] == [0, 10, 30])
+        # Linearly spaced, starting higher than 0
+        assert all(self.sim.run(tspan=[10, 20, 30]).tout[0] == [10, 20, 30])
+        # Linearly spaced, starting higher than 0
+        assert all(self.sim.run(tspan=[5, 20, 30]).tout[0] == [5, 20, 30])
+
     def tearDown(self):
         self.model = None
         self.time = None
