@@ -93,7 +93,7 @@ __global__ void Gillespie_all_steps(int* species_matrix, int* result,
             auto r1 =  curand_uniform(&randState);
             auto r2 =  curand_uniform(&randState);
 
-            auto tau = -__log10f(r1)/a0;  // find time of next reaction
+            auto tau = -__logf(r1)/a0;  // find time of next reaction
             auto k = sample(A, a0*r2);  // find next reaction
 
             t += tau; // update time
