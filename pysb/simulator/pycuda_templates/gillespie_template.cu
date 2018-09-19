@@ -1,27 +1,39 @@
 #include <curand_kernel.h>
 #include <stdio.h>
+
 #define num_species {n_species}
 #define NPARAM {n_params}
 #define NREACT {n_reactions}
 #define NREACT_MIN_ONE NREACT-1
 
-__constant__ int stoch_matrix[]={{
-{stoch}
-}};
+
 
 
 extern "C" {{
 
+__constant__ int stoch_matrix[]={{
+{stoch}
+}};
 
-__device__ void propensities(int *y, float *h, float *param_arry)
+__device__ float sum_propensities(float *a){{
+    float a0 = 0;
+    for(auto j=0; j<NREACT; j++){{
+        a0 += a[j];
+    }}
+    return a0;
+}}
+
+__device__ float propensities(int *y, float *h, float *param_arry)
 {{
 {hazards}
+return sum_propensities(h);
 }}
 
 
 __device__ void stoichiometry(int *y, int r){{
-    for(int i=0; i<num_species; i++){{
-        y[i]+=stoch_matrix[r*num_species+ i];
+    auto step = r*num_species;
+    for(auto i=0; i<num_species; i++){{
+        y[i]+=stoch_matrix[step + i];
     }}
 }}
 
@@ -36,116 +48,67 @@ __device__ int sample(float* a, float u){{
 }}
 
 
+__device__ void update_results(int* result, int *y,  int step, int time_index){{
+    for(auto j=0; j<num_species; j++){{
+        result[step + j + (time_index * num_species)] = y[j];
+    }}
+}}
 
-__global__ void Gillespie_all_steps(int* species_matrix, int* result, float* time, int NRESULTS,
+__global__ void Gillespie_all_steps(int* species_matrix, int* result,
+                                    float* time, int NRESULTS,
                                     const float* param_values){{
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     curandState randState;
 //    curandStateMRG32k3a randState;
     curand_init(clock64(), tid, 0, &randState);
-    float t = time[0] ;
-    float r1 = 0.0f;
-    float r2 = 0.0f;
-    float a0 = 0.0f;
-    int k = 0;
-    int y[num_species];
-    float A[NREACT] = {{0.0}};
-    float param_arry[NPARAM];
+    auto t = time[0] ;
 
-    for(int i=0; i<NPARAM; i++){{
+    int y[num_species];
+    int prev[num_species];
+    float A[NREACT] = {{0.0}};
+    float param_arry[NPARAM] =  {{0.0}};
+    const int result_stepping = tid*NRESULTS*num_species;
+
+    // init parameters for thread
+    for(auto i=0; i<NPARAM; i++){{
         param_arry[i] = param_values[tid*NPARAM + i];
         }}
 
-    // init species array per thread
-    for(int i=0; i<num_species; i++){{
+    // init species counter for thread
+    for(auto i=0; i<num_species; i++){{
         y[i] = species_matrix[tid*num_species + i];
+        prev[i] = y[i];
         }}
 
-    // calculate initial propensities
-    propensities(y, A, param_arry);
-    for(int j=0; j<NREACT; j++){{
-        a0 += A[j];
-    }}
+    int time_index = 0;
     // beginning of loop
-    for(int i=0; i<NRESULTS;){{
-        if (t<time[i]){{
-            r1 =  curand_uniform(&randState);
-            r2 =  curand_uniform(&randState);
-            k = sample(A, a0*r1);
-            stoichiometry(y, k);
-            propensities(y, A, param_arry);
-            a0 = 0;
-            // summing up propensities
-            for(int j=0; j<NREACT; j++)
-                a0 += A[j];
-            t += -__logf(r2)/a0;
-            }}
-       else {{
-            for(int j=0; j<num_species; j++){{
-                result[tid*NRESULTS*num_species + i*num_species + j] = y[j];
-                }}
-            i++;
-            }}
-        }}
+    while (time_index < NRESULTS){{
+        while (t < time[time_index]){{
 
-    }}
+            // calculate propensities
+            auto a0 = propensities(y, A, param_arry);
 
+            // calculate two random numbers
+            auto r1 =  curand_uniform(&randState);
+            auto r2 =  curand_uniform(&randState);
 
-__global__ void Gillespie_one_step(int* species_matrix, int* result, float* start_time, float end_time,
-                                   float* result_time, const float* param_values){{
+            auto tau = -__log10f(r1)/a0;  // find time of next reaction
+            auto k = sample(A, a0*r2);  // find next reaction
 
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    curandState randState;
-//    curandStateMRG32k3a randState;
-    curand_init(clock64(), tid, 0, &randState);
-    float start_t = start_time[tid] ;
+            t += tau; // update time
 
-    float r1 = 0.0f;
-    float r2 = 0.0f;
-    float dt = 0.0f;
-    float a0 = 0;
-    int k = 0;
-    int y[num_species];
-
-    float param_arry[NPARAM];
-
-    for(int i=0; i<NPARAM; i++){{
-        param_arry[i] = param_values[tid*NPARAM + i];
-        }}
-    float A[NREACT] = {{0.0}};
-
-    // init species
-    for(int i=0; i<num_species; i++){{
-        y[i] = species_matrix[tid*num_species + i];
-        }}
-    // calculate initial propensities
-    propensities(y, A, param_arry);
-    for(int j=0; j<NREACT; j++){{
-        a0 += A[j];
-    }}
-    // beginning of loop
-    while (start_t < end_time){{
-//        __syncthreads();
-        r1 =  curand_uniform(&randState);
-        r2 =  curand_uniform(&randState);
-        k = sample(A, a0*r1);
-        stoichiometry( y ,k );
-        propensities( y, A, param_arry);
-        a0 = 0;
-        // summing up propensities
-        for(int j=0; j<NREACT; j++){{
-            a0 += A[j];
+            for(auto j=0; j<num_species; j++){{
+                prev[j] = y[j];
             }}
 
-        dt = -__logf(r2)/a0;
-        start_t += dt;
+            stoichiometry(y, k); // update species matrix
+            }}
+
+        update_results(result, prev, result_stepping, time_index);
+        time_index++;
         }}
 
-    for(int j=0; j<num_species; j++){{
-        result[tid*num_species +  j] = y[j];
-        }}
-    result_time[tid] = start_t;
     }}
 
 }} // extern c close

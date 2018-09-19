@@ -95,7 +95,7 @@ _path_config = {
         },
         'env_var': 'CUDAPATH',
         'search_paths': {
-            'posix': ('/usr/local/cuda/bin', ),
+            'posix': ('/usr/local/cuda/bin', '/usr/bin'),
             'nt': ('C:/Program Files/NVIDIA GPU Computing '
                    'Toolkit/CUDA/v8.0/bin', )
         }
