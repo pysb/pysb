@@ -88,3 +88,12 @@ class TestCupSODASimulatorSingle(object):
 
     def test_run_cupsoda_instance(self):
         run_cupsoda(model, tspan=self.tspan)
+
+    @raises(ValueError)
+    def test_invalid_init_kwarg(self):
+        CupSodaSimulator(model, tspan=self.tspan, spam='eggs')
+
+    @raises(ValueError)
+    def test_invalid_integrator_option(self):
+        CupSodaSimulator(model, tspan=self.tspan,
+                         integrator_options={'spam': 'eggs'})
