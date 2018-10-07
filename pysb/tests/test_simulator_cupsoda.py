@@ -80,9 +80,9 @@ class TestCupSODASimulatorSingle(object):
 
     def test_verbose(self):
         solver = CupSodaSimulator(model, tspan=self.tspan, verbose=True,
-                                  vol=1e-5,
                                   integrator_options={'atol': 1e-12,
                                                       'rtol': 1e-12,
+                                                      'vol': 1e-5,
                                                       'max_steps': 20000})
         solver.run()
 
