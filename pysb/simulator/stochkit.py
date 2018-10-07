@@ -97,7 +97,11 @@ class StochKitSimulator(Simulator):
                                                 param_values=param_values,
                                                 verbose=verbose,
                                                 **kwargs)
-        self.cleanup = kwargs.get('cleanup', True)
+        self.cleanup = kwargs.pop('cleanup', True)
+        if kwargs:
+            raise ValueError('Unknown keyword argument(s): {}'.format(
+                ', '.join(kwargs.keys())
+            ))
         self._outdir = None
         generate_equations(self._model,
                            cleanup=self.cleanup,
