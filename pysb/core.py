@@ -179,10 +179,7 @@ class Component(object):
         # We assume we're dealing with Component subclasses here
         frame = inspect.currentframe().f_back
         while frame is not None:
-            try:
-                mod_name = frame.f_globals['__name__']
-            except KeyError:
-                mod_name = '__unnamed__'
+            mod_name = frame.f_globals.get('__name__', '__unnamed__')
             if mod_name in ['IPython.core.interactiveshell', '__main__']:
                 break
             if mod_name not in ['pysb.core', 'pysb.macros'] and not \
