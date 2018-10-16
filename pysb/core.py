@@ -192,7 +192,7 @@ class Component(object):
     def __getstate__(self):
         # clear the weakref to parent model (restored in Model.__setstate__)
         state = self.__dict__.copy()
-        state.pop('model', None)
+        del state['model']
         # Force _export to False; we don't want the unpickling process to
         # trigger SelfExporter.export!
         state['_export'] = False
