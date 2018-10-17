@@ -95,6 +95,9 @@ class BngSimulator(Simulator):
                                       _run_kwargs=locals()
                                       )
 
+        if cleanup is None:
+            clean = self.cleanup
+
         if method not in self._SIMULATOR_TYPES:
             raise ValueError("Method must be one of " +
                              str(self._SIMULATOR_TYPES))
@@ -153,8 +156,7 @@ class BngSimulator(Simulator):
                               verbose=verbose_bool,
                               output_dir=output_dir,
                               output_prefix=output_file_basename,
-                              cleanup=self.cleanup if cleanup is None
-                              else cleanup,
+                              cleanup=cleanup,
                               model_additional_species=model_additional_species
                               ) as bngfile:
             if hpp_bngl:
