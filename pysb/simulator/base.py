@@ -161,8 +161,7 @@ class Simulator(object):
             else:
                 return 1
 
-    @staticmethod
-    def _update_initials_dict(initials_dict, initials_source):
+    def _update_initials_dict(self, initials_dict, initials_source):
         if isinstance(initials_source, collections.Mapping):
             # Can't just use .update() as we need to test
             # equality with .is_equivalent_to()
@@ -176,7 +175,14 @@ class Simulator(object):
                 if not found:
                     initials_dict[cp] = val
         elif initials_source is not None:
-            for cp_idx, cp in enumerate(initials_dict.keys()):
+            # Update from array-like structure, which we can only do if we
+            # have the species available (e.g. not in network-free simulations)
+            if not self.model.species:
+                raise ValueError(
+                    'Cannot update initials from an array-like source without '
+                    'model species. ')
+            initials_dict = {}
+            for cp_idx, cp in enumerate(self.model.species):
                 initials_dict[cp] = [initials_source[n][cp_idx] for n in
                                      range(len(initials_source))]
         return initials_dict

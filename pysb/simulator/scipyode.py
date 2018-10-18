@@ -147,11 +147,16 @@ class ScipyOdeSimulator(Simulator):
                                                 verbose=verbose,
                                                 **kwargs)
         # We'll need to know if we're using the Jacobian when we get to run()
-        self._use_analytic_jacobian = kwargs.get('use_analytic_jacobian',
+        self._use_analytic_jacobian = kwargs.pop('use_analytic_jacobian',
                                                  False)
-        self.cleanup = kwargs.get('cleanup', True)
-        integrator = kwargs.get('integrator', 'vode')
-        compiler_mode = kwargs.get('compiler', None)
+        self.cleanup = kwargs.pop('cleanup', True)
+        integrator = kwargs.pop('integrator', 'vode')
+        compiler_mode = kwargs.pop('compiler', None)
+        integrator_options = kwargs.pop('integrator_options', {})
+        if kwargs:
+            raise ValueError('Unknown keyword argument(s): {}'.format(
+                ', '.join(kwargs.keys())
+            ))
         # Generate the equations for the model
         pysb.bng.generate_equations(self._model, self.cleanup, self.verbose)
 
@@ -339,7 +344,7 @@ class ScipyOdeSimulator(Simulator):
             options.update(
                 self.default_integrator_options[integrator])  # default options
 
-        options.update(kwargs.get('integrator_options', {}))  # overwrite
+        options.update(integrator_options)  # overwrite
         # defaults
         self.opts = options
 

@@ -304,7 +304,7 @@ class StochKitExporter(Exporter):
         document.append(reacs)
 
         if pretty_print:
-            return etree.tostring(document, pretty_print=True)
+            return etree.tostring(document, pretty_print=True).decode('utf8')
         else:
             # Hack to print pretty xml without pretty-print
             # (requires the lxml module).
