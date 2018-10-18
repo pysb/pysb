@@ -109,17 +109,26 @@ class BngSimulator(Simulator):
                         population_maps)):
                 raise ValueError('population_maps should be a list of '
                                  'PopulationMap objects')
-
-            if not np.allclose(self.tspan, np.linspace(0, self.tspan[-1],
-                                                       len(self.tspan))):
-                raise SimulatorException('NFsim requires tspan to be linearly '
-                                         'spaced starting at t=0')
-            additional_args['t_end'] = self.tspan[-1]
-            additional_args['n_steps'] = len(self.tspan) - 1
             model_additional_species = self.initials_dict.keys()
         else:
-            additional_args['sample_times'] = self.tspan
             model_additional_species = None
+
+        tspan_lin_spaced = np.allclose(
+            self.tspan,
+            np.linspace(self.tspan[0], self.tspan[-1], len(self.tspan))
+        )
+        if method == 'nf' and (not tspan_lin_spaced or self.tspan[0] != 0.0):
+            raise SimulatorException('NFsim requires tspan to be linearly '
+                                     'spaced starting at t=0')
+
+        # BNG requires t_start even when supplying sample_times
+        additional_args['t_start'] = self.tspan[0]
+        if tspan_lin_spaced:
+            # Just supply t_end and n_steps
+            additional_args['n_steps'] = len(self.tspan) - 1
+            additional_args['t_end'] = self.tspan[-1]
+        else:
+            additional_args['sample_times'] = self.tspan
 
         additional_args['method'] = method
         additional_args['print_functions'] = True
