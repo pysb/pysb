@@ -1969,6 +1969,9 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     def __setstate__(self, state):
         self.__dict__ = state
 
+    def __dir__(self):
+        return self.keys()
+
     def get(self, key, default=None):
         if isinstance(key, (int, long)):
             raise ValueError("get is undefined for integer arguments, use []"
