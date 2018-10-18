@@ -55,6 +55,10 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run()
         assert simres._nsims == 1
 
+    @raises(ValueError)
+    def test_invalid_init_kwarg(self):
+        ScipyOdeSimulator(self.model, tspan=self.time, spam='eggs')
+
     def test_lsoda_solver_run(self):
         """Test lsoda."""
         solver_lsoda = ScipyOdeSimulator(self.model, tspan=self.time,
