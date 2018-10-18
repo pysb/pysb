@@ -96,7 +96,7 @@ class BngSimulator(Simulator):
                                       )
 
         if cleanup is None:
-            clean = self.cleanup
+            cleanup = self.cleanup
 
         if method not in self._SIMULATOR_TYPES:
             raise ValueError("Method must be one of " +
