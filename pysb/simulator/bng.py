@@ -25,7 +25,7 @@ class BngSimulator(Simulator):
 
     def run(self, tspan=None, initials=None, param_values=None, n_runs=1,
             method='ssa', output_dir=None, output_file_basename=None,
-            cleanup=True, population_maps=None, **additional_args):
+            cleanup=None, population_maps=None, **additional_args):
         """
         Simulate a model using BioNetGen
 
@@ -67,8 +67,9 @@ class BngSimulator(Simulator):
             output directory, rather than the individual files.
         cleanup : bool, optional
             If True (default), delete the temporary files after the
-            simulation is
-            finished. If False, leave them in place. Useful for debugging.
+            simulation is finished. If False, leave them in place (Useful for
+            debugging). The default value, None, means to use the value
+            specified in :py:func:`__init__`.
         population_maps: list of PopulationMap
             List of :py:class:`PopulationMap` objects for hybrid
             particle/population modeling. Only used when method='nf'.
@@ -93,6 +94,9 @@ class BngSimulator(Simulator):
                                       param_values=param_values,
                                       _run_kwargs=locals()
                                       )
+
+        if cleanup is None:
+            cleanup = self.cleanup
 
         if method not in self._SIMULATOR_TYPES:
             raise ValueError("Method must be one of " +
