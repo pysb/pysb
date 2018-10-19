@@ -3,12 +3,18 @@ from pysb.simulator import StochKitSimulator
 from pysb.examples import robertson, earm_1_0, expression_observables
 import numpy as np
 from pysb.core import as_complex_pattern
+from nose.tools import raises
 
 _STOCHKIT_SEED = 123
 
 
 def test_stochkit_export():
     StochKitExporter(robertson.model).export()
+
+
+@raises(ValueError)
+def test_stochkit_invalid_init_kwarg():
+    StochKitSimulator(earm_1_0.model, tspan=range(100), spam='eggs')
 
 
 def test_stochkit_earm():
