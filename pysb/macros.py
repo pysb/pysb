@@ -47,7 +47,7 @@ __all__ = ['equilibrate',
            'catalyze_one_step', 'catalyze_one_step_reversible',
            'synthesize', 'degrade', 'synthesize_degrade_table',
            'assemble_pore_sequential', 'pore_transport', 'pore_bind', 'assemble_chain_sequential_base',
-           'bind_complex', 'bind_table_complex']
+           'bind_complex', 'bind_table_complex', 'drug_binding']
 
 # Suppress ModelExistsWarnings in our doctests.
 _pysb_doctest_suppress_modelexistswarning = True
@@ -844,6 +844,114 @@ def bind_table_complex(bindtable, row_site, col_site, m1=None, m2=None, kf=None)
                     klist = (kf, kd*kf)
                 components |= bind_complex(s_row, row_site, s_col, col_site, klist, m1, m2)
     return components
+
+
+def drug_binding(drug, d_site, substrate, s_site, t_action, klist):
+    """
+    Generate the reversible binding reaction DRUG + SUBSTRATE | DRUG:SUBSTRATE
+    that only gets triggered when the simulation reaches the time point t_action.
+    The idea of this macro is to mimic experimental settings when a reaction is
+    started and later on some kind of perturbation is added to the system.
+
+    Parameters
+    ----------
+    drug, substrate: Monomer or MonomerPattern
+        Monomers participating in the binding reaction.
+    d_site, s_site: string
+        The names of the sites on s1 and s2 used for binding.
+    t_action: float
+        Time of the simulation at which the drug is added
+    klist: list of 2 Parameters or list of 2 numbers
+        Forward and reverse rate constants (in that order). If Parameters are
+        passed, they will be used directly in the generated Rules. If numbers
+        are passed, Parameters will be created with automatically generated
+        names based on the names and states of S1 and S2 and these parameters
+        will be included at the end of the returned component list.
+
+    Returns
+    -------
+    components : ComponentSet
+        The generated components. Contains the bidirectional binding Rule,
+        the time monomer, Parameter rate of time creation, Rule to simulate passing of time,
+        time Observable, two Expression rates that take into account when the interaction
+        between the drug and that substrate start to occur and optionally two Parameters
+        if klist was given as numbers
+        as numbers
+
+    Examples
+    --------
+    Binding between drug and substrate"
+        Model()
+        Monomer('drug', ['b'])
+        Monomer('substrate', ['b'])
+        drug_binding(drug(), 'b', substrate(), 'b', 10, [2,4])
+
+    Execution::
+
+        >>> Model() # doctest:+ELLIPSIS
+        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>
+        >>> Monomer('drug', ['b'])
+        Monomer('drug', ['b'])
+        >>> Monomer('substrate', ['b'])
+        Monomer('substrate', ['b'])
+        >>> drug_binding(drug(), 'b', substrate(), 'b', 10, [2,4])
+        ComponentSet([
+         Rule('bind_drug_substrate_to_drugsubstrate', drug(b=None) + substrate(b=None) | drug(b=1) % substrate(b=1), k_rf, k_rr),
+         Parameter('kf_drug_substrate', 2.0),
+         Parameter('kr_drug_substrate', 4.0),
+         Monomer('t'),
+         Parameter('k_t', 1.0),
+         Observable('t_obs', t()),
+         Expression('k_rf', (t_obs > 10)*kf_drug_substrate),
+         Expression('k_rr', (t_obs > 10)*kr_drug_substrate),
+         ])
+
+    """
+    _verify_sites(drug, d_site)
+    _verify_sites(substrate, s_site)
+
+    # Add a time monomer and reaction to be able to create an observable
+    # to track the time within the simulation
+    time = Monomer('t')
+    k_time = Parameter('k_t', 1)
+    time_obs = Observable('t_obs', time())
+    rule_time = Rule('create_time', None >> time(), k_time)
+
+    # Set up some aliases to the patterns we'll use in the rules
+    drug_free = drug({d_site: None})
+    # retain any existing state for substrate's s_site, otherwise set it to None
+    if s_site in substrate.site_conditions:
+        substrate_free = substrate()
+        s_state = (substrate.site_conditions[s_site], 1)
+    else:
+        substrate_free = substrate({s_site: None})
+        s_state = 1
+    ds_complex = drug({d_site: 1}) % substrate({s_site: s_state})
+
+    if all(isinstance(x, (Parameter, Expression)) for x in klist):
+        k1 = klist[0]
+        k2 = klist[1]
+        params_created = ComponentSet()
+
+    elif all(isinstance(x, numbers.Real) for x in klist):
+        k1 = Parameter('kf_drug_substrate', klist[0])
+        params_created = ComponentSet([k1])
+        k2 = Parameter('kr_drug_substrate', klist[1])
+        params_created.add(k2)
+    else:
+        raise ValueError("klist must contain Parameters, Expressions, or numbers.")
+
+    kf_expr = Expression('k_rf', (time_obs > t_action) * k1)
+    kr_expr = Expression('k_rr', (time_obs > t_action) * k2)
+    bind_kpars = [kf_expr, kr_expr]
+
+    components_added_macro = [time, k_time, time_obs, rule_time] + bind_kpars
+    components = _macro_rule('bind', drug_free + substrate_free | ds_complex, bind_kpars, ['kf', 'kr'])
+    components |= params_created
+    components |= components_added_macro
+
+    return components
+
 
 # Catalysis
 # =========
