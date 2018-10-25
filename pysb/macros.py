@@ -894,14 +894,15 @@ def drug_binding(drug, d_site, substrate, s_site, t_action, klist):
         Monomer('drug', ['b'])
         >>> Monomer('substrate', ['b'])
         Monomer('substrate', ['b'])
-        >>> drug_binding(drug(), 'b', substrate(), 'b', 10, [2,4])
+        >>> drug_binding(drug(), 'b', substrate(), 'b', 10, [0.1, 0.01])
         ComponentSet([
          Rule('bind_drug_substrate_to_drugsubstrate', drug(b=None) + substrate(b=None) | drug(b=1) % substrate(b=1), k_rf, k_rr),
-         Parameter('kf_drug_substrate', 2.0),
-         Parameter('kr_drug_substrate', 4.0),
+         Parameter('kf_drug_substrate', 0.1),
+         Parameter('kr_drug_substrate', 0.01),
          Monomer('t'),
          Parameter('k_t', 1.0),
          Observable('t_obs', t()),
+         Rule('create_time', None >> t(), k_t),
          Expression('k_rf', (t_obs > 10)*kf_drug_substrate),
          Expression('k_rr', (t_obs > 10)*kr_drug_substrate),
          ])
