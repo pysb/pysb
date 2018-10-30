@@ -2,6 +2,9 @@ import os
 import sys
 import sysconfig
 
+# Set to False to not utilize the system PATH environment variable
+use_path = True
+
 _path_config = {
     'bng': {
         'name': 'BioNetGen',
@@ -147,6 +150,11 @@ def get_path(prog_name):
                                      set_path.__name__))
 
     search_paths = path_conf['search_paths'][os.name]
+    if use_path:
+        search_paths = list(search_paths) + [
+            path.strip('"') for path in
+            os.environ.get('PATH', '').split(os.pathsep)]
+
     for search_path in search_paths:
         try:
             _path_cache[prog_name] = _validate_path(prog_name, search_path)
