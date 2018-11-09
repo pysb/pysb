@@ -15,7 +15,7 @@ before_install:
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
     pydot coveralls mock cython
 - if [[ $PYVER == 2.7 ]]; then pip install weave; fi
-- conda install --yes -c SBMLTeam python-libsbml
+- if [[ $PYVER == 3.7 ]]; then pip install python-libsbml; else conda install --yes -c SBMLTeam python-libsbml; fi
 - pip install libroadrunner
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
