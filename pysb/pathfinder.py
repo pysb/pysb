@@ -3,7 +3,7 @@ import sys
 import sysconfig
 
 # Set to False to not utilize the system PATH environment variable
-use_path = True
+use_path = 'PYSB_PATHFINDER_IGNORE_PATH' not in os.environ
 
 _path_config = {
     'bng': {
@@ -151,9 +151,8 @@ def get_path(prog_name):
 
     search_paths = path_conf['search_paths'][os.name]
     if use_path:
-        search_paths = list(search_paths) + [
-            path.strip('"') for path in
-            os.environ.get('PATH', '').split(os.pathsep)]
+        search_paths = list(search_paths) + os.environ.get('PATH', '').split(
+            os.pathsep)
 
     for search_path in search_paths:
         try:
