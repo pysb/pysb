@@ -29,6 +29,7 @@ import logging
 import itertools
 import contextlib
 import importlib
+import multiprocessing as mp
 
 
 class ScipyOdeSimulator(Simulator):
@@ -209,6 +210,7 @@ class ScipyOdeSimulator(Simulator):
             if self._compiler == 'cython':
                 if not Cython:
                     raise ImportError('Cython library is not installed')
+                self._code_eqs = code_eqs
 
                 def rhs(t, y, p):
                     # note that the evaluated code sets ydot as a side effect
@@ -270,6 +272,7 @@ class ScipyOdeSimulator(Simulator):
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
         jac_fn = None
+        self._jac_eqs = None
         if self._use_analytic_jacobian:
             species_symbols = [sympy.Symbol('__s%d' % i)
                                for i in range(len(self._model.species))]
@@ -326,6 +329,8 @@ class ScipyOdeSimulator(Simulator):
                     with self._patch_distutils_logging:
                         jacobian(0.0, self.initials[0], self.param_values[0])
                 else:
+                    self._jac_eqs = jac_eqs
+
                     def jacobian(t, y, p):
                         Cython.inline(
                             jac_eqs, quiet=True,
@@ -483,7 +488,8 @@ class ScipyOdeSimulator(Simulator):
             eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
         return eqns
 
-    def run(self, tspan=None, initials=None, param_values=None):
+    def run(self, tspan=None, initials=None, param_values=None,
+            num_processors=1):
         """
         Run a simulation and returns the result (trajectories)
 
@@ -498,6 +504,8 @@ class ScipyOdeSimulator(Simulator):
         initials
         param_values
             See parameter definitions in :class:`ScipyOdeSimulator`.
+        num_processors : int
+            Number of CPU cores to use (default: 1)
 
         Returns
         -------
@@ -508,38 +516,70 @@ class ScipyOdeSimulator(Simulator):
                                            param_values=param_values,
                                            _run_kwargs=[])
         n_sims = len(self.param_values)
-        trajectories = np.ndarray((n_sims, len(self.tspan),
-                              len(self._model.species)))
-        for n in range(n_sims):
-            self._logger.info('Running simulation %d of %d', n + 1, n_sims)
-            if self.integrator == 'lsoda':
-                trajectories[n] = scipy.integrate.odeint(
-                    self.func,
-                    self.initials[n],
-                    self.tspan,
-                    Dfun=self.jac_fn,
-                    args=(self.param_values[n],),
-                    **self.opts)
-            else:
-                self.integrator.set_initial_value(self.initials[n],
-                                                  self.tspan[0])
-                # Set parameter vectors for RHS func and Jacobian
-                self.integrator.set_f_params(self.param_values[n])
-                if self._use_analytic_jacobian:
-                    self.integrator.set_jac_params(self.param_values[n])
-                trajectories[n][0] = self.initials[n]
-                i = 1
-                while self.integrator.successful() and self.integrator.t < \
-                        self.tspan[-1]:
-                    self._logger.log(EXTENDED_DEBUG,
-                                     'Simulation %d/%d Integrating t=%g',
-                                     n + 1, n_sims, self.integrator.t)
-                    trajectories[n][i] = self.integrator.integrate(self.tspan[i])
-                    i += 1
-                if self.integrator.t < self.tspan[-1]:
-                    trajectories[n, i:, :] = 'nan'
 
-        tout = np.array([self.tspan]*n_sims)
+        num_species = len(self._model.species)
+        if num_processors == 1:
+            self._logger.debug('Single processor (serial) mode')
+            # Serial
+            trajectories = np.ndarray((n_sims, len(self.tspan), num_species))
+            for n in range(n_sims):
+                self._logger.info('Running simulation %d of %d', n + 1, n_sims)
+                if self.integrator == 'lsoda':
+                    trajectories[n] = scipy.integrate.odeint(
+                        self.func,
+                        self.initials[n],
+                        self.tspan,
+                        Dfun=self.jac_fn,
+                        args=(self.param_values[n],),
+                        **self.opts)
+                else:
+                    self.integrator.set_initial_value(self.initials[n],
+                                                      self.tspan[0])
+                    # Set parameter vectors for RHS func and Jacobian
+                    self.integrator.set_f_params(self.param_values[n])
+                    if self._use_analytic_jacobian:
+                        self.integrator.set_jac_params(self.param_values[n])
+                    trajectories[n][0] = self.initials[n]
+                    i = 1
+                    while self.integrator.successful() and self.integrator.t < \
+                            self.tspan[-1]:
+                        self._logger.log(EXTENDED_DEBUG,
+                                         'Simulation %d/%d Integrating t=%g',
+                                         n + 1, n_sims, self.integrator.t)
+                        trajectories[n][i] = self.integrator.integrate(self.tspan[i])
+                        i += 1
+                    if self.integrator.t < self.tspan[-1]:
+                        trajectories[n, i:, :] = 'nan'
+        else:
+            # Parallel
+            if self._compiler != 'cython':
+                raise ValueError('Parallel execution is only available with '
+                                 'compiler=\'cython\' option')
+
+            self._logger.debug('Multi-processor (parallel) mode using {} '
+                               'processes'.format(num_processors))
+            num_odes = len(self._model.odes)
+            with mp.Pool(processes=num_processors) as pool:
+                if self.integrator == 'lsoda':
+                    results = [pool.apply_async(
+                        _lsoda_process,
+                        args=(self._code_eqs, self._jac_eqs, num_species,
+                              num_odes, self.initials[n], self.tspan),
+                        kwds=dict(args=(self.param_values[n],),
+                                  **self.opts)
+                    ) for n in range(n_sims)]
+                else:
+                    results = [pool.apply_async(
+                        _integrator_process,
+                        args=(self._code_eqs, self._jac_eqs, num_species,
+                              num_odes, self.initials[n], self.tspan,
+                              self.param_values[n],
+                              self._init_kwargs.get('integrator', 'vode')),
+                        kwds=self.opts
+                    ) for n in range(n_sims)]
+                trajectories = [r.get() for r in results]
+
+        tout = np.array([self.tspan] * n_sims)
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, tout, trajectories)
 
@@ -611,4 +651,71 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
     warn = logging.LoggerAdapter.info
     # Provide 'fatal' to match up with distutils log functions.
     fatal = logging.LoggerAdapter.critical
+
+
+def _lsoda_process(code_eqs, jac_eqs, num_species, num_odes, *args, **kwargs):
+    """ Single LSODA integration process, for parallel execution """
+    ydot = np.zeros(num_species)
+
+    def rhs(y, t, p):
+        # note that the evaluated code sets ydot as a side effect
+        Cython.inline(code_eqs, quiet=True)
+
+        return ydot
+
+    jac_fn = None
+    if jac_eqs:
+        jac = np.zeros((num_odes, num_species))
+
+        def jac_fn(y, t, p):
+            Cython.inline(jac_eqs, quiet=True)
+            return jac
+
+    return scipy.integrate.odeint(
+        rhs,
+        *args,
+        Dfun=jac_fn,
+        **kwargs
+    )
+
+
+def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
+                        tspan, param_values, integrator_name, **opts):
+    ydot = np.zeros(num_species)
+
+    def rhs(t, y, p):
+        # note that the evaluated code sets ydot as a side effect
+        Cython.inline(code_eqs, quiet=True)
+
+        return ydot
+
+    jac_fn = None
+    if jac_eqs:
+        jac = np.zeros((num_odes, num_species))
+
+        def jac_fn(t, y, p):
+            Cython.inline(jac_eqs, quiet=True)
+            return jac
+
+    integrator = scipy.integrate.ode(rhs, jac=jac_fn)
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error', 'No integrator name match')
+        integrator.set_integrator(integrator_name, **opts)
+    integrator.set_initial_value(initials, tspan[0])
+
+    # Set parameter vectors for RHS func and Jacobian
+    integrator.set_f_params(param_values)
+    if jac_eqs:
+        integrator.set_jac_params(param_values)
+
+    trajectory = np.ndarray((len(tspan), num_species))
+    trajectory[0] = initials
+    i = 1
+    while integrator.successful() and integrator.t < tspan[-1]:
+        trajectory[i] = integrator.integrate(tspan[i])
+        i += 1
+    if integrator.t < tspan[-1]:
+        trajectory[i:, :] = 'nan'
+
+    return trajectory
 
