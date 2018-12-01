@@ -506,7 +506,10 @@ class ScipyOdeSimulator(Simulator):
         param_values
             See parameter definitions in :class:`ScipyOdeSimulator`.
         num_processors : int
-            Number of CPU cores to use (default: 1)
+            Number of processes to use (default: 1). Set to a larger number
+            (e.g. the number of CPU cores available) for parallel execution of
+            simulations. This is only useful when simulating with more than one
+            set of initial conditions and/or parameters.
 
         Returns
         -------
@@ -685,6 +688,7 @@ def _lsoda_process(code_eqs, jac_eqs, num_species, num_odes, *args, **kwargs):
 
 def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
                         tspan, param_values, integrator_name, **opts):
+    """ Single integrator process, for parallel execution """
     ydot = np.zeros(num_species)
 
     def rhs(t, y, p):
@@ -722,4 +726,3 @@ def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
         trajectory[i:, :] = 'nan'
 
     return trajectory
-
