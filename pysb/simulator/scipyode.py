@@ -29,6 +29,7 @@ import logging
 import itertools
 import contextlib
 import importlib
+import sys
 import multiprocessing as mp
 
 
@@ -552,6 +553,9 @@ class ScipyOdeSimulator(Simulator):
                         trajectories[n, i:, :] = 'nan'
         else:
             # Parallel
+            if sys.version_info < (3, 3):
+                raise ValueError('Parallel execution is only available with '
+                                 'Python >= 3.3')
             if self._compiler != 'cython':
                 raise ValueError('Parallel execution is only available with '
                                  'compiler=\'cython\' option')
