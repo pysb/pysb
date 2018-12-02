@@ -65,8 +65,7 @@ class GPUSimulator(Simulator):
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
-    def __init__(self, model, verbose=False, tspan=None, precision=np.float32,
-                 **kwargs):
+    def __init__(self, model, verbose=False, tspan=None, **kwargs):
         super(GPUSimulator, self).__init__(model, verbose, **kwargs)
 
         if pycuda is None:
@@ -75,13 +74,14 @@ class GPUSimulator(Simulator):
                 self.__class__.__name__))
 
         generate_equations(self._model)
-        self._precision = precision
+
         self.tout = None
         self.tspan = tspan
         self.verbose = verbose
 
         # private attribute
         self._threads = 32
+        self._blocks = None
         self._parameter_number = len(self._model.parameters)
         self._n_species = len(self._model.species)
         self._n_reactions = len(self._model.reactions)
@@ -154,14 +154,16 @@ class GPUSimulator(Simulator):
                           lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
             for q, prm in enumerate(params_names):
-                rate = re.sub(r'\b(%s)\b' % prm, 'param_arry[%s]' % q, rate)
+                rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
             items = rate.split('*')
             rate = ''
+            # places param_arry value at the front to make propensities doubles
             for i in items:
-                if i.startswith('param_arry'):
+                if i.startswith('param_vec'):
                     rate += i + '*'
+
             for i in sorted(items):
-                if i.startswith('param_arry'):
+                if i.startswith('param_vec'):
                     continue
                 rate += i + '*'
             rate = re.sub('\*$', '', rate)
@@ -176,10 +178,7 @@ class GPUSimulator(Simulator):
                                          hazards=hazards_string,
                                          stoch=stoich_string,
                                          )
-        if self._precision == np.float64:
-            cs_string = cs_string.replace('float', 'double')
-            cs_string = cs_string.replace('cuda_uniform',
-                                          'cuda_uniform_double')
+
         self._logger.debug("Converted PySB model to pycuda code")
         return cs_string
 
@@ -191,55 +190,13 @@ class GPUSimulator(Simulator):
                 source_file.write(code)
         nvcc_bin = get_path('nvcc')
         self._logger.debug("Compiling CUDA code")
-        self._kernel = pycuda.compiler.SourceModule(code, nvcc=nvcc_bin,
-                                                    no_extern_c=True,
-                                                    keep=False)
+        opts = ['-O3', '--use_fast_math']
+        self._kernel = pycuda.compiler.SourceModule(
+            code, nvcc=nvcc_bin, options=opts, no_extern_c=True, keep=False
+        )
 
         self._ssa_all = self._kernel.get_function("Gillespie_all_steps")
         self._logger.debug("Compiled CUDA code")
-
-    def _run_all(self, timepoints, params, initials, threads, blocks):
-
-        # compile kernel and send parameters to GPU
-        if self._step_0:
-            self._setup()
-
-        if self.verbose:
-            self._print_verbose(self._ssa_all)
-
-        total_threads = int(blocks * threads)
-
-        param_array_gpu = gpuarray.to_gpu(
-            self._create_gpu_array(params, total_threads, self._precision)
-        )
-
-        species_matrix_gpu = gpuarray.to_gpu(
-            self._create_gpu_array(initials, total_threads, np.uint32)
-        )
-
-        # allocate and upload time to GPU
-        time_points_gpu = gpuarray.to_gpu(
-            np.array(timepoints, dtype=self._precision)
-        )
-
-        # allocate space on GPU for results
-        result = driver.managed_zeros(
-            shape=(total_threads, len(timepoints), self._n_species),
-            dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
-        )
-
-        # perform simulation
-        self._ssa_all(species_matrix_gpu, result, time_points_gpu,
-                      np.int32(len(timepoints)), param_array_gpu,
-                      block=(threads, 1, 1), grid=(blocks, 1))
-
-        # Wait for kernel completion before host access
-        pycuda.autoinit.context.synchronize()
-
-        # retrieve and store results, only keeping n_simulations
-        # actual simulations we will return
-        n_simulations = len(params)
-        return result[:n_simulations, :, :]
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
             threads=32):
@@ -250,7 +207,7 @@ class GPUSimulator(Simulator):
             nominal_values = np.array(
                 [p.value for p in self._model.parameters])
             param_values = np.zeros((num_particles, len(nominal_values)),
-                                    dtype=self._precision)
+                                    dtype=np.float64)
             param_values[:, :] = nominal_values
         self.param_values = param_values
 
@@ -266,25 +223,70 @@ class GPUSimulator(Simulator):
         if tspan is None:
             tspan = self.tspan
 
-        tout = [tspan for _ in range(len(param_values))]
-        t_out = np.array(tspan, dtype=self._precision)
+        tout = [tspan] * len(param_values)
+        t_out = np.array(tspan, dtype=np.float64)
 
         if threads is None:
             threads = self._threads
+        else:
+            self._threads = threads
+
+        # print(self.get_gpu_settings(param_values))
 
         size_params = param_values.shape[0]
 
         blocks = self.get_blocks(size_params, threads)
-
+        # blocks, threads = self.get_gpu_settings(param_values)
+        self._threads = threads
+        self._blocks = blocks
         self._logger.info("Starting {} simulations".format(number_sim))
 
-        timer_start = time.time()
-        result = self._run_all(t_out, param_values, initials, threads, blocks)
-        timer_end = time.time()
-        self._logger.info("{} simulations "
-                          "in {}s".format(number_sim, timer_end - timer_start))
+        # compile kernel and send parameters to GPU
+        if self._step_0:
+            self._setup()
 
-        return SimulationResult(self, tout, result)
+        timer_start = time.time()
+
+        if self.verbose:
+            self._print_verbose(self._ssa_all)
+
+        #  Note, this number will be larger than n_simulations if the gpu grid
+        #  is not filled. The rest will be filled with zeros and not impact
+        #  results. They are trimmed right before passing to simulation results
+        total_threads = int(blocks * threads)
+
+        param_array_gpu = gpuarray.to_gpu(
+            self._create_gpu_array(param_values, total_threads, np.float64)
+        )
+
+        species_matrix_gpu = gpuarray.to_gpu(
+            self._create_gpu_array(initials, total_threads, np.int32)
+        )
+
+        # allocate and upload time to GPU
+        time_points_gpu = gpuarray.to_gpu(np.array(t_out, dtype=np.float64))
+
+        # allocate space on GPU for results
+        result = driver.managed_zeros(
+            shape=(total_threads, len(t_out), self._n_species),
+            dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
+        )
+
+        # perform simulation
+        self._ssa_all(species_matrix_gpu, result, time_points_gpu,
+                      np.int32(len(t_out)), param_array_gpu,
+                      block=(threads, 1, 1), grid=(blocks, 1))
+
+        # Wait for kernel completion before host access
+        pycuda.autoinit.context.synchronize()
+
+        self._time = time.time() - timer_start
+        self._logger.info("{} simulations "
+                          "in {}s".format(number_sim, self._time))
+
+        # retrieve and store results, only keeping n_simulations
+        # actual simulations we will return
+        return SimulationResult(self, tout, result[:size_params, :, :])
 
     def _print_verbose(self, code):
         self._logger.info("threads = {}".format(self._threads))
@@ -307,19 +309,6 @@ class GPUSimulator(Simulator):
         self._compile(self._code)
         self._step_0 = False
 
-    def _create_gpu_array(self, values, total_threads, prec):
-
-        # Create species matrix on GPU
-        # will make according to number of total threads, not n_simulations
-        gpu_array = np.zeros((total_threads, values.shape[1]), dtype=prec)
-        # Filling species matrix
-        # Note that this might not fill entire array that was created.
-        # The rest of the array will be zeros to fill up GPU.
-        for i in range(len(values)):
-            for j in range(values.shape[1]):
-                gpu_array[i, j] = values[i, j]
-        return gpu_array
-
     def _create_gpu_init(self, initials, total_threads):
 
         # Create species matrix on GPU
@@ -335,27 +324,45 @@ class GPUSimulator(Simulator):
         return species_matrix
 
     @staticmethod
+    def _create_gpu_array(values, total_threads, prec):
+
+        # Create species matrix on GPU
+        # will make according to number of total threads, not n_simulations
+        gpu_array = np.zeros((total_threads, values.shape[1]), dtype=prec)
+        # Filling species matrix
+        # Note that this might not fill entire array that was created.
+        # The rest of the array will be zeros to fill up GPU.
+        for i in range(len(values)):
+            for j in range(values.shape[1]):
+                gpu_array[i, j] = values[i, j]
+        return gpu_array
+
+    @staticmethod
     def get_blocks(n_params, threads):
+        if threads > 256:
+            logging.warn("Limit of 256 threads per block due to curand."
+                         " Setting to 256.")
+            threads = 256
         if n_params % threads == 0:
             return int(n_params / threads)
         else:
             return int(n_params / threads) + 1
 
     @staticmethod
-    def get_gpu_settings(parameters):
+    def get_gpu_settings(n_simulations):
         """
         Gathers optimal number of _threads per block given size of parameters
         :return _blocks, _threads
         """
         max_threads = tools.DeviceData().max_threads
-        max_threads = 256
+        # max_threads = 256
         warp_size = tools.DeviceData().warp_size
         max_warps = max_threads / warp_size
         threads = max_warps * warp_size
-        if len(parameters) % threads == 0:
-            blocks = len(parameters) / threads
+        if n_simulations % threads == 0:
+            blocks = n_simulations / threads
         else:
-            blocks = len(parameters) / threads + 1
+            blocks = n_simulations / threads + 1
         return blocks, threads
 
 
