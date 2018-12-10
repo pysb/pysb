@@ -21,7 +21,8 @@ def run():
     tspan = np.linspace(0, 50, 501)
     # run_cupsoda returns a 3D array of species and observables trajectories
     trajectories = run_cupsoda(model, tspan, initials=initials,
-                               atol=1e-10, rtol=1e-4, verbose=True)
+                               integrator_options={'atol': 1e-10, 'rtol': 1e-4},
+                               verbose=True)
     # extract the trajectories for the 'Product' into a numpy array and
     # transpose to aid in plotting
     x = np.array([tr['Product'] for tr in trajectories]).T
