@@ -8,9 +8,10 @@ def run():
     n_sims = 100
     vol = model.parameters['vol'].value
     tspan = np.linspace(0, 500, 501)
-    sim = CupSodaSimulator(model, tspan, vol=vol, verbose=True,
+    sim = CupSodaSimulator(model, tspan, verbose=True,
                            integrator_options={'atol' : 1e-12,
                                                'rtol' : 1e-6,
+                                               'vol': vol,
                                                'max_steps' :20000})
 
     # Rate constants
