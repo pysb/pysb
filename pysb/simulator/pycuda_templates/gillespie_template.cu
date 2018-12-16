@@ -101,17 +101,18 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
                 prev[j] = y[j];
                 }}
 
-            // calculate two random numbers
-            double r1 =  curand_uniform_double(&randState);
-            double tau = -__logf(r1)/a0;  // find time of next reaction
-
-            double r2 =  curand_uniform_double(&randState);
-            double k = sample(A, a0*r2);  // find next reaction
-
-            t += tau;  // update time
-
-
+            t +=  -__logf(curand_uniform(&randState))/a0;  // update time
             stoichiometry(y, sample(A, a0*curand_uniform(&randState))); // update species matrix
+
+
+            // calculate two random numbers
+//            double r1 =  curand_uniform(&randState);
+//            double tau = -__logf(r1)/a0;  // find time of next reaction
+//            t += tau;  // update time
+
+//            double r2 =  curand_uniform(&randState);
+//            double k = sample(A, a0*r2);  // find next reaction
+//            stoichiometry(y, k); // update species matrix
             }}
 
         update_results(result, prev, result_stepping, time_index);
