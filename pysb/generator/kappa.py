@@ -115,7 +115,7 @@ class KappaGenerator(object):
     def generate_species(self):
         if self._warn_no_ic and not self.model.initial_conditions:
             warnings.warn("Warning: No initial conditions.")
-        if any(self.model.initial_conditions_fixed):
+        if any(ic.fixed for ic in self.model.initials):
             raise KappaException(
                 "Kappa generator does not support fixed-amount species"
             )

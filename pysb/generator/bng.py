@@ -132,21 +132,24 @@ class BngGenerator(object):
         self.__content += "end functions\n\n"
 
     def generate_species(self):
-        if not self.model.initial_conditions:
+        if not self.model.initials:
             warn_caller("Model does not contain any initial conditions")
             return
-        species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
-        fixed = ['$' if f else '' for f in self.model.initial_conditions_fixed]
+        species_codes = [
+            format_complexpattern(ic.pattern) for ic in self.model.initials
+        ]
+        fixed = ['$' if ic.fixed else '' for ic in self.model.initials]
         species_codes = [f + c for f, c in zip(fixed, species_codes)]
         for cp in self._additional_initials:
-            if not any([cp.is_equivalent_to(i) for i, _ in
-                        self.model.initial_conditions]):
+            if not any([
+                cp.is_equivalent_to(ic.pattern) for ic in self.model.initials
+            ]):
                 species_codes.append(format_complexpattern(cp))
         max_length = max(len(code) for code in species_codes)
         self.__content += "begin species\n"
         for i, code in enumerate(species_codes):
-            if i < len(self.model.initial_conditions):
-                param = self.model.initial_conditions[i][1].name
+            if i < len(self.model.initials):
+                param = self.model.initials[i].value.name
             else:
                 param = '0'
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code,
