@@ -16,13 +16,26 @@ except ImportError:
 from nose.plugins.skip import SkipTest
 
 
+# Pairs of model, format that are expected to be incompatible.
+skip_combinations = {
+    ('fixed_initial', 'kappa'),
+}
+
+
 def test_export():
     for model in get_example_models():
         for format in export.formats:
+            if (base_name(model), format) in skip_combinations:
+                continue
             fn = lambda: check_convert(model, format)
             fn.description = "Check export: {} → {}".format(
                 model.name, format)
             yield fn
+
+
+def base_name(model):
+    # This needs to handle names with zero or more dots.
+    return model.name.split('.')[-1]
 
 
 def check_convert(model, format):
@@ -37,8 +50,7 @@ def check_convert(model, format):
     except Exception as e:
         # Some example models are deliberately incomplete, so here we
         # will treat any of these "expected" exceptions as a success.
-        model_base_name = model.name.rsplit('.', 1)[1]
-        exception_class = expected_exceptions.get(model_base_name)
+        exception_class = expected_exceptions.get(base_name(model))
         if not exception_class or not isinstance(e, exception_class):
             raise
 
