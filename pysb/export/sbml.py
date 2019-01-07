@@ -169,6 +169,7 @@ class SbmlExporter(Exporter):
 
         # Initial values/assignments
         initial_concs = [0.0] * len(self.model.species)
+        fixed_species_idx = set()
         for ic in self.model.initials:
             sp_idx = self.model.get_species_index(ic.pattern)
             if isinstance(ic.value, pysb.Expression):
@@ -180,6 +181,8 @@ class SbmlExporter(Exporter):
                 initial_concs[sp_idx] = None
             else:
                 initial_concs[sp_idx] = ic.value.value
+                if ic.fixed:
+                    fixed_species_idx.add(sp_idx)
 
         # Species
         for i, s in enumerate(self.model.species):
@@ -204,7 +207,7 @@ class SbmlExporter(Exporter):
                 compartment_name = 'default'
             _check(sp.setCompartment(compartment_name))
             _check(sp.setName(str(s).replace('% ', '._br_')))
-            _check(sp.setBoundaryCondition(False))
+            _check(sp.setBoundaryCondition(i in fixed_species_idx))
             _check(sp.setConstant(False))
             _check(sp.setHasOnlySubstanceUnits(True))
             if initial_concs[i] is not None:
