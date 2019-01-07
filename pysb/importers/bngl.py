@@ -186,11 +186,6 @@ class BnglBuilder(Builder):
 
     def _parse_initials(self):
         for i in self._x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
-            if i.get('Fixed') is not None and i.get('Fixed') == "1":
-                self._warn_or_except('Species %s is fixed, but will be '
-                                     'treated as an ordinary species in '
-                                     'PySB.' % i.get('name'))
-
             value_param = i.get('concentration')
             try:
                 value = float(value_param)
@@ -210,7 +205,9 @@ class BnglBuilder(Builder):
                         'concentration')]
             mon_pats = self._parse_species(i)
             species_cpt = self.model.compartments.get(i.get('compartment'))
-            self.initial(ComplexPattern(mon_pats, species_cpt), value_param)
+            cp = ComplexPattern(mon_pats, species_cpt)
+            fixed = i.get('Fixed') == "1"
+            self.initial(cp, value_param, fixed)
 
     def _parse_compartments(self):
         for c in self._x.iterfind(_ns('{0}ListOfCompartments/{0}compartment')):
