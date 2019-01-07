@@ -54,9 +54,8 @@ class Simulator(object):
     initials : vector-like or dict, optional
         Values to use for the initial condition of all species. Ordering is
         determined by the order of model.species. If not specified, initial
-        conditions will be taken from model.initial_conditions (with
-        initial condition parameter values taken from `param_values` if
-        specified).
+        conditions will be taken from model.initials (with initial condition
+        parameter values taken from `param_values` if specified).
     param_values : vector-like or dict, optional
         Values to use for every parameter in the model. Ordering is
         determined by the order of model.parameters.
@@ -189,8 +188,8 @@ class Simulator(object):
 
     @property
     def initials_dict(self):
-        initials_dict = {cp: [param.value] for cp, param in
-                         self.model.initial_conditions}
+        initials_dict = {ic.pattern: [ic.value.value]
+                         for ic in self.model.initials}
         # Apply any base initial overrides
         initials_dict = self._update_initials_dict(initials_dict,
                                                    self._initials)
@@ -264,8 +263,8 @@ class Simulator(object):
                     for pv in self.param_values]
                 if len(subs) == 1 and n_sims_actual > 1:
                     subs = list(itertools.repeat(subs[0], n_sims_actual))
-            y0 = self._update_y0(y0, self._model.initial_conditions, subs,
-                                 n_sims_params)
+            ic_tuples = [(ic.pattern, ic.value) for ic in self._model.initials]
+            y0 = self._update_y0(y0, ic_tuples, subs, n_sims_params)
 
         # Any remaining unset initials should be set to zero
         y0 = np.nan_to_num(y0)

@@ -67,8 +67,8 @@ def test_compartment_species_equivalence():
     Initial(Q(x=None) ** C, p)
     Initial(R(y=None) ** C, p)
     generate_equations(model)
-    for i, (cp, param) in enumerate(model.initial_conditions):
-        ok_(cp.is_equivalent_to(model.species[i]))
+    for i, ic in enumerate(model.initials):
+        ok_(ic.pattern.is_equivalent_to(model.species[i]))
     ok_(model.species[2].is_equivalent_to(Q(x=1) ** C % R(y=1) ** C))
 
 

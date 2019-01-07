@@ -58,9 +58,8 @@ class ScipyOdeSimulator(Simulator):
     initials : vector-like or dict, optional
         Values to use for the initial condition of all species. Ordering is
         determined by the order of model.species. If not specified, initial
-        conditions will be taken from model.initial_conditions (with
-        initial condition parameter values taken from `param_values` if
-        specified).
+        conditions will be taken from model.initials (with initial condition
+        parameter values taken from `param_values` if specified).
     param_values : vector-like or dict, optional
         Values to use for every parameter in the model. Ordering is
         determined by the order of model.parameters.

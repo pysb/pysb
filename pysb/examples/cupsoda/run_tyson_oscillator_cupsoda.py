@@ -23,10 +23,10 @@ def run():
     # Initial concentrations
     initials = np.zeros((n_sims, len(model.species)))
     for i in range(len(initials)):
-        for ic in model.initial_conditions:
+        for ic in model.initials:
             for j in range(len(initials[i])):
-                if str(ic[0]) == str(model.species[j]):
-                    initials[i][j] = ic[1].value
+                if str(ic.pattern) == str(model.species[j]):
+                    initials[i][j] = ic.value.value
                     break
 
     x = sim.run(initials=initials, param_values=param_values)

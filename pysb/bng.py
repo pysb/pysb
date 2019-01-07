@@ -96,8 +96,10 @@ class BngBaseInterface(object):
         """
         if not self.model.rules:
             raise NoRulesError()
-        if not self.model.initial_conditions and not any(r.is_synth() for r
-                                                         in self.model.rules):
+        if (
+            not self.model.initials
+            and not any(r.is_synth() for r in self.model.rules)
+        ):
             raise NoInitialConditionsError()
 
     @classmethod
