@@ -136,10 +136,9 @@ class BngGenerator(object):
             warn_caller("Model does not contain any initial conditions")
             return
         species_codes = [
-            format_complexpattern(ic.pattern) for ic in self.model.initials
+            format_complexpattern(ic.pattern, ic.fixed)
+            for ic in self.model.initials
         ]
-        fixed = ['$' if ic.fixed else '' for ic in self.model.initials]
-        species_codes = [f + c for f, c in zip(fixed, species_codes)]
         for cp in self._additional_initials:
             if not any([
                 cp.is_equivalent_to(ic.pattern) for ic in self.model.initials
@@ -190,10 +189,12 @@ def format_reactionpattern(rp, for_observable=False):
         delimiter = ' '
     return delimiter.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
-def format_complexpattern(cp):
+def format_complexpattern(cp, fixed=False):
     if cp is None:
         return '0'
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
+    if fixed:
+        ret = '$' + ret
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)
     if cp.match_once:
