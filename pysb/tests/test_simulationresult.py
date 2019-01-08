@@ -10,6 +10,7 @@ from nose.tools import assert_raises, raises
 import warnings
 from pysb.pattern import SpeciesPatternMatcher
 import collections
+import copy
 import pandas as pd
 
 
@@ -98,7 +99,8 @@ class TestSimulationResultEarm13(object):
 
 def test_save_load():
     tspan = np.linspace(0, 100, 101)
-    model = tyson_oscillator.model
+    # Make a copy of model so other tests etc. don't see the changed name.
+    model = copy.deepcopy(tyson_oscillator.model)
     test_unicode_name = u'Hello \u2603 and \U0001f4a9!'
     model.name = test_unicode_name
     sim = ScipyOdeSimulator(model, integrator='lsoda')
