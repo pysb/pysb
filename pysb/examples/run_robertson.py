@@ -14,7 +14,7 @@ from robertson import model
 t = linspace(0, 40)
 # Simulate the model
 print("Simulating...")
-y = ScipyOdeSimulator(model, rtol=1e-4, atol=[1e-8, 1e-14, 1e-6]).run(
+y = ScipyOdeSimulator(model, integrator_options=dict(rtol=1e-4, atol=[1e-8, 1e-14, 1e-6])).run(
     tspan=t).all
 # Gather the observables of interest into a matrix
 yobs = array([y[obs] for obs in ('A_total', 'B_total', 'C_total')]).T

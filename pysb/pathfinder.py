@@ -2,6 +2,9 @@ import os
 import sys
 import sysconfig
 
+# Set to False to not utilize the system PATH environment variable
+use_path = 'PYSB_PATHFINDER_IGNORE_PATH' not in os.environ
+
 _path_config = {
     'bng': {
         'name': 'BioNetGen',
@@ -126,14 +129,13 @@ def get_path(prog_name):
                                 path_conf['name'],
                                 _get_executable(prog_name)))
 
-    # If this is anaconda, check the anaconda binary dir
-    if _is_anaconda():
-        try:
-            _path_cache[prog_name] = _validate_path(prog_name,
-                                                    _get_anaconda_bindir())
-            return _path_cache[prog_name]
-        except ValueError:
-            pass
+    # Check the Anaconda environment, if applicable, or BINDIR
+    try:
+        _path_cache[prog_name] = _validate_path(prog_name,
+                                                _get_anaconda_bindir())
+        return _path_cache[prog_name]
+    except ValueError:
+        pass
 
     # Check default paths for this operating system
     if os.name not in path_conf['search_paths'].keys():
@@ -147,6 +149,10 @@ def get_path(prog_name):
                                      set_path.__name__))
 
     search_paths = path_conf['search_paths'][os.name]
+    if use_path:
+        search_paths = list(search_paths) + os.environ.get('PATH', '').split(
+            os.pathsep)
+
     for search_path in search_paths:
         try:
             _path_cache[prog_name] = _validate_path(prog_name, search_path)
@@ -186,10 +192,6 @@ def set_path(prog_name, full_path):
     _path_cache[prog_name] = _validate_path(prog_name, full_path)
 
 
-def _is_anaconda():
-    """ Identify if this is an anaconda environment """
-    return 'conda' in sys.version
-
 
 def _get_anaconda_bindir():
     """ Get the binary path from python build time (for anaconda) """
@@ -198,7 +200,7 @@ def _get_anaconda_bindir():
     if conda_env:
         return os.path.join(conda_env, 'Scripts' if os.name == 'nt' else 'bin')
 
-    # Otherwise, use the default anaconda bin directory
+    # Otherwise, try the default anaconda/python bin directory
     bindir = sysconfig.get_config_var('BINDIR')
     if os.name == 'nt':
         # bindir doesn't point to scripts directory on Windows
@@ -236,7 +238,7 @@ def _validate_path(prog_name, full_path):
     if not os.path.isfile(full_path):
         # On anaconda, check batch file on Windows, if applicable
         batch_file = _get_batch_file(prog_name)
-        if _is_anaconda() and os.name == 'nt' and batch_file:
+        if os.name == 'nt' and batch_file:
             try:
                 return _validate_path(prog_name,
                                       os.path.join(full_path, batch_file))

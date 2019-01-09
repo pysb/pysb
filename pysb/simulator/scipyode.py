@@ -174,7 +174,7 @@ class ScipyOdeSimulator(Simulator):
                     "installing a package for compiling the ODEs to C code: "
                     "'weave' (recommended for Python 2) or "
                     "'cython' (recommended for Python 3). This warning can "
-                    "be suppressed by specifying compiler_mode='python'.")
+                    "be suppressed by specifying compiler='python'.")
             self._logger.debug('Equation mode set to "%s"' % self._compiler)
         else:
             self._compiler = compiler_mode

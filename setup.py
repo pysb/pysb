@@ -28,7 +28,7 @@ def main():
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'theano', 'h5py', 'mock', 'cython',
-                         'libsbml', 'roadrunner'],
+                         'python-libsbml', 'libroadrunner'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
