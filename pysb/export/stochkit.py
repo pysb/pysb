@@ -165,9 +165,7 @@ class StochKitExporter(Exporter):
                 if si is None:
                     raise IndexError("Species not found in model: %s" %
                                      repr(cp))
-                if isinstance(value_obj, (int, float)):
-                    value = value_obj
-                elif value_obj in self.model.parameters:
+                if value_obj in self.model.parameters:
                     pi = self.model.parameters.index(value_obj)
                     value = param_values[pi]
                 elif value_obj in self.model.expressions:
