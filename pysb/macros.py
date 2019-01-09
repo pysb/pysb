@@ -851,7 +851,7 @@ def create_t_obs():
     Generate a rule to simulate passing of time and create a time observable
     that can be used in complex Expression rates.
 
-    .. note::
+    .. warning::
         This macro is usually used to create rate laws that depend on time.
         Time tracking rate laws using this macro only work for deterministic simulations.
 
@@ -900,7 +900,7 @@ def drug_binding(drug, d_site, substrate, s_site, t_action, klist):
     The idea of this macro is to mimic experimental settings when a reaction is
     started and later on some kind of perturbation is added to the system.
 
-    .. note::
+    .. warning::
         This macro only works when a model is simulated using a deterministic simulator.
 
     Parameters
