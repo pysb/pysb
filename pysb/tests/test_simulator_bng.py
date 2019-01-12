@@ -132,8 +132,11 @@ def test_stop_if():
     Expression('exp_const', k + 1)
     Expression('exp_dyn', Atot + 1)
     sim = BngSimulator(model, verbose=5)
-    tspan = np.linspace(0,100,101)
-    x = sim.run(tspan, stop_if='Atot>9', seed=310482829)
-    assert np.isclose(x.observables['Atot'][-1], 10)
+    tspan = np.linspace(0, 100, 101)
+    x = sim.run(tspan, stop_if='Atot>9', seed=_BNG_SEED)
+    # All except the last Atot value should be <=9
+    assert all(x.observables['Atot'][:-1] <= 9)
+    assert x.observables['Atot'][-1] > 9
+    # Starting with Atot > 9 should terminate simulation immediately
     y = sim.run(tspan, initials=x.species[-1], stop_if='Atot>9')
-    assert len(y.observables) == 1 # 2nd sim should quit immediately
+    assert len(y.observables) == 1
