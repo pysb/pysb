@@ -1,6 +1,6 @@
 from pysb.testing import *
 import numpy as np
-from pysb import Monomer, Parameter, Initial, Observable, Rule
+from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator.bng import BngSimulator, PopulationMap
 from pysb.bng import generate_equations
 from pysb.examples import robertson, expression_observables, earm_1_0
@@ -129,6 +129,8 @@ def test_stop_if():
     Monomer('A')
     Rule('A_synth', None >> A(), Parameter('k', 1))
     Observable('Atot', A())
+    Expression('exp_const', k + 1)
+    Expression('exp_dyn', Atot + 1)
     sim = BngSimulator(model, verbose=5)
     tspan = np.linspace(0,100,101)
     x = sim.run(tspan, stop_if='Atot>9', seed=310482829)

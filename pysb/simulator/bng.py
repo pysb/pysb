@@ -231,7 +231,7 @@ class BngSimulator(Simulator):
                                         (len(self.model.species) + 1):
                                         (len(self.model.species) + 1) +
                                         len(self.model.observables) +
-                                        len(self.model.expressions)])
+                                        len(self.model.expressions_dynamic())])
 
         return SimulationResult(self, tout=tout, trajectories=species_out,
                                 observables_and_expressions=obs_exp_out,
