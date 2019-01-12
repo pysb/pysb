@@ -228,7 +228,10 @@ class BngSimulator(Simulator):
                                    1:(len(self.model.species) + 1)])
                 if len(self.model.observables) or len(self.model.expressions):
                     obs_exp_out.append(yfull_view[:,
-                                       (len(self.model.species) + 1):])
+                                        (len(self.model.species) + 1):
+                                        (len(self.model.species) + 1) +
+                                        len(self.model.observables) +
+                                        len(self.model.expressions)])
 
         return SimulationResult(self, tout=tout, trajectories=species_out,
                                 observables_and_expressions=obs_exp_out,

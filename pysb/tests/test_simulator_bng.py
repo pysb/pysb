@@ -122,3 +122,16 @@ def test_hpp():
                 seed=_BNG_SEED)
     observables = np.array(x.observables)
     assert len(observables) == 50
+
+
+def test_stop_if():
+    Model()
+    Monomer('A')
+    Rule('A_synth', None >> A(), Parameter('k', 1))
+    Observable('Atot', A())
+    sim = BngSimulator(model, verbose=5)
+    tspan = np.linspace(0,100,101)
+    x = sim.run(tspan, stop_if='Atot>9', seed=310482829)
+    assert np.isclose(x.observables['Atot'][-1], 10)
+    y = sim.run(tspan, initials=x.species[-1], stop_if='Atot>9')
+    assert len(y.observables) == 1 # 2nd sim should quit immediately
