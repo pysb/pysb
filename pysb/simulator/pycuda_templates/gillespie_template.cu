@@ -1,5 +1,6 @@
 #include <curand_kernel.h>
 #include <stdio.h>
+#include <time.h>
 
 #define num_species {n_species}
 #define NPARAM {n_params}
@@ -40,7 +41,7 @@ __device__ void stoichiometry(int *y, int r){{
 
 
 
-__device__ int sample(double* a, double u){{
+__device__ int sample(const double* a, double u){{
     int i = 0;
     #pragma unroll
     for(;i < NREACT_MIN_ONE && u > a[i]; i++){{
@@ -92,9 +93,12 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
     // beginning of loop
     while (time_index < NRESULTS){{
         while (t < time[time_index]){{
-
-            // calculate propensities
+                    // calculate propensities
             double a0 = propensities(y, A, param_vec);
+            if (a0 <= 0.0){{
+                t = time[NRESULTS-1];
+                continue;
+            }}
 
             #pragma unroll
             for(int j=0; j<num_species; j++){{
