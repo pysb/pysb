@@ -25,7 +25,8 @@ class BngSimulator(Simulator):
 
     def run(self, tspan=None, initials=None, param_values=None, n_runs=1,
             method='ssa', output_dir=None, output_file_basename=None,
-            cleanup=None, population_maps=None, **additional_args):
+            cleanup=None, population_maps=None, netgen_args=None, 
+            **additional_args):
         """
         Simulate a model using BioNetGen
 
@@ -176,8 +177,10 @@ class BngSimulator(Simulator):
                     f.write(hpp_bngl)
             if method != 'nf':
                 # TODO: Write existing netfile if already generated
+                if netgen_args is None:
+                    netgen_args = {}
                 bngfile.action('generate_network', overwrite=True,
-                               verbose=extended_debug)
+                               verbose=extended_debug, **netgen_args)
             if output_file_basename is None:
                 prefix = 'pysb'
             else:

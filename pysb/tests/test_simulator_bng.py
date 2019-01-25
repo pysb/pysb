@@ -122,3 +122,20 @@ def test_hpp():
                 seed=_BNG_SEED)
     observables = np.array(x.observables)
     assert len(observables) == 50
+
+def test_bng_netgen_args():
+    Model()
+    N_STATES=10
+    Monomer('A', ['state'], {'state' : ['_{}'.format(i) 
+                                        for i in range(N_STATES)]})
+    Initial(A(state='_0'), Parameter('A0'))
+    Parameter('k', 1)
+    [Rule('State_{}_to_{}'.format(i,i+1), 
+          A(state='_{}'.format(i)) >> A(state='_{}'.format(i+1)), k) 
+          for i in range(N_STATES-1)]
+    sim = BngSimulator(model)
+    sim.run(tspan=[0,1], netgen_args={'max_iter':1})
+    assert len(model.species) == 2
+    model.reset_equations()
+    sim.run(tspan=[0,1], netgen_args={'max_iter':2})
+    assert len(model.species) == 3
