@@ -300,11 +300,11 @@ class GPUSimulatorCL(Simulator):
             with open("ssa_cuda_code.cu", "w") as source_file:
                 source_file.write(code)
         # This prints off all the options per device and platform
-        print("Platforms availables")
+        self._logger.info("Platforms availables")
         for i in cl.get_platforms():
-            print("\t{}\n\tDevices available".format(i))
+            self._logger.info("\t{}\n\tDevices available".format(i))
             for j in i.get_devices():
-                print("\t\t{}".format(j))
+                self._logger.info("\t\t{}".format(j))
 
         # need to let the users select this
         platform = cl.get_platforms()[0]
