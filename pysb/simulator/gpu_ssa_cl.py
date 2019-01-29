@@ -13,6 +13,7 @@ import logging
 from pysb.core import Expression
 from pysb.bng import generate_equations
 from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
+from pyopencl import device_type
 
 
 class GPUSimulatorCL(Simulator):
@@ -43,7 +44,8 @@ class GPUSimulatorCL(Simulator):
         model.parameters.
     verbose : bool, optional (default: False)
         Verbose output.
-
+    device : str
+        {'cpu', 'gpu'}
     Attributes
     ----------
     verbose: bool
@@ -55,7 +57,8 @@ class GPUSimulatorCL(Simulator):
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
-    def __init__(self, model, verbose=False, tspan=None, **kwargs):
+    def __init__(self, model, verbose=False, tspan=None, device='cpu',
+                 **kwargs):
         super(GPUSimulatorCL, self).__init__(model, verbose, **kwargs)
 
         generate_equations(self._model)
@@ -76,6 +79,7 @@ class GPUSimulatorCL(Simulator):
         self._kernel = None
         self._param_tex = None
         self._ssa = None
+        self._device = device
 
         if verbose:
             setup_logger(logging.INFO)
@@ -166,150 +170,26 @@ class GPUSimulatorCL(Simulator):
         self._logger.debug("Converted PySB model to pycuda code")
         return cs_string
 
-    def _pysb_to_cuda2(self):
-        """ converts pysb reactions to cuda compilable code
-
-        """
-        p = re.compile('\s')
-        stoich_matrix = (_rhs(self._model) + _lhs(self._model)).T
-
-        all_reactions = []
-        for rxn_number, rxn in enumerate(stoich_matrix.T):
-            changes = []
-            for index, change in enumerate(rxn):
-                if change != 0:
-                    changes.append([index, change])
-            all_reactions.append(changes)
-
-        params_names = [g.name for g in self._model.parameters]
-        _reaction_number = len(self._model.reactions)
-
-        stoich_string = ''
-        l_lim = self._n_species - 1
-        r_lim = self._n_reactions - 1
-        for i in range(0, self._n_reactions):
-            for j in range(0, len(stoich_matrix)):
-                stoich_string += "%s" % repr(stoich_matrix[j][i])
-                if not (i == l_lim and j == r_lim):
-                    stoich_string += ','
-            stoich_string += '\n'
-        hazards_string = ''
-        pattern = "(__s\d+)\*\*(\d+)"
-        deps = dict()
-        h_dict = dict()
-        for n, rxn in enumerate(self._model.reactions):
-            hazards_string += "\th[%s] = " % repr(n)
-
-            rate = sympy.fcode(rxn["rate"])
-            rate = re.sub('d0', '', rate)
-            rate = p.sub('', rate)
-            expr_strings = {
-                e.name: '(%s)' % sympy.ccode(
-                    e.expand_expr(expand_observables=True)
-                ) for e in self.model.expressions}
-            # expand only expressions used in the rate eqn
-            for e in {sym for sym in rxn["rate"].atoms()
-                      if isinstance(sym, Expression)}:
-                rate = re.sub(r'\b%s\b' % e.name,
-                              expr_strings[e.name],
-                              rate)
-
-            matches = re.findall(pattern, rate)
-            for m in matches:
-                repl = m[0]
-                for i in range(1, int(m[1])):
-                    repl += "*(%s-%d)" % (m[0], i)
-                rate = re.sub(pattern, repl, rate)
-
-            rate = re.sub(r'_*s(\d+)',
-                          lambda m: 'y[%s]' % (int(m.group(1))),
-                          rate)
-            for q, prm in enumerate(params_names):
-                rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
-            items = rate.split('*')
-            rate = ''
-            # places param_arry value at the front to make propensities doubles
-            for i in items:
-                if i.startswith('param_vec'):
-                    rate += i + '*'
-
-            for i in sorted(items):
-                if i.startswith('param_vec'):
-                    continue
-                rate += i + '*'
-            rate = re.sub('\*$', '', rate)
-            rate = re.sub('d0', '', rate)
-            rate = p.sub('', rate)
-            rate = rate.replace('pow', 'powf')
-
-            hazards_string += rate + ";\n"
-            deps[n] = list()
-            for i in rxn['reactants']:
-                deps[n].append(i)
-                if i in h_dict:
-                    h_dict[i].add("h[%s] = " % repr(n)+rate)
-                else:
-                    h_dict[i] = set(["h[%s] = " % repr(n)+rate])
-            for i in rxn['products']:
-                deps[n].append(i)
-                if i in h_dict:
-                    h_dict[i].add("h[%s] = " % repr(n)+rate)
-                else:
-                    h_dict[i] = set(["h[%s] = " % repr(n)+rate])
-
-        final_string = "switch(rxn) {\n"
-        for i in deps:
-            h_string = '\tcase {} :\n'.format(i)
-            to_add = set()
-            for n in deps[i]:
-                for m in h_dict[n]:
-                    to_add.add(m)
-            # print(to_add)
-            for n in to_add:
-                h_string += '\t\t{};\n'.format(n)
-                new_line = n.replace('y', 'prev')
-                new_line = re.sub(r'=', '-=', new_line)
-                new_line = re.sub(r'h\[\d+]', 'a0', new_line)
-                new_line2 = re.sub(r'=', '+=', n)
-                new_line2 = re.sub(r'h\[\d+]', 'a0', new_line2)
-                h_string += '\t\t{};\n'.format(new_line)
-                h_string += '\t\t{};\n'.format(new_line2)
-            # else:
-            #     h_string += '\t\th[{}] =\t{};\n'.format(n, h_dict[n])
-            h_string += "\t\tbreak;\n"
-            # print(h_string)
-            final_string += h_string
-        final_string += '}'
-
-        template_code = _load_template()
-
-        cs_string = template_code.format(n_species=self._n_species,
-                                         n_params=self._parameter_number,
-                                         n_reactions=_reaction_number,
-                                         hazards=hazards_string,
-                                         stoch=stoich_string,
-                                         hazards2=final_string)
-
-        self._logger.debug("Converted PySB model to pycuda code")
-        return cs_string
-
-    def _compile(self, code):
+    def _compile(self):
 
         if self.verbose:
             self._logger.info("Output cuda file to ssa_cuda_code.cu")
-            with open("ssa_cuda_code.cu", "w") as source_file:
-                source_file.write(code)
+            with open("ssa_opencl_code.cu", "w") as source_file:
+                source_file.write(self._code)
         # This prints off all the options per device and platform
-        self._logger.info("Platforms availables")
+        self._logger.debug("Platforms availables")
+        devices = []
         for i in cl.get_platforms():
-            self._logger.info("\t{}\n\tDevices available".format(i))
+            to_device = {'cpu': device_type.CPU, 'gpu': device_type.GPU}
+            if len(i.get_devices(device_type=to_device[self._device])) > 0:
+                devices = i.get_devices(device_type=to_device[self._device])
+            self._logger.debug("\t{}\n\tDevices available".format(i))
             for j in i.get_devices():
-                self._logger.info("\t\t{}".format(j))
-
+                self._logger.debug("\t\t{}".format(j))
         # need to let the users select this
-        platform = cl.get_platforms()[0]
-        device = platform.get_devices()[1]
-        self.context = cl.Context([device])
+        # platform = cl.get_platforms()[1]
+        # device = platform.get_devices()[0]
+        self.context = cl.Context(devices)
         self.queue = cl.CommandQueue(self.context)
         cache_dir = None
         if self.verbose:
@@ -357,13 +237,6 @@ class GPUSimulatorCL(Simulator):
 
         timer_start = time.time()
 
-        #  Note, this number will be larger than n_simulations if the gpu grid
-        #  is not filled. The rest will be filled with zeros and not impact
-        #  results. They are trimmed right before passing to simulation results
-
-        # Not sure if this is needed for GPUs
-        # total_threads = int(blocks * threads)
-        # print(blocks, threads)
         total_threads = size_params
         # allocate and upload time to GPU
 
@@ -418,10 +291,7 @@ class GPUSimulatorCL(Simulator):
         return SimulationResult(self, tout, res)
 
     def _setup(self):
-        # print(self._code)
-        with open('cl.cl', 'w') as f:
-            f.write(self._code)
-        self._compile(self._code)
+        self._compile()
         self._step_0 = False
 
     @staticmethod
