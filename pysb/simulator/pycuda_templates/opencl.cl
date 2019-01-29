@@ -56,14 +56,6 @@ void stoichiometry(unsigned int *y, int r){{
 }}
 
 
-void update_results(__global int* result, int *y,  int step, int time_index){{
-
-    for(int j=0; j<num_species; j++){{
-        result[step + j + (time_index * num_species)] = y[j];
-    }}
-}}
-
-
 int sample(double* a, double u){{
     int i = 0;
     for(;i < NREACT_MIN_ONE && u > a[i]; i++){{
@@ -79,7 +71,7 @@ __kernel  void Gillespie_all_steps(
          __global int* result,
          __global double* time,
          __global double* param_values,
-         int NRESULTS){{
+         int n_timepoints){{
 
 
     int tid = get_global_id(0);
@@ -94,7 +86,9 @@ __kernel  void Gillespie_all_steps(
     int prev[num_species];
     double A[NREACT] = {{0.0}};
     double param_vec[NPARAM] =  {{0.0}};
-    int result_stepping = tid*NRESULTS*num_species;
+
+    int result_stepping = tid*n_timepoints*num_species;
+
     printf("Result stepping : %i %i\n", tid, result_stepping);
     // init parameters for thread
     int param_stride = tid*NPARAM;
@@ -108,13 +102,12 @@ __kernel  void Gillespie_all_steps(
     for(int i=0; i<num_species; i++){{
         y[i] = species_matrix[species_stride + i];
         prev[i] = y[i];
-
         }}
 
     double t = time[0] ;
     int time_index = 0;
     // beginning of loop
-    while (time_index < NRESULTS){{
+    while (time_index < n_timepoints){{
         while (t < time[time_index]){{
                     // calculate propensities
             double a0 = propensities(y, A, param_vec);
@@ -122,9 +115,9 @@ __kernel  void Gillespie_all_steps(
 //                t = time[NRESULTS-1];
 //                continue;
 //            }}
-//            if (tid==0){{
-//                printf("%i \t %f\t%f %f\n", time_index, t, time[time_index], a0);
-//            }}
+            if (tid==0){{
+                printf("%i \t %f\t%f %f\n", time_index, t, time[time_index], a0);
+            }}
             for(int j=0; j<num_species; j++){{
                 prev[j] = y[j];
 //                if (tid==0){{printf("%i\t", y[j]); }}
@@ -155,7 +148,11 @@ __kernel  void Gillespie_all_steps(
 //            return;
             }}
 
-        update_results(result, prev, result_stepping, time_index);
+
+        int index = tid * n_timepoints * num_species;
+        for(int j=0; j<num_species; j++){{
+            result[index + j + (time_index * num_species)] = prev[j];
+         }}
         time_index+=1;
         }}
 

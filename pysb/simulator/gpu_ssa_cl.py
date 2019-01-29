@@ -385,17 +385,17 @@ class GPUSimulatorCL(Simulator):
         # {'C', 'F', 'A', 'K'}
         param_array_gpu = array.to_device(
             self.queue,
-            param_values.flatten(order="C")
+            param_values.astype(np.float64)#.flatten(order="C")
         )
 
         species_matrix_gpu = array.to_device(
             self.queue,
-            initials.flatten(order='C')
+            initials.astype(np.int64)#.flatten(order='C')
         )
 
         result_gpu = array.zeros(
             self.queue,
-            order='C',
+            order='F',
             shape=(total_threads, len(t_out), self._n_species),
             dtype=np.int64
         )
