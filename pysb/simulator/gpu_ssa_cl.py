@@ -2,7 +2,7 @@ from __future__ import print_function
 
 #
 import pyopencl as cl
-
+from pyopencl import array
 import re
 import numpy as np
 import os
@@ -10,8 +10,6 @@ import sympy
 import time
 from pysb.logging import setup_logger
 import logging
-
-from pysb.pathfinder import get_path
 from pysb.core import Expression
 from pysb.bng import generate_equations
 from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
@@ -370,36 +368,32 @@ class GPUSimulatorCL(Simulator):
         #  results. They are trimmed right before passing to simulation results
 
         # Not sure if this is needed for GPUs
-        total_threads = int(blocks * threads)
+        # total_threads = int(blocks * threads)
         # print(blocks, threads)
         total_threads = size_params
         # allocate and upload time to GPU
-        mem_flags = cl.mem_flags
-        from pyopencl import array
-        time_points_gpu = cl.Buffer(
-            self.context,
-            mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR,
-            hostbuf=np.array(t_out, dtype=np.float64)
+
+        time_points_gpu = array.to_device(
+            self.queue,
+            np.array(t_out, dtype=np.float64)
         )
         mem_order = 'C'
-        # {'C', 'F', 'A', 'K'}
         param_array_gpu = array.to_device(
             self.queue,
-            param_values.astype(np.float64)#.flatten(order="C")
+            param_values.astype(np.float64).flatten(order=mem_order)
         )
 
         species_matrix_gpu = array.to_device(
             self.queue,
-            initials.astype(np.int64)#.flatten(order='C')
+            initials.astype(np.int64).flatten(order=mem_order)
         )
 
         result_gpu = array.zeros(
             self.queue,
-            order='F',
-            shape=(total_threads, len(t_out), self._n_species),
+            order=mem_order,
+            shape=(total_threads * len(t_out) * self._n_species,),
             dtype=np.int64
         )
-
 
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
@@ -408,9 +402,9 @@ class GPUSimulatorCL(Simulator):
             None,
             species_matrix_gpu.data,
             result_gpu.data,
-            time_points_gpu,
+            time_points_gpu.data,
             param_array_gpu.data,
-            np.int32(len(t_out)),
+            np.int64(len(t_out)),
             )
         complete_event.wait()
         # events = [complete_event]
@@ -424,8 +418,10 @@ class GPUSimulatorCL(Simulator):
         # retrieve and store results, only keeping n_simulations
         # actual simulations we will return
         tout = np.array(tout)
-        print(result_gpu.get(self.queue))
-        return SimulationResult(self, tout, result_gpu.get(self.queue))
+        res = result_gpu.get(self.queue)
+        res = res.reshape((total_threads, len(t_out), self._n_species))
+
+        return SimulationResult(self, tout, res)
 
     def _setup(self):
         # print(self._code)
@@ -511,7 +507,16 @@ if __name__ == '__main__':
     from pysb.examples.michment import model
     sim = GPUSimulatorCL(model)
     traj = sim.run(
-        tspan=np.linspace(0, 10, 11),
+        tspan=np.linspace(0, 20, 11),
         number_sim=10
     )
-    print(traj.dataframe.head(10))
+
+    result = traj.dataframe['Product']
+    print(result.head(10))
+    tout = result.index.levels[1].values
+    result = result.unstack(0)
+    result = result.as_matrix()
+    import matplotlib.pyplot as plt
+
+    plt.plot(tout, result, '0.5', lw=2, alpha=0.25)
+    plt.show()

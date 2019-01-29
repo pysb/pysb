@@ -33,31 +33,31 @@ int constant stoch_matrix[]={{
 
 double sum_propensities(double *a){{
     double a0 = 0;
-    for(int j=0; j<NREACT; j++){{
+    for(long j=0; j<NREACT; j++){{
         a0 += a[j];
     }}
     return a0;
 }}
 
-double propensities(unsigned int *y, double *h, double *param_vec)
+double propensities(long *y, double *h, double *param_vec)
 {{
 {hazards}
 return sum_propensities(h);
 }}
 
 
-void stoichiometry(unsigned int *y, int r){{
-    int step = r*num_species;
+void stoichiometry(long *y, long r){{
+    long step = r*num_species;
 
-    for(int i=0; i<num_species; i++){{
+    for(long i=0; i<num_species; i++){{
         y[i]+=stoch_matrix[step + i];
     }}
 
 }}
 
 
-int sample(double* a, double u){{
-    int i = 0;
+long sample(double* a, double u){{
+    long i = 0;
     for(;i < NREACT_MIN_ONE && u > a[i]; i++){{
         u -= a[i];
         }}
@@ -67,65 +67,56 @@ int sample(double* a, double u){{
 
 
 __kernel  void Gillespie_all_steps(
-        __global int* species_matrix,
-         __global int* result,
-         __global double* time,
-         __global double* param_values,
-         int n_timepoints){{
+        __global const long* species_matrix,
+         __global long* result,
+         __global const double* time,
+         __global const double* param_values,
+         const long n_timepoints){{
 
 
-    int tid = get_global_id(0);
-//    printf("%i", get_work_dim());
-//    return;
-//    return;
-//    key_t k = {{{{tid, 0xdecafbad, 0xfacebead, 0x12345678}}}};
+    const long tid = get_global_id(0);
+
     key_t k = {{{{ tid, 0xdecafbad, 0xfacebead, 0x12345678}}}};
     ctr_t c = {{{{0, 0xdecafbad, 0xfacebead, 0x12345678}}}};
 
-    int y[num_species];
-    int prev[num_species];
+    long y[num_species];
+    long prev[num_species];
     double A[NREACT] = {{0.0}};
     double param_vec[NPARAM] =  {{0.0}};
 
-    int result_stepping = tid*n_timepoints*num_species;
-
-    printf("Result stepping : %i %i\n", tid, result_stepping);
     // init parameters for thread
-    int param_stride = tid*NPARAM;
+    long param_stride = tid*NPARAM;
 
-    for(int i=0; i<NPARAM; i++){{
+    for(long i=0; i<NPARAM; i++){{
         param_vec[i] = param_values[param_stride + i];
         }}
 
     // init species counter for thread
-    int species_stride = tid*num_species;
-    for(int i=0; i<num_species; i++){{
+    long species_stride = tid*num_species;
+    for(long i=0; i<num_species; i++){{
         y[i] = species_matrix[species_stride + i];
         prev[i] = y[i];
         }}
 
     double t = time[0] ;
-    int time_index = 0;
+    long time_index = 0;
     // beginning of loop
     while (time_index < n_timepoints){{
         while (t < time[time_index]){{
                     // calculate propensities
             double a0 = propensities(y, A, param_vec);
-//            if (a0 <= 0.0){{
-//                t = time[NRESULTS-1];
-//                continue;
-//            }}
-            if (tid==0){{
-                printf("%i \t %f\t%f %f\n", time_index, t, time[time_index], a0);
+            if (a0 <= 0.0){{
+                t = time[n_timepoints-1];
+                continue;
             }}
+//            if (tid==0){{
+//                printf("%i \t %f\t%f %f\n", time_index, t, time[time_index], a0);
+//            }}
             for(int j=0; j<num_species; j++){{
                 prev[j] = y[j];
-//                if (tid==0){{printf("%i\t", y[j]); }}
+//                if (tid==1){{printf("%i\t", prev[j]); }}
                 }}
-//              if (tid==0){{ printf("\n"); }}
-//            output_vec_t ran = GET_RANDOM_NUM(gen_bits(&k, &c));
-//            t +=  -log(ran.x)/a0;  // update time
-//            stoichiometry(y, sample(A, a0*ran.y)); // update species matrix
+//              if (tid==1){{ printf("\n"); }}
 
             output_vec_t ran = GET_RANDOM_NUM(gen_bits(&k, &c));
             double r1 = ran.s0;
@@ -135,23 +126,20 @@ __kernel  void Gillespie_all_steps(
             double tau = -log(r1)/a0;  // find time of next reaction
             t += tau;  // update time
 
-            int k = sample(A, a0*r2);  // find next reaction
-//            if (tid==0){{ printf("reaction %i\ta0=%f\n", k, a0); }}
-//            if (tid==0){{ printf("\t %f\t%f\t%f\t%i\n ", r1, r2, tau, k);}}
+            long k = sample(A, a0*r2);  // find next reaction
+//            if (tid==1){{ printf("reaction %i\ta0=%f\n", k, a0); }}
+//            if (tid==1){{ printf("\t %f\t%f\t%f\t%i\n ", r1, r2, tau, k);}}
             stoichiometry(y, k); // update species matrix
-//            for (int j=0; j<num_species; j++){{
-//                if(prev[j] != y[j]+1 || prev[j] != y[j]-1 || prev[j]==y[j]){{
-//                printf("%i %i %i\n", k, prev[j], y[j]);
-//                return;
-//                }}
-//            }}
-//            return;
             }}
 
-
-        int index = tid * n_timepoints * num_species;
-        for(int j=0; j<num_species; j++){{
-            result[index + j + (time_index * num_species)] = prev[j];
+        // resets to correct start
+        long index = tid * n_timepoints * num_species;
+        // add an entire species timepoint stride
+        index += time_index * num_species;
+//        if (tid==1){{ printf("\n Time %f\t%i\n", t, index); }}
+        // iterates through each species
+        for(long j=0; j<num_species; j++){{
+            result[index + j] = prev[j];
          }}
         time_index+=1;
         }}
