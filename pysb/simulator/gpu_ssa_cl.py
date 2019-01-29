@@ -319,8 +319,7 @@ class GPUSimulatorCL(Simulator):
             cache_dir=cache_dir
         )
 
-    def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
-            threads=32):
+    def run(self, tspan=None, param_values=None, initials=None, number_sim=0):
 
         if param_values is None:
             # Run simulation using same param_values
@@ -347,13 +346,8 @@ class GPUSimulatorCL(Simulator):
         tout = [tspan] * len(param_values)
         t_out = np.array(tspan, dtype=np.float64)
 
-        if threads is None:
-            threads = self._threads
-
         size_params = param_values.shape[0]
-        blocks, threads = self.get_blocks(size_params, threads)
-        self._threads = threads
-        self._blocks = blocks
+
         self._logger.info("Starting {} simulations on {} blocks"
                           "".format(number_sim, self._blocks))
 
