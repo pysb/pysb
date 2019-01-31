@@ -2,7 +2,7 @@ from __future__ import print_function
 
 #
 import pyopencl as cl
-from pyopencl import array
+from pyopencl import array as ocl_array
 import re
 import numpy as np
 import os
@@ -57,7 +57,7 @@ class GPUSimulatorCL(Simulator):
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
-    def __init__(self, model, verbose=False, tspan=None, device='cpu',
+    def __init__(self, model, verbose=False, tspan=None, device='gpu',
                  **kwargs):
         super(GPUSimulatorCL, self).__init__(model, verbose, **kwargs)
 
@@ -68,13 +68,11 @@ class GPUSimulatorCL(Simulator):
         self.verbose = verbose
 
         # private attribute
-        self._threads = 32
-        self._blocks = None
         self._parameter_number = len(self._model.parameters)
         self._n_species = len(self._model.species)
         self._n_reactions = len(self._model.reactions)
         self._step_0 = True
-        self._code = self._pysb_to_cuda()
+        self._code = self._pysb_to_opencl()
         self._ssa_all = None
         self._kernel = None
         self._param_tex = None
@@ -83,10 +81,10 @@ class GPUSimulatorCL(Simulator):
 
         if verbose:
             setup_logger(logging.INFO)
-        self._logger.info("Initialized GPU class")
+        self._logger.info("Initialized OpenCL class")
 
-    def _pysb_to_cuda(self):
-        """ converts pysb reactions to cuda compilable code
+    def _pysb_to_opencl(self):
+        """ converts pysb reactions to OpenCL compilable code
 
         """
         p = re.compile('\s')
@@ -167,20 +165,31 @@ class GPUSimulatorCL(Simulator):
                                          stoch=stoich_string,
                                          )
 
-        self._logger.debug("Converted PySB model to pycuda code")
+        self._logger.debug("Converted PySB model to OpenCL code")
         return cs_string
 
     def _compile(self):
 
         if self.verbose:
-            self._logger.info("Output cuda file to ssa_cuda_code.cu")
-            with open("ssa_opencl_code.cu", "w") as source_file:
+            self._logger.info("Output OpenCl file to ssa_opencl_code.cl")
+            with open("ssa_opencl_code.cl", "w") as source_file:
                 source_file.write(self._code)
         # This prints off all the options per device and platform
         self._logger.debug("Platforms availables")
         devices = []
+
+#        platform = cl.get_platforms()
+#        for i in platform.get_devices():
+#            if pyopencl.device_type.to_string(found_device.name) == 'GPU':
+#                print('es')
+
+
+
         for i in cl.get_platforms():
+            #for d in i.get_devices():
+            #    print(d.get_info().TYPE)
             to_device = {'cpu': device_type.CPU, 'gpu': device_type.GPU}
+            #print(i.get_devices)
             if len(i.get_devices(device_type=to_device[self._device])) > 0:
                 devices = i.get_devices(device_type=to_device[self._device])
             self._logger.debug("\t{}\n\tDevices available".format(i))
@@ -201,8 +210,18 @@ class GPUSimulatorCL(Simulator):
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0):
 
+        # if no parameter values are specified:
+        # run simulation using parameters determined by the model
+        # data structure of param_values:
+        # ( number_sim x p.value ) dimensional matrix
+        # rows... parameters for one simulation
+        # number of rows... how many simulations are performed with these rows
+        # if no parameter set is specified, the original parameter set is taken
+        # from the model, and trajectories are simulated number_sim times, using
+        # this parameters
+        # note, that param_values can be extended to include various different
+        # parameter sets
         if param_values is None:
-            # Run simulation using same param_values
             num_particles = int(number_sim)
             nominal_values = np.array(
                 [p.value for p in self._model.parameters])
@@ -211,25 +230,31 @@ class GPUSimulatorCL(Simulator):
             param_values[:, :] = nominal_values
         self.param_values = param_values
 
+        total_num_of_sim = param_values.shape[0]
+
+
+        # if no initial conditions are specified:
+        # run simulation using initial conditions determined by the model
+        # for each param_value row, an initial condition row is created
         if initials is None:
-            # Run simulation using same initial conditions
             species_names = [str(s) for s in self._model.species]
             initials = np.zeros(len(species_names))
             for ic in self._model.initial_conditions:
                 initials[species_names.index(str(ic[0]))] = int(ic[1].value)
-            initials = np.repeat([initials], param_values.shape[0], axis=0)
+            initials = np.repeat([initials], total_num_of_sim, axis=0)
             self.initials = initials
+
 
         if tspan is None:
             tspan = self.tspan
 
+        # tspan for each simulation
         tout = [tspan] * len(param_values)
         t_out = np.array(tspan, dtype=np.float64)
 
-        size_params = param_values.shape[0]
+        #self._logger.info("Starting {} simulations on {} blocks"
+        #                  "".format(number_sim, self._blocks))
 
-        self._logger.info("Starting {} simulations on {} blocks"
-                          "".format(number_sim, self._blocks))
 
         # compile kernel and send parameters to GPU
         if self._step_0:
@@ -237,35 +262,39 @@ class GPUSimulatorCL(Simulator):
 
         timer_start = time.time()
 
-        total_threads = size_params
-        # allocate and upload time to GPU
 
-        time_points_gpu = array.to_device(
+        # allocate and upload data to device
+
+        # transfer the array of time points to the device
+        time_points_gpu = ocl_array.to_device(
             self.queue,
             np.array(t_out, dtype=np.float64)
         )
         mem_order = 'C'
-        param_array_gpu = array.to_device(
+        # transfer the data structure of
+        # ( number of simulations x different parameter sets )
+        # to the device
+        param_array_gpu = ocl_array.to_device(
             self.queue,
             param_values.astype(np.float64).flatten(order=mem_order)
         )
 
-        species_matrix_gpu = array.to_device(
+        species_matrix_gpu = ocl_array.to_device(
             self.queue,
             initials.astype(np.int64).flatten(order=mem_order)
         )
 
-        result_gpu = array.zeros(
+        result_gpu = ocl_array.zeros(
             self.queue,
             order=mem_order,
-            shape=(total_threads * len(t_out) * self._n_species,),
+            shape=(total_num_of_sim * len(t_out) * self._n_species,),
             dtype=np.int64
         )
 
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
             self.queue,
-            (total_threads,),
+            (total_num_of_sim,),
             None,
             species_matrix_gpu.data,
             result_gpu.data,
@@ -286,43 +315,13 @@ class GPUSimulatorCL(Simulator):
         # actual simulations we will return
         tout = np.array(tout)
         res = result_gpu.get(self.queue)
-        res = res.reshape((total_threads, len(t_out), self._n_species))
+        res = res.reshape((total_num_of_sim, len(t_out), self._n_species))
 
         return SimulationResult(self, tout, res)
 
     def _setup(self):
         self._compile()
         self._step_0 = False
-
-    @staticmethod
-    def _create_gpu_array(values, total_threads, prec):
-
-        # Create species matrix on GPU
-        # will make according to number of total threads, not n_simulations
-        gpu_array = np.zeros((total_threads, values.shape[1]), dtype=prec)
-        # Filling species matrix
-        # Note that this might not fill entire array that was created.
-        # The rest of the array will be zeros to fill up GPU.
-        for i in range(len(values)):
-            for j in range(values.shape[1]):
-                gpu_array[i, j] = values[i, j]
-        return gpu_array
-
-    @staticmethod
-    def get_blocks(n_simulations, threads_per_block):
-        max_threads = 256
-        if threads_per_block > max_threads:
-            logging.warning("Limit of 256 threads per block due to curand."
-                            " Setting to 256.")
-            threads_per_block = max_threads
-        if n_simulations < threads_per_block:
-            block_count = 1
-            threads_per_block = threads_per_block
-        elif n_simulations % threads_per_block == 0:
-            block_count = int(n_simulations // threads_per_block)
-        else:
-            block_count = int(n_simulations // threads_per_block + 1)
-        return block_count, threads_per_block
 
 
 def _lhs(model):
@@ -343,9 +342,7 @@ def _lhs(model):
 
 def _rhs(model):
     """
-
     Right hand side of matrix
-
     """
     right_side = np.zeros((len(model.reactions), len(model.species)),
                           dtype=np.int32)
@@ -362,7 +359,7 @@ def _rhs(model):
 def _load_template():
     with open(os.path.join(os.path.dirname(__file__),
                            'pycuda_templates',
-                           'opencl.cl'), 'r') as f:
+                           'opencl_template.cl'), 'r') as f:
         gillespie_code = f.read()
     return gillespie_code
 
