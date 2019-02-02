@@ -94,20 +94,28 @@ class CupSodaSimulator(Simulator):
         Verbosity setting. See the base class
         :class:`pysb.simulator.base.Simulator` for further details.
     gpu : int or list
-        Index of GPU being run on, or a list of integers to use multiple GPUs
-    vol : float or None
-        System volume
-    n_blocks: int
-        Number of GPU blocks used by the simulator.
+        Index of GPU being run on, or a list of integers to use multiple GPUs.
+        Simulations will be split equally among the of GPUs.
     outdir : str
         Directory where cupSODA output files are placed. Input files are
         also placed here.
     opts: dict
-        Dictionary of options for the integrator in use.
+        Dictionary of options for the integrator, which can include the
+        following:
+
+        * vol (float or None): System volume
+        * n_blocks (int or None): Number of GPU blocks used by the simulator
+        * atol (float): Absolute integrator tolerance
+        * rtol (float): Relative integrator tolerance
+        * chunksize (int or None): The maximum number of simulations to run
+          per GPU at one time. Set this option if your GPU is running out of
+          memory.
+        * memory_usage ('global', 'shared', or 'sharedconstant'): The type of
+          GPU memory to use
+        * max_steps (int): The maximum number of internal integrator iterations
+          (equivalent to LSODA's mxstep)
     integrator : str
-        Name of the integrator in use.
-    default_integrator_options : dict
-        Nested dictionary of default options for all supported integrators.
+        Name of the integrator in use (only "cupsoda" is supported).
 
     Notes
     -----
@@ -125,10 +133,13 @@ class CupSodaSimulator(Simulator):
     References
     ----------
 
-    1. Nobile M.S., Cazzaniga P., Besozzi D., Mauri G., 2014. GPU-accelerated
+    1. Harris, L.A., Nobile, M.S., Pino, J.C., Lubbock, A.L.R., Besozzi, D.,
+       Mauri, G., Cazzaniga, P., and Lopez, C.F. 2017. GPU-powered model
+       analysis with PySB/cupSODA. Bioinformatics 33, pp.3492–3494.
+    2. Nobile M.S., Cazzaniga P., Besozzi D., Mauri G., 2014. GPU-accelerated
        simulations of mass-action kinetics models with cupSODA, Journal of
        Supercomputing, 69(1), pp.17-24.
-    2. Petzold, L., 1983. Automatic selection of methods for solving stiff and
+    3. Petzold, L., 1983. Automatic selection of methods for solving stiff and
        nonstiff systems of ordinary differential equations. SIAM journal on
        scientific and statistical computing, 4(1), pp.136-148.
 
@@ -144,11 +155,12 @@ class CupSodaSimulator(Simulator):
             'max_steps': 20000, # max # of internal iterations (LSODA's MXSTEP)
             'atol': 1e-8,  # absolute tolerance
             'rtol': 1e-8,  # relative tolerance
+            'chunksize': None,  # Max number of simulations per GPU per run
             'n_blocks': None,  # number of GPU blocks
             'memory_usage': 'sharedconstant'}}  # see _memory_options dict
 
     _integrator_options_allowed = {'max_steps', 'atol', 'rtol', 'n_blocks',
-                                   'memory_usage', 'vol'}
+                                   'memory_usage', 'vol', 'chunksize'}
 
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
@@ -216,6 +228,77 @@ class CupSodaSimulator(Simulator):
         # regex for extracting cupSODA reported running time
         self._running_time_regex = re.compile(r'Running time:\s+(\d+\.\d+)')
 
+    def _run_chunk(self, gpus, outdir, chunk_idx, cmtx, sims, trajectories,
+                   tout):
+        _indirs = {}
+        _outdirs = {}
+        p = {}
+
+        # Path to cupSODA executable
+        bin_path = get_path('cupsoda')
+
+        # Start simulations
+        for gpu in gpus:
+            _indirs[gpu] = os.path.join(outdir, "INPUT_GPU{}_{}".format(
+                gpu, chunk_idx))
+            os.mkdir(_indirs[gpu])
+            _outdirs[gpu] = os.path.join(outdir, "OUTPUT_GPU{}_{}".format(
+                gpu, chunk_idx))
+
+            # Create cupSODA input files
+            self._create_input_files(_indirs[gpu], sims[gpu], cmtx)
+
+            # Build command
+            # ./cupSODA input_model_folder blocks output_folder simulation_
+            # file_prefix gpu_number fitness_calculation memory_use dump
+            command = [bin_path, _indirs[gpu], str(self.n_blocks),
+                       _outdirs[gpu], self._prefix, str(gpu),
+                       '0', self._memory_usage, str(self._cupsoda_verbose)]
+
+            self._logger.info("Running cupSODA: " + ' '.join(command))
+
+            # Run simulation and return trajectories
+            p[gpu] = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+
+        # Read results
+        for gpu in gpus:
+            (p_out, p_err) = p[gpu].communicate()
+            p_out = p_out.decode('utf-8')
+            p_err = p_err.decode('utf-8')
+            logger_level = self._logger.logger.getEffectiveLevel()
+            if logger_level <= logging.INFO:
+                run_time_match = self._running_time_regex.search(p_out)
+                if run_time_match:
+                    self._logger.info('cupSODA GPU {} chunk {} reported '
+                                      'time: {} seconds'.format(
+                        gpu,
+                        chunk_idx,
+                        run_time_match.group(1)))
+            self._logger.debug('cupSODA GPU {} chunk {} stdout:\n{}'.format(
+                gpu, chunk_idx, p_out))
+            if p_err:
+                self._logger.error('cupSODA GPU {} chunk {} '
+                                   'stderr:\n{}'.format(
+                    gpu, chunk_idx, p_err))
+            if p[gpu].returncode:
+                raise SimulatorException(
+                    "cupSODA GPU {} chunk {} exception:\n{}\n{}".format(
+                        gpu, chunk_idx, p_out.rstip("at line"), p_err.rstrip()
+                    )
+                )
+            tout_run, trajectories_run = self._load_trajectories(
+                _outdirs[gpu], sims[gpu])
+            if trajectories is None:
+                tout = tout_run
+                trajectories = trajectories_run
+            else:
+                tout = np.concatenate((tout, tout_run))
+                trajectories = np.concatenate(
+                    (trajectories, trajectories_run))
+
+        return tout, trajectories
+
     def run(self, tspan=None, initials=None, param_values=None):
         """Perform a set of integrations.
 
@@ -259,14 +342,6 @@ class CupSodaSimulator(Simulator):
         # Create directories for cupSODA input and output files
         _outdirs = {}
         _indirs = {}
-        p = {}
-
-        # Split simulations equally between GPUs
-        sims = dict(zip(gpus, np.array_split(range(len(self.param_values)),
-                                             len(gpus))))
-
-        # Path to cupSODA executable
-        bin_path = get_path('cupsoda')
 
         start_time = time.time()
 
@@ -276,61 +351,36 @@ class CupSodaSimulator(Simulator):
                                   dir=self._base_dir)
         self._logger.debug("Output directory is %s" % outdir)
 
-        for gpu in gpus:
-            _indirs[gpu] = os.path.join(outdir, "INPUT" + str(gpu))
-            os.mkdir(_indirs[gpu])
-            _outdirs[gpu] = os.path.join(outdir, "OUTPUT" + str(gpu))
+        # Set up chunking (enforce max # sims per GPU per run)
+        n_sims = len(self.param_values)
 
-            # Create cupSODA input files
-            self._create_input_files(_indirs[gpu], sims[gpu], cmtx)
+        chunksize_gpu = self.opts.get('chunksize', None)
+        if chunksize_gpu is None:
+            chunksize_gpu = n_sims
 
-            # Build command
-            # ./cupSODA input_model_folder blocks output_folder simulation_
-            # file_prefix gpu_number fitness_calculation memory_use dump
-            command = [bin_path, _indirs[gpu], str(self.n_blocks),
-                       _outdirs[gpu], self._prefix, str(gpu),
-                       '0', self._memory_usage, str(self._cupsoda_verbose)]
-
-            self._logger.info("Running cupSODA: " + ' '.join(command))
-
-            # Run simulation and return trajectories
-            p[gpu] = subprocess.Popen(command, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
+        chunksize_total = chunksize_gpu * len(gpus)
 
         tout = None
         trajectories = None
-        for gpu in gpus:
-            (p_out, p_err) = p[gpu].communicate()
-            p_out = p_out.decode('utf-8')
-            p_err = p_err.decode('utf-8')
-            logger_level = self._logger.logger.getEffectiveLevel()
-            if logger_level <= logging.INFO:
-                run_time_match = self._running_time_regex.search(p_out)
-                if run_time_match:
-                    self._logger.info('cupSODA GPU {} reported time: {} '
-                                      'seconds'.format(
-                        gpu,
-                        run_time_match.group(1)))
-            self._logger.debug('cupSODA GPU {} stdout:\n{}'.format(gpu, p_out))
-            if p_err:
-                self._logger.error('cupSODA GPU {} strerr:\n{}'.format(gpu, p_err))
-            if p[gpu].returncode:
-                raise SimulatorException(
-                    "cupSODA GPU {} exception:\n{}\n{}".format(
-                        gpu, p_out.rstip("at line"), p_err.rstrip()
-                    )
-                )
-            tout_run, trajectories_run = self._load_trajectories(
-                _outdirs[gpu], sims[gpu])
-            if trajectories is None:
-                tout = tout_run
-                trajectories = trajectories_run
-            else:
-                tout = np.concatenate((tout, tout_run))
-                trajectories = np.concatenate((trajectories, trajectories_run))
 
-        if self._cleanup:
-            shutil.rmtree(outdir)
+        chunks = np.array_split(range(n_sims),
+                                np.ceil(n_sims / chunksize_total))
+
+        try:
+            for chunk_idx, chunk in enumerate(chunks):
+                self._logger.debug('cupSODA chunk {} of {}'.format(
+                    (chunk_idx + 1), len(chunks)))
+
+                # Split chunk equally between GPUs
+                sims = dict(zip(gpus, np.array_split(chunk,
+                                                     len(gpus))))
+
+                tout, trajectories = self._run_chunk(
+                    gpus, outdir, chunk_idx, cmtx, sims,
+                    trajectories, tout)
+        finally:
+            if self._cleanup:
+                shutil.rmtree(outdir)
 
         end_time = time.time()
         self._logger.info("cupSODA + I/O time: {} seconds".format(

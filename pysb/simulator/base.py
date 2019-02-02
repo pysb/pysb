@@ -108,15 +108,15 @@ class Simulator(object):
         self.tout = None
         # Per-run initial conditions/parameter/tspan override
         self._tspan = tspan
-        # Base initials and param values
-        self._initials = None
-        self.initials = initials
-        self._params = None
-        self.param_values = param_values
         # Per-run tspan, initials and param_values
         self._run_tspan = None
         self._run_initials = None
         self._run_params = None
+        # Base initials and param values
+        self._params = None
+        self.param_values = param_values
+        self._initials = None
+        self.initials = initials
         # Store init kwargs and run kwargs if needed for saving results
         self._init_kwargs = kwargs
         self._run_kwargs = None
