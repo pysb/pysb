@@ -135,7 +135,7 @@ class CupSodaSimulator(Simulator):
 
     1. Harris, L.A., Nobile, M.S., Pino, J.C., Lubbock, A.L.R., Besozzi, D.,
        Mauri, G., Cazzaniga, P., and Lopez, C.F. 2017. GPU-powered model
-       analysis with PySB/cupSODA. Bioinformatics 33, pp.3492–3494.
+       analysis with PySB/cupSODA. Bioinformatics 33, pp.3492-3494.
     2. Nobile M.S., Cazzaniga P., Besozzi D., Mauri G., 2014. GPU-accelerated
        simulations of mass-action kinetics models with cupSODA, Journal of
        Supercomputing, 69(1), pp.17-24.
