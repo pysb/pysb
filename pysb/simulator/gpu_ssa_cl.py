@@ -245,6 +245,12 @@ class GPUSimulatorCL(Simulator):
             self.initials = initials
 
 
+        # use clock() to create a random number seed for each simulation
+        random_seeds = np.empty(total_num_of_sim, dtype=np.float64)
+        for seed in range(len(random_seeds)):
+            random_seeds[seed] = time.clock()
+
+
         if tspan is None:
             tspan = self.tspan
 
@@ -270,6 +276,13 @@ class GPUSimulatorCL(Simulator):
             self.queue,
             np.array(t_out, dtype=np.float64)
         )
+
+        # transfer the array of time points to the device
+        random_seeds_gpu = ocl_array.to_device(
+            self.queue,
+            np.array(random_seeds, dtype=np.float64)
+        )
+
         mem_order = 'C'
         # transfer the data structure of
         # ( number of simulations x different parameter sets )
@@ -300,6 +313,7 @@ class GPUSimulatorCL(Simulator):
             result_gpu.data,
             time_points_gpu.data,
             param_array_gpu.data,
+            random_seeds_gpu.data,
             np.int64(len(t_out)),
             )
         complete_event.wait()

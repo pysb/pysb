@@ -71,12 +71,13 @@ __kernel  void Gillespie_all_steps(
          __global long* result,
          __global const double* time,
          __global const double* param_values,
+         __global const double* random_seed,
          const long n_timepoints){{
 
 
     const long tid = get_global_id(0);
 
-    key_t k = {{{{ tid, 0xdecafbad, 0xfacebead, 0x12345678}}}};
+    key_t k = {{{{ random_seed[tid], 0xdecafbad, 0xfacebead, 0x12345678}}}};
     ctr_t c = {{{{0, 0xdecafbad, 0xfacebead, 0x12345678}}}};
 
     long y[num_species];
