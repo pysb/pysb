@@ -18,10 +18,10 @@ class TestCupSODASimulatorSingle(object):
                                                            'max_steps': 20000})
         len_model_species = len(model.species)
         y0 = np.zeros((self.n_sims, len_model_species))
-        for ic in model.initial_conditions:
+        for ic in model.initials:
             for j in range(len_model_species):
-                if str(ic[0]) == str(model.species[j]):
-                    y0[:, j] = ic[1].value
+                if str(ic.pattern) == str(model.species[j]):
+                    y0[:, j] = ic.value.value
                     break
         self.y0 = y0
 
