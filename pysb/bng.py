@@ -96,8 +96,10 @@ class BngBaseInterface(object):
         """
         if not self.model.rules:
             raise NoRulesError()
-        if not self.model.initial_conditions and not any(r.is_synth() for r
-                                                         in self.model.rules):
+        if (
+            not self.model.initials
+            and not any(r.is_synth() for r in self.model.rules)
+        ):
             raise NoInitialConditionsError()
 
     @classmethod
@@ -778,7 +780,7 @@ def _parse_species(model, line):
     monomer_patterns = []
     for ms in monomer_strings:
         monomer_name, site_strings, monomer_compartment_name = \
-            re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
+            re.match(r'\$?(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
         site_conditions = {}
         if len(site_strings):
             for ss in site_strings.split(','):

@@ -60,7 +60,7 @@ def run(model):
     pysb.bng.generate_equations(model)
 
     graph = pygraphviz.AGraph(directed=True, rankdir="LR")
-    ic_species = [cp for cp, parameter in model.initial_conditions]
+    ic_species = [ic.pattern for ic in model.initials]
     for i, cp in enumerate(model.species):
         species_node = 's%d' % i
         slabel = re.sub(r'% ', r'%\\l', str(cp))

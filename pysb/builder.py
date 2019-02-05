@@ -172,9 +172,11 @@ class Builder(object):
         self.model.add_component(e)
         return e
 
-    def initial(self, *args):
+    def initial(self, *args, **kwargs):
         """Adds an initial condition to the Builder's model instance."""
-        self.model.initial(*args)
+        i = Initial(*args, _export=False, **kwargs)
+        self.model.add_initial(i)
+        return i
 
     def __getitem__(self, index):
         """Returns the component with the given string index

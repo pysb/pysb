@@ -231,8 +231,8 @@ class MatlabExporter(Exporter):
                              len(self.model.species)
         initial_values_str += ('\n'+' '*12).join(
                 ['initial_values(%d) = self.parameters.%s; %% %s' %
-                 (i+1, _fix_underscores(ic[1].name), ic[0])
-                 for i, ic in enumerate(self.model.initial_conditions)])
+                 (i+1, _fix_underscores(ic.value.name), ic.pattern)
+                 for i, ic in enumerate(self.model.initials)])
 
         # -- Build observables declaration --
         observables_str = 'self.observables = struct( ...\n'+' '*16

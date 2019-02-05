@@ -200,9 +200,9 @@ class MathematicaExporter(Exporter):
 
         ## INITIAL CONDITIONS
         ic_values = ['0'] * len(self.model.odes)
-        for i, ic in enumerate(self.model.initial_conditions):
-            ic_values[self.model.get_species_index(ic[0])] = \
-                                        ic[1].name.replace('_', '')
+        for i, ic in enumerate(self.model.initials):
+            idx = self.model.get_species_index(ic.pattern)
+            ic_values[idx] = ic.value.name.replace('_', '')
 
         init_conds_str = 'initconds = {\n'
         init_conds_str += ',\n'.join(['s%s[0] == %s' % (i, val)

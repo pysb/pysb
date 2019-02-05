@@ -75,9 +75,10 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
     def test_y0_as_list(self):
         """Test y0 with list of initial conditions"""
         # Test the initials getter method before anything is changed
-        assert np.allclose(self.sim.initials[0][0:2],
-                           [ic[1].value for ic in
-                            self.model.initial_conditions])
+        assert np.allclose(
+            self.sim.initials[0][0:2],
+            [ic.value.value for ic in self.model.initials]
+        )
 
         initials = [10, 20, 0]
         simres = self.sim.run(initials=initials)
