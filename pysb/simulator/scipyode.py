@@ -31,10 +31,6 @@ import contextlib
 import importlib
 
 
-CYTHON_DECL = '#cython: boundscheck=False, wraparound=False, ' \
-              'nonecheck=False, initializedcheck=False\n'
-
-
 class ScipyOdeSimulator(Simulator):
     """
     Simulate a model using SciPy ODE integration
@@ -136,6 +132,13 @@ class ScipyOdeSimulator(Simulator):
         }
     }
 
+    default_cython_directives = {
+        'boundscheck': False,
+        'wraparound': False,
+        'nonecheck': False,
+        'initializedcheck': False
+    }
+
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
 
@@ -152,6 +155,8 @@ class ScipyOdeSimulator(Simulator):
         integrator = kwargs.pop('integrator', 'vode')
         compiler_mode = kwargs.pop('compiler', None)
         integrator_options = kwargs.pop('integrator_options', {})
+        cython_directives = kwargs.pop('cython_directives',
+                                       self.default_cython_directives)
         if kwargs:
             raise ValueError('Unknown keyword argument(s): {}'.format(
                 ', '.join(kwargs.keys())
@@ -204,11 +209,12 @@ class ScipyOdeSimulator(Simulator):
             if self._compiler == 'cython':
                 if not Cython:
                     raise ImportError('Cython library is not installed')
-                code_eqs = CYTHON_DECL + code_eqs
 
                 def rhs(t, y, p):
                     # note that the evaluated code sets ydot as a side effect
-                    Cython.inline(code_eqs, quiet=True)
+                    Cython.inline(
+                        code_eqs, quiet=True,
+                        cython_compiler_directives=cython_directives)
 
                     return ydot
 
@@ -320,10 +326,10 @@ class ScipyOdeSimulator(Simulator):
                     with self._patch_distutils_logging:
                         jacobian(0.0, self.initials[0], self.param_values[0])
                 else:
-                    jac_eqs = CYTHON_DECL + jac_eqs
-
                     def jacobian(t, y, p):
-                        Cython.inline(jac_eqs, quiet=True)
+                        Cython.inline(
+                            jac_eqs, quiet=True,
+                            cython_compiler_directives=cython_directives)
                         return jac
 
                     with _set_cflags_no_warnings(self._logger):
