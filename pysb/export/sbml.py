@@ -6,7 +6,6 @@ for :py:mod:`pysb.export`.
 """
 import pysb
 import pysb.bng
-from sympy import sympify
 from pysb.export import Exporter
 from sympy.printing.mathml import MathMLPrinter
 from xml.dom.minidom import Document
@@ -170,17 +169,20 @@ class SbmlExporter(Exporter):
 
         # Initial values/assignments
         initial_concs = [0.0] * len(self.model.species)
-        for cp, param in self.model.initial_conditions:
-            sp_idx = self.model.get_species_index(cp)
-            if isinstance(param, pysb.Expression):
+        fixed_species_idx = set()
+        for ic in self.model.initials:
+            sp_idx = self.model.get_species_index(ic.pattern)
+            if isinstance(ic.value, pysb.Expression):
                 ia = smodel.createInitialAssignment()
                 _check(ia)
                 _check(ia.setSymbol('__s{}'.format(sp_idx)))
-                init_mathml = self._sympy_to_sbmlast(sympify(param.name))
+                init_mathml = self._sympy_to_sbmlast(ic.value)
                 _check(ia.setMath(init_mathml))
                 initial_concs[sp_idx] = None
             else:
-                initial_concs[sp_idx] = param.value
+                initial_concs[sp_idx] = ic.value.value
+                if ic.fixed:
+                    fixed_species_idx.add(sp_idx)
 
         # Species
         for i, s in enumerate(self.model.species):
@@ -205,7 +207,7 @@ class SbmlExporter(Exporter):
                 compartment_name = 'default'
             _check(sp.setCompartment(compartment_name))
             _check(sp.setName(str(s).replace('% ', '._br_')))
-            _check(sp.setBoundaryCondition(False))
+            _check(sp.setBoundaryCondition(i in fixed_species_idx))
             _check(sp.setConstant(False))
             _check(sp.setHasOnlySubstanceUnits(True))
             if initial_concs[i] is not None:

@@ -113,14 +113,19 @@ class KappaGenerator(object):
         self.__content += "\n"
 
     def generate_species(self):
-        if self._warn_no_ic and not self.model.initial_conditions:
+        if self._warn_no_ic and not self.model.initials:
             warnings.warn("Warning: No initial conditions.")
+        if any(ic.fixed for ic in self.model.initials):
+            raise KappaException(
+                "Kappa generator does not support fixed-amount species"
+            )
 
-        species_codes = [self.format_complexpattern(cp)
-                         for cp, param in self.model.initial_conditions]
+        species_codes = [
+            self.format_complexpattern(ic.pattern) for ic in self.model.initials
+        ]
         #max_length = max(len(code) for code in species_codes)
         for i, code in enumerate(species_codes):
-            param = self.model.initial_conditions[i][1]
+            param = self.model.initials[i].value
             #self.__content += ("%%init:  %-" + str(max_length) + \
             #                  "s   %s\n") % (code, param.name)
             if (self.dialect == 'kasim'):
