@@ -330,6 +330,10 @@ class Simulator(object):
         if new_initials is None:
             return None
 
+        # If new_initials is a pandas dataframe, convert to a dict
+        if pd and isinstance(new_initials, pd.DataFrame):
+            new_initials = new_initials.to_dict(orient='list')
+
         # Check if new_initials is a dict, and if so validate the keys
         # (ComplexPatterns)
         if isinstance(new_initials, dict):
@@ -356,6 +360,11 @@ class Simulator(object):
                                      'values'.format(cplx_pat))
         else:
             if not isinstance(new_initials, np.ndarray):
+                if not isinstance(new_initials, list):
+                    raise ValueError(
+                        'Implicit conversion of data type "{}" is not '
+                        'supported. Please supply initials as a numpy array '
+                        'or a pandas DataFrame.'.format(type(new_initials)))
                 new_initials = np.array(new_initials, copy=False)
             # if new_initials is a 1D array, convert to a 2D array of length 1
             if len(new_initials.shape) == 1:
@@ -451,6 +460,11 @@ class Simulator(object):
     def _process_incoming_params(self, new_params):
         if new_params is None:
             return None
+
+        # Convert pandas dataframe to dictionary
+        if pd and isinstance(new_params, pd.DataFrame):
+            new_params = new_params.to_dict(orient='list')
+
         if isinstance(new_params, dict):
             n_sims = 1
             if len(new_params) > 0:
@@ -469,6 +483,11 @@ class Simulator(object):
                                      "must be equal length")
         else:
             if not isinstance(new_params, np.ndarray):
+                if not isinstance(new_params, list):
+                    raise ValueError(
+                        'Implicit conversion of data type "{}" is not '
+                        'supported. Please supply parameters as a numpy array '
+                        'or a pandas DataFrame.'.format(type(new_params)))
                 new_params = np.array(new_params)
             # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
