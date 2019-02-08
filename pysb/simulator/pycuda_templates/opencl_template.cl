@@ -6,8 +6,8 @@
 
 typedef double output_t;
 typedef double4 output_vec_t;
-typedef philox4x32_ctr_t ctr_t;
-typedef philox4x32_key_t key_t;
+typedef philox2x32_ctr_t ctr_t;
+typedef philox2x32_key_t key_t;
 
 #define GET_RANDOM_NUM(gen) ( ((double) 2.3283064365386963e-10) * convert_double4(gen)+ ((double) 5.421010862427522e-20) * convert_double4(gen))
 
@@ -18,7 +18,7 @@ uint4 gen_bits(key_t *key, ctr_t *ctr)
         uint4 vec_el;
     }} u;
 
-    u.ctr_el = philox4x32(*ctr, *key);
+    u.ctr_el = philox2x32(*ctr, *key);
     if (++ctr->v[0] == 0)
         if (++ctr->v[1] == 0)
             ++ctr->v[2];
@@ -71,14 +71,14 @@ __kernel  void Gillespie_all_steps(
          __global long* result,
          __global const double* time,
          __global const double* param_values,
-         __global const double* random_seed,
+         __global const long* random_seed,
          const long n_timepoints){{
 
 
     const long tid = get_global_id(0);
 
-    key_t k = {{{{ random_seed[tid], 0xdecafbad, 0xfacebead, 0x12345678}}}};
-    ctr_t c = {{{{0, 0xdecafbad, 0xfacebead, 0x12345678}}}};
+    key_t k = {{{{ random_seed[tid], 0xdecafbad}}}};
+    ctr_t c = {{{{0, 0xdecafbad}}}};
 
     long y[num_species];
     long prev[num_species];

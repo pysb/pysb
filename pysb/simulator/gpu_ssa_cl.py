@@ -178,18 +178,16 @@ class GPUSimulatorCL(Simulator):
         self._logger.debug("Platforms availables")
         devices = []
 
-#        platform = cl.get_platforms()
-#        for i in platform.get_devices():
-#            if pyopencl.device_type.to_string(found_device.name) == 'GPU':
-#                print('es')
-
-
+        #        platform = cl.get_platforms()
+        #        for i in platform.get_devices():
+        #            if pyopencl.device_type.to_string(found_device.name) == 'GPU':
+        #                print('es')
 
         for i in cl.get_platforms():
-            #for d in i.get_devices():
+            # for d in i.get_devices():
             #    print(d.get_info().TYPE)
             to_device = {'cpu': device_type.CPU, 'gpu': device_type.GPU}
-            #print(i.get_devices)
+            # print(i.get_devices)
             if len(i.get_devices(device_type=to_device[self._device])) > 0:
                 devices = i.get_devices(device_type=to_device[self._device])
             self._logger.debug("\t{}\n\tDevices available".format(i))
@@ -228,10 +226,10 @@ class GPUSimulatorCL(Simulator):
             param_values = np.zeros((num_particles, len(nominal_values)),
                                     dtype=np.float64)
             param_values[:, :] = nominal_values
+
         self.param_values = param_values
 
         total_num_of_sim = param_values.shape[0]
-
 
         # if no initial conditions are specified:
         # run simulation using initial conditions determined by the model
@@ -244,12 +242,10 @@ class GPUSimulatorCL(Simulator):
             initials = np.repeat([initials], total_num_of_sim, axis=0)
             self.initials = initials
 
-
         # use clock() to create a random number seed for each simulation
         random_seeds = np.empty(total_num_of_sim, dtype=np.float64)
         for seed in range(len(random_seeds)):
             random_seeds[seed] = time.clock()
-
 
         if tspan is None:
             tspan = self.tspan
@@ -258,16 +254,14 @@ class GPUSimulatorCL(Simulator):
         tout = [tspan] * len(param_values)
         t_out = np.array(tspan, dtype=np.float64)
 
-        #self._logger.info("Starting {} simulations on {} blocks"
+        # self._logger.info("Starting {} simulations on {} blocks"
         #                  "".format(number_sim, self._blocks))
-
 
         # compile kernel and send parameters to GPU
         if self._step_0:
             self._setup()
 
         timer_start = time.time()
-
 
         # allocate and upload data to device
 
@@ -280,7 +274,8 @@ class GPUSimulatorCL(Simulator):
         # transfer the array of time points to the device
         random_seeds_gpu = ocl_array.to_device(
             self.queue,
-            np.array(random_seeds, dtype=np.float64)
+            # np.array(random_seeds, dtype=np.float64)
+            np.random.randint(2 ** 32, size=total_num_of_sim, dtype=np.int64)
         )
 
         mem_order = 'C'
@@ -307,7 +302,7 @@ class GPUSimulatorCL(Simulator):
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
             self.queue,
-            (total_num_of_sim,),
+            (total_num_of_sim, 1,),
             None,
             species_matrix_gpu.data,
             result_gpu.data,
@@ -315,7 +310,7 @@ class GPUSimulatorCL(Simulator):
             param_array_gpu.data,
             random_seeds_gpu.data,
             np.int64(len(t_out)),
-            )
+        )
         complete_event.wait()
         # events = [complete_event]
         # Wait for kernel completion before host access
@@ -380,6 +375,7 @@ def _load_template():
 
 if __name__ == '__main__':
     from pysb.examples.michment import model
+
     sim = GPUSimulatorCL(model)
     traj = sim.run(
         tspan=np.linspace(0, 20, 11),
