@@ -169,14 +169,20 @@ class SbmlExporter(Exporter):
             _check(expr_rule.setMath(expr_mathml))
 
         # Initial values/assignments
+        initial_concs = [0.0] * len(self.model.species)
         fixed_species_idx = set()
         for ic in self.model.initials:
             sp_idx = self.model.get_species_index(ic.pattern)
-            ia = smodel.createInitialAssignment()
-            _check(ia)
-            _check(ia.setSymbol('__s{}'.format(sp_idx)))
-            init_mathml = self._sympy_to_sbmlast(Symbol(ic.value.name))
-            _check(ia.setMath(init_mathml))
+            if isinstance(ic.value, pysb.Expression):
+                ia = smodel.createInitialAssignment()
+                _check(ia)
+                _check(ia.setSymbol('__s{}'.format(sp_idx)))
+                init_mathml = self._sympy_to_sbmlast(Symbol(ic.value.name))
+                _check(ia.setMath(init_mathml))
+            else:
+                initial_concs[sp_idx] = ic.value.value
+                if ic.fixed:
+                    fixed_species_idx.add(sp_idx)
 
             if ic.fixed:
                 fixed_species_idx.add(sp_idx)
@@ -207,6 +213,8 @@ class SbmlExporter(Exporter):
             _check(sp.setBoundaryCondition(i in fixed_species_idx))
             _check(sp.setConstant(False))
             _check(sp.setHasOnlySubstanceUnits(True))
+            if initial_concs[i] is not None:
+                _check(sp.setInitialAmount(initial_concs[i]))
 
         # Parameters
         params_only_initials = (self.model.parameters_initial_conditions() -
