@@ -1352,8 +1352,7 @@ class Observable(Component, sympy.Symbol):
         """ Expand observables in terms of species and coefficients """
         return sympy.Add(*[a * b for a, b in zip(
             self.coefficients,
-            sympy.symbols(','.join('__s%d' % sp_id for sp_id in
-                                   self.species) + ',')
+            [sympy.Symbol('__s%d' % sp_id) for sp_id in self.species]
         )])
 
     def __repr__(self):
