@@ -50,6 +50,9 @@ def bngl_import_compare_simulations(bng_file, force=False,
         return
 
     # Check all species trajectories are equal (within numerical tolerance)
+    logger.debug(yfull1.dtype.names)
+    logger.debug(yfull2.dtype.names)
+
     assert yfull1.dtype.names == yfull2.dtype.names
     for species in yfull1.dtype.names:
         logger.debug(species)
