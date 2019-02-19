@@ -406,18 +406,12 @@ class ScipyOdeSimulator(Simulator):
                         distutils.errors.CompileError,
                         ImportError,
                         ValueError) as e:
-                    if isinstance(e, ValueError) and (
-                            len(e.args) != 1 or
-                            e.args[0] != 'Symbol table not found'):
+                    if not cls._check_compiler_error(e, 'weave'):
                         raise
-                    logger.warn('weave compiler appears non-functional. {}\n'
-                                'Original error: {}'.format(
-                                    _c_compiler_message(), repr(e)))
 
     @classmethod
     def _test_cython(cls):
         if not hasattr(cls, '_use_cython'):
-            logger = get_logger(__name__)
             cls._use_cython = False
             if Cython is None:
                 return
@@ -427,17 +421,31 @@ class ScipyOdeSimulator(Simulator):
             except (Cython.Compiler.Errors.CompileError,
                     distutils.errors.DistutilsPlatformError,
                     ValueError) as e:
-                if isinstance(e, distutils.errors.DistutilsPlatformError) and \
-                        str(e) != 'Unable to find vcvarsall.bat':
-                    raise
-                if isinstance(e, ValueError) and (
-                        len(e.args) != 1 or
-                        e.args[0] != 'Symbol table not found'):
+                if not cls._check_compiler_error(e, 'cython'):
                     raise
 
-                logger.warn('Cython compiler appears non-functional. {}\n'
-                            'Original error: {}'.format(
-                                _c_compiler_message(), repr(e)))
+    @staticmethod
+    def _check_compiler_error(e, compiler):
+        if isinstance(e, distutils.errors.DistutilsPlatformError) and \
+                str(e) != 'Unable to find vcvarsall.bat':
+            return False
+
+        if isinstance(e, ValueError) and e.args != ('Symbol table not found',):
+            return False
+
+        # Build platform-specific C compiler error message
+        message = 'Please check you have a functional C compiler'
+        if os.name == 'nt':
+            message += ', available from ' \
+                       'https://wiki.python.org/moin/WindowsCompilers'
+        else:
+            message += '.'
+
+        get_logger(__name__).warn(
+            '{} compiler appears non-functional. {}\n'
+            'Original error: {}'.format(compiler, message, repr(e)))
+
+        return True
 
     @classmethod
     def _autoselect_compiler(cls):
@@ -599,13 +607,3 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
     # Provide 'fatal' to match up with distutils log functions.
     fatal = logging.LoggerAdapter.critical
 
-
-def _c_compiler_message():
-    message = 'Please check you have a functional C compiler'
-    if os.name == 'nt':
-        message += ', available from ' \
-                   'https://wiki.python.org/moin/WindowsCompilers'
-    else:
-        message += '.'
-
-    return message
