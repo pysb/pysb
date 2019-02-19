@@ -16,6 +16,7 @@ def main():
           version=versioneer.get_version(),
           description='Python Systems Biology modeling framework',
           long_description=long_description,
+          long_description_content_type='text/x-rst',
           author='Jeremy Muhlich',
           author_email='jmuhlich@bitflood.org',
           url='http://pysb.org/',
