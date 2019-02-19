@@ -9,15 +9,16 @@ import warnings
 import mock
 import tempfile
 import shutil
+from pysb.logging import get_logger
 
-# Some models don't match BNG originals exactly, due to sympy conversion of
-# x/y to x*y**(-1), which leads to loss of numerical precision, particularly
-# when x or y is large.
+
 REDUCED_PRECISION = {
     'CaOscillate_Func': 1e-4,
     'michment': 1e-8,
     'motor': 1e-8
 }
+
+logger = get_logger(__name__)
 
 
 def bngl_import_compare_simulations(bng_file, force=False,
@@ -51,11 +52,12 @@ def bngl_import_compare_simulations(bng_file, force=False,
     # Check all species trajectories are equal (within numerical tolerance)
     assert yfull1.dtype.names == yfull2.dtype.names
     for species in yfull1.dtype.names:
-        print(species)
-        print(yfull1[species])
-        print(yfull2[species])
-        print(numpy.allclose(yfull1[species], yfull2[species], atol=precision,
-                             rtol=precision))
+        logger.debug(species)
+        logger.debug(species)
+        logger.debug(yfull1[species])
+        logger.debug(yfull2[species])
+        logger.debug(numpy.allclose(yfull1[species], yfull2[species],
+                                    atol=precision, rtol=precision))
         assert numpy.allclose(yfull1[species], yfull2[species], atol=precision,
                               rtol=precision)
 
