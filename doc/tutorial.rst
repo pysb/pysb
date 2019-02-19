@@ -452,8 +452,8 @@ one shown (output shown below the ``'>>>'``` prompts)::
       {'obsC8': <pysb.core.Observable object at 0x104b2c4d0>,
        'obsBid': <pysb.core.Observable object at 0x104b2c5d0>,
        'obstBid': <pysb.core.Observable object at 0x104b2c6d0>}
-   >>> m.model.initial_conditions
-      [(C8(b=None), Parameter(name='C8_0', value=1000)), (Bid(b=None, S=u), Parameter(name='Bid_0', value=10000))]
+   >>> m.model.initials
+      [Initial(C8(b=None), C8_0), Initial(Bid(b=None, S='u'), Bid_0)]
    >>> m.model.rules
       {'C8_Bid_bind': Rule(name='C8_Bid_bind', reactants=C8(b=None) +
       Bid(b=None, S=None), products=C8(b=1) % Bid(b=1, S=None),

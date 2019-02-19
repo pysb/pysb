@@ -6,12 +6,12 @@ import itertools
 
 # Construct initials dict
 mult = np.linspace(0.8, 1.2, 11)
-matrix = [mult*ic[1].value for ic in model.initial_conditions]
+matrix = [mult*ic.value.value for ic in model.initials]
 initials = {}
-for i,ic in enumerate(model.initial_conditions):
-    initials[ic[0]] = []
+for i, ic in enumerate(model.initials):
+    initials[ic.pattern] = []
     for tup in itertools.product(*matrix): # Cartesian product
-        initials[ic[0]].append(tup[i])
+        initials[ic.pattern].append(tup[i])
 
 tspan = np.linspace(0, 50, 501)
 sim = ScipyOdeSimulator(model, tspan, verbose=False)
