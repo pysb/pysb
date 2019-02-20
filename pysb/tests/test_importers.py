@@ -11,7 +11,8 @@ import tempfile
 import shutil
 from pysb.logging import get_logger
 
-
+# Some models don't match BNG originals exactly due to loss of numerical
+# precision.
 REDUCED_PRECISION = {
     'CaOscillate_Func': 1e-4,
     'michment': 1e-8,
@@ -53,11 +54,8 @@ def bngl_import_compare_simulations(bng_file, force=False,
     assert yfull1.dtype.names == yfull2.dtype.names
     for species in yfull1.dtype.names:
         logger.debug(species)
-        logger.debug(species)
         logger.debug(yfull1[species])
         logger.debug(yfull2[species])
-        logger.debug(numpy.allclose(yfull1[species], yfull2[species],
-                                    atol=precision, rtol=precision))
         assert numpy.allclose(yfull1[species], yfull2[species], atol=precision,
                               rtol=precision)
 
