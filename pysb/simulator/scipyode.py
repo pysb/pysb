@@ -408,15 +408,10 @@ class ScipyOdeSimulator(Simulator):
                                      extra_compile_args=extra_compile_args)
                     cls._use_inline = True
                 except (weave.build_tools.CompileError,
-                        distutils.errors.CompileError, ImportError):
-                    pass
-                except ValueError as e:
-                    if len(e.args) == 1 and \
-                                        e.args[0] == "Symbol table not found":
-                        get_logger(__name__).debug(
-                            "'ValueError: Symbol table not found' "
-                            "encountered; weave compiler is not functional")
-                    else:
+                        distutils.errors.CompileError,
+                        ImportError,
+                        ValueError) as e:
+                    if not cls._check_compiler_error(e, 'weave'):
                         raise
 
     @classmethod
@@ -428,15 +423,34 @@ class ScipyOdeSimulator(Simulator):
             try:
                 Cython.inline('x = 1', force=True, quiet=True)
                 cls._use_cython = True
-            except Cython.Compiler.Errors.CompileError:
-                pass
-            except ValueError as e:
-                if len(e.args) == 1 and e.args[0] == "Symbol table not found":
-                    get_logger(__name__).debug(
-                        "'ValueError: Symbol table not found' "
-                        "encountered; Cython compiler is not functional")
-                else:
+            except (Cython.Compiler.Errors.CompileError,
+                    distutils.errors.DistutilsPlatformError,
+                    ValueError) as e:
+                if not cls._check_compiler_error(e, 'cython'):
                     raise
+
+    @staticmethod
+    def _check_compiler_error(e, compiler):
+        if isinstance(e, distutils.errors.DistutilsPlatformError) and \
+                str(e) != 'Unable to find vcvarsall.bat':
+            return False
+
+        if isinstance(e, ValueError) and e.args != ('Symbol table not found',):
+            return False
+
+        # Build platform-specific C compiler error message
+        message = 'Please check you have a functional C compiler'
+        if os.name == 'nt':
+            message += ', available from ' \
+                       'https://wiki.python.org/moin/WindowsCompilers'
+        else:
+            message += '.'
+
+        get_logger(__name__).warn(
+            '{} compiler appears non-functional. {}\n'
+            'Original error: {}'.format(compiler, message, repr(e)))
+
+        return True
 
     @classmethod
     def _autoselect_compiler(cls):
@@ -597,3 +611,4 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
     warn = logging.LoggerAdapter.info
     # Provide 'fatal' to match up with distutils log functions.
     fatal = logging.LoggerAdapter.critical
+
