@@ -2,20 +2,21 @@ from ez_setup import use_setuptools
 use_setuptools()
 from setuptools import setup
 import versioneer
+import os
 
 
 def main():
+    this_directory = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(this_directory, 'README.rst'), 'r') as f:
+        long_description = f.read()
 
     cmdclass = versioneer.get_cmdclass()
 
     setup(name='pysb',
           version=versioneer.get_version(),
           description='Python Systems Biology modeling framework',
-          long_description='PySB (pronounced "Pie Ess Bee") is a framework ' + \
-              'for building rule-based mathematical models of biochemical ' + \
-              'systems. It works nicely with scientific Python libraries ' + \
-              'such as NumPy, SciPy and SymPy for model simulation and ' + \
-              'analysis.',
+          long_description=long_description,
+          long_description_content_type='text/x-rst',
           author='Jeremy Muhlich',
           author_email='jmuhlich@bitflood.org',
           url='http://pysb.org/',

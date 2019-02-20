@@ -16,13 +16,15 @@ before_install:
     pydot coveralls mock cython
 - if [[ $PYVER == 2.7 ]]; then pip install weave; fi
 - if [[ $PYVER == 3.7 ]]; then pip install python-libsbml; else conda install --yes -c SBMLTeam python-libsbml; fi
-- pip install libroadrunner
+- pip install libroadrunner twine
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
 # Install BioNetGen, Kappa, StochKit and Atomizer
 - conda install --yes -c alubbock kappa stochkit bionetgen atomizer
 install:
   python setup.py build --build-lib=build/lib
+before_script:
+  python setup.py sdist && twine check dist/*
 script:
   nosetests build/lib/pysb --with-coverage --cover-inclusive
   --cover-package=build/lib/pysb -a '!gpu'
