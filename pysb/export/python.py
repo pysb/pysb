@@ -14,8 +14,8 @@ The standalone Python code defines a class, ``Model``, with a method
 ``simulate`` that can be used to simulate the model.
 
 As shown in the code for the Robertson model below, the ``Model`` class defines
-the fields ``parameters``, ``observables``, and ``initial_conditions`` as lists
-of ``collections.namedtuple`` objects that allow access to the features of the
+the fields ``parameters``, ``observables``, and ``initials`` as lists of
+``collections.namedtuple`` objects that allow access to the features of the
 model.
 
 The ``simulate`` method has the following signature::
@@ -146,7 +146,7 @@ class PythonExporter(Exporter):
             'num_species': len(self.model.species),
             'num_params': len(self.model.parameters),
             'num_observables': len(self.model.observables),
-            'num_ics': len(self.model.initial_conditions),
+            'num_ics': len(self.model.initials),
             }
         output.write(pad(r"""
             def __init__(self):
@@ -160,7 +160,7 @@ class PythonExporter(Exporter):
                 self.sim_param_values = numpy.empty(%(num_params)d)
                 self.parameters = [None] * %(num_params)d
                 self.observables = [None] * %(num_observables)d
-                self.initial_conditions = [None] * %(num_ics)d
+                self.initials = [None] * %(num_ics)d
             """, 4) % init_data)
         for i, p in enumerate(self.model.parameters):
             p_data = (i, repr(p.name), p.value)
@@ -174,12 +174,11 @@ class PythonExporter(Exporter):
             output.write("self.observables[%d] = Observable(%s, %s, %s)\n" %
                          obs_data)
         output.write("\n")
-        for i, (cp, param) in enumerate(self.model.initial_conditions):
-            ic_data = (i, self.model.parameters.index(param),
-                       self.model.get_species_index(cp))
+        for i, ic in enumerate(self.model.initials):
+            ic_data = (i, self.model.parameters.index(ic.value),
+                       self.model.get_species_index(ic.pattern))
             output.write(" " * 8)
-            output.write("self.initial_conditions[%d] = Initial(%d, %d)\n" %
-                         ic_data)
+            output.write("self.initials[%d] = Initial(%d, %d)\n" % ic_data)
         output.write("\n")
 
         output.write("    if _use_inline:\n")
@@ -188,7 +187,7 @@ class PythonExporter(Exporter):
                 ydot = self.ydot
                 weave.inline(r'''%s''', ['ydot', 't', 'y', 'p'])
                 return ydot
-            """, 8) % (pad('\n' + code_eqs, 16) + ' ' * 16))
+            """, 8) % ('\n' + pad(code_eqs, 16) + ' ' * 16))
         output.write("    else:\n")
         output.write(pad(r"""
             def ode_rhs(self, t, y, p):
@@ -210,7 +209,7 @@ class PythonExporter(Exporter):
                     # create parameter vector from the values in the model
                     self.sim_param_values[:] = [p.value for p in self.parameters]
                 self.y0.fill(0)
-                for ic in self.initial_conditions:
+                for ic in self.initials:
                     self.y0[ic.species_index] = self.sim_param_values[ic.param_index]
                 if self.y is None or len(tspan) != len(self.y):
                     self.y = numpy.empty((len(tspan), len(self.y0)))

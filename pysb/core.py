@@ -9,6 +9,7 @@ import weakref
 import copy
 import itertools
 import sympy
+import numpy as np
 import scipy.sparse
 import networkx as nx
 
@@ -23,9 +24,6 @@ except NameError:
     basestring = str
     long = int
 
-def Initial(*args):
-    """Declare an initial condition (see Model.initial)."""
-    return SelfExporter.default_model.initial(*args)
 
 def MatchOnce(pattern):
     """Make a ComplexPattern match-once."""
@@ -108,14 +106,25 @@ class SelfExporter(object):
                 obj.name = module_name   # internal name for identification
                 export_name = 'model'    # symbol name for export
         elif isinstance(obj, Component):
-            if SelfExporter.default_model == None:
-                raise Exception("A Model must be declared before declaring any model components")
+            if SelfExporter.default_model is None:
+                raise ModelNotDefinedError
             SelfExporter.default_model.add_component(obj)
 
         # load obj into target namespace under obj.name
         if export_name in SelfExporter.target_globals:
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
+
+    @staticmethod
+    def add_initial(initial):
+        """Add an Initial to the default model."""
+        if not SelfExporter.do_export:
+            return
+        if not isinstance(initial, Initial):
+            raise ValueError("initial must be an Initial object")
+        if SelfExporter.default_model is None:
+            raise ModelNotDefinedError
+        SelfExporter.default_model.add_initial(initial)
 
     @staticmethod
     def cleanup():
@@ -1343,8 +1352,7 @@ class Observable(Component, sympy.Symbol):
         """ Expand observables in terms of species and coefficients """
         return sympy.Add(*[a * b for a, b in zip(
             self.coefficients,
-            sympy.symbols(','.join('__s%d' % sp_id for sp_id in
-                                   self.species) + ',')
+            [sympy.Symbol('__s%d' % sp_id) for sp_id in self.species]
         )])
 
     def __repr__(self):
@@ -1425,6 +1433,61 @@ class Expression(Component, sympy.Symbol):
         return repr(self)
 
 
+class Initial(object):
+    """
+    An initial condition for a species.
+
+    An initial condition is made up of a species, its amount or concentration,
+    and whether it is to be held fixed during a simulation.
+
+    Species patterns must satisfy all of the following:
+    * Able to be cast as a ComplexPattern
+    * Concrete (see ComplexPattern.is_concrete)
+    * Distinct from any existing initial condition pattern
+    * match_once is False (nonsensical in this context)
+
+    Parameters
+    ----------
+    pattern : ComplexPattern
+        A concrete pattern defining the species to initialize.
+    value : Parameter or Expression Amount of the species the model will start
+        with. If an Expression is used, it must evaluate to a constant (can't
+        reference any Observables).
+    fixed : bool
+        Whether or not the species should be held fixed (never consumed).
+
+    Parameters
+    ----------
+    Identical to Parameters (see above).
+
+    """
+
+    def __init__(self, pattern, value, fixed=False, _export=True):
+        try:
+            pattern = as_complex_pattern(pattern)
+        except InvalidComplexPatternException as e:
+            raise InvalidInitialConditionError("Not a ComplexPattern")
+        if not pattern.is_concrete():
+            raise InvalidInitialConditionError("Pattern not concrete")
+        if pattern.match_once:
+            raise InvalidInitialConditionError("MatchOnce not allowed here")
+        validate_const_expr(value, "initial condition value")
+        self.pattern = pattern
+        self.value = value
+        self.fixed = fixed
+        self._export = _export
+        if self._export:
+            SelfExporter.add_initial(self)
+
+    def __repr__(self):
+        ret = '%s(%s, %s' % (self.__class__.__name__, repr(self.pattern),
+                             self.value.name)
+        if self.fixed:
+            ret += ', fixed=True'
+        ret += ')'
+        return ret
+
+
 class Model(object):
 
     """
@@ -1447,12 +1510,12 @@ class Model(object):
         See Parameter section above.
     monomers, compartments, parameters, rules, observables : ComponentSet
         The Component objects which make up the model.
-    initial_conditions : list of tuple of (ComplexPattern, Parameter)
+    initials : list of Initial
         Specifies which species are present in the model's starting
-        state (t=0) and how much there is of each one.  The
-        ComplexPattern defines the species identity, and it must be
-        concrete (see ComplexPattern.is_concrete).  The
-        Parameter defines the amount or concentration of the species.
+        state (t=0) and how much there is of each one.
+    initial_conditions : list of tuple of (ComplexPattern, Parameter)
+        The old representation of initial conditions, deprecated in favor of
+        `initials`.
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
         the initial conditions and successively applying the rules. Each 
@@ -1489,9 +1552,10 @@ class Model(object):
         self.rules = ComponentSet()
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
-        self.initial_conditions = []
+        self.initials = []
         self.annotations = []
         self._odes = OdeView(self)
+        self._initial_conditions = InitialConditionsView(self)
         self.reset_equations()
         #####
         self.diffusivities = []
@@ -1505,7 +1569,7 @@ class Model(object):
             for component in model_copy.all_components():
                 self.add_component(component)
                 component._do_export()
-            self.initial_conditions = model_copy.initial_conditions
+            self.initials = model_copy.initials
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -1605,7 +1669,7 @@ class Model(object):
 
     def parameters_initial_conditions(self):
         """Return a ComponentSet of initial condition parameters."""
-        cset = ComponentSet(ic[1] for ic in self.initial_conditions)
+        cset = ComponentSet(ic.value for ic in self.initials)
         # intersect with original parameter list to retain ordering
         return self.parameters & cset
 
@@ -1664,6 +1728,8 @@ class Model(object):
                     sm[r, i] -= 1
                 for p in reaction['products']:
                     sm[p, i] += 1
+            fixed = [i for i, ic in enumerate(self.initials) if ic.fixed]
+            sm[fixed, :] = 0
             self._stoichiometry_matrix = sm.tocsr()
         return self._stoichiometry_matrix
 
@@ -1704,59 +1770,38 @@ class Model(object):
             if component in cset:
                 cset.rename(component, new_name)
 
-    def _validate_initial_condition_pattern(self, pattern):
-        """
-        Make sure a pattern is valid for an initial condition.
-
-        Patterns must satisfy all of the following:
-        * Able to be cast as a ComplexPattern
-        * Concrete (see ComplexPattern.is_concrete)
-        * Distinct from any existing initial condition pattern
-        * match_once is False (nonsensical in this context)
-
-        Parameters
-        ----------
-        pattern : MonomerPattern or ComplexPattern
-            Pattern to validate
-
-        Returns
-        -------
-        The validated pattern, upgraded to a ComplexPattern.
-
-        """
-        try:
-            complex_pattern = as_complex_pattern(pattern)
-        except InvalidComplexPatternException as e:
-            raise InvalidInitialConditionError("Not a ComplexPattern")
-        if not complex_pattern.is_concrete():
-            raise InvalidInitialConditionError("Pattern not concrete")
-        if any(complex_pattern.is_equivalent_to(other_cp)
-               for other_cp, value in self.initial_conditions):
-            # FIXME until we get proper canonicalization this could produce
-            # false negatives
+    def add_initial(self, initial):
+        if initial in self.initials:
+            return
+        if any(
+            initial.pattern.is_equivalent_to(other.pattern)
+            for other in self.initials
+        ):
             raise InvalidInitialConditionError("Duplicate species")
-        if complex_pattern.match_once:
-            raise InvalidInitialConditionError("MatchOnce not allowed here")
-        return complex_pattern
+        self.initials.append(initial)
 
-    def initial(self, pattern, value):
-        """
-        Add an initial condition.
+    def initial(self, pattern, value, fixed=False):
+        """Add an initial condition.
 
-        An initial condition is made up of a species and its amount or
-        concentration.
-
-        Parameters
-        ----------
-        pattern : ComplexPattern
-            A concrete pattern defining the species to initialize.
-        value : Parameter
-            Amount of the species the model will start with.
+        This method is deprecated. Instead, create an Initial object
+        and pass it to add_initial.
 
         """
-        complex_pattern = self._validate_initial_condition_pattern(pattern)
-        validate_const_expr(value, "initial condition value")
-        self.initial_conditions.append( (complex_pattern, value) )
+        warnings.warn(
+            'Model.initial will be removed in a future version. Instead,'
+            ' create an Initial object and pass it to Model.add_initial.',
+            DeprecationWarning
+        )
+        self.add_initial(Initial(pattern, value, fixed, _export=False))
+
+    @property
+    def initial_conditions(self):
+        warnings.warn(
+            'Model.initial_conditions will be removed in a future version.'
+            ' Instead, you can get a list of Initial objects with'
+            ' Model.initials.', DeprecationWarning
+        )
+        return self._initial_conditions
 
     def update_initial_condition_pattern(self, before_pattern, after_pattern):
         """
@@ -1780,9 +1825,13 @@ class Model(object):
             before_pattern.
         """
 
+        before_pattern = as_complex_pattern(before_pattern)
+
         # Get the initial condition index
-        ic_index_list = [i for i, ic in enumerate(self.initial_conditions)
-                   if ic[0].is_equivalent_to(as_complex_pattern(before_pattern))]
+        ic_index_list = [
+            i for i, ic in enumerate(self.initials)
+            if ic.pattern.is_equivalent_to(before_pattern)
+        ]
 
         # If the initial condition to replace is not found, raise an error
         if not ic_index_list:
@@ -1793,19 +1842,14 @@ class Model(object):
         # error (this should never happen, because duplicate initial conditions
         # are not allowed to be created)
         assert len(ic_index_list) == 1
-        ic_index = ic_index_list[0]
 
-        # Make sure the new initial condition pattern is valid
-        after_pattern = self._validate_initial_condition_pattern(after_pattern)
-
-        # Since everything checks out, replace the old initial condition
-        # pattern with the new one.  Because initial_conditions are tuples (and
-        # hence immutable), we cannot simply replace the pattern; instead we
-        # must delete the old one and add the new one.
-        # We retain the old parameter object:
-        p = self.initial_conditions[ic_index][1]
-        del self.initial_conditions[ic_index]
-        self.initial_conditions.append( (after_pattern, p) )
+        # Build the new InitialCondition and replace the old one.
+        initial_index = ic_index_list[0]
+        initial_old = self.initials[initial_index]
+        initial_new = InitialCondition(
+            after_pattern, initial_old.value, initial_old.fixed
+        )
+        self.initials[initial_index] = initial_new
 
     def get_species_index(self, complex_pattern):
         """
@@ -1900,6 +1944,14 @@ class UnknownSiteError(ValueError):
 
 class CompartmentAlreadySpecifiedError(ValueError):
     pass
+
+class ModelNotDefinedError(RuntimeError):
+    """SelfExporter method was called before a model was defined."""
+    def __init__(self):
+        ValueError.__init__(
+            self,
+            "A Model must be declared before declaring any model components"
+        )
 
 
 class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
@@ -2158,6 +2210,20 @@ class OdeView(collections.Sequence):
 
     def __len__(self):
         return len(self.model.species)
+
+
+class InitialConditionsView(collections.Sequence):
+    """Compatibility shim for the Model.initial_conditions property."""
+
+    def __init__(self, model):
+        self.model = model
+
+    def __getitem__(self, key):
+        initial = self.model.initials[key]
+        return (initial.pattern, initial.value)
+
+    def __len__(self):
+        return len(self.model.initials)
 
 
 class ComponentDuplicateNameError(ValueError):

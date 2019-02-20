@@ -6,9 +6,9 @@ for :py:mod:`pysb.export`.
 """
 import pysb
 import pysb.bng
-from sympy import sympify
 from pysb.export import Exporter
 from sympy.printing.mathml import MathMLPrinter
+from sympy import Symbol
 from xml.dom.minidom import Document
 try:
     import libsbml
@@ -169,18 +169,17 @@ class SbmlExporter(Exporter):
             _check(expr_rule.setMath(expr_mathml))
 
         # Initial values/assignments
-        initial_concs = [0.0] * len(self.model.species)
-        for cp, param in self.model.initial_conditions:
-            sp_idx = self.model.get_species_index(cp)
-            if isinstance(param, pysb.Expression):
-                ia = smodel.createInitialAssignment()
-                _check(ia)
-                _check(ia.setSymbol('__s{}'.format(sp_idx)))
-                init_mathml = self._sympy_to_sbmlast(sympify(param.name))
-                _check(ia.setMath(init_mathml))
-                initial_concs[sp_idx] = None
-            else:
-                initial_concs[sp_idx] = param.value
+        fixed_species_idx = set()
+        for ic in self.model.initials:
+            sp_idx = self.model.get_species_index(ic.pattern)
+            ia = smodel.createInitialAssignment()
+            _check(ia)
+            _check(ia.setSymbol('__s{}'.format(sp_idx)))
+            init_mathml = self._sympy_to_sbmlast(Symbol(ic.value.name))
+            _check(ia.setMath(init_mathml))
+
+            if ic.fixed:
+                fixed_species_idx.add(sp_idx)
 
         # Species
         for i, s in enumerate(self.model.species):
@@ -205,21 +204,13 @@ class SbmlExporter(Exporter):
                 compartment_name = 'default'
             _check(sp.setCompartment(compartment_name))
             _check(sp.setName(str(s).replace('% ', '._br_')))
-            _check(sp.setBoundaryCondition(False))
+            _check(sp.setBoundaryCondition(i in fixed_species_idx))
             _check(sp.setConstant(False))
             _check(sp.setHasOnlySubstanceUnits(True))
-            if initial_concs[i] is not None:
-                _check(sp.setInitialAmount(initial_concs[i]))
 
         # Parameters
-        params_only_initials = (self.model.parameters_initial_conditions() -
-                                self.model.parameters_rules() -
-                                self.model.parameters_compartments() -
-                                self.model.parameters_expressions())
 
         for i, param in enumerate(self.model.parameters):
-            if param in params_only_initials:
-                continue
             p = smodel.createParameter()
             _check(p)
             _check(p.setId(param.name))

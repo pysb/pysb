@@ -24,8 +24,8 @@ L_0 = Parameter('L_0', 1e2)
 R_0 = Parameter('R_0', 1e4)
 model.add_component(L_0)
 model.add_component(R_0)
-model.initial(L(r=None), L_0)
-model.initial(R(l=None), R_0)
+model.add_initial(Initial(L(r=None), L_0))
+model.add_initial(Initial(R(l=None), R_0))
 
 if __name__ == '__main__':
     print(__doc__, "\n", model)
