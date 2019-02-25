@@ -548,7 +548,7 @@ class MonomerPattern(object):
         value = '%s(' % self.monomer.name
         value += ', '.join([
                 k + '=' + repr(self.site_conditions[k])
-                for k in sorted(self.monomer.sites)
+                for k in self.monomer.sites
                 if k in self.site_conditions
                 ])
         value += ')'
