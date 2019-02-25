@@ -330,6 +330,14 @@ class Simulator(object):
         if new_initials is None:
             return None
 
+        # If new_initials is a pandas dataframe, convert to a dict
+        if pd and isinstance(new_initials, pd.DataFrame):
+            new_initials = new_initials.to_dict(orient='list')
+
+        # If new_initials is a list, convert to numpy array
+        if isinstance(new_initials, list):
+            new_initials = np.array(new_initials, copy=False)
+
         # Check if new_initials is a dict, and if so validate the keys
         # (ComplexPatterns)
         if isinstance(new_initials, dict):
@@ -354,9 +362,7 @@ class Simulator(object):
                 if not np.isfinite(val).all():
                     raise ValueError('Please check initial {} for non-finite '
                                      'values'.format(cplx_pat))
-        else:
-            if not isinstance(new_initials, np.ndarray):
-                new_initials = np.array(new_initials, copy=False)
+        elif isinstance(new_initials, np.ndarray):
             # if new_initials is a 1D array, convert to a 2D array of length 1
             if len(new_initials.shape) == 1:
                 new_initials = np.resize(new_initials, (1, len(new_initials)))
@@ -368,6 +374,11 @@ class Simulator(object):
             if not np.isfinite(new_initials).all():
                 raise ValueError('Please check initials array '
                                  'for non-finite values')
+        else:
+            raise ValueError(
+                'Implicit conversion of data type "{}" is not '
+                'supported. Please supply initials as a numpy array, list, '
+                'or a pandas DataFrame.'.format(type(new_initials)))
 
         if n_sims > 1:
             if not self._supports['multi_initials']:
@@ -451,6 +462,15 @@ class Simulator(object):
     def _process_incoming_params(self, new_params):
         if new_params is None:
             return None
+
+        # Convert pandas dataframe to dictionary
+        if pd and isinstance(new_params, pd.DataFrame):
+            new_params = new_params.to_dict(orient='list')
+
+        # If new_params is a list, convert to numpy array
+        if isinstance(new_params, list):
+            new_params = np.array(new_params)
+
         if isinstance(new_params, dict):
             n_sims = 1
             if len(new_params) > 0:
@@ -467,9 +487,7 @@ class Simulator(object):
                 if len(val) != n_sims:
                     raise ValueError("all arrays in params dictionary "
                                      "must be equal length")
-        else:
-            if not isinstance(new_params, np.ndarray):
-                new_params = np.array(new_params)
+        elif isinstance(new_params, np.ndarray):
             # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
                 new_params = np.resize(new_params, (1, len(new_params)))
@@ -478,6 +496,11 @@ class Simulator(object):
             if new_params.shape[1] != len(self._model.parameters):
                 raise ValueError("new_params must be the same length as "
                                  "model.parameters")
+        else:
+            raise ValueError(
+                'Implicit conversion of data type "{}" is not '
+                'supported. Please supply parameters as a numpy array, list, '
+                'or a pandas DataFrame.'.format(type(new_params)))
 
         # Check whether simulator supports multiple param_values
         if n_sims > 1 and not self._supports['multi_param_values']:
