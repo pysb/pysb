@@ -181,21 +181,22 @@ class GPUSimulator(Simulator):
         self._logger.debug("Converted PySB model to pycuda code")
         return cs_string
 
-    def _compile(self, code):
+    def _compile(self):
 
         if self.verbose:
             self._logger.info("Output cuda file to ssa_cuda_code.cu")
             with open("ssa_cuda_code.cu", "w") as source_file:
-                source_file.write(code)
+                source_file.write(self._code)
         nvcc_bin = get_path('nvcc')
         self._logger.debug("Compiling CUDA code")
         opts = ['-O3', '--use_fast_math']
         self._kernel = pycuda.compiler.SourceModule(
-            code, nvcc=nvcc_bin, options=opts, no_extern_c=True, keep=False
+            self._code, nvcc=nvcc_bin, options=opts, no_extern_c=True,
         )
 
         self._ssa = self._kernel.get_function("Gillespie_all_steps")
         self._logger.debug("Compiled CUDA code")
+        self._step_0 = False
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
             threads=32):
@@ -237,7 +238,7 @@ class GPUSimulator(Simulator):
 
         # compile kernel and send parameters to GPU
         if self._step_0:
-            self._setup()
+            self._compile()
 
         timer_start = time.time()
 
@@ -258,7 +259,7 @@ class GPUSimulator(Simulator):
         )
 
         # allocate and upload time to GPU
-        time_points_gpu = gpuarray.to_gpu(np.array(t_out, dtype=np.float32))
+        time_points_gpu = gpuarray.to_gpu(np.array(t_out, dtype=np.float64))
 
         # allocate space on GPU for results
         result = driver.managed_zeros(
@@ -297,10 +298,6 @@ class GPUSimulator(Simulator):
         self._logger.debug("limited by = {}".format(occ.limited_by))
         self._logger.debug("occupancy  = {}".format(occ.occupancy))
         self._logger.debug("tb/mp limits  = {}".format(occ.tb_per_mp_limits))
-
-    def _setup(self):
-        self._compile(self._code)
-        self._step_0 = False
 
     @staticmethod
     def _create_gpu_array(values, total_threads, prec):
