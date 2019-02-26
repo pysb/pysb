@@ -93,30 +93,30 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
     // beginning of loop
     while (time_index < NRESULTS){{
         while (t < time[time_index]){{
-                    // calculate propensities
+            // calculate propensities
             double a0 = propensities(y, A, param_vec);
             if (a0 <= 0.0){{
                 t = time[NRESULTS-1];
                 continue;
             }}
 
+            // store last state to be saved to output
             #pragma unroll
             for(int j=0; j<num_species; j++){{
                 prev[j] = y[j];
                 }}
 
-            t +=  -__logf(curand_uniform(&randState))/a0;  // update time
-            stoichiometry(y, sample(A, a0*curand_uniform(&randState))); // update species matrix
-
-
             // calculate two random numbers
-//            double r1 =  curand_uniform(&randState);
-//            double tau = -__logf(r1)/a0;  // find time of next reaction
-//            t += tau;  // update time
+            double r1 =  curand_uniform(&randState);
+            double r2 =  curand_uniform(&randState);
 
-//            double r2 =  curand_uniform(&randState);
-//            double k = sample(A, a0*r2);  // find next reaction
-//            stoichiometry(y, k); // update species matrix
+            // find time of next reaction and update time
+            double tau = -__logf(r1)/a0;
+            t += tau;
+
+            // find next reaction and update species matrix
+            double k = sample(A, a0*r2);
+            stoichiometry(y, k);
             }}
 
         update_results(result, prev, result_stepping, time_index);
@@ -126,6 +126,3 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
     }}
 
 }} // extern c close
-// 0.221723079681s, each its own
-// 0.222158908844s when not keeping r1
-// 0.219128847122s when not keeping r1 or tau

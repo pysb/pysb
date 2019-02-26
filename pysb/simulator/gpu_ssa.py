@@ -69,19 +69,15 @@ class GPUSimulator(Simulator):
         super(GPUSimulator, self).__init__(model, verbose, **kwargs)
 
         if pycuda is None:
-            raise SimulatorException('pycuda library was not found and is '
-                                     'required for {}'.format(
-                self.__class__.__name__))
+            raise SimulatorException('pycuda library required for {}'
+                                     ''.format(self.__class__.__name__))
 
         generate_equations(self._model)
 
-        self.tout = None
         self.tspan = tspan
         self.verbose = verbose
 
         # private attribute
-        self._threads = 32
-        self._blocks = None
         self._parameter_number = len(self._model.parameters)
         self._n_species = len(self._model.species)
         self._n_reactions = len(self._model.reactions)
@@ -101,7 +97,7 @@ class GPUSimulator(Simulator):
 
         """
         p = re.compile('\s')
-        stoich_matrix = (_rhs(self._model) + _lhs(self._model)).T
+        stoich_matrix = _get_stoch(self.model)
 
         all_reactions = []
         for rxn_number, rxn in enumerate(stoich_matrix.T):
@@ -117,6 +113,7 @@ class GPUSimulator(Simulator):
         stoich_string = ''
         l_lim = self._n_species - 1
         r_lim = self._n_reactions - 1
+
         for i in range(0, self._n_reactions):
             for j in range(0, len(stoich_matrix)):
                 stoich_string += "%s" % repr(stoich_matrix[j][i])
@@ -155,16 +152,13 @@ class GPUSimulator(Simulator):
             for q, prm in enumerate(params_names):
                 rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
             items = rate.split('*')
-            rate = ''
-            # places param_arry value at the front to make propensities doubles
-            for i in items:
-                if i.startswith('param_vec'):
-                    rate += i + '*'
 
-            for i in sorted(items):
-                if i.startswith('param_vec'):
-                    continue
-                rate += i + '*'
+            # create rate string. Places param_vec upfront to ensure that
+            # the resulting value is a double (type of param_vec) and not
+            # degraded to an int
+            rate = [i for i in sorted(items) if i.startswith('param_vec')]
+            rate += [i for i in sorted(items) if not i.startswith('param_vec')]
+            rate = "*".join(rate)
             rate = re.sub('\*$', '', rate)
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
@@ -201,24 +195,31 @@ class GPUSimulator(Simulator):
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
             threads=32):
 
+        num_sim = int(number_sim)
+
+        # check for proper arguments
+        if param_values is None and initials is None and not num_sim:
+            raise InvalidSimulationValues()
+        elif param_values is None and not num_sim:
+            num_sim = np.array(initials).shape[0]
+        elif initials is None and not num_sim:
+            num_sim = np.array(param_values).shape[0]
+
         if param_values is None:
             # Run simulation using same param_values
-            num_particles = int(number_sim)
-            nominal_values = np.array(
-                [p.value for p in self._model.parameters])
-            param_values = np.zeros((num_particles, len(nominal_values)),
-                                    dtype=np.float64)
-            param_values[:, :] = nominal_values
-        self.param_values = param_values
+            param_values = np.repeat(self.param_values, num_sim, axis=0)
+        elif len(param_values.shape) == 1:
+            param_values = np.repeat([param_values], num_sim, axis=0)
 
         if initials is None:
             # Run simulation using same initial conditions
-            species_names = [str(s) for s in self._model.species]
-            initials = np.zeros(len(species_names))
-            for ic in self._model.initial_conditions:
-                initials[species_names.index(str(ic[0]))] = int(ic[1].value)
-            initials = np.repeat([initials], param_values.shape[0], axis=0)
-            self.initials = initials
+            initials = np.repeat(self.initials, num_sim, axis=0)
+        elif len(initials.shape) == 1:
+            initials = np.repeat([initials], num_sim, axis=0)
+
+        super(GPUSimulator, self).run(tspan=tspan, initials=initials,
+                                      param_values=param_values,
+                                      _run_kwargs=locals())
 
         if tspan is None:
             tspan = self.tspan
@@ -226,24 +227,20 @@ class GPUSimulator(Simulator):
         tout = [tspan] * len(param_values)
         t_out = np.array(tspan, dtype=np.float64)
 
+        # set default threads per block
         if threads is None:
-            threads = self._threads
+            threads = 32
 
-        size_params = param_values.shape[0]
-        blocks, threads = self.get_blocks(size_params, threads)
-        self._threads = threads
-        self._blocks = blocks
+        blocks, threads = self.get_blocks(num_sim, threads)
+
         self._logger.info("Starting {} simulations on {} blocks"
-                          "".format(number_sim, self._blocks))
+                          "".format(num_sim, blocks))
 
         # compile kernel and send parameters to GPU
         if self._step_0:
             self._compile()
-
-        timer_start = time.time()
-
         if self.verbose:
-            self._print_verbose()
+            self._print_verbose(threads)
 
         #  Note, this number will be larger than n_simulations if the gpu grid
         #  is not filled. The rest will be filled with zeros and not impact
@@ -266,7 +263,7 @@ class GPUSimulator(Simulator):
             shape=(total_threads, len(t_out), self._n_species),
             dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
         )
-
+        timer_start = time.time()
         # perform simulation
         self._ssa(species_matrix_gpu, result, time_points_gpu,
                   np.int32(len(t_out)), param_array_gpu,
@@ -277,21 +274,20 @@ class GPUSimulator(Simulator):
 
         self._time = time.time() - timer_start
         self._logger.info("{} simulations "
-                          "in {}s".format(number_sim, self._time))
+                          "in {}s".format(num_sim, self._time))
 
-        # retrieve and store results, only keeping n_simulations
-        # actual simulations we will return
-        return SimulationResult(self, tout, result[:size_params, :, :])
+        # retrieve and store results, only keeping num_sim (desired quantity)
+        return SimulationResult(self, tout, result[:num_sim, :, :])
 
-    def _print_verbose(self):
-        self._logger.debug("threads = {}".format(self._threads))
+    def _print_verbose(self, threads):
+        self._logger.debug("threads = {}".format(threads))
         kern = self._ssa
         self._logger.debug("Local memory  = {}".format(kern.local_size_bytes))
         self._logger.debug("Shared memory = {}".format(kern.shared_size_bytes))
         self._logger.debug("Registers  = {}".format(kern.num_regs))
 
         occ = tools.OccupancyRecord(tools.DeviceData(),
-                                    threads=self._threads,
+                                    threads=threads,
                                     shared_mem=kern.shared_size_bytes,
                                     registers=kern.num_regs)
         self._logger.debug("tb_per_mp  = {}".format(occ.tb_per_mp))
@@ -308,9 +304,7 @@ class GPUSimulator(Simulator):
         # Filling species matrix
         # Note that this might not fill entire array that was created.
         # The rest of the array will be zeros to fill up GPU.
-        for i in range(len(values)):
-            for j in range(values.shape[1]):
-                gpu_array[i, j] = values[i, j]
+        gpu_array[:len(values)] = values
         return gpu_array
 
     @staticmethod
@@ -330,12 +324,14 @@ class GPUSimulator(Simulator):
         return block_count, threads_per_block
 
 
-def _lhs(model):
+def _get_stoch(model):
     """
     Left hand side
     """
     left_side = np.zeros((len(model.reactions), len(model.species)),
                          dtype=np.int32)
+    right_side = left_side.copy()
+
     for i in range(len(model.reactions)):
         for j in range(len(model.species)):
             stoich = 0
@@ -343,25 +339,12 @@ def _lhs(model):
                 if j == k:
                     stoich += 1
             left_side[i, j] = stoich
-    return left_side * -1
-
-
-def _rhs(model):
-    """
-
-    Right hand side of matrix
-
-    """
-    right_side = np.zeros((len(model.reactions), len(model.species)),
-                          dtype=np.int32)
-    for i in range(len(model.reactions)):
-        for j in range(len(model.species)):
             stoich = 0
             for k in model.reactions[i]['products']:
                 if j == k:
                     stoich += 1
             right_side[i, j] = stoich
-    return right_side
+    return (right_side + left_side * -1).T
 
 
 def _load_template():
@@ -370,3 +353,9 @@ def _load_template():
                            'gillespie_template.cu'), 'r') as f:
         gillespie_code = f.read()
     return gillespie_code
+
+
+class InvalidSimulationValues(Exception):
+    def __init__(self):
+        Exception.__init__(self, "Please a multi-dimension set of parameters,"
+                                 " initials, or number_sim>0")
