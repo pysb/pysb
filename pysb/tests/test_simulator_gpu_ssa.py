@@ -13,10 +13,7 @@ class TestGpu(object):
         self.simulator = GPUSimulator(model)
 
     def test_multiple_call_host(self):
-        traj = self.simulator.run(self.tspan, number_sim=100)
-
-    def test_one_single_call_host(self):
-        traj = self.simulator.run_one_step(self.tspan, number_sim=100)
+        self.simulator.run(self.tspan, number_sim=100)
 
 
 if __name__ == '__main__':
