@@ -1,10 +1,12 @@
-from pysb.simulator.scipyode import ScipyOdeSimulator
-from pysb.simulator.gpu_ssa_cl import GPUSimulatorCL
-import numpy as np
-from pysb.examples.earm_1_0 import model
-import matplotlib.pyplot as plt
-from pysb.logging import setup_logger
 import logging
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from pysb.examples.earm_1_0 import model
+from pysb.logging import setup_logger
+from pysb.simulator.opencl_ssa import OpenCLSimulator
+from pysb.simulator.scipyode import ScipyOdeSimulator
 
 setup_logger(logging.INFO)
 
@@ -16,7 +18,7 @@ def run(n_sim=1000):
     tspan = np.linspace(0, 20000, 101)
     name = 'tBid_total'
 
-    sim = GPUSimulatorCL(model, tspan=tspan, verbose=True)
+    sim = OpenCLSimulator(model, tspan=tspan, verbose=True, device='cpu')
     traj = sim.run(tspan=tspan, number_sim=n_sim)
 
     result = np.array(traj.observables)[name]

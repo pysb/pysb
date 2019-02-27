@@ -12,20 +12,17 @@ try:
 except ImportError:
     pycuda = None
 
-import re
 import numpy as np
 import os
-import sympy
 import time
 from pysb.logging import setup_logger
 import logging
 from pysb.pathfinder import get_path
-from pysb.core import Expression
-from pysb.bng import generate_equations
-from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
+from pysb.simulator.base import SimulationResult, SimulatorException
+from pysb.simulator.ssa_base import SSABase
 
 
-class GPUSimulator(Simulator):
+class CUDASimulator(SSABase):
     """
     GPU simulator
 
@@ -66,13 +63,10 @@ class GPUSimulator(Simulator):
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
     def __init__(self, model, verbose=False, tspan=None, **kwargs):
-        super(GPUSimulator, self).__init__(model, verbose, **kwargs)
-
         if pycuda is None:
             raise SimulatorException('pycuda library required for {}'
                                      ''.format(self.__class__.__name__))
-
-        generate_equations(self._model)
+        super(CUDASimulator, self).__init__(model, verbose, **kwargs)
 
         self.tspan = tspan
         self.verbose = verbose
@@ -82,7 +76,10 @@ class GPUSimulator(Simulator):
         self._n_species = len(self._model.species)
         self._n_reactions = len(self._model.reactions)
         self._step_0 = True
-        self._code = self._pysb_to_cuda()
+
+        template_code = _load_template()
+        self._code = template_code.format(**self._get_template_args())
+
         self._ssa_all = None
         self._kernel = None
         self._param_tex = None
@@ -91,89 +88,6 @@ class GPUSimulator(Simulator):
         if verbose:
             setup_logger(logging.INFO)
         self._logger.info("Initialized GPU class")
-
-    def _pysb_to_cuda(self):
-        """ converts pysb reactions to cuda compilable code
-
-        """
-        p = re.compile('\s')
-        stoich_matrix = _get_stoch(self.model)
-
-        all_reactions = []
-        for rxn_number, rxn in enumerate(stoich_matrix.T):
-            changes = []
-            for index, change in enumerate(rxn):
-                if change != 0:
-                    changes.append([index, change])
-            all_reactions.append(changes)
-
-        params_names = [g.name for g in self._model.parameters]
-        _reaction_number = len(self._model.reactions)
-
-        stoich_string = ''
-        l_lim = self._n_species - 1
-        r_lim = self._n_reactions - 1
-
-        for i in range(0, self._n_reactions):
-            for j in range(0, len(stoich_matrix)):
-                stoich_string += "%s" % repr(stoich_matrix[j][i])
-                if not (i == l_lim and j == r_lim):
-                    stoich_string += ','
-            stoich_string += '\n'
-        hazards_string = ''
-        pattern = "(__s\d+)\*\*(\d+)"
-        for n, rxn in enumerate(self._model.reactions):
-
-            hazards_string += "\th[%s] = " % repr(n)
-            rate = sympy.fcode(rxn["rate"])
-            rate = re.sub('d0', '', rate)
-            rate = p.sub('', rate)
-            expr_strings = {
-                e.name: '(%s)' % sympy.ccode(
-                    e.expand_expr(expand_observables=True)
-                ) for e in self.model.expressions}
-            # expand only expressions used in the rate eqn
-            for e in {sym for sym in rxn["rate"].atoms()
-                      if isinstance(sym, Expression)}:
-                rate = re.sub(r'\b%s\b' % e.name,
-                              expr_strings[e.name],
-                              rate)
-
-            matches = re.findall(pattern, rate)
-            for m in matches:
-                repl = m[0]
-                for i in range(1, int(m[1])):
-                    repl += "*(%s-%d)" % (m[0], i)
-                rate = re.sub(pattern, repl, rate)
-
-            rate = re.sub(r'_*s(\d+)',
-                          lambda m: 'y[%s]' % (int(m.group(1))),
-                          rate)
-            for q, prm in enumerate(params_names):
-                rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
-            items = rate.split('*')
-
-            # create rate string. Places param_vec upfront to ensure that
-            # the resulting value is a double (type of param_vec) and not
-            # degraded to an int
-            rate = [i for i in sorted(items) if i.startswith('param_vec')]
-            rate += [i for i in sorted(items) if not i.startswith('param_vec')]
-            rate = "*".join(rate)
-            rate = re.sub('\*$', '', rate)
-            rate = re.sub('d0', '', rate)
-            rate = p.sub('', rate)
-            rate = rate.replace('pow', 'powf')
-            hazards_string += rate + ";\n"
-        template_code = _load_template()
-        cs_string = template_code.format(n_species=self._n_species,
-                                         n_params=self._parameter_number,
-                                         n_reactions=_reaction_number,
-                                         hazards=hazards_string,
-                                         stoch=stoich_string,
-                                         )
-
-        self._logger.debug("Converted PySB model to pycuda code")
-        return cs_string
 
     def _compile(self):
 
@@ -196,35 +110,14 @@ class GPUSimulator(Simulator):
             threads=32):
 
         num_sim = int(number_sim)
-
-        # check for proper arguments
-        if param_values is None and initials is None and not num_sim:
-            raise InvalidSimulationValues()
-        elif param_values is None and not num_sim:
-            num_sim = np.array(initials).shape[0]
-        elif initials is None and not num_sim:
-            num_sim = np.array(param_values).shape[0]
-
-        if param_values is None:
-            # Run simulation using same param_values
-            param_values = np.repeat(self.param_values, num_sim, axis=0)
-        elif len(param_values.shape) == 1:
-            param_values = np.repeat([param_values], num_sim, axis=0)
-
-        if initials is None:
-            # Run simulation using same initial conditions
-            initials = np.repeat(self.initials, num_sim, axis=0)
-        elif len(initials.shape) == 1:
-            initials = np.repeat([initials], num_sim, axis=0)
-
-        super(GPUSimulator, self).run(tspan=tspan, initials=initials,
-                                      param_values=param_values,
-                                      _run_kwargs=locals())
+        super(CUDASimulator, self).run(tspan=tspan, initials=initials,
+                                       param_values=param_values,
+                                       number_sim=num_sim)
 
         if tspan is None:
             tspan = self.tspan
 
-        tout = [tspan] * len(param_values)
+        tout = [tspan] * num_sim
         t_out = np.array(tspan, dtype=np.float64)
 
         # set default threads per block
@@ -248,11 +141,12 @@ class GPUSimulator(Simulator):
         total_threads = int(blocks * threads)
 
         param_array_gpu = gpuarray.to_gpu(
-            self._create_gpu_array(param_values, total_threads, np.float64)
+            self._create_gpu_array(self.param_values, total_threads,
+                                   np.float64)
         )
 
         species_matrix_gpu = gpuarray.to_gpu(
-            self._create_gpu_array(initials, total_threads, np.int32)
+            self._create_gpu_array(self.initials, total_threads, np.int32)
         )
 
         # allocate and upload time to GPU
@@ -324,27 +218,6 @@ class GPUSimulator(Simulator):
         return block_count, threads_per_block
 
 
-def _get_stoch(model):
-    """
-    Left hand side
-    """
-    left_side = np.zeros((len(model.reactions), len(model.species)),
-                         dtype=np.int32)
-    right_side = left_side.copy()
-
-    for i in range(len(model.reactions)):
-        for j in range(len(model.species)):
-            stoich = 0
-            for k in model.reactions[i]['reactants']:
-                if j == k:
-                    stoich += 1
-            left_side[i, j] = stoich
-            stoich = 0
-            for k in model.reactions[i]['products']:
-                if j == k:
-                    stoich += 1
-            right_side[i, j] = stoich
-    return (right_side + left_side * -1).T
 
 
 def _load_template():
@@ -354,8 +227,3 @@ def _load_template():
         gillespie_code = f.read()
     return gillespie_code
 
-
-class InvalidSimulationValues(Exception):
-    def __init__(self):
-        Exception.__init__(self, "Please a multi-dimension set of parameters,"
-                                 " initials, or number_sim>0")
