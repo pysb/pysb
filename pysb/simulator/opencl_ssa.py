@@ -117,7 +117,7 @@ class OpenCLSimulator(SSABase):
         if self._step_0:
             self._setup()
 
-        self._logger.info("Starting {} simulations".format(number_sim))
+        self._logger.info("Creating content on device")
         timer_start = time.time()
 
         # transfer the array of time points to the device
@@ -152,6 +152,11 @@ class OpenCLSimulator(SSABase):
             dtype=np.int64
         )
 
+        elasped_t = time.time() - timer_start
+        self._logger.info("Completed transfer in: {.4f}s".format(elasped_t))
+
+        self._logger.info("Starting {} simulations".format(number_sim))
+        timer_start = time.time()
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
             self.queue,

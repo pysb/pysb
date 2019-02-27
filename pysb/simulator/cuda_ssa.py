@@ -125,9 +125,6 @@ class CUDASimulator(SSABase):
 
         blocks, threads = self.get_blocks(self.num_sim, threads)
 
-        self._logger.info("Starting {} simulations on {} blocks"
-                          "".format(self.num_sim, blocks))
-
         # compile kernel and send parameters to GPU
         if self._step_0:
             self._compile()
@@ -139,6 +136,8 @@ class CUDASimulator(SSABase):
         #  results. They are trimmed right before passing to simulation results
         total_threads = int(blocks * threads)
 
+        self._logger.info("Creating content on device")
+        timer_start = time.time()
         param_array_gpu = gpuarray.to_gpu(
             self._create_gpu_array(self.param_values, total_threads,
                                    np.float64)
@@ -156,6 +155,12 @@ class CUDASimulator(SSABase):
             shape=(total_threads, len(t_out), self._n_species),
             dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
         )
+        elasped_t = time.time() - timer_start
+        self._logger.info("Completed transfer in: {.4f}s".format(elasped_t))
+
+        self._logger.info("Starting {} simulations on {} blocks"
+                          "".format(self.num_sim, blocks))
+
         timer_start = time.time()
         # perform simulation
         self._ssa(species_matrix_gpu, result, time_points_gpu,
@@ -167,7 +172,7 @@ class CUDASimulator(SSABase):
 
         self._time = time.time() - timer_start
         self._logger.info("{} simulations "
-                          "in {}s".format(self.num_sim, self._time))
+                          "in {.4f}s".format(self.num_sim, self._time))
 
         # retrieve and store results, only keeping num_sim (desired quantity)
         return SimulationResult(self, tout, result[:self.num_sim, :, :])
