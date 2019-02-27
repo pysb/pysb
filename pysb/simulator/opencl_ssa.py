@@ -107,10 +107,9 @@ class OpenCLSimulator(SSABase):
         self.program = cl.Program(self.context, self._code).build()
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0):
-        num_sim = int(number_sim)
         super(OpenCLSimulator, self).run(tspan=tspan, initials=initials,
                                          param_values=param_values,
-                                         number_sim=num_sim)
+                                         number_sim=number_sim)
 
         # tspan for each simulation
         t_out = np.array(tspan, dtype=np.float64)
@@ -130,7 +129,7 @@ class OpenCLSimulator(SSABase):
         # transfer the array of time points to the device
         random_seeds_gpu = ocl_array.to_device(
             self.queue,
-            np.array(random.sample(range(2 ** 32), num_sim))
+            np.array(random.sample(range(2 ** 32), self.num_sim))
         )
 
         # transfer the data structure of
@@ -149,14 +148,14 @@ class OpenCLSimulator(SSABase):
         result_gpu = ocl_array.zeros(
             self.queue,
             order='C',
-            shape=(num_sim * len(t_out) * self._n_species,),
+            shape=(self.num_sim * len(t_out) * self._n_species,),
             dtype=np.int64
         )
 
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
             self.queue,
-            (num_sim, 1,),
+            (self.num_sim, 1,),
             None,
             species_matrix_gpu.data,
             result_gpu.data,
@@ -172,9 +171,9 @@ class OpenCLSimulator(SSABase):
 
         # retrieve and store results, only keeping n_simulations
         # actual simulations we will return
-        tout = np.array([tspan] * num_sim)
+        tout = np.array([tspan] * self.num_sim)
         res = result_gpu.get(self.queue)
-        res = res.reshape((num_sim, len(t_out), self._n_species))
+        res = res.reshape((self.num_sim, len(t_out), self._n_species))
 
         return SimulationResult(self, tout, res)
 

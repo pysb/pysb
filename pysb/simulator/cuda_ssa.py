@@ -109,25 +109,24 @@ class CUDASimulator(SSABase):
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
             threads=32):
 
-        num_sim = int(number_sim)
         super(CUDASimulator, self).run(tspan=tspan, initials=initials,
                                        param_values=param_values,
-                                       number_sim=num_sim)
+                                       number_sim=number_sim)
 
         if tspan is None:
             tspan = self.tspan
 
-        tout = [tspan] * num_sim
+        tout = [tspan] * self.num_sim
         t_out = np.array(tspan, dtype=np.float64)
 
         # set default threads per block
         if threads is None:
             threads = 32
 
-        blocks, threads = self.get_blocks(num_sim, threads)
+        blocks, threads = self.get_blocks(self.num_sim, threads)
 
         self._logger.info("Starting {} simulations on {} blocks"
-                          "".format(num_sim, blocks))
+                          "".format(self.num_sim, blocks))
 
         # compile kernel and send parameters to GPU
         if self._step_0:
@@ -168,10 +167,10 @@ class CUDASimulator(SSABase):
 
         self._time = time.time() - timer_start
         self._logger.info("{} simulations "
-                          "in {}s".format(num_sim, self._time))
+                          "in {}s".format(self.num_sim, self._time))
 
         # retrieve and store results, only keeping num_sim (desired quantity)
-        return SimulationResult(self, tout, result[:num_sim, :, :])
+        return SimulationResult(self, tout, result[:self.num_sim, :, :])
 
     def _print_verbose(self, threads):
         self._logger.debug("threads = {}".format(threads))

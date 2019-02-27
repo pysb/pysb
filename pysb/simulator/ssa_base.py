@@ -28,6 +28,7 @@ class SSABase(Simulator):
         self._n_species = len(self._model.species)
         self._n_reactions = len(self._model.reactions)
         self._step_0 = True
+        self.num_sim = None
         if verbose:
             setup_logger(logging.INFO)
         self._logger.info("Initialized GPU class")
@@ -130,7 +131,7 @@ class SSABase(Simulator):
             initials = np.repeat(self.initials, num_sim, axis=0)
         elif len(initials.shape) == 1:
             initials = np.repeat([initials], num_sim, axis=0)
-
+        self.num_sim = num_sim
         super(SSABase, self).run(tspan=tspan, initials=initials,
                                  param_values=param_values,
                                  _run_kwargs=locals())
