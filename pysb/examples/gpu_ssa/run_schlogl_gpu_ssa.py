@@ -5,6 +5,7 @@ from pysb.bng import generate_network
 from pysb.examples.schlogl import model
 from pysb.integrate import odesolve
 from pysb.simulator.gpu_ssa import GPUSimulator
+from pysb.simulator.gpu_ssa_cl import GPUSimulatorCL
 
 generate_network(model, verbose=False, cleanup=False, )
 tspan = np.linspace(0, 100, 101, dtype=np.float32)
@@ -46,9 +47,13 @@ def plot_mean_min_max(tout, trajectories, param_values=None, title=None,
 def main(number_particles, value):
     model.parameters['X_0'].value = value
     savename = 'test_{}'.format(int(value))
-    threads = 128
-    simulator = GPUSimulator(model, threads=threads, precision=np.float64,
-                             verbose=True)
+
+    use_opencl = True
+    if use_opencl:
+        simulator = GPUSimulatorCL(model, verbose=True)
+    else:
+        simulator = GPUSimulator(model, threads=32, verbose=True)
+
     traj = simulator.run(tspan, number_sim=number_particles)
     result = traj.dataframe[name]
 
@@ -59,7 +64,7 @@ def main(number_particles, value):
 
 
 if __name__ == '__main__':
-    main(2 ** 13, 100)
+    main(100, 100)
     quit()
     for i in range(100, 400, 100):
         main(2 ** 10, i)
