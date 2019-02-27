@@ -8,9 +8,10 @@ def run():
     n_sims = 100
     vol = model.parameters['vol'].value
     tspan = np.linspace(0, 500, 501)
-    sim = CupSodaSimulator(model, tspan, vol=vol, verbose=True,
+    sim = CupSodaSimulator(model, tspan, verbose=True,
                            integrator_options={'atol' : 1e-12,
                                                'rtol' : 1e-6,
+                                               'vol': vol,
                                                'max_steps' :20000})
 
     # Rate constants
@@ -22,10 +23,10 @@ def run():
     # Initial concentrations
     initials = np.zeros((n_sims, len(model.species)))
     for i in range(len(initials)):
-        for ic in model.initial_conditions:
+        for ic in model.initials:
             for j in range(len(initials[i])):
-                if str(ic[0]) == str(model.species[j]):
-                    initials[i][j] = ic[1].value
+                if str(ic.pattern) == str(model.species[j]):
+                    initials[i][j] = ic.value.value
                     break
 
     x = sim.run(initials=initials, param_values=param_values)

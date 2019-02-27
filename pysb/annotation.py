@@ -1,4 +1,4 @@
-from pysb.core import SelfExporter, Component
+from pysb.core import SelfExporter, Component, Model
 
 class Annotation(object):
 
@@ -33,6 +33,8 @@ class Annotation(object):
     def __repr__(self):
         if isinstance(self.subject, Component):
             subject = self.subject.name
+        elif isinstance(self.subject, Model):
+            subject = 'model'
         else:
             subject = self.subject
         return "%s(%s, %s, %s)" % (self.__class__.__name__, subject,

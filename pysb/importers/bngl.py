@@ -6,6 +6,8 @@ import xml.etree.ElementTree
 import re
 from sympy.parsing.sympy_parser import parse_expr
 import warnings
+import pysb.logging
+import collections
 import numbers
 
 
@@ -32,11 +34,13 @@ class BnglBuilder(Builder):
             con.action('readFile', file=filename, skip_actions=1)
             con.action('writeXML', evaluate_expressions=0)
             con.execute()
-            self._force = force
             self._x = xml.etree.ElementTree.parse('%s.xml' %
                                                   con.base_filename)\
                                            .getroot().find(_ns('{0}model'))
-            self._model_env = {}
+        self._force = force
+        self._model_env = {}
+        self._renamed_states = collections.defaultdict(dict)
+        self._log = pysb.logging.get_logger(__name__)
         self._parse_bng_xml()
 
     def _warn_or_except(self, msg):
@@ -101,6 +105,9 @@ class BnglBuilder(Builder):
                         mon_states[state_nm] = bond_list
                 state = comp.get('state')
                 if state:
+                    # If we changed the state string, use the updated version
+                    state = self._renamed_states.get(mon_name, {}).get(
+                        state, state)
                     if mon_states[state_nm]:
                         # Site has a bond and a state
                         mon_states[state_nm] = (state, mon_states[state_nm])
@@ -116,16 +123,29 @@ class BnglBuilder(Builder):
                                       '{0}MoleculeType')):
             mon_name = m.get('id')
             sites = []
-            states = {}
+            states = collections.defaultdict(list)
             for ctype in m.iterfind(_ns('{0}ListOfComponentTypes/'
                                         '{0}ComponentType')):
                 c_name = ctype.get('id')
                 sites.append(c_name)
                 states_list = ctype.find(_ns('{}ListOfAllowedStates'))
                 if states_list is not None:
-                    states[c_name] = [s.get('id') for s in
-                                      states_list.iterfind(_ns(
-                                                           '{}AllowedState'))]
+                    for s in states_list.iterfind(_ns('{}AllowedState')):
+                        state = s.get('id')
+                        if re.match('[0-9]*$', state):
+                            new_state = '_' + state
+                            while new_state in states[c_name]:
+                                new_state = '_' + new_state
+                            self._renamed_states[mon_name][state] = \
+                                new_state
+                            state = new_state
+                        states[c_name].append(state)
+                    if self._renamed_states[mon_name]:
+                        self._log.info('Monomer "{}" states were renamed as '
+                                       'follows: {}'.format(
+                            mon_name,
+                            self._renamed_states[mon_name])
+                        )
             try:
                 self.monomer(mon_name, sites, states)
             except Exception as e:
@@ -166,11 +186,6 @@ class BnglBuilder(Builder):
 
     def _parse_initials(self):
         for i in self._x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
-            if i.get('Fixed') is not None and i.get('Fixed') == "1":
-                self._warn_or_except('Species %s is fixed, but will be '
-                                     'treated as an ordinary species in '
-                                     'PySB.' % i.get('name'))
-
             value_param = i.get('concentration')
             try:
                 value = float(value_param)
@@ -190,7 +205,9 @@ class BnglBuilder(Builder):
                         'concentration')]
             mon_pats = self._parse_species(i)
             species_cpt = self.model.compartments.get(i.get('compartment'))
-            self.initial(ComplexPattern(mon_pats, species_cpt), value_param)
+            cp = ComplexPattern(mon_pats, species_cpt)
+            fixed = i.get('Fixed') == "1"
+            self.initial(cp, value_param, fixed)
 
     def _parse_compartments(self):
         for c in self._x.iterfind(_ns('{0}ListOfCompartments/{0}compartment')):

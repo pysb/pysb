@@ -1,34 +1,20 @@
 """
-Module containing a class for exporting a PySB model to SBML.
+Module containing a class for exporting a PySB model to SBML using libSBML
 
 For information on how to use the model exporters, see the documentation
 for :py:mod:`pysb.export`.
 """
-
-# FIXME this should use libsbml if available
-
 import pysb
 import pysb.bng
 from pysb.export import Exporter
-import sympy
 from sympy.printing.mathml import MathMLPrinter
-import itertools
-import textwrap
+from sympy import Symbol
+from xml.dom.minidom import Document
 try:
-    from cStringIO import StringIO
+    import libsbml
 except ImportError:
-    from io import StringIO
+    libsbml = None
 
-def indent(text, n=0):
-    """Re-indent a multi-line string, stripping leading newlines and trailing
-    spaces."""
-    text = text.lstrip('\n')
-    text = textwrap.dedent(text)
-    lines = text.split('\n')
-    lines = [' '*n + l for l in lines]
-    text = '\n'.join(lines)
-    text = text.rstrip(' ')
-    return text
 
 class MathMLContentPrinter(MathMLPrinter):
     """Prints an expression to MathML without presentation markup."""
@@ -37,51 +23,64 @@ class MathMLContentPrinter(MathMLPrinter):
         ci.appendChild(self.dom.createTextNode(sym.name))
         return ci
 
-def print_mathml(expr, **settings):
-    return MathMLContentPrinter(settings).doprint(expr)
+    def to_xml(self, expr):
+        # Preferably this should use a public API, but as that doesn't exist...
+        return self._print(expr)
 
-def format_single_annotation(annotation):
-    return '''<rdf:li rdf:resource="%s" />''' % annotation.object
 
-def get_annotation_preamble(meta_id):
-    return indent('''
-      <annotation>
-          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
-              <rdf:Description rdf:about="#%s">
-      ''' % meta_id)
+def _check(value):
+    """
+    Validate a libsbml return value
 
-def get_annotation_postamble():
-    return indent('''
-              </rdf:Description>
-          </rdf:RDF>
-      </annotation>
-      ''')
+    Raises ValueError if 'value' is a libsbml error code or None.
+    """
+    if type(value) is int and value != libsbml.LIBSBML_OPERATION_SUCCESS:
+        raise ValueError(
+            'Error encountered converting to SBML. '
+            'LibSBML returned error code {}: "{}"'.format(
+                value,
+                libsbml.OperationReturnValue_toString(value).strip()
+            )
+        )
+    elif value is None:
+        raise ValueError('LibSBML returned a null value')
 
-def get_species_annotation(meta_id, cp):
-    output = get_annotation_preamble(meta_id)
-    model = cp.monomer_patterns[0].monomer.model()
-    if len(cp.monomer_patterns) == 1:
-        # single monomer
-        all_annotations = model.get_annotations(cp.monomer_patterns[0].monomer)
-        groups = itertools.groupby(all_annotations, lambda a: a.predicate)
-        for predicate, annotations in groups:
-            qualifier = 'bqbiol:%s' % predicate
-            output += indent('<%s>\n    <rdf:Bag>\n' % qualifier, 12)
-            for a in annotations:
-                output += indent(format_single_annotation(a) + '\n', 20)
-            output += indent('    </rdf:Bag>\n</%s>\n' % qualifier, 12)
-    else:
-        # complex
-        monomers = set(mp.monomer for mp in cp.monomer_patterns)
-        annotations = [a for m in monomers for a in model.get_annotations(m)
-                       if a.predicate in ('is', 'hasPart')]
-        qualifier = 'bqbiol:hasPart'
-        output += indent('<%s>\n    <rdf:Bag>\n' % qualifier, 12)
-        for a in annotations:
-            output += indent(format_single_annotation(a) + '\n', 20)
-        output += indent('    </rdf:Bag>\n</%s>\n' % qualifier, 12)
-    output += get_annotation_postamble()
-    return indent(output, 16)
+
+def _add_ci(x_doc, x_parent, name):
+    """ Add <ci>name</ci> element to <x_parent> within x_doc """
+    ci = x_doc.createElement('ci')
+    ci.appendChild(x_doc.createTextNode(name))
+    x_parent.appendChild(ci)
+
+
+def _xml_to_ast(x_element):
+    """ Wrap MathML fragment with <math> tag and convert to libSBML AST """
+    x_doc = Document()
+    x_mathml = x_doc.createElement('math')
+    x_mathml.setAttribute('xmlns', 'http://www.w3.org/1998/Math/MathML')
+
+    x_mathml.appendChild(x_element)
+    x_doc.appendChild(x_mathml)
+
+    mathml_ast = libsbml.readMathMLFromString(x_doc.toxml())
+    _check(mathml_ast)
+    return mathml_ast
+
+
+def _mathml_expr_call(expr):
+    """ Generate an XML <apply> expression call """
+    x_doc = Document()
+    x_apply = x_doc.createElement('apply')
+    x_doc.appendChild(x_apply)
+
+    _add_ci(x_doc, x_apply, expr.name)
+    for sym in expr.expand_expr(expand_observables=True).free_symbols:
+        if isinstance(sym, pysb.Expression):
+            continue
+        _add_ci(x_doc, x_apply, sym.name if isinstance(sym, pysb.Parameter) else str(sym))
+
+    return x_apply
+
 
 class SbmlExporter(Exporter):
     """A class for returning the SBML for a given PySB model.
@@ -89,24 +88,42 @@ class SbmlExporter(Exporter):
     Inherits from :py:class:`pysb.export.Exporter`, which implements
     basic functionality for all exporters.
     """
+    def __init__(self, *args, **kwargs):
+        if not libsbml:
+            raise ImportError('The SbmlExporter requires the libsbml python package')
+        super(SbmlExporter, self).__init__(*args, **kwargs)
 
-    def export(self):
-        """Export the SBML for the PySB model associated with the exporter.
+    def _sympy_to_sbmlast(self, sympy_expr):
+        """
+        Convert a sympy expression to the AST format used by libsbml
+        """
+        return _xml_to_ast(MathMLContentPrinter().to_xml(sympy_expr))
+
+    def convert(self, level=(3, 2)):
+        """
+        Convert the PySB model to a libSBML document
+
+        Requires the libsbml python package
+
+        Parameters
+        ----------
+        level: (int, int)
+            The SBML level and version to use. The default is SBML level 3, version 2. Conversion
+            to other levels/versions may not be possible or may lose fidelity.
 
         Returns
         -------
-        string
-            String containing the SBML output.
+        libsbml.SBMLDocument
+            A libSBML document converted form the PySB model
         """
+        doc = libsbml.SBMLDocument(3, 2)
+        smodel = doc.createModel()
+        _check(smodel)
+        _check(smodel.setName(self.model.name))
 
-        output = StringIO()
         pysb.bng.generate_equations(self.model)
 
-        output.write(
-            """<?xml version="1.0" encoding="UTF-8"?>
-    <sbml xmlns="http://www.sbml.org/sbml/level2" level="2" version="1">
-        <model name="%s">""" % self.model.name)
-
+        # Docstring
         if self.docstring:
             notes_str = """
             <notes>
@@ -114,55 +131,174 @@ class SbmlExporter(Exporter):
                     <p>%s</p>
                 </body>
             </notes>""" % self.docstring.replace("\n", "<br />\n"+" "*20)
-            output.write(notes_str)
+            _check(smodel.setNotes(notes_str))
 
-        output.write("""
-            <listOfCompartments>
-                <compartment id="default" name="default" spatialDimensions="3" size="1"/>
-            </listOfCompartments>
-    """)
+        # Compartments
+        if self.model.compartments:
+            for cpt in self.model.compartments:
+                c = smodel.createCompartment()
+                _check(c)
+                _check(c.setId(cpt.name))
+                _check(c.setSpatialDimensions(cpt.dimension))
+                _check(c.setSize(cpt.size.value))
+                _check(c.setConstant(True))
+        else:
+            c = smodel.createCompartment()
+            _check(c)
+            _check(c.setId('default'))
+            _check(c.setSpatialDimensions(3))
+            _check(c.setSize(1))
+            _check(c.setConstant(True))
 
-        # complexpattern, initial value
-        ics = [[s, 0] for s in self.model.species]
-        for cp, ic_param in self.model.initial_conditions:
-            ics[self.model.get_species_index(cp)][1] = ic_param.value
-        output.write("        <listOfSpecies>\n")
-        for i, (cp, value) in enumerate(ics):
-            id = '__s%d' % i
-            metaid = 'metaid_%d' % i
-            name = str(cp).replace('% ', '._br_')  # CellDesigner does something weird with % in names
-            output.write('            <species id="%s" metaid="%s" name="%s" compartment="default" initialAmount="%.17g">\n'
-                         % (id, metaid, name, value));
-            output.write(get_species_annotation(metaid, cp))
-            output.write('            </species>\n')
-        output.write("        </listOfSpecies>\n")
+        # Expressions
+        for i, expr in enumerate(self.model.expressions):
+            # create an observable "parameter"
+            e = smodel.createParameter()
+            _check(e)
+            _check(e.setId(expr.name))
+            _check(e.setName(expr.name))
+            _check(e.setConstant(False))
 
-        output.write("        <listOfParameters>\n")
-        for i, param in enumerate(self.model.parameters_rules()):
-            output.write('            <parameter id="%s" metaid="metaid_%s" name="%s" value="%.17g"/>\n'
-                         % (param.name, param.name, param.name, param.value));
-        output.write("        </listOfParameters>\n")
+            # create an assignment rule which assigns the expression to the parameter
+            expr_rule = smodel.createAssignmentRule()
 
-        output.write("        <listOfReactions>\n")
+            _check(expr_rule)
+            _check(expr_rule.setVariable(e.getId()))
+
+            expr_mathml = self._sympy_to_sbmlast(expr.expand_expr(expand_observables=True))
+            _check(expr_rule.setMath(expr_mathml))
+
+        # Initial values/assignments
+        fixed_species_idx = set()
+        for ic in self.model.initials:
+            sp_idx = self.model.get_species_index(ic.pattern)
+            ia = smodel.createInitialAssignment()
+            _check(ia)
+            _check(ia.setSymbol('__s{}'.format(sp_idx)))
+            init_mathml = self._sympy_to_sbmlast(Symbol(ic.value.name))
+            _check(ia.setMath(init_mathml))
+
+            if ic.fixed:
+                fixed_species_idx.add(sp_idx)
+
+        # Species
+        for i, s in enumerate(self.model.species):
+            sp = smodel.createSpecies()
+            _check(sp)
+            _check(sp.setId('__s{}'.format(i)))
+            if self.model.compartments:
+                # Try to determine compartment, which must be unique for the species
+                mon_cpt = set(mp.compartment for mp in s.monomer_patterns if mp.compartment is not None)
+                if len(mon_cpt) == 0 and s.compartment:
+                    compartment_name = s.compartment_name
+                elif len(mon_cpt) == 1:
+                    mon_cpt = mon_cpt.pop()
+                    if s.compartment is not None and mon_cpt != s.compartment:
+                        raise ValueError('Species {} has different monomer and species compartments, '
+                                         'which is not supported in SBML'.format(s))
+                    compartment_name = mon_cpt.name
+                else:
+                    raise ValueError('Species {} has more than one different monomer compartment, '
+                                     'which is not supported in SBML'.format(s))
+            else:
+                compartment_name = 'default'
+            _check(sp.setCompartment(compartment_name))
+            _check(sp.setName(str(s).replace('% ', '._br_')))
+            _check(sp.setBoundaryCondition(i in fixed_species_idx))
+            _check(sp.setConstant(False))
+            _check(sp.setHasOnlySubstanceUnits(True))
+
+        # Parameters
+
+        for i, param in enumerate(self.model.parameters):
+            p = smodel.createParameter()
+            _check(p)
+            _check(p.setId(param.name))
+            _check(p.setName(param.name))
+            _check(p.setValue(param.value))
+            _check(p.setConstant(True))
+
+        # Reactions
         for i, reaction in enumerate(self.model.reactions_bidirectional):
-            reversible = str(reaction['reversible']).lower()
-            output.write('            <reaction id="r%d" metaid="metaid_r%d" name="r%d" reversible="%s">\n'
-                         % (i, i, i, reversible));
-            output.write('                <listOfReactants>\n');
-            for species in reaction['reactants']:
-                output.write('                    <speciesReference species="__s%d"/>\n' % species)
-            output.write('                </listOfReactants>\n');
-            output.write('                <listOfProducts>\n');
-            for species in reaction['products']:
-                output.write('                    <speciesReference species="__s%d"/>\n' % species)
-            output.write('                </listOfProducts>\n');
-            mathml = '<math xmlns="http://www.w3.org/1998/Math/MathML">' \
-                + print_mathml(reaction['rate']) + '</math>'
-            output.write('                <kineticLaw>' + mathml + '</kineticLaw>\n');
-            output.write('            </reaction>\n');
-        output.write("        </listOfReactions>\n")
+            rxn = smodel.createReaction()
+            _check(rxn)
+            _check(rxn.setId('r{}'.format(i)))
+            _check(rxn.setName(' + '.join(reaction['rule'])))
+            _check(rxn.setReversible(reaction['reversible']))
 
-        output.write("    </model>\n</sbml>\n")
-        return output.getvalue()
+            for sp in reaction['reactants']:
+                reac = rxn.createReactant()
+                _check(reac)
+                _check(reac.setSpecies('__s{}'.format(sp)))
+                _check(reac.setConstant(True))
+
+            for sp in reaction['products']:
+                prd = rxn.createProduct()
+                _check(prd)
+                _check(prd.setSpecies('__s{}'.format(sp)))
+                _check(prd.setConstant(True))
+
+            for symbol in reaction['rate'].free_symbols:
+                if isinstance(symbol, pysb.Expression):
+                    expr = symbol.expand_expr(expand_observables=True)
+                    for sym in expr.free_symbols:
+                        if not isinstance(sym, (pysb.Parameter, pysb.Expression)):
+                            # Species reference, needs to be specified as modifier
+                            modifier = rxn.createModifier()
+                            _check(modifier)
+                            _check(modifier.setSpecies(str(sym)))
+
+            rate = rxn.createKineticLaw()
+            _check(rate)
+            rate_mathml = self._sympy_to_sbmlast(reaction['rate'])
+            _check(rate.setMath(rate_mathml))
+
+        # Observables
+        for i, observable in enumerate(self.model.observables):
+            # create an observable "parameter"
+            obs = smodel.createParameter()
+            _check(obs)
+            _check(obs.setId('__obs{}'.format(i)))
+            _check(obs.setName(observable.name))
+            _check(obs.setConstant(False))
+
+            # create an assignment rule which assigns the observable expression to the parameter
+            obs_rule = smodel.createAssignmentRule()
+
+            _check(obs_rule)
+            _check(obs_rule.setVariable(obs.getId()))
+
+            obs_mathml = self._sympy_to_sbmlast(observable.expand_obs())
+            _check(obs_rule.setMath(obs_mathml))
 
 
+
+
+        # Apply any requested level/version conversion
+        if level != (3, 2):
+            prop = libsbml.ConversionProperties(libsbml.SBMLNamespaces(*level))
+            prop.addOption('strict', False)
+            prop.addOption('setLevelAndVersion', True)
+            prop.addOption('ignorePackages', True)
+            _check(doc.convert(prop))
+
+        return doc
+
+    def export(self, level=(3, 2)):
+        """
+        Export the SBML for the PySB model associated with the exporter
+
+        Requires libsbml package.
+
+        Parameters
+        ----------
+        level: (int, int)
+            The SBML level and version to use. The default is SBML level 3, version 2. Conversion
+            to other levels/versions may not be possible or may lose fidelity.
+
+        Returns
+        -------
+        string
+            String containing the SBML output.
+        """
+        return libsbml.writeSBMLToString(self.convert(level=level))

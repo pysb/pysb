@@ -77,15 +77,7 @@ def _sbml_location(filename):
 
 def test_bngl_import_expected_passes_with_force():
     for filename in ('Haugh2b',
-                     'continue',
-                     'gene_expr',
-                     'gene_expr_func',
                      'Motivating_example',
-                     'Motivating_example_cBNGL',
-                     'test_synthesis_cBNGL_simple',
-                     'test_synthesis_complex',
-                     'test_synthesis_complex_source_cBNGL',
-                     'test_synthesis_simple'
                      ):
         full_filename = _bngl_location(filename)
         with warnings.catch_warnings():
@@ -95,20 +87,29 @@ def test_bngl_import_expected_passes_with_force():
 
 def test_bngl_import_expected_passes():
     for filename in ('CaOscillate_Func',
+                     'continue',
                      'deleteMolecules',
                      'egfr_net',
                      'empty_compartments_block',
+                     'gene_expr',
+                     'gene_expr_func',
                      'gene_expr_simple',
                      'isomerization',
                      'michment',
+                     'Motivating_example_cBNGL',
                      'motor',
                      'simple_system',
                      'test_compartment_XML',
                      'test_setconc',
+                     'test_synthesis_cBNGL_simple',
+                     'test_synthesis_complex',
                      'test_synthesis_complex_0_cBNGL',
+                     'test_synthesis_complex_source_cBNGL',
+                     'test_synthesis_simple',
                      'toy-jim',
                      'univ_synth',
-                     'visualize'):
+                     'visualize',
+                     ):
         full_filename = _bngl_location(filename)
         yield (bngl_import_compare_simulations, full_filename)
 

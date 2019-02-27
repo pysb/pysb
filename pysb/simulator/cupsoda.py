@@ -146,18 +146,40 @@ class CupSodaSimulator(Simulator):
             'n_blocks': None,  # number of GPU blocks
             'memory_usage': 'sharedconstant'}}  # see _memory_options dict
 
+    _integrator_options_allowed = {'max_steps', 'atol', 'rtol', 'n_blocks',
+                                   'memory_usage', 'vol'}
+
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
         super(CupSodaSimulator, self).__init__(model, tspan=tspan,
                                                initials=initials,
                                                param_values=param_values,
                                                verbose=verbose, **kwargs)
-        self.gpu = kwargs.get('gpu', 0)
-        self._obs_species_only = kwargs.get('obs_species_only', True)
-        self._cleanup = kwargs.get('cleanup', True)
-        self._prefix = kwargs.get('prefix', self._model.name.replace('.', '_'))
-        self._base_dir = kwargs.get('base_dir', None)
-        self.integrator = kwargs.get('integrator', 'cupsoda')
+        self.gpu = kwargs.pop('gpu', 0)
+        self._obs_species_only = kwargs.pop('obs_species_only', True)
+        self._cleanup = kwargs.pop('cleanup', True)
+        self._prefix = kwargs.pop('prefix', self._model.name)
+        # Sanitize the directory - cupsoda doesn't handle spaces etc. well
+        self._prefix = re.sub('[^0-9a-zA-Z]', '_', self._prefix)
+        self._base_dir = kwargs.pop('base_dir', None)
+        self.integrator = kwargs.pop('integrator', 'cupsoda')
+        integrator_options = kwargs.pop('integrator_options', {})
+
+        if kwargs:
+            raise ValueError('Unknown keyword argument(s): {}'.format(
+                ', '.join(kwargs.keys())
+            ))
+
+        unknown_integrator_options = set(integrator_options.keys()).difference(
+            self._integrator_options_allowed
+        )
+        if unknown_integrator_options:
+            raise ValueError(
+                'Unknown integrator_options: {}. Allowed options: {}'.format(
+                    ', '.join(unknown_integrator_options),
+                    ', '.join(self._integrator_options_allowed)
+                )
+            )
 
         # generate the equations for the model
         pysb.bng.generate_equations(self._model, self._cleanup, self.verbose)
@@ -171,7 +193,7 @@ class CupSodaSimulator(Simulator):
         else:
             raise SimulatorException(
                 "Integrator type '" + self.integrator + "' not recognized.")
-        options.update(kwargs.get('integrator_options', {}))  # overwrite
+        options.update(integrator_options)  # overwrite
 
         # defaults
         self.opts = options

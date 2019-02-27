@@ -74,8 +74,8 @@ class PysbFlatExporter(Exporter):
         write_cset(self.model.observables)
         write_cset(self.model.expressions_dynamic())
         write_cset(self.model.rules)
-        for pattern, value in self.model.initial_conditions:
-            output.write("Initial(%s, %s)\n" % (repr(pattern), value.name))
+        for ic in self.model.initials:
+            output.write("%s\n" % ic)
         output.write("\n")
         write_cset(self.model.annotations)
 

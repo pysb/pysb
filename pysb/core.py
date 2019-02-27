@@ -9,6 +9,7 @@ import weakref
 import copy
 import itertools
 import sympy
+import numpy as np
 import scipy.sparse
 import networkx as nx
 
@@ -23,9 +24,6 @@ except NameError:
     basestring = str
     long = int
 
-def Initial(*args):
-    """Declare an initial condition (see Model.initial)."""
-    return SelfExporter.default_model.initial(*args)
 
 def MatchOnce(pattern):
     """Make a ComplexPattern match-once."""
@@ -108,14 +106,25 @@ class SelfExporter(object):
                 obj.name = module_name   # internal name for identification
                 export_name = 'model'    # symbol name for export
         elif isinstance(obj, Component):
-            if SelfExporter.default_model == None:
-                raise Exception("A Model must be declared before declaring any model components")
+            if SelfExporter.default_model is None:
+                raise ModelNotDefinedError
             SelfExporter.default_model.add_component(obj)
 
         # load obj into target namespace under obj.name
         if export_name in SelfExporter.target_globals:
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
+
+    @staticmethod
+    def add_initial(initial):
+        """Add an Initial to the default model."""
+        if not SelfExporter.do_export:
+            return
+        if not isinstance(initial, Initial):
+            raise ValueError("initial must be an Initial object")
+        if SelfExporter.default_model is None:
+            raise ModelNotDefinedError
+        SelfExporter.default_model.add_initial(initial)
 
     @staticmethod
     def cleanup():
@@ -162,9 +171,10 @@ class Component(object):
         Containing model.
 
     """
+    _VARIABLE_NAME_REGEX = re.compile(r'[_a-z][_a-z0-9]*\Z', re.IGNORECASE)
 
     def __init__(self, name, _export=True):
-        if not re.match(r'[_a-z][_a-z0-9]*\Z', name, re.IGNORECASE):
+        if not self._VARIABLE_NAME_REGEX.match(name):
             raise InvalidComponentNameError(name)
         self.name = name
         self.model = None  # to be set in Model.add_component
@@ -172,10 +182,26 @@ class Component(object):
         if self._export:
             self._do_export()
 
+        # Try to find calling module by walking the stack
+        self._modules = []
+        self._function = None
+        # We assume we're dealing with Component subclasses here
+        frame = inspect.currentframe().f_back
+        while frame is not None:
+            mod_name = frame.f_globals.get('__name__', '__unnamed__')
+            if mod_name in ['IPython.core.interactiveshell', '__main__']:
+                break
+            if mod_name not in ['pysb.core', 'pysb.macros'] and not \
+                    mod_name.startswith('importlib.'):
+                self._modules.append(mod_name)
+                if self._function is None:
+                    self._function = frame.f_code.co_name
+            frame = frame.f_back
+
     def __getstate__(self):
         # clear the weakref to parent model (restored in Model.__setstate__)
         state = self.__dict__.copy()
-        del state['model']
+        state.pop('model', None)
         # Force _export to False; we don't want the unpickling process to
         # trigger SelfExporter.export!
         state['_export'] = False
@@ -203,7 +229,6 @@ class Component(object):
 
 
 class Monomer(Component):
-
     """
     Model component representing a protein or other molecule.
 
@@ -233,8 +258,10 @@ class Monomer(Component):
     a dict following the same layout as the kwargs may be passed as the first
     and only positional argument instead.
 
+    Site names and state values must start with a letter, or one or more
+    underscores followed by a letter. Any remaining characters must be
+    alphanumeric or underscores.
     """
-
     def __init__(self, name, sites=None, site_states=None, _export=True):
         Component.__init__(self, name, _export)
 
@@ -250,27 +277,30 @@ class Monomer(Component):
                isinstance(sites, basestring):
             raise ValueError("sites must be a list of strings")
 
-        # ensure no duplicate sites
+        # ensure no duplicate sites and validate each site name
         sites_seen = {}
         for site in sites:
+            if not self._VARIABLE_NAME_REGEX.match(site):
+                raise ValueError('Invalid site name: ' + str(site))
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
         sites_dup = [site for site, count in sites_seen.items() if count > 1]
         if sites_dup:
-            raise Exception("Duplicate sites specified: " + str(sites_dup))
+            raise ValueError("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
         unknown_sites = [site for site in site_states if not site in sites_seen]
         if unknown_sites:
-            raise Exception("Unknown sites in site_states: " +
-                            str(unknown_sites))
+            raise ValueError("Unknown sites in site_states: " +
+                             str(unknown_sites))
         # ensure site_states values are all strings
         invalid_sites = [site for (site, states) in site_states.items()
-                              if not all([isinstance(s, basestring)
-                                          for s in states])]
+                         if not all([isinstance(s, basestring)
+                                     and self._VARIABLE_NAME_REGEX.match(s)
+                                     for s in states])]
         if invalid_sites:
-            raise Exception("Non-string state values in site_states for "
-                            "sites: " + str(invalid_sites))
+            raise ValueError("Invalid or non-string state values in "
+                             "site_states for sites: " + str(invalid_sites))
 
         self.sites = list(sites)
         self.site_states = site_states
@@ -1322,8 +1352,7 @@ class Observable(Component, sympy.Symbol):
         """ Expand observables in terms of species and coefficients """
         return sympy.Add(*[a * b for a, b in zip(
             self.coefficients,
-            sympy.symbols(','.join('__s%d' % sp_id for sp_id in
-                                   self.species) + ',')
+            [sympy.Symbol('__s%d' % sp_id) for sp_id in self.species]
         )])
 
     def __repr__(self):
@@ -1404,6 +1433,61 @@ class Expression(Component, sympy.Symbol):
         return repr(self)
 
 
+class Initial(object):
+    """
+    An initial condition for a species.
+
+    An initial condition is made up of a species, its amount or concentration,
+    and whether it is to be held fixed during a simulation.
+
+    Species patterns must satisfy all of the following:
+    * Able to be cast as a ComplexPattern
+    * Concrete (see ComplexPattern.is_concrete)
+    * Distinct from any existing initial condition pattern
+    * match_once is False (nonsensical in this context)
+
+    Parameters
+    ----------
+    pattern : ComplexPattern
+        A concrete pattern defining the species to initialize.
+    value : Parameter or Expression Amount of the species the model will start
+        with. If an Expression is used, it must evaluate to a constant (can't
+        reference any Observables).
+    fixed : bool
+        Whether or not the species should be held fixed (never consumed).
+
+    Parameters
+    ----------
+    Identical to Parameters (see above).
+
+    """
+
+    def __init__(self, pattern, value, fixed=False, _export=True):
+        try:
+            pattern = as_complex_pattern(pattern)
+        except InvalidComplexPatternException as e:
+            raise InvalidInitialConditionError("Not a ComplexPattern")
+        if not pattern.is_concrete():
+            raise InvalidInitialConditionError("Pattern not concrete")
+        if pattern.match_once:
+            raise InvalidInitialConditionError("MatchOnce not allowed here")
+        validate_const_expr(value, "initial condition value")
+        self.pattern = pattern
+        self.value = value
+        self.fixed = fixed
+        self._export = _export
+        if self._export:
+            SelfExporter.add_initial(self)
+
+    def __repr__(self):
+        ret = '%s(%s, %s' % (self.__class__.__name__, repr(self.pattern),
+                             self.value.name)
+        if self.fixed:
+            ret += ', fixed=True'
+        ret += ')'
+        return ret
+
+
 class Model(object):
 
     """
@@ -1426,12 +1510,12 @@ class Model(object):
         See Parameter section above.
     monomers, compartments, parameters, rules, observables : ComponentSet
         The Component objects which make up the model.
-    initial_conditions : list of tuple of (ComplexPattern, Parameter)
+    initials : list of Initial
         Specifies which species are present in the model's starting
-        state (t=0) and how much there is of each one.  The
-        ComplexPattern defines the species identity, and it must be
-        concrete (see ComplexPattern.is_concrete).  The
-        Parameter defines the amount or concentration of the species.
+        state (t=0) and how much there is of each one.
+    initial_conditions : list of tuple of (ComplexPattern, Parameter)
+        The old representation of initial conditions, deprecated in favor of
+        `initials`.
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
         the initial conditions and successively applying the rules. Each 
@@ -1468,9 +1552,10 @@ class Model(object):
         self.rules = ComponentSet()
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
-        self.initial_conditions = []
+        self.initials = []
         self.annotations = []
         self._odes = OdeView(self)
+        self._initial_conditions = InitialConditionsView(self)
         self.reset_equations()
         #####
         self.diffusivities = []
@@ -1484,7 +1569,7 @@ class Model(object):
             for component in model_copy.all_components():
                 self.add_component(component)
                 component._do_export()
-            self.initial_conditions = model_copy.initial_conditions
+            self.initials = model_copy.initials
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -1535,6 +1620,28 @@ class Model(object):
         # return self for "model = model.reload()" idiom, until a better solution can be found
         return SelfExporter.default_model
 
+    @property
+    def modules(self):
+        """
+        Return the set of Python modules where Components are defined
+
+        Returns
+        -------
+        list
+            List of module names where model Components are defined
+
+        Examples
+        --------
+
+        >>> from pysb.examples.earm_1_0 import model
+        >>> 'pysb.examples.earm_1_0' in model.modules
+        True
+        """
+        all_components = self.components
+        if not all_components:
+            return []
+        return sorted(set.union(*[set(c._modules) for c in all_components]))
+
     def all_component_sets(self):
         """Return a list of all ComponentSet objects."""
         set_names = [t.__name__.lower() + 's' for t in Model._component_types]
@@ -1562,7 +1669,7 @@ class Model(object):
 
     def parameters_initial_conditions(self):
         """Return a ComponentSet of initial condition parameters."""
-        cset = ComponentSet(ic[1] for ic in self.initial_conditions)
+        cset = ComponentSet(ic.value for ic in self.initials)
         # intersect with original parameter list to retain ordering
         return self.parameters & cset
 
@@ -1572,9 +1679,20 @@ class Model(object):
         # intersect with original parameter list to retain ordering
         return self.parameters & cset
 
+    def parameters_expressions(self):
+        """Return a ComponentSet of the parameters used in expressions."""
+        cset = ComponentSet()
+        for expr in self.expressions:
+            for sym in expr.expand_expr().free_symbols:
+                if sym in self.parameters:
+                    cset.add(sym)
+        # intersect with original parameter list to retain ordering
+        return self.parameters & cset
+
     def parameters_unused(self):
         """Return a ComponentSet of unused parameters."""
-        cset_used = self.parameters_rules() | self.parameters_initial_conditions() | self.parameters_compartments()
+        cset_used = (self.parameters_rules() | self.parameters_initial_conditions() |
+                     self.parameters_compartments() | self.parameters_expressions())
         return self.parameters - cset_used
 
 #     def expressions_constant(self):
@@ -1610,6 +1728,8 @@ class Model(object):
                     sm[r, i] -= 1
                 for p in reaction['products']:
                     sm[p, i] += 1
+            fixed = [i for i, ic in enumerate(self.initials) if ic.fixed]
+            sm[fixed, :] = 0
             self._stoichiometry_matrix = sm.tocsr()
         return self._stoichiometry_matrix
 
@@ -1650,59 +1770,38 @@ class Model(object):
             if component in cset:
                 cset.rename(component, new_name)
 
-    def _validate_initial_condition_pattern(self, pattern):
-        """
-        Make sure a pattern is valid for an initial condition.
-
-        Patterns must satisfy all of the following:
-        * Able to be cast as a ComplexPattern
-        * Concrete (see ComplexPattern.is_concrete)
-        * Distinct from any existing initial condition pattern
-        * match_once is False (nonsensical in this context)
-
-        Parameters
-        ----------
-        pattern : MonomerPattern or ComplexPattern
-            Pattern to validate
-
-        Returns
-        -------
-        The validated pattern, upgraded to a ComplexPattern.
-
-        """
-        try:
-            complex_pattern = as_complex_pattern(pattern)
-        except InvalidComplexPatternException as e:
-            raise InvalidInitialConditionError("Not a ComplexPattern")
-        if not complex_pattern.is_concrete():
-            raise InvalidInitialConditionError("Pattern not concrete")
-        if any(complex_pattern.is_equivalent_to(other_cp)
-               for other_cp, value in self.initial_conditions):
-            # FIXME until we get proper canonicalization this could produce
-            # false negatives
+    def add_initial(self, initial):
+        if initial in self.initials:
+            return
+        if any(
+            initial.pattern.is_equivalent_to(other.pattern)
+            for other in self.initials
+        ):
             raise InvalidInitialConditionError("Duplicate species")
-        if complex_pattern.match_once:
-            raise InvalidInitialConditionError("MatchOnce not allowed here")
-        return complex_pattern
+        self.initials.append(initial)
 
-    def initial(self, pattern, value):
-        """
-        Add an initial condition.
+    def initial(self, pattern, value, fixed=False):
+        """Add an initial condition.
 
-        An initial condition is made up of a species and its amount or
-        concentration.
-
-        Parameters
-        ----------
-        pattern : ComplexPattern
-            A concrete pattern defining the species to initialize.
-        value : Parameter
-            Amount of the species the model will start with.
+        This method is deprecated. Instead, create an Initial object
+        and pass it to add_initial.
 
         """
-        complex_pattern = self._validate_initial_condition_pattern(pattern)
-        validate_const_expr(value, "initial condition value")
-        self.initial_conditions.append( (complex_pattern, value) )
+        warnings.warn(
+            'Model.initial will be removed in a future version. Instead,'
+            ' create an Initial object and pass it to Model.add_initial.',
+            DeprecationWarning
+        )
+        self.add_initial(Initial(pattern, value, fixed, _export=False))
+
+    @property
+    def initial_conditions(self):
+        warnings.warn(
+            'Model.initial_conditions will be removed in a future version.'
+            ' Instead, you can get a list of Initial objects with'
+            ' Model.initials.', DeprecationWarning
+        )
+        return self._initial_conditions
 
     def update_initial_condition_pattern(self, before_pattern, after_pattern):
         """
@@ -1726,9 +1825,13 @@ class Model(object):
             before_pattern.
         """
 
+        before_pattern = as_complex_pattern(before_pattern)
+
         # Get the initial condition index
-        ic_index_list = [i for i, ic in enumerate(self.initial_conditions)
-                   if ic[0].is_equivalent_to(as_complex_pattern(before_pattern))]
+        ic_index_list = [
+            i for i, ic in enumerate(self.initials)
+            if ic.pattern.is_equivalent_to(before_pattern)
+        ]
 
         # If the initial condition to replace is not found, raise an error
         if not ic_index_list:
@@ -1739,19 +1842,14 @@ class Model(object):
         # error (this should never happen, because duplicate initial conditions
         # are not allowed to be created)
         assert len(ic_index_list) == 1
-        ic_index = ic_index_list[0]
 
-        # Make sure the new initial condition pattern is valid
-        after_pattern = self._validate_initial_condition_pattern(after_pattern)
-
-        # Since everything checks out, replace the old initial condition
-        # pattern with the new one.  Because initial_conditions are tuples (and
-        # hence immutable), we cannot simply replace the pattern; instead we
-        # must delete the old one and add the new one.
-        # We retain the old parameter object:
-        p = self.initial_conditions[ic_index][1]
-        del self.initial_conditions[ic_index]
-        self.initial_conditions.append( (after_pattern, p) )
+        # Build the new InitialCondition and replace the old one.
+        initial_index = ic_index_list[0]
+        initial_old = self.initials[initial_index]
+        initial_new = InitialCondition(
+            after_pattern, initial_old.value, initial_old.fixed
+        )
+        self.initials[initial_index] = initial_new
 
     def get_species_index(self, complex_pattern):
         """
@@ -1847,6 +1945,14 @@ class UnknownSiteError(ValueError):
 class CompartmentAlreadySpecifiedError(ValueError):
     pass
 
+class ModelNotDefinedError(RuntimeError):
+    """SelfExporter method was called before a model was defined."""
+    def __init__(self):
+        ValueError.__init__(
+            self,
+            "A Model must be declared before declaring any model components"
+        )
+
 
 class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     """
@@ -1915,6 +2021,9 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
     def __setstate__(self, state):
         self.__dict__ = state
 
+    def __dir__(self):
+        return self.keys()
+
     def get(self, key, default=None):
         if isinstance(key, (int, long)):
             raise ValueError("get is undefined for integer arguments, use []"
@@ -1923,6 +2032,101 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             return self[key]
         except KeyError:
             return default
+
+    def filter(self, filter_predicate):
+        """
+        Filter a ComponentSet using a predicate or set of predicates
+
+        Parameters
+        ----------
+        filter_predicate: callable or pysb.pattern.FilterPredicate
+            A predicate (condition) to test each Component in the
+            ComponentSet against. This can either be an anonymous "lambda"
+            function or a subclass of pysb.pattern.FilterPredicate. For
+            lambda functions, the argument is a single Component and return
+            value is a boolean indicating a match or not.
+
+        Returns
+        -------
+        ComponentSet
+            A ComponentSet containing Components matching all of the
+            supplied filters
+
+        Examples
+        --------
+
+        >>> from pysb.examples.earm_1_0 import model
+        >>> from pysb.pattern import Name, Pattern, Module, Function
+        >>> m = model.monomers
+
+        Find parameters exactly equal to 10000:
+
+        >>> model.parameters.filter(lambda c: c.value == 1e4)  \
+            # doctest:+NORMALIZE_WHITESPACE
+        ComponentSet([
+         Parameter('pC3_0', 10000.0),
+         Parameter('pC6_0', 10000.0),
+        ])
+
+        Find rules with a forward rate < 1e-8, using a custom function:
+
+        >>> model.rules.filter(lambda c: c.rate_forward.value < 1e-8) \
+            # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('bind_pC3_Apop', Apop(b=None) + pC3(b=None) | Apop(b=1) %
+                pC3(b=1), kf25, kr25),
+        ])
+
+        We can also use some built in predicates for more complex matching
+        scenarios, including combining multiple predicates.
+
+        Find rules with a name beginning with "inhibit" that contain cSmac:
+
+        >>> model.rules.filter(Name('^inhibit') & Pattern(m.cSmac())) \
+            # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('inhibit_cSmac_by_XIAP', cSmac(b=None) + XIAP(b=None) |
+                cSmac(b=1) % XIAP(b=1), kf28, kr28),
+        ])
+
+        Find rules with any form of Bax (i.e. Bax, aBax, mBax):
+
+        >>> model.rules.filter(Pattern(m.Bax) | Pattern(m.aBax) | \
+                Pattern(m.MBax)) # doctest: +NORMALIZE_WHITESPACE
+        ComponentSet([
+         Rule('bind_Bax_tBid', tBid(b=None) + Bax(b=None) |
+              tBid(b=1) % Bax(b=1), kf12, kr12),
+         Rule('produce_aBax_via_tBid', tBid(b=1) % Bax(b=1) >>
+              tBid(b=None) + aBax(b=None), kc12),
+         Rule('transloc_MBax_aBax', aBax(b=None) |
+              MBax(b=None), kf13, kr13),
+         Rule('inhibit_MBax_by_Bcl2', MBax(b=None) + Bcl2(b=None) |
+              MBax(b=1) % Bcl2(b=1), kf14, kr14),
+         Rule('dimerize_MBax_to_Bax2', MBax(b=None) + MBax(b=None) |
+              Bax2(b=None), kf15, kr15),
+         ])
+
+        Count the number of parameter that don't start with kf (note the ~
+        negation operator):
+
+        >>> len(model.parameters.filter(~Name('^kf')))
+        60
+
+        Get components not defined in this module (file). In this case,
+        everything is defined in one file, but for multi-file models this
+        becomes more useful:
+
+        >>> model.components.filter(~Module('^pysb.examples.earm_1_0$'))
+        ComponentSet([
+         ])
+
+        Count the number of rules defined in the 'catalyze' function:
+
+        >>> len(model.rules.filter(Function('^catalyze$')))
+        24
+
+        """
+        return ComponentSet(filter(filter_predicate, self))
 
     def iterkeys(self):
         for c in self:
@@ -2006,6 +2210,20 @@ class OdeView(collections.Sequence):
 
     def __len__(self):
         return len(self.model.species)
+
+
+class InitialConditionsView(collections.Sequence):
+    """Compatibility shim for the Model.initial_conditions property."""
+
+    def __init__(self, model):
+        self.model = model
+
+    def __getitem__(self, key):
+        initial = self.model.initials[key]
+        return (initial.pattern, initial.value)
+
+    def __len__(self):
+        return len(self.model.initials)
 
 
 class ComponentDuplicateNameError(ValueError):

@@ -132,19 +132,23 @@ class BngGenerator(object):
         self.__content += "end functions\n\n"
 
     def generate_species(self):
-        if not self.model.initial_conditions:
+        if not self.model.initials:
             warn_caller("Model does not contain any initial conditions")
             return
-        species_codes = [format_complexpattern(cp) for cp, param in self.model.initial_conditions]
+        species_codes = [
+            format_complexpattern(ic.pattern, ic.fixed)
+            for ic in self.model.initials
+        ]
         for cp in self._additional_initials:
-            if not any([cp.is_equivalent_to(i) for i, _ in
-                        self.model.initial_conditions]):
+            if not any([
+                cp.is_equivalent_to(ic.pattern) for ic in self.model.initials
+            ]):
                 species_codes.append(format_complexpattern(cp))
         max_length = max(len(code) for code in species_codes)
         self.__content += "begin species\n"
         for i, code in enumerate(species_codes):
-            if i < len(self.model.initial_conditions):
-                param = self.model.initial_conditions[i][1].name
+            if i < len(self.model.initials):
+                param = self.model.initials[i].value.name
             else:
                 param = '0'
             self.__content += ("  %-" + str(max_length) + "s   %s\n") % (code,
@@ -185,10 +189,12 @@ def format_reactionpattern(rp, for_observable=False):
         delimiter = ' '
     return delimiter.join([format_complexpattern(cp) for cp in rp.complex_patterns])
 
-def format_complexpattern(cp):
+def format_complexpattern(cp, fixed=False):
     if cp is None:
         return '0'
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
+    if fixed:
+        ret = '$' + ret
     if cp.compartment is not None:
         ret = '@%s:%s' % (cp.compartment.name, ret)
     if cp.match_once:
@@ -271,6 +277,40 @@ class BngPrinter(StrPrinter):
     def _print_Pow(self, expr, rational=False):
         return super(BngPrinter, self)._print_Pow(expr, rational)\
             .replace('**', '^')
+
+    def _print_And(self, expr):
+        return super(BngPrinter, self)._print_And(expr).replace('&', '&&')
+
+    def _print_Or(self, expr):
+        return super(BngPrinter, self)._print_Or(expr).replace('|', '||')
+
+    def _print_log(self, expr):
+        # BNG doesn't accept "log", only "ln".
+        return 'ln' + "(%s)" % self.stringify(expr.args, ", ")
+
+    def _print_Pi(self, expr):
+        return '_pi'
+
+    def _print_Exp1(self, expr):
+        return '_e'
+
+    def _print_floor(self, expr):
+        return 'rint({} - 0.5)'.format(self._print(expr.args[0]))
+
+    def _print_ceiling(self, expr):
+        return '(rint({} + 1) - 1)'.format(self._print(expr.args[0]))
+
+    def __make_lower(self, expr):
+        """ Print a function with its name in lower case """
+        return '{}({})'.format(
+            self._print(expr.func).lower(),
+            self._print(expr.args[0] if len(expr.args) == 1 else
+                        ', '.join([self._print(a) for a in expr.args]))
+        )
+
+    _print_Abs = __make_lower
+    _print_Min = __make_lower
+    _print_Max = __make_lower
 
 
 def expression_to_muparser(expression):

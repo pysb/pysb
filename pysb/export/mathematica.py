@@ -108,8 +108,9 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-from math import floor, log
-from pysb.export import Exporter
+from pysb.export import Exporter, ExpressionsNotSupported, \
+    CompartmentsNotSupported
+
 
 class MathematicaExporter(Exporter):
     """A class for returning the ODEs for a given PySB model for use in
@@ -128,6 +129,10 @@ class MathematicaExporter(Exporter):
         string
             String containing the Mathematica code for the model's ODEs.
         """
+        if self.model.expressions:
+            raise ExpressionsNotSupported()
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
 
         output = StringIO()
         pysb.bng.generate_equations(self.model)
@@ -195,9 +200,9 @@ class MathematicaExporter(Exporter):
 
         ## INITIAL CONDITIONS
         ic_values = ['0'] * len(self.model.odes)
-        for i, ic in enumerate(self.model.initial_conditions):
-            ic_values[self.model.get_species_index(ic[0])] = \
-                                        ic[1].name.replace('_', '')
+        for i, ic in enumerate(self.model.initials):
+            idx = self.model.get_species_index(ic.pattern)
+            ic_values[idx] = ic.value.name.replace('_', '')
 
         init_conds_str = 'initconds = {\n'
         init_conds_str += ',\n'.join(['s%s[0] == %s' % (i, val)

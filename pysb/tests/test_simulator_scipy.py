@@ -6,6 +6,7 @@ from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator import ScipyOdeSimulator
 from pysb.examples import robertson, earm_1_0
 import unittest
+import pandas as pd
 
 
 class TestScipySimulatorBase(object):
@@ -55,6 +56,10 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run()
         assert simres._nsims == 1
 
+    @raises(ValueError)
+    def test_invalid_init_kwarg(self):
+        ScipyOdeSimulator(self.model, tspan=self.time, spam='eggs')
+
     def test_lsoda_solver_run(self):
         """Test lsoda."""
         solver_lsoda = ScipyOdeSimulator(self.model, tspan=self.time,
@@ -71,9 +76,10 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
     def test_y0_as_list(self):
         """Test y0 with list of initial conditions"""
         # Test the initials getter method before anything is changed
-        assert np.allclose(self.sim.initials[0][0:2],
-                           [ic[1].value for ic in
-                            self.model.initial_conditions])
+        assert np.allclose(
+            self.sim.initials[0][0:2],
+            [ic.value.value for ic in self.model.initials]
+        )
 
         initials = [10, 20, 0]
         simres = self.sim.run(initials=initials)
@@ -107,6 +113,18 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
                                self.mon('B')(b=None): 0})
         assert np.allclose(simres.observables['AB_complex'][0], 100)
 
+    def test_y0_as_dataframe(self):
+        initials_dict = {self.mon('A')(a=None): [0],
+                         self.mon('B')(b=1) % self.mon('A')(a=1): [100],
+                         self.mon('B')(b=None): [0]}
+        initials_df = pd.DataFrame(initials_dict)
+        simres = self.sim.run(initials=initials_df)
+        assert np.allclose(simres.observables['AB_complex'][0], 100)
+
+    @raises(ValueError)
+    def test_y0_as_pandas_series(self):
+        self.sim.run(initials=pd.Series())
+
     @raises(TypeError)
     def test_y0_non_numeric_value(self):
         """Test y0 with non-numeric value."""
@@ -117,6 +135,14 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run(param_values={'kbindAB': 0})
         # kbindAB=0 should ensure no AB_complex is produced.
         assert np.allclose(simres.observables["AB_complex"], 0)
+
+    def test_param_values_as_dataframe(self):
+        simres = self.sim.run(param_values=pd.DataFrame({'kbindAB': [0]}))
+        assert np.allclose(simres.observables['AB_complex'], 0)
+
+    @raises(ValueError)
+    def test_param_values_as_pandas_series(self):
+        self.sim.run(param_values=pd.Series())
 
     def test_param_values_as_list_ndarray(self):
         """Test param_values as a list and ndarray."""
@@ -196,6 +222,24 @@ class TestScipySimulatorSequential(TestScipySimulatorBase):
         assert np.allclose(simres.initials, new_initials)
         # Check that the single-run initials were removed after the run
         assert np.allclose(self.sim.initials, orig_initials)
+
+    def test_sequential_initials_dict_then_list(self):
+        A, B = self.model.monomers
+
+        base_sim = ScipyOdeSimulator(
+            self.model,
+            initials={A(a=None): 10, B(b=None): 20})
+
+        assert np.allclose(base_sim.initials, [10, 20, 0])
+        assert len(base_sim.initials_dict) == 2
+
+        # Now set initials using a list, which should overwrite the dict
+        base_sim.initials = [30, 40, 50]
+
+        assert np.allclose(base_sim.initials, [30, 40, 50])
+        assert np.allclose(
+            sorted([x[0] for x in base_sim.initials_dict.values()]),
+            base_sim.initials)
 
     def test_sequential_param_values(self):
         orig_param_values = self.sim.param_values

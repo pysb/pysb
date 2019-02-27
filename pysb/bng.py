@@ -96,8 +96,10 @@ class BngBaseInterface(object):
         """
         if not self.model.rules:
             raise NoRulesError()
-        if not self.model.initial_conditions and not any(r.is_synth() for r
-                                                         in self.model.rules):
+        if (
+            not self.model.initials
+            and not any(r.is_synth() for r in self.model.rules)
+        ):
             raise NoInitialConditionsError()
 
     @classmethod
@@ -225,7 +227,7 @@ class BngBaseInterface(object):
 
             # Read concentrations data
             try:
-                cdat_arr = numpy.loadtxt(base_filename + '.cdat', skiprows=1)
+                cdat_arr = numpy.loadtxt(base_filename + '.cdat', skiprows=1, ndmin=2)
                 # -1 for time column
                 names += ['__s%d' % i for i in range(cdat_arr.shape[1] - 1)]
             except IOError:
@@ -237,7 +239,7 @@ class BngBaseInterface(object):
                     # Exclude \# and time column
                     names += f.readline().split()[2:]
                     # Exclude first column (time)
-                    gdat_arr = numpy.loadtxt(f)
+                    gdat_arr = numpy.loadtxt(f, ndmin=2)
                     if cdat_arr is None:
                         cdat_arr = numpy.ndarray((len(gdat_arr), 0))
                     else:
@@ -445,8 +447,11 @@ class BngFileInterface(BngBaseInterface):
                 output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
                     % (filename, int(skip_file_actions))
             output += bng_commands
-            self._logger.debug('BNG command file contents:\n\n' + output)
             bng_file.write(output)
+            lines = output.split('\n')
+            line_number_format = 'L{{:0{}d}}  {{}}'.format(int(numpy.ceil(numpy.log10(len(lines)))))
+            output = '\n'.join(line_number_format.format(ln + 1, line) for ln, line in enumerate(lines))
+            self._logger.debug('BNG command file contents:\n' + output)
 
         # Reset the command queue, in case execute() is called again
         self.command_queue.close()
@@ -460,13 +465,24 @@ class BngFileInterface(BngBaseInterface):
                              cwd=self.base_directory,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
+
+        # output lines as DEBUG, unless a warning or error is encountered
+        capture_error = False
+        captured_error_lines = []
         for line in iter(p.stdout.readline, b''):
-            self._logger.debug(line[:-1])
-        (p_out, p_err) = p.communicate()
-        p_out = p_out.decode('utf-8')
+            line = line[:-1].decode('utf-8')
+            if line.startswith('ERROR:'):
+                capture_error = True
+            if capture_error:
+                captured_error_lines.append(line)
+
+            self._logger.debug(line)
+
+        # p_out is already consumed, so only get p_err
+        (_, p_err) = p.communicate()
         p_err = p_err.decode('utf-8')
-        if p.returncode:
-            raise BngInterfaceError(p_out.rstrip("at line") + "\n" +
+        if p.returncode or captured_error_lines:
+            raise BngInterfaceError('\n'.join(captured_error_lines) + "\n" +
                                     p_err.rstrip())
 
     def action(self, action, **kwargs):
@@ -764,7 +780,7 @@ def _parse_species(model, line):
     monomer_patterns = []
     for ms in monomer_strings:
         monomer_name, site_strings, monomer_compartment_name = \
-            re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
+            re.match(r'\$?(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
         site_conditions = {}
         if len(site_strings):
             for ss in site_strings.split(','):

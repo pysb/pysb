@@ -1,6 +1,6 @@
 from pysb.testing import *
 import numpy as np
-from pysb import Monomer, Parameter, Initial, Observable, Rule
+from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator.bng import BngSimulator, PopulationMap
 from pysb.bng import generate_equations
 from pysb.examples import robertson, expression_observables, earm_1_0
@@ -62,6 +62,16 @@ class TestBngSimulator(object):
     def test_bng_pla(self):
         self.sim.run(n_runs=5, method='pla', seed=_BNG_SEED)
 
+    def test_tout_matches_tspan(self):
+        # Linearly spaced, starting from 0
+        assert all(self.sim.run(tspan=[0, 10, 20]).tout[0] == [0, 10, 20])
+        # Non-linearly spaced, starting from 0
+        assert all(self.sim.run(tspan=[0, 10, 30]).tout[0] == [0, 10, 30])
+        # Linearly spaced, starting higher than 0
+        assert all(self.sim.run(tspan=[10, 20, 30]).tout[0] == [10, 20, 30])
+        # Linearly spaced, starting higher than 0
+        assert all(self.sim.run(tspan=[5, 20, 30]).tout[0] == [5, 20, 30])
+
     def tearDown(self):
         self.model = None
         self.time = None
@@ -112,3 +122,21 @@ def test_hpp():
                 seed=_BNG_SEED)
     observables = np.array(x.observables)
     assert len(observables) == 50
+
+
+def test_stop_if():
+    Model()
+    Monomer('A')
+    Rule('A_synth', None >> A(), Parameter('k', 1))
+    Observable('Atot', A())
+    Expression('exp_const', k + 1)
+    Expression('exp_dyn', Atot + 1)
+    sim = BngSimulator(model, verbose=5)
+    tspan = np.linspace(0, 100, 101)
+    x = sim.run(tspan, stop_if='Atot>9', seed=_BNG_SEED)
+    # All except the last Atot value should be <=9
+    assert all(x.observables['Atot'][:-1] <= 9)
+    assert x.observables['Atot'][-1] > 9
+    # Starting with Atot > 9 should terminate simulation immediately
+    y = sim.run(tspan, initials=x.species[-1], stop_if='Atot>9')
+    assert len(y.observables) == 1

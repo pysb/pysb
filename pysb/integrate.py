@@ -123,9 +123,8 @@ class Solver(object):
         y0 : vector-like, optional
             Values to use for the initial condition of all species. Ordering is
             determined by the order of model.species. If not specified, initial
-            conditions will be taken from model.initial_conditions (with
-            initial condition parameter values taken from `param_values` if
-            specified).
+            conditions will be taken from model.initials (with initial condition
+            parameter values taken from `param_values` if specified).
         """
         self._yobs_view = None
         self._yexpr_view = None
@@ -157,8 +156,8 @@ def odesolve(model, tspan, param_values=None, y0=None, integrator='vode',
     y0 : vector-like, optional
         Values to use for the initial condition of all species. Ordering is
         determined by the order of model.species. If not specified, initial
-        conditions will be taken from model.initial_conditions (with initial
-        condition parameter values taken from `param_values` if specified).
+        conditions will be taken from model.initials (with initial condition
+        parameter values taken from `param_values` if specified).
     integrator : string, optional
         Name of the integrator to use, taken from the list of integrators known
         to :py:class:`scipy.integrate.ode`.

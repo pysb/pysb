@@ -171,7 +171,9 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
-from pysb.export import Exporter, pad
+from pysb.export import Exporter, pad, ExpressionsNotSupported, \
+    CompartmentsNotSupported
+
 
 class MatlabExporter(Exporter):
     """A class for returning the ODEs for a given PySB model for use in
@@ -190,6 +192,11 @@ class MatlabExporter(Exporter):
             String containing the MATLAB code for an implementation of the
             model's ODEs.
         """
+        if self.model.expressions:
+            raise ExpressionsNotSupported()
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
+
         output = StringIO()
         pysb.bng.generate_equations(self.model)
 
@@ -224,8 +231,8 @@ class MatlabExporter(Exporter):
                              len(self.model.species)
         initial_values_str += ('\n'+' '*12).join(
                 ['initial_values(%d) = self.parameters.%s; %% %s' %
-                 (i+1, _fix_underscores(ic[1].name), ic[0])
-                 for i, ic in enumerate(self.model.initial_conditions)])
+                 (i+1, _fix_underscores(ic.value.name), ic.pattern)
+                 for i, ic in enumerate(self.model.initials)])
 
         # -- Build observables declaration --
         observables_str = 'self.observables = struct( ...\n'+' '*16

@@ -1,25 +1,30 @@
 language: python
 sudo: required
 dist: trusty
-python:
-- '2.7'
-- '3.6'
+env:
+- PYVER=2.7
+- PYVER=3.6
+- PYVER=3.7
 before_install:
-- wget http://repo.continuum.io/miniconda/Miniconda${TRAVIS_PYTHON_VERSION:0:1}-latest-Linux-x86_64.sh
+- wget http://repo.continuum.io/miniconda/Miniconda${PYVER:0:1}-latest-Linux-x86_64.sh
     -O miniconda.sh
 - chmod +x miniconda.sh
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
-- conda install --yes -c conda-forge python="$TRAVIS_PYTHON_VERSION"
+- conda install --yes -c conda-forge python="$PYVER"
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
     pydot coveralls mock cython
-- if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then pip install weave; fi
+- if [[ $PYVER == 2.7 ]]; then pip install weave; fi
+- if [[ $PYVER == 3.7 ]]; then pip install python-libsbml; else conda install --yes -c SBMLTeam python-libsbml; fi
+- pip install libroadrunner twine
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
 # Install BioNetGen, Kappa, StochKit and Atomizer
 - conda install --yes -c alubbock kappa stochkit bionetgen atomizer
 install:
   python setup.py build --build-lib=build/lib
+before_script:
+  python setup.py sdist && twine check dist/*
 script:
   nosetests build/lib/pysb --with-coverage --cover-inclusive
   --cover-package=build/lib/pysb -a '!gpu'

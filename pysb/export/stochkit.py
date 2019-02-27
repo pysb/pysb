@@ -7,7 +7,7 @@ library with permission from author Brian Drawert.
 For information on how to use the model exporters, see the documentation
 for :py:mod:`pysb.export`.
 """
-from pysb.export import Exporter
+from pysb.export import Exporter, CompartmentsNotSupported
 from pysb.core import as_complex_pattern, Expression, Parameter
 from pysb.bng import generate_equations
 import numpy as np
@@ -122,6 +122,9 @@ class StochKitExporter(Exporter):
         string
             The model in StochKit2 XML format
         """
+        if self.model.compartments:
+            raise CompartmentsNotSupported()
+
         generate_equations(self.model)
         document = etree.Element("Model")
 
@@ -156,19 +159,17 @@ class StochKitExporter(Exporter):
             subs = dict((p, param_values[i]) for i, p in
                         enumerate(self.model.parameters))
 
-            for cp, value_obj in self.model.initial_conditions:
-                cp = as_complex_pattern(cp)
+            for ic in self.model.initials:
+                cp = as_complex_pattern(ic.pattern)
                 si = self.model.get_species_index(cp)
                 if si is None:
                     raise IndexError("Species not found in model: %s" %
                                      repr(cp))
-                if isinstance(value_obj, (int, float)):
-                    value = value_obj
-                elif value_obj in self.model.parameters:
-                    pi = self.model.parameters.index(value_obj)
+                if ic.value in self.model.parameters:
+                    pi = self.model.parameters.index(ic.value)
                     value = param_values[pi]
-                elif value_obj in self.model.expressions:
-                    value = value_obj.expand_expr().evalf(subs=subs)
+                elif ic.value in self.model.expressions:
+                    value = ic.value.expand_expr().evalf(subs=subs)
                 else:
                     raise ValueError(
                         "Unexpected initial condition value type")
@@ -301,7 +302,7 @@ class StochKitExporter(Exporter):
         document.append(reacs)
 
         if pretty_print:
-            return etree.tostring(document, pretty_print=True)
+            return etree.tostring(document, pretty_print=True).decode('utf8')
         else:
             # Hack to print pretty xml without pretty-print
             # (requires the lxml module).
