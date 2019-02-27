@@ -1,21 +1,23 @@
 from __future__ import absolute_import
 from __future__ import print_function as _
-import pysb.core
-from pysb.generator.bng import BngGenerator, format_complexpattern
-import os
-import subprocess
-import re
-import itertools
-import sympy
-import numpy
-import tempfile
+
 import abc
-from warnings import warn
-import shutil
 import collections
+import itertools
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+from warnings import warn
+
+import numpy
+import sympy
+
+import pysb.core
 import pysb.pathfinder as pf
+from pysb.generator.bng import BngGenerator, format_complexpattern
 from pysb.logging import get_logger, EXTENDED_DEBUG
-import logging
 
 try:
     from cStringIO import StringIO
@@ -395,6 +397,7 @@ class BngFileInterface(BngBaseInterface):
             model_additional_species=model_additional_species,
             model_population_maps=model_population_maps
         )
+        self._time = 0
         self._init_command_queue()
 
     def _init_command_queue(self):
@@ -475,7 +478,9 @@ class BngFileInterface(BngBaseInterface):
                 capture_error = True
             if capture_error:
                 captured_error_lines.append(line)
-
+            if 'Program times' in line:
+                self._time += float(line.split(' ')[3])
+                # quit()
             self._logger.debug(line)
 
         # p_out is already consumed, so only get p_err

@@ -1,12 +1,14 @@
-from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
-from pysb.bng import BngFileInterface, load_equations, generate_hybrid_model
-import numpy as np
+import collections
 import logging
-from pysb.logging import EXTENDED_DEBUG
+import os
+
+import numpy as np
+
+from pysb.bng import BngFileInterface, load_equations, generate_hybrid_model
 from pysb.core import as_complex_pattern, Parameter, \
     InvalidComplexPatternException
-import collections
-import os
+from pysb.logging import EXTENDED_DEBUG
+from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
 
 
 class BngSimulator(Simulator):
@@ -206,6 +208,7 @@ class BngSimulator(Simulator):
                                 skip_file_actions=True)
             else:
                 bngfile.execute()
+            self._time = bngfile._time
             if method != 'nf':
                 load_equations(self.model, bngfile.net_filename)
             list_of_yfull = \
