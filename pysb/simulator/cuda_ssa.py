@@ -156,7 +156,7 @@ class CUDASimulator(SSABase):
             dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
         )
         elasped_t = time.time() - timer_start
-        self._logger.info("Completed transfer in: {.4f}s".format(elasped_t))
+        self._logger.info("Completed transfer in: {:.4f}s".format(elasped_t))
 
         self._logger.info("Starting {} simulations on {} blocks"
                           "".format(self.num_sim, blocks))
@@ -172,7 +172,7 @@ class CUDASimulator(SSABase):
 
         self._time = time.time() - timer_start
         self._logger.info("{} simulations "
-                          "in {.4f}s".format(self.num_sim, self._time))
+                          "in {:.4f}s".format(self.num_sim, self._time))
 
         # retrieve and store results, only keeping num_sim (desired quantity)
         return SimulationResult(self, tout, result[:self.num_sim, :, :])

@@ -153,7 +153,7 @@ class OpenCLSimulator(SSABase):
         )
 
         elasped_t = time.time() - timer_start
-        self._logger.info("Completed transfer in: {.4f}s".format(elasped_t))
+        self._logger.info("Completed transfer in: {:.4f}s".format(elasped_t))
 
         self._logger.info("Starting {} simulations".format(number_sim))
         timer_start = time.time()
@@ -172,7 +172,7 @@ class OpenCLSimulator(SSABase):
         complete_event.wait()
         self._time = time.time() - timer_start
         self._logger.info("{} simulations "
-                          "in {}s".format(number_sim, self._time))
+                          "in {:.4f}s".format(number_sim, self._time))
 
         # retrieve and store results, only keeping n_simulations
         # actual simulations we will return
