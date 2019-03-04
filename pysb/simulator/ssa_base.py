@@ -31,7 +31,6 @@ class SSABase(Simulator):
         self.num_sim = None
         if verbose:
             setup_logger(logging.INFO)
-        self._logger.info("Initialized GPU class")
 
     def _get_template_args(self):
         """ converts pysb reactions to pycuda/pyopencl format """

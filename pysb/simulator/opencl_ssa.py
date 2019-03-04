@@ -1,16 +1,18 @@
 from __future__ import print_function
 
 import random
-
+import numpy as np
+import os
+import time
 try:
     import pyopencl as cl
     from pyopencl import array as ocl_array
     from pyopencl import device_type
 except ImportError:
     cl = None
-import numpy as np
-import os
-import time
+    device_type = None
+    ocl_array = None
+
 from pysb.bng import generate_equations
 from pysb.simulator.base import SimulationResult, SimulatorException
 from pysb.simulator.cuda_ssa import SSABase
@@ -18,7 +20,9 @@ from pysb.simulator.cuda_ssa import SSABase
 
 class OpenCLSimulator(SSABase):
     """
-    GPU simulator
+    OpenCL simulator
+
+    Requires opencl and pyopencl.
 
     Parameters
     ----------
@@ -83,7 +87,7 @@ class OpenCLSimulator(SSABase):
         if device not in ('gpu', 'cpu'):
             raise AssertionError("device arg must be 'cpu' or 'gpu'")
         self._device = device
-        self._logger.info("Initialized OpenCL class")
+        self._logger.info("Initialized OpenCLSimulator class")
 
     def _compile(self):
 
@@ -107,6 +111,27 @@ class OpenCLSimulator(SSABase):
         self.program = cl.Program(self.context, self._code).build()
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0):
+        """
+        Run a simulation and returns the result (trajectories)
+
+        .. note::
+            In early versions of the Simulator class, ``tspan``, ``initials``
+            and ``param_values`` supplied to this method persisted to future
+            :func:`run` calls. This is no longer the case.
+
+        Parameters
+        ----------
+        tspan
+        initials
+        param_values
+            See parameter definitions in :class:`ScipyOdeSimulator`.
+        number_sim: int
+            Number of simulations to perform
+
+        Returns
+        -------
+        A :class:`SimulationResult` object
+        """
         super(OpenCLSimulator, self).run(tspan=tspan, initials=initials,
                                          param_values=param_values,
                                          number_sim=number_sim)
@@ -174,8 +199,7 @@ class OpenCLSimulator(SSABase):
         self._logger.info("{} simulations "
                           "in {:.4f}s".format(number_sim, self._time))
 
-        # retrieve and store results, only keeping n_simulations
-        # actual simulations we will return
+        # retrieve and store results
         tout = np.array([tspan] * self.num_sim)
         res = result_gpu.get(self.queue)
         res = res.reshape((self.num_sim, len(t_out), self._n_species))

@@ -24,7 +24,9 @@ from pysb.simulator.ssa_base import SSABase
 
 class CUDASimulator(SSABase):
     """
-    GPU simulator
+    CUDA simulator for NVIDIA gpus
+
+    Requires pycuda, cuda, and cuda compatible NVIDIA gpus.
 
     Parameters
     ----------
@@ -87,7 +89,7 @@ class CUDASimulator(SSABase):
 
         if verbose:
             setup_logger(logging.INFO)
-        self._logger.info("Initialized GPU class")
+        self._logger.info("Initialized CUDASimulator class")
 
     def _compile(self):
 
@@ -107,7 +109,29 @@ class CUDASimulator(SSABase):
         self._step_0 = False
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
-            threads=32):
+            threads_per_block=None):
+        """
+        Run a simulation and returns the result (trajectories)
+
+        .. note::
+            In early versions of the Simulator class, ``tspan``, ``initials``
+            and ``param_values`` supplied to this method persisted to future
+            :func:`run` calls. This is no longer the case.
+
+        Parameters
+        ----------
+        tspan
+        initials
+        param_values
+            See parameter definitions in :class:`ScipyOdeSimulator`.
+        number_sim: int
+            Number of simulations to perform
+        threads_per_block: int
+            Number of threads per block. Optimal value is generally 32
+        Returns
+        -------
+        A :class:`SimulationResult` object
+        """
 
         super(CUDASimulator, self).run(tspan=tspan, initials=initials,
                                        param_values=param_values,
@@ -120,10 +144,10 @@ class CUDASimulator(SSABase):
         t_out = np.array(tspan, dtype=np.float64)
 
         # set default threads per block
-        if threads is None:
-            threads = 32
+        if threads_per_block is None:
+            threads_per_block = 32
 
-        blocks, threads = self.get_blocks(self.num_sim, threads)
+        blocks, threads = self.get_blocks(self.num_sim, threads_per_block)
 
         # compile kernel and send parameters to GPU
         if self._step_0:
@@ -207,14 +231,14 @@ class CUDASimulator(SSABase):
 
     @staticmethod
     def get_blocks(n_simulations, threads_per_block):
-        max_threads = 256
-        if threads_per_block > max_threads:
+        max_tpb = 256
+        if threads_per_block > max_tpb:
             logging.warning("Limit of 256 threads per block due to curand."
                             " Setting to 256.")
-            threads_per_block = max_threads
-        if n_simulations < max_threads:
+            threads_per_block = max_tpb
+        if n_simulations < max_tpb:
             block_count = 1
-            threads_per_block = max_threads
+            threads_per_block = max_tpb
         elif n_simulations % threads_per_block == 0:
             block_count = int(n_simulations // threads_per_block)
         else:
