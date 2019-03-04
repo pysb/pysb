@@ -188,8 +188,7 @@ class OpenCLSimulator(SSABase):
 
 
 def _load_template():
-    with open(os.path.join(os.path.dirname(__file__),
-                           'pycuda_templates',
-                           'opencl_template.cl'), 'r') as f:
+    _path = os.path.join(os.path.dirname(__file__), 'templates', 'opencl.cl')
+    with open(_path, 'r') as f:
         gillespie_code = f.read()
     return gillespie_code

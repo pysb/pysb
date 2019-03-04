@@ -5,4 +5,5 @@ graft doc
 prune doc/_build
 include versioneer.py
 include pysb/_version.py
-include pysb/simulator/pycuda_templates/gillespie_template.cu
+include pysb/simulator/templates/cuda.cu
+include pysb/simulator/templates/openl.cu

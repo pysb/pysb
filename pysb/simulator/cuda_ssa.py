@@ -222,12 +222,9 @@ class CUDASimulator(SSABase):
         return block_count, threads_per_block
 
 
-
-
 def _load_template():
-    with open(os.path.join(os.path.dirname(__file__),
-                           'pycuda_templates',
-                           'gillespie_template.cu'), 'r') as f:
+    _path = os.path.join(os.path.dirname(__file__), 'templates', 'ssa.cu')
+    with open(_path, 'r') as f:
         gillespie_code = f.read()
     return gillespie_code
 
