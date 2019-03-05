@@ -170,6 +170,7 @@ class SbmlExporter(Exporter):
 
         # Initial values/assignments
         fixed_species_idx = set()
+        initial_species_idx = set()
         for ic in self.model.initials:
             sp_idx = self.model.get_species_index(ic.pattern)
             ia = smodel.createInitialAssignment()
@@ -177,6 +178,7 @@ class SbmlExporter(Exporter):
             _check(ia.setSymbol('__s{}'.format(sp_idx)))
             init_mathml = self._sympy_to_sbmlast(Symbol(ic.value.name))
             _check(ia.setMath(init_mathml))
+            initial_species_idx.add(sp_idx)
 
             if ic.fixed:
                 fixed_species_idx.add(sp_idx)
@@ -207,6 +209,9 @@ class SbmlExporter(Exporter):
             _check(sp.setBoundaryCondition(i in fixed_species_idx))
             _check(sp.setConstant(False))
             _check(sp.setHasOnlySubstanceUnits(True))
+            if i not in initial_species_idx:
+                _check(sp.setInitialAmount(0.0))
+
 
         # Parameters
 
