@@ -9,9 +9,21 @@ import warnings
 import mock
 import tempfile
 import shutil
+from pysb.logging import get_logger
+
+# Some models don't match BNG originals exactly due to loss of numerical
+# precision.
+REDUCED_PRECISION = {
+    'CaOscillate_Func': 1e-4,
+    'michment': 1e-8,
+    'motor': 1e-8
+}
+
+logger = get_logger(__name__)
 
 
 def bngl_import_compare_simulations(bng_file, force=False,
+                                    precision=1e-12,
                                     sim_times=range(0, 100, 10)):
     """
     Test BNGL file import by running an ODE simulation on the imported model
@@ -34,15 +46,18 @@ def bngl_import_compare_simulations(bng_file, force=False,
         bng.execute()
         yfull2 = bng.read_simulation_results()
 
+    # Don't check trajectories on forced examples
+    if force:
+        return
+
     # Check all species trajectories are equal (within numerical tolerance)
-    for species in m.species:
-        print(species)
-        print(yfull1[species])
-        print(yfull2[species])
-        print(numpy.allclose(yfull1[species], yfull2[species], atol=1e-8,
-                             rtol=1e-8))
-        assert numpy.allclose(yfull1[species], yfull2[species], atol=1e-8,
-                              rtol=1e-8)
+    assert yfull1.dtype.names == yfull2.dtype.names
+    for species in yfull1.dtype.names:
+        logger.debug(species)
+        logger.debug(yfull1[species])
+        logger.debug(yfull2[species])
+        assert numpy.allclose(yfull1[species], yfull2[species], atol=precision,
+                              rtol=precision)
 
 
 def _bng_validate_directory():
@@ -111,7 +126,8 @@ def test_bngl_import_expected_passes():
                      'visualize',
                      ):
         full_filename = _bngl_location(filename)
-        yield (bngl_import_compare_simulations, full_filename)
+        yield (bngl_import_compare_simulations, full_filename, False,
+               REDUCED_PRECISION.get(filename, 1e-12))
 
 
 def test_bngl_import_expected_errors():
