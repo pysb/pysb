@@ -187,8 +187,8 @@ class BnglBuilder(Builder):
                 except ValueError:
                     # Despite the "Constant" label, some constant expressions
                     # appear here e.g. ln(2)/120 in BNG's Repressilator model
-                    self.parameter(name=p_name,
-                                   value=self._eval_in_model_env(
+                    self.expression(name=p_name,
+                                    expr=self._eval_in_model_env(
                                         p.get('value')))
             elif p.get('type') == 'ConstantExpression':
                 self.expression(name=p_name,
