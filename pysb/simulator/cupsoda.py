@@ -168,7 +168,9 @@ class CupSodaSimulator(Simulator):
                                                initials=initials,
                                                param_values=param_values,
                                                verbose=verbose, **kwargs)
-        self.gpu = kwargs.pop('gpu', 0)
+        self.gpu = kwargs.pop('gpu', (0, ))
+        if not isinstance(self.gpu, collections.Iterable):
+            self.gpu = [self.gpu]
         self._obs_species_only = kwargs.pop('obs_species_only', True)
         self._cleanup = kwargs.pop('cleanup', True)
         self._prefix = kwargs.pop('prefix', self._model.name.replace('.', '_'))
@@ -334,11 +336,6 @@ class CupSodaSimulator(Simulator):
                                           param_values=param_values,
                                           _run_kwargs=[])
 
-        if isinstance(self.gpu, collections.Iterable):
-            gpus = self.gpu
-        else:
-            gpus = [self.gpu]
-
         # Create directories for cupSODA input and output files
         _outdirs = {}
         _indirs = {}
@@ -358,7 +355,7 @@ class CupSodaSimulator(Simulator):
         if chunksize_gpu is None:
             chunksize_gpu = n_sims
 
-        chunksize_total = chunksize_gpu * len(gpus)
+        chunksize_total = chunksize_gpu * len(self.gpu)
 
         tout = None
         trajectories = None
@@ -372,11 +369,11 @@ class CupSodaSimulator(Simulator):
                     (chunk_idx + 1), len(chunks)))
 
                 # Split chunk equally between GPUs
-                sims = dict(zip(gpus, np.array_split(chunk,
-                                                     len(gpus))))
+                sims = dict(zip(self.gpu, np.array_split(chunk,
+                                                     len(self.gpu))))
 
                 tout, trajectories = self._run_chunk(
-                    gpus, outdir, chunk_idx, cmtx, sims,
+                    self.gpu, outdir, chunk_idx, cmtx, sims,
                     trajectories, tout)
         finally:
             if self._cleanup:
@@ -415,7 +412,7 @@ class CupSodaSimulator(Simulator):
                 threads_per_block = default_threads_per_block
             else:
                 cuda.init()
-                device = cuda.Device(self.gpu)
+                device = cuda.Device(self.gpu[0])
                 attrs = device.get_attributes()
                 shared_memory_per_block = attrs[
                     cuda.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK]
