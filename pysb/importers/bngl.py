@@ -173,24 +173,22 @@ class BnglBuilder(Builder):
     def _parse_observables(self):
         for o in self._x.iterfind(_ns('{0}ListOfObservables/{0}Observable')):
             o_name = o.get('name')
+            match_mode = o.get('type').lower()
             cplx_pats = []
             for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
+                cpt = self.model.compartments.get(mp.get('compartment'))
                 match_once = mp.get('matchOnce')
-                match_once = True if match_once == "1" else False
+                match_once = True if match_once == "1" and \
+                    match_mode != 'species' else False
                 cplx_pats.append(ComplexPattern(self._parse_species(mp),
-                                                compartment=None,
+                                                compartment=cpt,
                                                 match_once=match_once))
             self.observable(o_name,
                             ReactionPattern(cplx_pats),
-                            match=o.get('type').lower())
+                            match=match_mode)
 
     def _parse_initials(self):
         for i in self._x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
-            if i.get('Fixed') is not None and i.get('Fixed') == "1":
-                self._warn_or_except('Species %s is fixed, but will be '
-                                     'treated as an ordinary species in '
-                                     'PySB.' % i.get('name'))
-
             value_param = i.get('concentration')
             try:
                 value = float(value_param)
@@ -210,7 +208,9 @@ class BnglBuilder(Builder):
                         'concentration')]
             mon_pats = self._parse_species(i)
             species_cpt = self.model.compartments.get(i.get('compartment'))
-            self.initial(ComplexPattern(mon_pats, species_cpt), value_param)
+            cp = ComplexPattern(mon_pats, species_cpt)
+            fixed = i.get('Fixed') == "1"
+            self.initial(cp, value_param, fixed)
 
     def _parse_compartments(self):
         for c in self._x.iterfind(_ns('{0}ListOfCompartments/{0}compartment')):
@@ -288,6 +288,14 @@ class BnglBuilder(Builder):
                     delete_molecules = True
                     break
 
+            # Process any MoveConnected declaration
+            move_connected = False
+            for change_cpt_ops in r.iterfind(_ns('{0}ListOfOperations/'
+                                                 '{0}ChangeCompartment')):
+                if change_cpt_ops.get('moveConnected') == "1":
+                    move_connected = True
+                    break
+
             # Give warning/error if ListOfExcludeReactants or
             # ListOfExcludeProducts is present
             if r.find(_ns('{}ListOfExcludeReactants')) is not None or \
@@ -307,7 +315,8 @@ class BnglBuilder(Builder):
                                      'network generation times.')
 
             self.rule(r_name, rule_exp, r_rate,
-                      delete_molecules=delete_molecules)
+                      delete_molecules=delete_molecules,
+                      move_connected=move_connected)
 
         # Set the reverse rates
         for r_name, rev_rate in rev_rates.items():
@@ -317,9 +326,10 @@ class BnglBuilder(Builder):
             rule.rate_reverse = rev_rate
 
     def _parse_expressions(self):
-        expr_namespace = {p.name: p.value for p in self.model.parameters}
-        expr_namespace.update({o.name: o for o in
-                               self.model.observables})
+        expr_namespace = dict(
+            self.model.parameters | self.model.expressions_constant()
+            | self.model.observables
+        )
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             if e.find(_ns('{0}ListOfArguments/{0}Argument')) is not None:

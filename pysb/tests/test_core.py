@@ -148,6 +148,14 @@ def test_observable_constructor_with_monomer():
     o = Observable('o', A, _export=False)
 
 @with_model
+def test_expand_obs_no_coeffs():
+    A = Monomer('A')
+    o = Observable('A_obs', A())
+    # Test that expand_obs works with observable when no coefficients or
+    # species are present
+    o.expand_obs()
+
+@with_model
 def test_compartment_initial_error():
     Monomer('A', ['s'])
     Parameter('A_0', 2.0)

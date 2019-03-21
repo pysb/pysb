@@ -173,7 +173,9 @@ class CupSodaSimulator(Simulator):
             self.gpu = [self.gpu]
         self._obs_species_only = kwargs.pop('obs_species_only', True)
         self._cleanup = kwargs.pop('cleanup', True)
-        self._prefix = kwargs.pop('prefix', self._model.name.replace('.', '_'))
+        self._prefix = kwargs.pop('prefix', self._model.name)
+        # Sanitize the directory - cupsoda doesn't handle spaces etc. well
+        self._prefix = re.sub('[^0-9a-zA-Z]', '_', self._prefix)
         self._base_dir = kwargs.pop('base_dir', None)
         self.integrator = kwargs.pop('integrator', 'cupsoda')
         integrator_options = kwargs.pop('integrator_options', {})
