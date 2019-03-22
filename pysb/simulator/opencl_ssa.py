@@ -50,6 +50,8 @@ class OpenCLSimulator(SSABase):
         Verbose output.
     device : str
         {'cpu', 'gpu'}
+    multi_gpu : bool
+        If device=gpu, will use multiple gpus for opencl run
     Attributes
     ----------
     verbose: bool
@@ -62,6 +64,7 @@ class OpenCLSimulator(SSABase):
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
     def __init__(self, model, verbose=False, tspan=None, device='gpu',
+                 multi_gpu=False,
                  **kwargs):
 
         if cl is None:
@@ -74,6 +77,7 @@ class OpenCLSimulator(SSABase):
         self.tout = None
         self.tspan = tspan
         self.verbose = verbose
+        self.multi_gpu = multi_gpu
 
         # private attribute
         self._parameter_number = len(self._model.parameters)
@@ -96,15 +100,29 @@ class OpenCLSimulator(SSABase):
             with open("ssa_opencl_code.cl", "w") as source_file:
                 source_file.write(self._code)
         # This prints off all the options per device and platform
-        self._logger.debug("Platforms availables")
-        devices = []
+        self._logger.info("Platforms availables")
+
         to_device = {'cpu': device_type.CPU, 'gpu': device_type.GPU}
-        for i in cl.get_platforms():
+        device = to_device[self._device.lower()]
+        platforms = [i for i in cl.get_platforms()
+                     if len(i.get_devices(device_type=device))]
+        if not len(platforms):
+            raise Exception("Cannot find a platform with {} "
+                            "devices".format(self._device))
+        for i in platforms:
             if len(i.get_devices(device_type=to_device[self._device])) > 0:
+                self._logger.info("\t{}".format(i.name))
+                for j in i.get_devices():
+                    self._logger.info("\t\t{}".format(j.name))
                 devices = i.get_devices(device_type=to_device[self._device])
-            self._logger.debug("\t{}\n\tDevices available".format(i))
-            for j in i.get_devices():
-                self._logger.debug("\t\t{}".format(j))
+        if len(devices) > 1:
+            if not self.multi_gpu:
+                self._logger.info("Only use 1 of {} gpus".format(len(devices)))
+                devices = [devices[0]]
+        self._logger.info("Using platform {}".format(platforms[0].name))
+        self._logger.info("Using device(s) {}".format(
+            ','.join(i.name for i in devices))
+        )
         # need to let the users select this
         self.context = cl.Context(devices)
         self.queue = cl.CommandQueue(self.context)
