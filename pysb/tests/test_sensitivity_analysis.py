@@ -1,5 +1,5 @@
 from pysb.tools.sensitivity_analysis import \
-    InitialsSensitivity
+    PairwiseSensitivity
 from pysb.examples.tyson_oscillator import model
 import numpy as np
 import numpy.testing as npt
@@ -24,7 +24,7 @@ class TestSensitivityAnalysis(object):
                                         integrator_options={'rtol': 1e-8,
                                                             'atol': 1e-8,
                                                             'mxstep': 20000})
-        self.sens = InitialsSensitivity(
+        self.sens = PairwiseSensitivity(
             solver=self.solver,
             values_to_sample=self.vals,
             objective_function=self.obj_func_cell_cycle,
@@ -72,7 +72,7 @@ class TestSensitivityAnalysis(object):
                                         integrator_options={'rtol': 1e-8,
                                                             'atol': 1e-8,
                                                             'nsteps': 20000})
-        sens_vode = InitialsSensitivity(
+        sens_vode = PairwiseSensitivity(
             solver=solver_vode,
             values_to_sample=self.vals,
             objective_function=self.obj_func_cell_cycle,
@@ -88,9 +88,6 @@ class TestSensitivityAnalysis(object):
     def test_p_matrix(self):
         npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
                                 decimal=3)
-
-    def test_num_simulations(self):
-        assert len(self.sens.simulation_initials) == 25
 
     def test_pmatrix_outfile_exists(self):
         self.sens.run(save_name=self.savename,
@@ -128,7 +125,7 @@ class TestSensitivityAnalysis(object):
                                    integrator_options={'rtol': 1e-8,
                                                        'atol': 1e-8,
                                                        'mxstep': 20000})
-        sens = InitialsSensitivity(
+        sens = PairwiseSensitivity(
             values_to_sample=vals,
             objective_function=self.obj_func_cell_cycle,
             observable=self.observable,

@@ -1,6 +1,5 @@
 import os
 from itertools import product
-import collections
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
@@ -9,18 +8,15 @@ import pysb.simulator.base
 from pysb.logging import get_logger
 
 
-class InitialsSensitivity(object):
-    """
-    Pairwise sensitivity analysis of initial conditions
+class PairwiseSensitivity(object):
+    """ Pairwise sensitivity analysis of model parameters
 
     This class calculates the sensitivity of a specified model Observable to
     changes in pairs of initial species concentrations. The results are
     stored in matrices described in Attributes.
-
     .. warning::
         The interface for this class is considered experimental and may
         change without warning as PySB is updated.
-
     Parameters
     ----------
     solver : pysb.simulator.Simulator
@@ -34,7 +30,6 @@ class InitialsSensitivity(object):
         of changed that is used for calculating sensitivity. See Example.
     observable : str
         Observable used in the objective_function.
-
     Attributes
     ----------
     b_matrix: numpy.ndarray
@@ -47,15 +42,12 @@ class InitialsSensitivity(object):
     p_prime_matrix: numpy.ndarray
         Normalized pairwise sensitivity matrix (in the sense that it
         contains changes from the baseline, unperturbed case)
-
     References
     ----------
     Harris et al. Bioinformatics (2017), under review.
-
     Examples
     --------
     Sensitivity analysis on the Tyson cell cycle model
-
     >>> from pysb.examples.tyson_oscillator import model
     >>> import numpy as np
     >>> from pysb.simulator.scipyode import ScipyOdeSimulator
@@ -78,7 +70,7 @@ class InitialsSensitivity(object):
     ...     local_freq = np.average(local_times)/len(local_times)*2
     ...     return local_freq
     >>> solver = ScipyOdeSimulator(model, tspan)
-    >>> sens = InitialsSensitivity(\
+    >>> sens = PairwiseSensitivity(\
             values_to_sample=values_to_sample,\
             observable=observable,\
             objective_function=obj_func_cell_cycle,\
@@ -99,7 +91,6 @@ class InitialsSensitivity(object):
      [ 0.      0.      5.0243 -4.5381]
      [ 5.0243  5.0243  0.      0.    ]
      [-4.5381 -4.5381  0.      0.    ]]
-
     >>> print(sens.p_prime_matrix) #doctest: +NORMALIZE_WHITESPACE
      [[ 0.      0.      5.0243 -4.5381]
       [ 0.      0.      5.0243 -4.5381]
@@ -115,69 +106,54 @@ class InitialsSensitivity(object):
     """
 
     def __init__(self, solver, values_to_sample, objective_function,
-                 observable):
+                 observable, sens_type='initials', sample_list=None):
         self._model = solver.model
         self._logger = get_logger(__name__, model=self._model)
         self._logger.info('%s created for observable %s' % (
             self.__class__.__name__, observable))
         generate_equations(self._model)
-        self._ic_params_of_interest_cache = None
         self._values_to_sample = values_to_sample
         if solver is None or not isinstance(solver,
                                             pysb.simulator.base.Simulator):
-            raise(TypeError, "solver must be a pysb.simulator object")
+            raise (TypeError, "solver must be a pysb.simulator object")
         self._solver = solver
         self.objective_function = objective_function
         self.observable = observable
+        self._sens_type = sens_type
+        if self._sens_type == 'params':
+            self.index = [i.name for i in self._model.parameters_rules()]
+        elif self._sens_type == 'initials':
+            self.index = [i[1].name for i in self._model.initial_conditions]
+        else:
+            self.index = [i.name for i in self._model.parameters]
+        if sample_list is not None:
+            self.index = sample_list
+        self.orig_vals = [i.value for i in self._model.parameters]
+
+        self.index_of_param = {}
+        for n, i in enumerate(self._model.parameters):
+            self.index_of_param[i.name] = n
+
+        self._n_sam = len(self._values_to_sample)
+        self._n_species = len(self.index)
+        self._nm = self._n_species * self._n_sam
+        self._size_of_matrix = self._nm ** 2
+        self._shape_of_matrix = self._nm, self._nm
 
         # Outputs
         self.b_matrix = []
         self.b_prime_matrix = []
+        self.params_to_run = self._setup_simulations()
         self.p_prime_matrix = np.zeros(self._size_of_matrix)
         self.p_matrix = np.zeros(self._size_of_matrix)
-
-        self._original_initial_conditions = np.zeros(len(self._model.species))
-        self._index_of_species_of_interest = self._create_index_of_species()
-        self.simulation_initials = self._setup_simulations()
         # Stores the objective function value for the original unperturbed
         # model
         self._objective_fn_standard = None
 
     @property
-    def _ic_params_of_interest(self):
-        if self._ic_params_of_interest_cache is None:
-            self._ic_params_of_interest_cache = list(
-                (i.value.name for i in self._model.initials))
-            self._ic_params_of_interest_cache = \
-                sorted(self._ic_params_of_interest_cache)
-
-        return self._ic_params_of_interest_cache
-
-    @property
-    def _n_species(self):
-        return len(self._ic_params_of_interest)
-
-    @property
-    def _n_sam(self):
-        return len(self._values_to_sample)
-
-    @property
-    def _nm(self):
-        return self._n_species * self._n_sam
-
-    @property
-    def _size_of_matrix(self):
-        return self._nm ** 2
-
-    @property
-    def _shape_of_matrix(self):
-        return self._nm, self._nm
-
-    @property
     def sensitivity_multiset(self):
         """
         Sensitivity analysis multiset (also called "Q" matrix)
-
         Returns
         -------
         list
@@ -200,7 +176,6 @@ class InitialsSensitivity(object):
     def _calculate_objective(self, function_value):
         """
         Calculate fraction of change for obj value and standard
-
         Parameters
         ----------
         function_value : scalar
@@ -221,16 +196,14 @@ class InitialsSensitivity(object):
         out_dir : str, optional
             location to save output if required
         """
-        if out_dir is not None:
-            if not os.path.exists(out_dir):
-                os.mkdir(out_dir)
         self._solver.initials = None
         self._solver.param_values = None
         sim_results = self._solver.run(param_values=None, initials=None)
         self._objective_fn_standard = self.objective_function(
             np.array(sim_results.observables[self.observable]))
 
-        traj = self._solver.run(initials=self.simulation_initials)
+        traj = self._solver.run(param_values=self.params_to_run)
+
         sensitivity_output = np.array(traj.observables)[self.observable].T
         p_matrix = np.zeros(self._size_of_matrix)
         p_prime_matrix = np.zeros(self._size_of_matrix)
@@ -259,6 +232,8 @@ class InitialsSensitivity(object):
         if save_name is not None:
             if out_dir is None:
                 out_dir = '.'
+            elif not os.path.exists(out_dir):
+                os.mkdir(out_dir)
             p_name = os.path.join(out_dir, '{}_p_matrix.csv'.format(save_name))
             p_prime_name = os.path.join(
                 out_dir, '{}_p_prime_matrix.csv'.format(save_name))
@@ -268,27 +243,15 @@ class InitialsSensitivity(object):
             np.savetxt(p_name, self.p_matrix)
             np.savetxt(p_prime_name, self.p_prime_matrix)
 
-    def _create_index_of_species(self):
-        """ create dictionary of initial conditions by index """
-        index_of_init_condition = {}
-        for ic in self._model.initials:
-            for sp_idx, sp in enumerate(self._model.species):
-                if ic.pattern.is_equivalent_to(sp):
-                    self._original_initial_conditions[sp_idx] = ic.value.value
-                    if ic.value.name in self._ic_params_of_interest:
-                        index_of_init_condition[ic.value.name] = sp_idx
-        index_of_species_of_interest = collections.OrderedDict(
-            sorted(index_of_init_condition.items()))
-        return index_of_species_of_interest
-
     def _g_function(self):
         """ creates sample matrix, index of samples values, and shows bij """
         counter = -1
         sampled_values_index = set()
         bij_unique = dict()
         sampling_matrix = np.zeros(
-            (self._size_of_matrix, len(self._model.species)))
-        sampling_matrix[:, :] = self._original_initial_conditions
+            (self._size_of_matrix, len(self.orig_vals)))
+        sampling_matrix[:, :] = self.orig_vals
+        # print(sampling_matrix.shape)
         matrix = self.b_matrix
         for j in range(len(matrix)):
             for i in matrix[j, :]:
@@ -298,13 +261,12 @@ class InitialsSensitivity(object):
                 s_2 = str(i[1]) + str(i[0])
                 counter += 1
 
-                if index_i == index_j:
-                    continue
-                elif s_1 in bij_unique or s_2 in bij_unique:
+                if index_i == index_j \
+                        or s_1 in bij_unique or s_2 in bij_unique:
                     continue
                 else:
-                    x = self._index_of_species_of_interest[index_i]
-                    y = self._index_of_species_of_interest[index_j]
+                    x = self.index_of_param[index_i]
+                    y = self.index_of_param[index_j]
                     sampling_matrix[counter, x] *= sigma_i
                     sampling_matrix[counter, y] *= sigma_j
                     bij_unique[s_1] = counter
@@ -316,7 +278,6 @@ class InitialsSensitivity(object):
     def _setup_simulations(self):
         """
         Create initial conditions matrix for sensitivity analysis
-
         Returns
         -------
         numpy.ndarray
@@ -324,16 +285,14 @@ class InitialsSensitivity(object):
         """
         # create matrix (cartesian product of sample vals vs index of species
         a_matrix = cartesian_product(self._values_to_sample,
-                                     self._index_of_species_of_interest)
-        # reshape to flatten
-        a_matrix = a_matrix.T.reshape(self._n_sam * self._n_species)
+                                     self.index).T.flatten()
+
         # creates matrix b
         self.b_matrix = cartesian_product(a_matrix, a_matrix)
 
         # create matrix a'
         a_prime = cartesian_product(np.ones(self._n_sam),
-                                    self._index_of_species_of_interest)
-        a_prime = a_prime.T.reshape(self._n_sam * self._n_species)
+                                    self.index).T.flatten()
 
         # creates matrix b prime
         self.b_prime_matrix = cartesian_product(a_prime, a_matrix)
@@ -342,8 +301,8 @@ class InitialsSensitivity(object):
 
         n_b_index = len(self.b_index)
 
-        b_prime = np.zeros((self._size_of_matrix, len(self._model.species)))
-        b_prime[:, :] = self._original_initial_conditions
+        b_prime = np.zeros((self._size_of_matrix, len(self.orig_vals)))
+        b_prime[:, :] = self.orig_vals
         counter = -1
 
         bp_not_in_b_raw = set()
@@ -368,8 +327,8 @@ class InitialsSensitivity(object):
                     bp_not_in_b_dict[counter] = bp_not_in_b_visited[s_1]
                 else:
                     new_sim_counter += 1
-                    x = self._index_of_species_of_interest[index_i]
-                    y = self._index_of_species_of_interest[index_j]
+                    x = self.index_of_param[index_i]
+                    y = self.index_of_param[index_j]
                     b_prime[new_sim_counter, x] *= sigma_i
                     b_prime[new_sim_counter, y] *= sigma_j
                     bp_not_in_b_visited[s_1] = new_sim_counter + n_b_index
@@ -381,8 +340,7 @@ class InitialsSensitivity(object):
         x = b_to_run[list(self.b_index)]
         y = b_prime[list(bp_not_in_b_raw)]
         simulations = np.vstack((x, y))
-        self._logger.debug("Number of simulations to run = %s" % len(
-                           simulations))
+        self._logger.debug("{} simulations to run".format(len(simulations)))
         return simulations
 
     def create_plot_p_h_pprime(self, save_name=None, out_dir=None, show=False):
@@ -478,10 +436,10 @@ class InitialsSensitivity(object):
             for m, i in enumerate(range(0, self._nm, self._n_sam)):
                 ax2 = plt.subplot(gs[n, m])
                 if n == 0:
-                    ax2.set_xlabel(self._ic_params_of_interest[m], fontsize=20)
+                    ax2.set_xlabel(self.index[m], fontsize=20)
                     ax2.xaxis.set_label_position('top')
                 if m == 0:
-                    ax2.set_ylabel(self._ic_params_of_interest[n], fontsize=20)
+                    ax2.set_ylabel(self.index[n], fontsize=20)
                 plt.xticks([])
                 plt.yticks([])
                 if i != j:
@@ -560,11 +518,11 @@ class InitialsSensitivity(object):
                         vmax=v_max, extent=[0, self._nm, 0, self._nm])
 
         shape_label = np.arange(self._n_sam / 2, self._nm, self._n_sam)
-        plt.xticks(shape_label, self._ic_params_of_interest,
+        plt.xticks(shape_label, self.index,
                    rotation='vertical', fontsize=12)
-        plt.yticks(shape_label, reversed(self._ic_params_of_interest),
+        plt.yticks(shape_label, reversed(self.index),
                    fontsize=12)
-        x_ticks = ([i for i in range(0, self._nm, self._n_sam)])
+        x_ticks = list(range(0, self._nm, self._n_sam))
         ax1.set_xticks(x_ticks, minor=True)
         ax1.set_yticks(x_ticks, minor=True)
         plt.grid(True, which='minor', linestyle='--')
@@ -583,7 +541,7 @@ class InitialsSensitivity(object):
         ax2.set_xlim(v_min - 2, v_max + 2)
         if x_axis_label is not None:
             ax2.set_xlabel(x_axis_label, fontsize=12)
-        plt.setp(ax2, yticklabels=reversed(self._ic_params_of_interest))
+        plt.setp(ax2, yticklabels=reversed(self.index))
         ax2.yaxis.tick_left()
         ax2.set_aspect(1. / ax2.get_data_ratio(), adjustable='box')
         if save_name is not None:
@@ -607,12 +565,10 @@ class InitialsSensitivity(object):
 def cartesian_product(array_1, array_2):
     """
     Cartesian product between two lists
-
     Parameters
     ----------
     array_1 : list_like
     array_2 : list_like
-
     Returns
     -------
     out : np.array
