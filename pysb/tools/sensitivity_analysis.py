@@ -42,6 +42,8 @@ class PairwiseSensitivity(object):
     p_prime_matrix: numpy.ndarray
         Normalized pairwise sensitivity matrix (in the sense that it
         contains changes from the baseline, unperturbed case)
+    sample_list: list
+        List of parameters to be used.
     References
     ----------
     Harris et al. Bioinformatics (2017), under review.
@@ -127,6 +129,10 @@ class PairwiseSensitivity(object):
         else:
             self.index = [i.name for i in self._model.parameters]
         if sample_list is not None:
+            _valid_options = [i.name for i in self._model.parameters]
+            for i in sample_list:
+                if i not in _valid_options:
+                    raise Exception("{} not in model.parameters".format(i))
             self.index = sample_list
         self.orig_vals = [i.value for i in self._model.parameters]
 
