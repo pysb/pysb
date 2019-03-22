@@ -1456,7 +1456,7 @@ class Initial(object):
     fixed : bool
         Whether or not the species should be held fixed (never consumed).
 
-    Parameters
+    Attributes
     ----------
     Identical to Parameters (see above).
 

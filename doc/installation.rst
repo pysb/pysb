@@ -144,7 +144,7 @@ Install Docker and the PySB software stack
 
    To use PySB with Docker, first you'll need to install Docker, which can be
    obtained from https://www.docker.com/community-edition#/download (Windows
-    and Mac). Linux users should use their package manager (e.g. ``apt-get``).
+   and Mac). Linux users should use their package manager (e.g. ``apt-get``).
 
 2. **Download the PySB software stack from the Docker Hub**
 
