@@ -1,5 +1,5 @@
 from pysb.tools.sensitivity_analysis import \
-    PairwiseSensitivity
+    PairwiseSensitivity, InitialsSensitivity
 from pysb.examples.tyson_oscillator import model
 import numpy as np
 import numpy.testing as npt
@@ -83,6 +83,22 @@ class TestSensitivityAnalysis(object):
         npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
                                 decimal=3)
 
+    def test_vode_run(self):
+        solver_vode = ScipyOdeSimulator(self.model,
+                                        tspan=self.tspan,
+                                        integrator='vode',
+                                        integrator_options={'rtol': 1e-8,
+                                                            'atol': 1e-8,
+                                                            'nsteps': 20000})
+        sens_vode = InitialsSensitivity(
+            solver=solver_vode,
+            values_to_sample=self.vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable
+        )
+        sens_vode.run()
+        npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
+                                decimal=3)
     def test_p_matrix_shape(self):
         assert self.sens.p_matrix.shape == (10, 10)
 
