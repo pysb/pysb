@@ -7,6 +7,7 @@ import os
 from pysb.simulator.scipyode import ScipyOdeSimulator
 import tempfile
 import shutil
+from nose.tools import *
 
 
 class TestSensitivityAnalysis(object):
@@ -130,6 +131,47 @@ class TestSensitivityAnalysis(object):
             objective_function=self.obj_func_cell_cycle,
             observable=self.observable,
             solver=solver
+        )
+        sens.run()
+        self.sens.create_plot_p_h_pprime(save_name='test4',
+                                         out_dir=self.output_dir)
+        assert os.path.exists(os.path.join(self.output_dir,
+                                           'test4_P_H_P_prime.png'))
+
+    def test_param_pair(self):
+        vals = [.8, .9, 1.1, 1.2, 1.3]
+        solver = ScipyOdeSimulator(self.model,
+                                   tspan=self.tspan,
+                                   integrator='lsoda',
+                                   integrator_options={'rtol': 1e-8,
+                                                       'atol': 1e-8,
+                                                       'mxstep': 20000})
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=solver, sample_list=['k1', 'cdc0']
+        )
+        sens.run()
+        self.sens.create_plot_p_h_pprime(save_name='test4',
+                                         out_dir=self.output_dir)
+        assert os.path.exists(os.path.join(self.output_dir,
+                                           'test4_P_H_P_prime.png'))
+
+    @raises(Exception)
+    def test_param_not_in_model(self):
+        vals = [.8, .9, 1.1, 1.2, 1.3]
+        solver = ScipyOdeSimulator(self.model,
+                                   tspan=self.tspan,
+                                   integrator='lsoda',
+                                   integrator_options={'rtol': 1e-8,
+                                                       'atol': 1e-8,
+                                                       'mxstep': 20000})
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=solver, sample_list=['a0']
         )
         sens.run()
         self.sens.create_plot_p_h_pprime(save_name='test4',
