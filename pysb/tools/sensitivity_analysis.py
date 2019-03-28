@@ -309,8 +309,8 @@ class PairwiseSensitivity(object):
         self.objective_function = objective_function
         self.observable = observable
         self._sens_type = sens_type
-        if self._sens_type not in ('params', 'initials', 'all', None):
-            if self._sens_type is None and sample_list is None:
+        if self._sens_type not in ('params', 'initials', 'all'):
+            if sample_list is None:
                 raise Exception("Please provide 'sens_type' or 'sample_list'")
         if sample_list is not None:
             _valid_options = [i.name for i in self._model.parameters]
