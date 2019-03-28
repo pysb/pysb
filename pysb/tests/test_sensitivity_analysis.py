@@ -83,7 +83,7 @@ class TestSensitivityAnalysis(object):
         npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
                                 decimal=3)
 
-    def test_vode_run(self):
+    def test_old_class_naming(self):
         solver_vode = ScipyOdeSimulator(self.model,
                                         tspan=self.tspan,
                                         integrator='vode',
@@ -99,6 +99,7 @@ class TestSensitivityAnalysis(object):
         sens_vode.run()
         npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
                                 decimal=3)
+
     def test_p_matrix_shape(self):
         assert self.sens.p_matrix.shape == (10, 10)
 
