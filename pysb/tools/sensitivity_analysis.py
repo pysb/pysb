@@ -297,15 +297,14 @@ class PairwiseSensitivity(object):
 
     def __init__(self, solver, values_to_sample, objective_function,
                  observable, sens_type='initials', sample_list=None):
+        if not isinstance(solver, pysb.simulator.base.Simulator):
+            raise TypeError("solver must be a pysb.simulator object")
         self._model = solver.model
         self._logger = get_logger(__name__, model=self._model)
         self._logger.info('%s created for observable %s' % (
             self.__class__.__name__, observable))
         generate_equations(self._model)
         self._values_to_sample = values_to_sample
-        if solver is None or not isinstance(solver,
-                                            pysb.simulator.base.Simulator):
-            raise (TypeError, "solver must be a pysb.simulator object")
         self._solver = solver
         self.objective_function = objective_function
         self.observable = observable
