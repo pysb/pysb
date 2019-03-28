@@ -66,15 +66,15 @@ class TestSensitivityAnalysis(object):
         local_freq = np.average(local_times) / len(local_times) * 2
         return local_freq
 
-    def test_vode_run(self):
-        solver_vode = ScipyOdeSimulator(self.model,
+    def test_run(self):
+        solver = ScipyOdeSimulator(self.model,
                                         tspan=self.tspan,
                                         integrator='vode',
                                         integrator_options={'rtol': 1e-8,
                                                             'atol': 1e-8,
                                                             'nsteps': 20000})
         sens_vode = PairwiseSensitivity(
-            solver=solver_vode,
+            solver=solver,
             values_to_sample=self.vals,
             objective_function=self.obj_func_cell_cycle,
             observable=self.observable
@@ -175,6 +175,25 @@ class TestSensitivityAnalysis(object):
         assert os.path.exists(os.path.join(self.output_dir,
                                            'test4_P_H_P_prime.png'))
 
+    def test_all_params(self):
+        vals = [.9, 1.0, 1.1]
+        solver = ScipyOdeSimulator(self.model,
+                                   tspan=self.tspan,
+                                   integrator='lsoda',
+                                   integrator_options={'rtol': 1e-8,
+                                                       'atol': 1e-8,
+                                                       'mxstep': 20000})
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=solver, sens_type='all'
+        )
+        sens.run()
+        self.sens.create_plot_p_h_pprime(save_name='test4',
+                                         out_dir=None)
+        assert os.path.exists('test4_P_H_P_prime.png')
+
     @raises(Exception)
     def test_param_not_in_model(self):
         vals = [.8, .9, 1.1, 1.2, 1.3]
@@ -190,8 +209,19 @@ class TestSensitivityAnalysis(object):
             observable=self.observable,
             solver=solver, sample_list=['a0']
         )
-        sens.run()
-        self.sens.create_plot_p_h_pprime(save_name='test4',
-                                         out_dir=self.output_dir)
-        assert os.path.exists(os.path.join(self.output_dir,
-                                           'test4_P_H_P_prime.png'))
+
+    @raises(Exception)
+    def test_param_not_in_model(self):
+        vals = [.8, .9, 1.1, 1.2, 1.3]
+        solver = ScipyOdeSimulator(self.model,
+                                   tspan=self.tspan,
+                                   integrator='lsoda',
+                                   integrator_options={'rtol': 1e-8,
+                                                       'atol': 1e-8,
+                                                       'mxstep': 20000})
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=solver, sample_list=None, sens_type=None
+        )

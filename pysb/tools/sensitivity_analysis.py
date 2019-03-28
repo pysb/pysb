@@ -310,18 +310,22 @@ class PairwiseSensitivity(object):
         self.objective_function = objective_function
         self.observable = observable
         self._sens_type = sens_type
-        if self._sens_type == 'params':
-            self.index = [i.name for i in self._model.parameters_rules()]
-        elif self._sens_type == 'initials':
-            self.index = [i[1].name for i in self._model.initial_conditions]
-        else:
-            self.index = [i.name for i in self._model.parameters]
+        if self._sens_type not in ('params', 'initials', 'all', None):
+            if self._sens_type is None and sample_list is None:
+                raise Exception("Please provide 'sens_type' or 'sample_list'")
         if sample_list is not None:
             _valid_options = [i.name for i in self._model.parameters]
             for i in sample_list:
                 if i not in _valid_options:
                     raise Exception("{} not in model.parameters".format(i))
             self.index = sample_list
+        elif self._sens_type == 'params':
+            self.index = [i.name for i in self._model.parameters_rules()]
+        elif self._sens_type == 'initials':
+            self.index = [i[1].name for i in self._model.initial_conditions]
+        elif self._sens_type == 'all':
+            self.index = [i.name for i in self._model.parameters]
+
         self.orig_vals = [i.value for i in self._model.parameters]
         self.index_of_param = {}
         for n, i in enumerate(self._model.parameters):
@@ -416,7 +420,7 @@ class PairwiseSensitivity(object):
                 )
             elif i in self.b_prime_in_b:
                 p_prime_matrix[i] = p_matrix[self.b_prime_in_b[i]]
-        # Reshape
+
         p_matrix = p_matrix.reshape(self._shape_of_matrix)
         # Project the mirrored image
         self.p_matrix = p_matrix + p_matrix.T
