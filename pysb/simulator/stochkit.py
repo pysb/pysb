@@ -6,6 +6,7 @@ import subprocess
 import os
 import shutil
 import tempfile
+import re
 from pysb.pathfinder import get_path
 from pysb.logging import EXTENDED_DEBUG
 
@@ -138,7 +139,7 @@ class StochKitSimulator(Simulator):
 
         # Find binary for selected algorithm (SSA, Tau-leaping, ...)
         if algorithm not in ['ssa', 'tau_leaping']:
-            raise SimulatorException(
+            raise StochKitSimulatorException(
                 "algorithm must be 'ssa' or 'tau_leaping'")
 
         executable = get_path('stochkit_{}'.format(algorithm))
@@ -174,36 +175,43 @@ class StochKitSimulator(Simulator):
                                           stderr=subprocess.PIPE, shell=True)
                 return_code = handle.wait()
             except OSError as e:
-                raise SimulatorException("StochKit execution failed: \
+                raise StochKitSimulatorException("StochKit execution failed: \
                 {0}\n{1}".format(cmd, e))
 
             try:
-                stderr = handle.stderr.read()
+                stderr = handle.stderr.read().decode('utf8')
             except Exception as e:
                 stderr = 'Error reading stderr: {0}'.format(e)
             try:
-                stdout = handle.stdout.read()
+                stdout = handle.stdout.read().decode('utf8')
             except Exception as e:
                 stdout = 'Error reading stdout: {0}'.format(e)
 
             if return_code != 0:
-                raise SimulatorException("Solver execution failed: \
-                '{0}' output:\nSTDOUT:\n{1}\nSTDERR:\n{2}".format(
-                    cmd, stdout, stderr))
+                raise StochKitSimulatorException(
+                    "Solver execution failed (return code: {})".format(
+                        return_code),
+                    stdout=stdout,
+                    stderr=stderr
+                )
 
             traj_dir = os.path.join(prefix_outdir, 'trajectories')
             try:
                 trajectories.extend([np.loadtxt(os.path.join(
                     traj_dir, f)) for f in sorted(os.listdir(traj_dir))])
             except Exception as e:
-                raise SimulatorException(
-                    "Error reading StochKit trajectories: {0}"
-                    "\nSTDOUT:{1}\nSTDERR:{2}".format(e, stdout, stderr))
+                raise StochKitSimulatorException(
+                    "Error reading StochKit trajectories: {}".format(e),
+                    stdout=stdout,
+                    stderr=stderr
+                )
 
             if len(trajectories) == 0 or len(stderr) != 0:
-                raise SimulatorException("Solver execution failed: \
-                '{0}' output:\nSTDOUT:\n{1}\nSTDERR:\n{2}".format(
-                    cmd, stdout, stderr))
+                raise StochKitSimulatorException(
+                    "Solver execution failed: {}".format(e),
+                    stdout=stdout,
+                    stderr=stderr
+                )
 
             self._logger.debug("StochKit STDOUT:\n{0}".format(stdout))
 
@@ -277,8 +285,10 @@ class StochKitSimulator(Simulator):
         t_length = len(self.tspan)
         if not np.allclose(self.tspan, np.linspace(0, self.tspan[-1],
                                                    t_length)):
-            raise SimulatorException('StochKit requires tspan to be linearly '
-                                     'spaced starting at t=0')
+            raise StochKitSimulatorException(
+                'StochKit requires tspan to be linearly '
+                'spaced starting at t=0'
+            )
 
         try:
             trajectories = self._run_stochkit(t=t_range,
@@ -305,3 +315,35 @@ class StochKitSimulator(Simulator):
         species = trajectories_array[:, :, 1:]
         return SimulationResult(self, self.tout, species,
                                 simulations_per_param_set=n_runs)
+
+
+class StochKitSimulatorException(SimulatorException):
+    def __init__(self, *args, stdout=None, stderr=None):
+        super(StochKitSimulatorException, self).__init__(*args)
+        log_data = None
+        m = re.search(r'Check log file "(.*?)" for error messages', stdout)
+        if m:
+            try:
+                with open(m.group(1), 'r') as f:
+                    log_data = f.read()
+            except OSError:
+                log_data = '<Error reading log file>'
+
+        message = self.args[0]
+
+        if stdout:
+            message += '\n\nSTDOUT:\n'
+            for l in stdout.splitlines():
+                message += '  {}\n'.format(l)
+
+        if stderr:
+            message += '\nSTDERR:\n'
+            for l in stderr.splitlines():
+                message += '  {}\n'.format(l)
+
+        if log_data:
+            message += '\nLOG FILE:\n'
+            for l in log_data.splitlines():
+                message += '  {}\n'.format(l)
+
+        self.args = (message, )
