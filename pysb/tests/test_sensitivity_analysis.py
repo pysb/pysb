@@ -7,7 +7,7 @@ import os
 from pysb.simulator.scipyode import ScipyOdeSimulator
 import tempfile
 import shutil
-from nose.tools import *
+from nose.tools import raises
 
 
 class TestSensitivityAnalysis(object):
@@ -168,7 +168,7 @@ class TestSensitivityAnalysis(object):
                                          out_dir=None)
         assert os.path.exists('test4_P_H_P_prime.png')
 
-    @raises(Exception)
+    @raises(ValueError)
     def test_param_not_in_model(self):
         vals = [.8, .9, 1.1, 1.2, 1.3]
         solver = ScipyOdeSimulator(self.model,
@@ -184,17 +184,7 @@ class TestSensitivityAnalysis(object):
             solver=solver, sample_list=['a0']
         )
 
-    @raises(Exception)
-    def test_sens_type_and_list_none(self):
-        vals = [.8, .9, 1.1, 1.2, 1.3]
-        sens = PairwiseSensitivity(
-            values_to_sample=vals,
-            objective_function=self.obj_func_cell_cycle,
-            observable=self.observable,
-            solver=self.solver, sample_list=None, sens_type=None
-        )
-
-    @raises(Exception)
+    @raises(ValueError)
     def test_sens_type_and_list_none(self):
         vals = [.8, .9, 1.1, 1.2, 1.3]
         sens = PairwiseSensitivity(
