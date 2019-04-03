@@ -18,6 +18,7 @@ class PairwiseSensitivity(object):
     .. warning::
         The interface for this class is considered experimental and may
         change without warning as PySB is updated.
+
     Parameters
     ----------
     solver : pysb.simulator.Simulator
@@ -31,6 +32,7 @@ class PairwiseSensitivity(object):
         of changed that is used for calculating sensitivity. See Example.
     observable : str
         Observable used in the objective_function.
+
     Attributes
     ----------
     b_matrix: numpy.ndarray
@@ -45,9 +47,11 @@ class PairwiseSensitivity(object):
         contains changes from the baseline, unperturbed case)
     sample_list: list
         List of parameters to be used.
+
     References
     ----------
     Harris et al. Bioinformatics (2017), under review.
+
     Examples
     --------
     Sensitivity analysis on the Tyson cell cycle model
@@ -117,8 +121,8 @@ class PairwiseSensitivity(object):
             solver=solver,\
             sens_type='params'\
         )
-    >>> print(sens.b_matrix.shape)
-    (14, 14)
+    >>> print(sens.b_matrix.shape == (14, 14))
+    True
     >>> sens.run()
     >>> print(sens.p_matrix)#doctest: +NORMALIZE_WHITESPACE
     [[  0.       0.      13.6596  13.6596  24.3955   4.7909  16.4603  11.3258
@@ -666,10 +670,11 @@ def cartesian_product(array_1, array_2):
     ----------
     array_1 : list_like
     array_2 : list_like
+
     Returns
     -------
-    out : np.array
-        array of shape (len(array_1) x len(array_2))
+    np.array
+        array of shape (len(array_1), len(array_2))
     """
     a = list(product(array_1, array_2))
     a = np.asarray(a, dtype=','.join(['object'] * len(a[0])))
