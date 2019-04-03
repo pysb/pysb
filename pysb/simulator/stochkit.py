@@ -318,8 +318,10 @@ class StochKitSimulator(Simulator):
 
 
 class StochKitSimulatorException(SimulatorException):
-    def __init__(self, *args, stdout=None, stderr=None):
+    def __init__(self, *args, **kwargs):
         super(StochKitSimulatorException, self).__init__(*args)
+        stdout = kwargs.get('stdout')
+        stderr = kwargs.get('stderr')
         log_data = None
         m = re.search(r'Check log file "(.*?)" for error messages', stdout)
         if m:
