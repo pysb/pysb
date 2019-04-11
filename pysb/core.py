@@ -364,6 +364,90 @@ def _check_state_bond_tuple(monomer, site, state):
     return is_state_bond_tuple(state) and _check_state(monomer, site, state[0])
 
 
+def validate_site_value(state, monomer=None, site=None, _in_multisite=False):
+    if state is None:
+        return True
+
+    if isinstance(state, basestring):
+        if monomer and site:
+            if not _check_state(monomer, site, state):
+                return False
+        return True
+
+    if _check_bond(state):
+        return True
+
+    if is_state_bond_tuple(state):
+        if monomer and site:
+            _check_state(monomer, site, state[0])
+        return True
+
+    if isinstance(state, MultiSite):
+        if _in_multisite:
+            raise ValueError('Cannot nest MultiSite within each other')
+
+        if monomer and site:
+            site_counts = collections.Counter(monomer.sites)
+            if len(state) > site_counts[site]:
+                raise ValueError(
+                    'MultiSite for site "{}" on monomer "{}" has maximum '
+                    'length {}'.format(site, monomer.name, site_counts[site])
+                )
+
+            return all(validate_site_value(s, monomer, site, True) for s in
+                       state)
+
+    return False
+
+
+class MultiSite(object):
+    """
+    MultiSite for a Monomer (also known as duplicate sites)
+
+    MultiSites are duplicate copies of a site which each have the same name and
+    semantics. In BioNetGen, these are known as duplicate sites. MultiSites
+    are not supported by Kappa.
+
+    Examples
+    --------
+
+    Define a Monomer "A" with MultiSite "a", which has two copies, and
+    Monomer "B" with MultiSite "b", which also has two copies but can take
+    state values "u" and "p":
+
+    >>> Model()  # doctest:+ELLIPSIS
+    <Model '_interactive_' (monomers: 0, ...
+    >>> Monomer('A', ['a', 'a'])  # BNG: A(a, a)
+    Monomer('A', ['a', 'a'])
+    >>> Monomer('B', ['b', 'b'], {'b': ['u', 'p']})  # BNG: B(b~u~p, b~u~p)
+    Monomer('B', ['b', 'b'], {'b': ['u', 'p']})
+
+    To specify MultiSites, use the MultiSite class. Here are some valid
+    examples of MultiSite patterns, with their BioNetGen equivalents:
+
+    >>> A(a=MultiSite(1, 2))  # BNG: A(a!1,a!2)
+    A(a=MultiSite(1, 2))
+    >>> B(b=MultiSite('u', 'p'))  # BNG: A(A~u,A~p)
+    B(b=MultiSite('u', 'p'))
+    >>> A(a=MultiSite(1, 2)) % B(b=MultiSite(('u', 1), 2))  # BNG: A(a!1, a!2).B(b~u!1, b~2)
+    A(a=MultiSite(1, 2)) % B(b=MultiSite(('u', 1), 2))
+    """
+    def __init__(self, *args):
+        self.sites = args
+        for s in self.sites:
+            validate_site_value(s, _in_multisite=True)
+
+    def __len__(self):
+        return len(self.sites)
+
+    def __iter__(self):
+        return iter(self.sites)
+
+    def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__, ', '.join(
+            repr(s) for s in self))
+
+
 class MonomerPattern(object):
 
     """
@@ -410,30 +494,10 @@ class MonomerPattern(object):
             raise Exception("MonomerPattern with unknown sites in " +
                             str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is one of: None, integer, list of integers, string,
-        # (string,integer), (string,WILD), ANY, WILD
-        site_counts = collections.Counter(monomer.sites)
         invalid_sites = []
         for (site, state) in site_conditions.items():
-            # pass through to next iteration if state type is ok
-            if state is None:
-                continue
-            elif isinstance(state, basestring):
-                _check_state(monomer, site, state)
-                continue
-            elif _check_bond(state):
-                continue
-            elif _check_state_bond_tuple(monomer, site, state):
-                continue
-            elif (isinstance(state, tuple) and
-                  len(state) <= site_counts[site] and
-                  all(s is None or
-                      _check_bond(s) or
-                      _check_state_bond_tuple(monomer, site, s) or
-                      _check_state(monomer, site, s)
-                      for s in state)):
-                continue
-            invalid_sites.append(site)
+            if not validate_site_value(state, monomer, site):
+                invalid_sites.append(site)
         if invalid_sites:
             raise ValueError("Invalid state value for sites: " +
                              '; '.join(['%s=%s' % (s, str(site_conditions[s]))
@@ -477,9 +541,8 @@ class MonomerPattern(object):
             return False
         for site_name, site_val in self.site_conditions.items():
             if site_name in dup_sites:
-                if not isinstance(site_val, tuple) or \
-                        len(site_val) < dup_sites[site_name] or \
-                        is_state_bond_tuple(site_val):
+                if not isinstance(site_val, MultiSite) or \
+                        len(site_val) < dup_sites[site_name]:
                     return False
 
                 if not all(self._site_instance_concrete(site_name, s)
@@ -594,7 +657,6 @@ class MonomerPattern(object):
         if self.compartment is not None:
             value += ' ** ' + self.compartment.name
         return value
-
 
 
 class ComplexPattern(object):
@@ -775,8 +837,7 @@ class ComplexPattern(object):
                 g.add_edge(mon_node_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
-                if isinstance(state_or_bond, tuple) and not \
-                        is_state_bond_tuple(state_or_bond):
+                if isinstance(state_or_bond, MultiSite):
                     # Duplicate sites
                     [_handle_site_instance(s) for s in state_or_bond]
                 else:

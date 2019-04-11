@@ -385,12 +385,22 @@ def test_duplicate_sites():
     Monomer('B', ['b', 'b'], {'b': ['u', 'p']})
 
     assert not A(a=1).is_concrete()
-    assert A(a=(1, 2)).is_concrete()
-    assert A(a=(1, None)).is_concrete()
+    assert A(a=MultiSite(1, 2)).is_concrete()
+    assert A(a=MultiSite(1, None)).is_concrete()
 
     assert not B(b=('u', 1)).is_concrete()
-    assert B(b=('u', 'p')).is_concrete()
-    assert B(b=(('u', 1), ('u', 2))).is_concrete()
+
+    assert B(b=MultiSite('u', 'p')).is_concrete()
+    assert B(b=MultiSite(('u', 1), ('u', 2))).is_concrete()
 
     # Check _as_graph() works for duplicate sites
-    B(b=(('u', 1), ('u', 2)))._as_graph()
+    B(b=MultiSite(('u', 1), ('u', 2)))._as_graph()
+
+    assert B(b=MultiSite('u', ('u', 1))).is_concrete()
+
+    # Syntax errors (should use MultiSite)
+    assert_raises(ValueError, B, b=('u', 'p'))
+    assert_raises(ValueError, B, b=['u', 'p'])
+
+    # Syntax error (can't nest MultiSite)
+    assert_raises(ValueError, MultiSite, MultiSite(1, 2), 'p')
