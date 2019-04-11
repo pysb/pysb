@@ -481,6 +481,7 @@ class MonomerPattern(object):
     * *tuple of (str, int)* : state with specified bond
     * *tuple of (str, WILD)* : state with wildcard bond
     * *tuple of (str, ANY)* : state with any bond
+    * MultiSite : duplicate sites
 
     If a site is not listed in site_conditions then the pattern will match any
     state for that site, i.e. \"don't write, don't care\".
@@ -806,7 +807,7 @@ class ComplexPattern(object):
             elif is_state_bond_tuple(state_or_bond):
                 state = state_or_bond[0]
                 bond_num = state_or_bond[1]
-            elif isinstance(state_or_bond, int):
+            elif isinstance(state_or_bond, (int, list)):
                 bond_num = state_or_bond
             elif state_or_bond is not ANY and state_or_bond is not None:
                 raise ValueError('Unrecognized state: {}'.format(
@@ -827,6 +828,9 @@ class ComplexPattern(object):
                 bond_edges[NO_BOND].append(mon_site_id)
             elif isinstance(bond_num, int):
                 bond_edges[bond_num].append(mon_site_id)
+            elif isinstance(bond_num, list):
+                for bond in bond_num:
+                    bond_edges[bond].append(mon_site_id)
 
         for mp in self.monomer_patterns:
             mon_node_id = next(node_count)

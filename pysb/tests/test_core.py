@@ -380,6 +380,17 @@ def test_rulepattern_match_none_against_state():
 
 
 @with_model
+def test_multi_bonds():
+    Monomer('A', ['a'])
+    a_pat = A(a=[1, 2])
+
+    # Check _as_graph() works for multi-bonds
+    a_pat._as_graph()
+
+    assert a_pat.is_concrete()
+
+
+@with_model
 def test_duplicate_sites():
     Monomer('A', ['a', 'a'])
     Monomer('B', ['b', 'b'], {'b': ['u', 'p']})
@@ -404,3 +415,6 @@ def test_duplicate_sites():
 
     # Syntax error (can't nest MultiSite)
     assert_raises(ValueError, MultiSite, MultiSite(1, 2), 'p')
+
+    # Duplicate sites with multi-bond
+    A(a=MultiSite([1, 2], [1, 2]))
