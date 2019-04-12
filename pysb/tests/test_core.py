@@ -378,3 +378,44 @@ def test_rulepattern_match_none_against_state():
     # so this should be a valid rule pattern
     A(phospho=None) + A(phospho=None) >> A(phospho=1) % A(phospho=1)
 
+
+@with_model
+def test_invalid_rule():
+    Monomer('A')
+    assert_raises(ExpressionError, Rule, 'r1', None >> A(), 1.0)
+    assert len(model.rules) == 0
+
+    Parameter('kf', 1.0)
+    assert_raises(Exception, Rule, 'r1', 'invalid_rule_expr', kf)
+    assert len(model.rules) == 0
+
+
+@with_model
+def test_invalid_expression():
+    assert_raises(ValueError, Expression, 'e1', 'invalid_expr')
+    assert len(model.expressions) == 0
+
+
+@with_model
+def test_invalid_monomer_name():
+    assert_raises(ValueError, Monomer, 'a', 123)
+    assert len(model.monomers) == 0
+
+
+@with_model
+def test_invalid_parameter():
+    assert_raises(ValueError, Parameter, 'a', 'invalid_value')
+    assert len(model.parameters) == 0
+
+
+@with_model
+def test_invalid_compartment():
+    assert_raises(Exception, Compartment, 'c1', 'invalid_parent')
+    assert len(model.compartments) == 0
+
+
+@with_model
+def test_invalid_observable():
+    assert_raises(InvalidReactionPatternException,
+                  Observable, 'o1', 'invalid_pattern')
+    assert len(model.observables) == 0
