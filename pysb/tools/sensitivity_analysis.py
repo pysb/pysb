@@ -31,7 +31,11 @@ class PairwiseSensitivity(object):
         A function that returns a scalar value. Used to calculate fraction
         of changed that is used for calculating sensitivity. See Example.
     observable : str
-        Observable used in the objective_function.
+        Observable name used in the objective_function.
+    sens_type: {'params', 'initials', 'all'}
+        Type of sensitivity analysis to perform. O
+    sample_list: list
+        List of model pysb.Parameters names to be used.
 
     Attributes
     ----------
@@ -40,13 +44,21 @@ class PairwiseSensitivity(object):
     b_prime_matrix: numpy.ndarray
         Same as b_matrix, only where one of the species concentrations is
         unchanged (i.e. with the single variable contribution removed)
+    index : list
+        List of model parameter names that will be used in analysis
+    index_of_param : dict
+        Dictionary that maps parameters name to index in orig_values array
+    objective_function : Identical to Parameters (see above).
+    orig_vals : numpy.array
+        Original values of the model.Parameters.
     p_matrix: numpy.ndarray
         Pairwise sensitivity matrix
     p_prime_matrix: numpy.ndarray
         Normalized pairwise sensitivity matrix (in the sense that it
         contains changes from the baseline, unperturbed case)
-    sample_list: list
-        List of parameters to be used.
+    params_to_run : np.array
+        Parameter sets to be passed to simulator
+
 
     References
     ----------
@@ -214,7 +226,7 @@ class PairwiseSensitivity(object):
         self._values_to_sample = values_to_sample
         self._solver = solver
         self.objective_function = objective_function
-        self.observable = observable
+        self._observable = observable
         self._sens_type = sens_type
         if self._sens_type not in ('params', 'initials', 'all'):
             if sample_list is None:
@@ -301,29 +313,29 @@ class PairwiseSensitivity(object):
         self._solver.param_values = None
         sim_results = self._solver.run(param_values=None, initials=None)
         self._objective_fn_standard = self.objective_function(
-            np.array(sim_results.observables[self.observable])
+            np.array(sim_results.observables[self._observable])
         )
 
         traj = self._solver.run(param_values=self.params_to_run)
 
-        output = np.array(traj.observables)[self.observable].T
+        output = np.array(traj.observables)[self._observable].T
         p_matrix = np.zeros(self._size_of_matrix)
         p_prime_matrix = np.zeros(self._size_of_matrix)
         counter = 0
         # places values in p matrix that are unique
         for i in range(len(p_matrix)):
-            if i in self.b_index:
+            if i in self._b_index:
                 p_matrix[i] = self._calculate_objective(output[:, counter])
                 counter += 1
 
         # places values in p matrix that are duplicated
         for i in range(len(p_matrix)):
-            if i in self.b_prime_not_in_b:
+            if i in self._b_prime_not_in_b:
                 p_prime_matrix[i] = self._calculate_objective(
-                    output[:, self.b_prime_not_in_b[i]]
+                    output[:, self._b_prime_not_in_b[i]]
                 )
-            elif i in self.b_prime_in_b:
-                p_prime_matrix[i] = p_matrix[self.b_prime_in_b[i]]
+            elif i in self._b_prime_in_b:
+                p_prime_matrix[i] = p_matrix[self._b_prime_in_b[i]]
 
         p_matrix = p_matrix.reshape(self._shape_of_matrix)
         # Project the mirrored image
@@ -398,9 +410,9 @@ class PairwiseSensitivity(object):
         # creates matrix b prime
         self.b_prime_matrix = cartesian_product(a_prime, a_matrix)
 
-        b_to_run, self.b_index, in_b = self._g_function()
+        b_to_run, self._b_index, in_b = self._g_function()
 
-        n_b_index = len(self.b_index)
+        n_b_index = len(self._b_index)
 
         b_prime = np.zeros((self._size_of_matrix, len(self.orig_vals)))
         b_prime[:, :] = self.orig_vals
@@ -436,9 +448,9 @@ class PairwiseSensitivity(object):
                     bp_not_in_b_dict[counter] = new_sim_counter + n_b_index
                     bp_not_in_b_raw.add(new_sim_counter)
 
-        self.b_prime_in_b = bp_dict
-        self.b_prime_not_in_b = bp_not_in_b_dict
-        x = b_to_run[sorted(self.b_index)]
+        self._b_prime_in_b = bp_dict
+        self._b_prime_not_in_b = bp_not_in_b_dict
+        x = b_to_run[sorted(self._b_index)]
         y = b_prime[sorted(bp_not_in_b_raw)]
         simulations = np.vstack((x, y))
         self._logger.debug("{} simulations to run".format(len(simulations)))
