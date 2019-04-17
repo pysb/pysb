@@ -15,6 +15,7 @@ class PairwiseSensitivity(object):
     This class calculates the sensitivity of a specified model Observable to
     changes in pairs of initial species concentrations. The results are
     stored in matrices described in Attributes.
+
     .. warning::
         The interface for this class is considered experimental and may
         change without warning as PySB is updated.
@@ -33,7 +34,7 @@ class PairwiseSensitivity(object):
     observable : str
         Observable name used in the objective_function.
     sens_type: {'params', 'initials', 'all'}
-        Type of sensitivity analysis to perform. O
+        Type of sensitivity analysis to perform.
     sample_list: list
         List of model pysb.Parameters names to be used.
 
@@ -62,11 +63,16 @@ class PairwiseSensitivity(object):
 
     References
     ----------
-    Harris et al. Bioinformatics (2017), under review.
+    1. Harris, L.A., Nobile, M.S., Pino, J.C., Lubbock, A.L.R., Besozzi, D.,
+       Mauri, G., Cazzaniga, P., and Lopez, C.F. 2017. GPU-powered model
+       analysis with PySB/cupSODA. Bioinformatics 33, pp.3492-3494.
+       https://academic.oup.com/bioinformatics/article/33/21/3492/3896987
 
     Examples
     --------
+
     Sensitivity analysis on the Tyson cell cycle model
+
     >>> from pysb.examples.tyson_oscillator import model
     >>> import numpy as np
     >>> from pysb.simulator.scipyode import ScipyOdeSimulator
@@ -267,6 +273,7 @@ class PairwiseSensitivity(object):
     def sensitivity_multiset(self):
         """
         Sensitivity analysis multiset (also called "Q" matrix)
+
         Returns
         -------
         list
@@ -289,6 +296,7 @@ class PairwiseSensitivity(object):
     def _calculate_objective(self, function_value):
         """
         Calculate fraction of change for obj value and standard
+
         Parameters
         ----------
         function_value : scalar
@@ -358,7 +366,7 @@ class PairwiseSensitivity(object):
             np.savetxt(p_prime_name, self.p_prime_matrix)
 
     def _g_function(self):
-        """ creates sample matrix, index of samples values, and shows bij """
+        """ Create sample matrix, index of samples values, and shows bij """
         counter = -1
         sampled_values_index = set()
         bij_unique = dict()
@@ -391,6 +399,7 @@ class PairwiseSensitivity(object):
     def _setup_simulations(self):
         """
         Create initial conditions matrix for sensitivity analysis
+
         Returns
         -------
         numpy.ndarray
@@ -460,7 +469,8 @@ class PairwiseSensitivity(object):
         """
         Plot of P, H(B), and P'
 
-        See :class:`InitialsSensitivity` for descriptions of these matrices
+        See :class:`PairwiseSensitivity` attributes for descriptions of these
+        matrices
 
         Parameters
         ----------
@@ -678,6 +688,7 @@ class PairwiseSensitivity(object):
 def cartesian_product(array_1, array_2):
     """
     Cartesian product between two lists
+
     Parameters
     ----------
     array_1 : list_like
@@ -694,6 +705,7 @@ def cartesian_product(array_1, array_2):
 
 
 class InitialsSensitivity(PairwiseSensitivity):
+    """ Deprecated; use :class:`PairwiseSensitivity` instead. """
     def __init__(self, *args, **kwargs):
         warnings.warn("InitialsSensitivity will be removed in a future "
                       "version of PySB. Use PairwiseSensitivity instead.",
