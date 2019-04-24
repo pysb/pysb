@@ -1,5 +1,5 @@
 from pysb.tools.sensitivity_analysis import \
-    InitialsSensitivity
+    PairwiseSensitivity, InitialsSensitivity
 from pysb.examples.tyson_oscillator import model
 import numpy as np
 import numpy.testing as npt
@@ -7,6 +7,7 @@ import os
 from pysb.simulator.scipyode import ScipyOdeSimulator
 import tempfile
 import shutil
+from nose.tools import raises
 
 
 class TestSensitivityAnalysis(object):
@@ -24,7 +25,7 @@ class TestSensitivityAnalysis(object):
                                         integrator_options={'rtol': 1e-8,
                                                             'atol': 1e-8,
                                                             'mxstep': 20000})
-        self.sens = InitialsSensitivity(
+        self.sens = PairwiseSensitivity(
             solver=self.solver,
             values_to_sample=self.vals,
             objective_function=self.obj_func_cell_cycle,
@@ -65,15 +66,21 @@ class TestSensitivityAnalysis(object):
         local_freq = np.average(local_times) / len(local_times) * 2
         return local_freq
 
-    def test_vode_run(self):
-        solver_vode = ScipyOdeSimulator(self.model,
-                                        tspan=self.tspan,
-                                        integrator='vode',
-                                        integrator_options={'rtol': 1e-8,
-                                                            'atol': 1e-8,
-                                                            'nsteps': 20000})
+    def test_run(self):
+
+        sens_vode = PairwiseSensitivity(
+            solver=self.solver,
+            values_to_sample=self.vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable
+        )
+        sens_vode.run()
+        npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
+                                decimal=3)
+
+    def test_old_class_naming(self):
         sens_vode = InitialsSensitivity(
-            solver=solver_vode,
+            solver=self.solver,
             values_to_sample=self.vals,
             objective_function=self.obj_func_cell_cycle,
             observable=self.observable
@@ -88,9 +95,6 @@ class TestSensitivityAnalysis(object):
     def test_p_matrix(self):
         npt.assert_almost_equal(self.sens.p_matrix, self.p_simulated,
                                 decimal=3)
-
-    def test_num_simulations(self):
-        assert len(self.sens.simulation_initials) == 25
 
     def test_pmatrix_outfile_exists(self):
         self.sens.run(save_name=self.savename,
@@ -122,20 +126,80 @@ class TestSensitivityAnalysis(object):
 
     def test_unique_simulations_only(self):
         vals = [.8, .9, 1.1, 1.2, 1.3]
-        solver = ScipyOdeSimulator(self.model,
-                                   tspan=self.tspan,
-                                   integrator='lsoda',
-                                   integrator_options={'rtol': 1e-8,
-                                                       'atol': 1e-8,
-                                                       'mxstep': 20000})
-        sens = InitialsSensitivity(
+        sens = PairwiseSensitivity(
             values_to_sample=vals,
             objective_function=self.obj_func_cell_cycle,
             observable=self.observable,
-            solver=solver
+            solver=self.solver
         )
         sens.run()
         self.sens.create_plot_p_h_pprime(save_name='test4',
                                          out_dir=self.output_dir)
         assert os.path.exists(os.path.join(self.output_dir,
                                            'test4_P_H_P_prime.png'))
+
+    def test_param_pair(self):
+        vals = [.9, 1.0, 1.1]
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=self.solver,
+            sample_list=['k1', 'cdc0']
+        )
+        sens.run()
+        self.sens.create_plot_p_h_pprime(save_name='test4',
+                                         out_dir=self.output_dir)
+        assert os.path.exists(os.path.join(self.output_dir,
+                                           'test4_P_H_P_prime.png'))
+
+    def test_all_params(self):
+        vals = [.9, 1.1]
+
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=self.solver,
+            sens_type='all'
+        )
+        sens.run()
+        self.sens.create_plot_p_h_pprime(save_name='test4',
+                                         out_dir=None)
+        assert os.path.exists('test4_P_H_P_prime.png')
+
+    @raises(ValueError)
+    def test_param_not_in_model(self):
+        vals = [.8, .9, 1.1, 1.2, 1.3]
+        solver = ScipyOdeSimulator(self.model,
+                                   tspan=self.tspan,
+                                   integrator='lsoda',
+                                   integrator_options={'rtol': 1e-8,
+                                                       'atol': 1e-8,
+                                                       'mxstep': 20000})
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=solver, sample_list=['a0']
+        )
+
+    @raises(ValueError)
+    def test_sens_type_and_list_none(self):
+        vals = [.8, .9, 1.1, 1.2, 1.3]
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=self.solver, sample_list=None, sens_type=None
+        )
+
+    @raises(TypeError)
+    def test_bad_solver(self):
+        vals = [.8, .9, 1.1, 1.2, 1.3]
+        sens = PairwiseSensitivity(
+            values_to_sample=vals,
+            objective_function=self.obj_func_cell_cycle,
+            observable=self.observable,
+            solver=None, sample_list=None, sens_type=None
+        )

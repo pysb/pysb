@@ -13,5 +13,6 @@ PySB Modules Reference
    macros.rst
    pattern.rst
    tools/render.rst
+   tools/sensitivity_analysis.rst
    importers/index.rst
    export/index.rst
