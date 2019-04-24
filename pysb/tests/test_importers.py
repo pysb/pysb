@@ -55,13 +55,17 @@ def bngl_import_compare_simulations(bng_file, force=False,
         return
 
     # Check all species trajectories are equal (within numerical tolerance)
-    assert yfull1.dtype.names == yfull2.dtype.names
+    assert len(yfull1.dtype.names) == len(yfull2.dtype.names)
     for species in yfull1.dtype.names:
         logger.debug(species)
         logger.debug(yfull1[species])
-        logger.debug(yfull2[species])
-        assert numpy.allclose(yfull1[species], yfull2[species], atol=precision,
-                              rtol=precision)
+        if species in yfull2.dtype.names:
+            renamed_species = species
+        else:
+            renamed_species = 'Obs_{}'.format(species)
+        logger.debug(yfull2[renamed_species])
+        assert numpy.allclose(yfull1[species], yfull2[renamed_species],
+                              atol=precision, rtol=precision)
 
 
 def _bng_validate_directory():
@@ -110,7 +114,8 @@ def test_bngl_import_expected_passes_no_sim():
                      'hybrid_test',  # Population maps are not converted
                      'tlbr'):
         full_filename = _bngl_location(filename)
-        yield (bngl_import_compare_simulations, full_filename, False, None)
+        yield (bngl_import_compare_simulations, full_filename, False, None,
+               None)
 
 
 def test_bngl_import_expected_passes():
@@ -158,7 +163,7 @@ def test_bngl_import_expected_errors():
                        'heise': errtype['statelabels'],
                        'isingspin_energy': errtype['ratelawmissing'],
                        'isingspin_localfcn': errtype['localfn'],
-                       'localfunc': 'Species \$Trash\(\) is fixed',
+                       'localfunc': errtype['localfn'],
                        'test_MM': errtype['ratelawtype'],
                        'test_sat': errtype['ratelawtype'],
                        }

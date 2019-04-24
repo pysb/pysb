@@ -1,7 +1,7 @@
 import inspect
 import warnings
 import pysb
-from pysb.core import is_state_bond_tuple, MultiSite
+from pysb.core import MultiSite
 import sympy
 from sympy.printing import StrPrinter
 
@@ -11,8 +11,8 @@ try:
 except NameError:
     basestring = str
 
-class BngGenerator(object):
 
+class BngGenerator(object):
     def __init__(self, model, additional_initials=None, population_maps=None):
         self.model = model
         if additional_initials is None:
@@ -46,7 +46,7 @@ class BngGenerator(object):
         max_length = max(len(p.name) for p in
                          self.model.parameters | self.model.expressions)
         for p in self.model.parameters:
-            self.__content += (("  %-" + str(max_length) + "s   %e\n") %
+            self.__content += (("  %-" + str(max_length) + "s   %.17g\n") %
                                (p.name, p.value))
         for e in exprs:
             self.__content += (("  %-" + str(max_length) + "s   %s\n") %

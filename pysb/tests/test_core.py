@@ -418,3 +418,8 @@ def test_duplicate_sites():
 
     # Duplicate sites with multi-bond
     A(a=MultiSite([1, 2], [1, 2]))
+
+
+@raises(ValueError)
+def test_duplicate_site_single_site():
+    MultiSite('a')

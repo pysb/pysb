@@ -10,7 +10,6 @@ import pysb.logging
 import collections
 import numbers
 import os
-import math
 
 
 def _ns(tag_string):
@@ -66,7 +65,7 @@ class BnglBuilder(Builder):
 
         # Quick security check on the expression
         if re.match(r'^[\w\s()/+\-._*]*$', expression):
-            return eval(expression, {'ln': math.log}, self._model_env)
+            return parse_expr(expression, self._model_env)
         else:
             self._warn_or_except('Security check on expression "%s" failed' %
                                  expression)

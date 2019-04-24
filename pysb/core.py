@@ -342,20 +342,20 @@ def _check_state(monomer, site, state):
 def _check_bond(bond):
     """ A bond can either by a single int, WILD, ANY, or a list of ints """
     return (
-        isinstance(bond, int) or
-        bond is WILD or
-        bond is ANY or
-        isinstance(bond, list) and all(isinstance(b, int) for b in bond)
+        isinstance(bond, int)
+        or bond is WILD
+        or bond is ANY
+        or isinstance(bond, list) and all(isinstance(b, int) for b in bond)
     )
 
 
 def is_state_bond_tuple(state):
     """ Check the argument is a (state, bond) tuple for a Mononer site """
     return (
-        isinstance(state, tuple) and
-        len(state) == 2 and
-        isinstance(state[0], basestring) and
-        _check_bond(state[1])
+        isinstance(state, tuple)
+        and len(state) == 2
+        and isinstance(state[0], basestring)
+        and _check_bond(state[1])
     )
 
 
@@ -367,22 +367,18 @@ def _check_state_bond_tuple(monomer, site, state):
 def validate_site_value(state, monomer=None, site=None, _in_multisite=False):
     if state is None:
         return True
-
-    if isinstance(state, basestring):
+    elif isinstance(state, basestring):
         if monomer and site:
             if not _check_state(monomer, site, state):
                 return False
         return True
-
-    if _check_bond(state):
+    elif _check_bond(state):
         return True
-
-    if is_state_bond_tuple(state):
+    elif is_state_bond_tuple(state):
         if monomer and site:
             _check_state(monomer, site, state[0])
         return True
-
-    if isinstance(state, MultiSite):
+    elif isinstance(state, MultiSite):
         if _in_multisite:
             raise ValueError('Cannot nest MultiSite within each other')
 
@@ -397,7 +393,9 @@ def validate_site_value(state, monomer=None, site=None, _in_multisite=False):
             return all(validate_site_value(s, monomer, site, True) for s in
                        state)
 
-    return False
+        return True
+    else:
+        return False
 
 
 class MultiSite(object):
@@ -407,6 +405,10 @@ class MultiSite(object):
     MultiSites are duplicate copies of a site which each have the same name and
     semantics. In BioNetGen, these are known as duplicate sites. MultiSites
     are not supported by Kappa.
+
+    When declared, a MultiSite instance is not connected to any Monomer or site,
+    so full validation is deferred until it is used as part of a
+    :py:class:`MonomerPattern` or :py:class:`ComplexPattern`.
 
     Examples
     --------
@@ -433,6 +435,9 @@ class MultiSite(object):
     A(a=MultiSite(1, 2)) % B(b=MultiSite(('u', 1), 2))
     """
     def __init__(self, *args):
+        if len(args) == 1:
+            raise ValueError('MultiSite should not be used when only a single '
+                             'site is specified')
         self.sites = args
         for s in self.sites:
             validate_site_value(s, _in_multisite=True)
