@@ -233,11 +233,11 @@ class ScipyOdeSimulator(Simulator):
                     code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                       '%s(\\1)' % macro, code_eqs)
 
-                    rhs = _get_rhs(self._compiler,
-                                   code_eqs,
-                                   ydot=ydot,
-                                   compiler_directives=self._compiler_directives
-                                   )
+                rhs = _get_rhs(self._compiler,
+                               code_eqs,
+                               ydot=ydot,
+                               compiler_directives=self._compiler_directives
+                               )
 
                 # Call rhs once just to trigger the weave C compilation step
                 # while asserting control over distutils logging.
@@ -514,7 +514,7 @@ class ScipyOdeSimulator(Simulator):
         else:
             self._logger.debug('Multi-processor (parallel) mode using {} '
                                'processes'.format(num_processors))
-        with DummyExecutor() if num_processors == 1 else \
+        with SerialExecutor() if num_processors == 1 else \
                 ProcessPoolExecutor(max_workers=num_processors) as executor:
             for n in range(n_sims):
                 results.append(executor.submit(
@@ -678,7 +678,7 @@ def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
     return trajectory
 
 
-class DummyExecutor(Executor):
+class SerialExecutor(Executor):
     """ Execute tasks in serial (immediately on submission) """
     def submit(self, fn, *args, **kwargs):
         f = Future()
