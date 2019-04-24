@@ -9,6 +9,7 @@ import warnings
 import pysb.logging
 import collections
 import numbers
+import os
 
 
 def _ns(tag_string):
@@ -30,6 +31,7 @@ class BnglBuilder(Builder):
     """
     def __init__(self, filename, force=False, cleanup=True):
         super(BnglBuilder, self).__init__()
+        filename = os.path.abspath(filename)
         with BngFileInterface(model=None, cleanup=cleanup) as con:
             con.action('readFile', file=filename, skip_actions=1)
             con.action('writeXML', evaluate_expressions=0)
