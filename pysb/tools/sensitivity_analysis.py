@@ -1,17 +1,16 @@
 import os
 from itertools import product
-import collections
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
 from pysb.bng import generate_equations
 import pysb.simulator.base
 from pysb.logging import get_logger
+import warnings
 
 
-class InitialsSensitivity(object):
-    """
-    Pairwise sensitivity analysis of initial conditions
+class PairwiseSensitivity(object):
+    """ Pairwise sensitivity analysis of model parameters
 
     This class calculates the sensitivity of a specified model Observable to
     changes in pairs of initial species concentrations. The results are
@@ -33,7 +32,11 @@ class InitialsSensitivity(object):
         A function that returns a scalar value. Used to calculate fraction
         of changed that is used for calculating sensitivity. See Example.
     observable : str
-        Observable used in the objective_function.
+        Observable name used in the objective_function.
+    sens_type: {'params', 'initials', 'all'}
+        Type of sensitivity analysis to perform.
+    sample_list: list
+        List of model pysb.Parameters names to be used.
 
     Attributes
     ----------
@@ -42,24 +45,38 @@ class InitialsSensitivity(object):
     b_prime_matrix: numpy.ndarray
         Same as b_matrix, only where one of the species concentrations is
         unchanged (i.e. with the single variable contribution removed)
+    index : list
+        List of model parameter names that will be used in analysis
+    index_of_param : dict
+        Dictionary that maps parameters name to index in orig_values array
+    objective_function : Identical to Parameters (see above).
+    orig_vals : numpy.array
+        Original values of the model.Parameters.
     p_matrix: numpy.ndarray
         Pairwise sensitivity matrix
     p_prime_matrix: numpy.ndarray
         Normalized pairwise sensitivity matrix (in the sense that it
         contains changes from the baseline, unperturbed case)
+    params_to_run : np.array
+        Parameter sets to be passed to simulator
+
 
     References
     ----------
-    Harris et al. Bioinformatics (2017), under review.
+    1. Harris, L.A., Nobile, M.S., Pino, J.C., Lubbock, A.L.R., Besozzi, D.,
+       Mauri, G., Cazzaniga, P., and Lopez, C.F. 2017. GPU-powered model
+       analysis with PySB/cupSODA. Bioinformatics 33, pp.3492-3494.
+       https://academic.oup.com/bioinformatics/article/33/21/3492/3896987
 
     Examples
     --------
+
     Sensitivity analysis on the Tyson cell cycle model
 
     >>> from pysb.examples.tyson_oscillator import model
     >>> import numpy as np
     >>> from pysb.simulator.scipyode import ScipyOdeSimulator
-    >>> np.set_printoptions(precision=4)
+    >>> np.set_printoptions(precision=4, suppress=True)
     >>> tspan=np.linspace(0, 200, 201)
     >>> observable = 'Y3'
     >>> values_to_sample = [.8, 1.2]
@@ -77,8 +94,11 @@ class InitialsSensitivity(object):
     ...     local_times = np.array(local_times)
     ...     local_freq = np.average(local_times)/len(local_times)*2
     ...     return local_freq
-    >>> solver = ScipyOdeSimulator(model, tspan)
-    >>> sens = InitialsSensitivity(\
+    >>> solver = ScipyOdeSimulator(model, tspan, integrator='lsoda',\
+                      integrator_options={'atol' : 1e-8,\
+                                          'rtol' : 1e-8,\
+                                          'mxstep' :20000})
+    >>> sens = PairwiseSensitivity(\
             values_to_sample=values_to_sample,\
             observable=observable,\
             objective_function=obj_func_cell_cycle,\
@@ -99,7 +119,6 @@ class InitialsSensitivity(object):
      [ 0.      0.      5.0243 -4.5381]
      [ 5.0243  5.0243  0.      0.    ]
      [-4.5381 -4.5381  0.      0.    ]]
-
     >>> print(sens.p_prime_matrix) #doctest: +NORMALIZE_WHITESPACE
      [[ 0.      0.      5.0243 -4.5381]
       [ 0.      0.      5.0243 -4.5381]
@@ -112,66 +131,143 @@ class InitialsSensitivity(object):
       [ 5.0243  5.0243  0.      0.    ]
       [-4.5381 -4.5381  0.      0.    ]]
     >>> sens.create_boxplot_and_heatplot() #doctest: +SKIP
+    >>> values_to_sample = [.9, 1.1]
+    >>> sens = PairwiseSensitivity(\
+            values_to_sample=values_to_sample,\
+            observable=observable,\
+            objective_function=obj_func_cell_cycle,\
+            solver=solver,\
+            sens_type='params'\
+        )
+    >>> print(sens.b_matrix.shape == (14, 14))
+    True
+    >>> sens.run()
+    >>> print(sens.p_matrix)#doctest: +NORMALIZE_WHITESPACE
+    [[  0.       0.      13.6596  13.6596  24.3955   4.7909  16.4603  11.3258
+        0.1621  31.2804  13.6596  13.6596  13.6596  13.6596]
+     [  0.       0.     -10.3728 -10.3728  -3.7277 -14.9803  -7.2934 -12.2416
+      -18.3144   0.     -10.3728 -10.3728 -10.3728 -10.3728]
+     [ 13.6596 -10.3728   0.       0.       7.3582  -6.483    3.0794  -2.269
+      -10.6969  12.7261   0.       0.       0.       0.    ]
+     [ 13.6596 -10.3728   0.       0.       7.3582  -6.483    3.0794  -2.269
+      -10.6969  12.7261   0.       0.       0.       0.    ]
+     [ 24.3955  -3.7277   7.3582   7.3582   0.       0.      10.859    5.2577
+       -4.376   23.2285   7.3582   7.3582   7.3582   7.3582]
+     [  4.7909 -14.9803  -6.483   -6.483    0.       0.      -3.4036  -9.0762
+      -15.2185   3.8574  -6.483   -6.483   -6.483   -6.483 ]
+     [ 16.4603  -7.2934   3.0794   3.0794  10.859   -3.4036   0.       0.
+       -7.9417  15.5267   3.0794   3.0794   3.0794   3.0794]
+     [ 11.3258 -12.2416  -2.269   -2.269    5.2577  -9.0762   0.       0.
+      -13.128   10.859   -2.269   -2.269   -2.269   -2.269 ]
+     [  0.1621 -18.3144 -10.6969 -10.6969  -4.376  -15.2185  -7.9417 -13.128
+        0.       0.     -10.6969 -10.6969 -10.6969 -10.6969]
+     [ 31.2804   0.      12.7261  12.7261  23.2285   3.8574  15.5267  10.859
+        0.       0.      12.7261  12.7261  12.7261  12.7261]
+     [ 13.6596 -10.3728   0.       0.       7.3582  -6.483    3.0794  -2.269
+      -10.6969  12.7261   0.       0.       0.       0.    ]
+     [ 13.6596 -10.3728   0.       0.       7.3582  -6.483    3.0794  -2.269
+      -10.6969  12.7261   0.       0.       0.       0.    ]
+     [ 13.6596 -10.3728   0.       0.       7.3582  -6.483    3.0794  -2.269
+      -10.6969  12.7261   0.       0.       0.       0.    ]
+     [ 13.6596 -10.3728   0.       0.       7.3582  -6.483    3.0794  -2.269
+      -10.6969  12.7261   0.       0.       0.       0.    ]]
+    >>> print(sens.p_matrix - sens.p_prime_matrix) \
+            #doctest: +NORMALIZE_WHITESPACE
+     [[  0.       0.      13.6596  13.6596  17.0373  11.2739  13.3809  13.5948
+       10.859   18.5543  13.6596  13.6596  13.6596  13.6596]
+     [  0.       0.     -10.3728 -10.3728 -11.0859  -8.4973 -10.3728  -9.9725
+       -7.6175 -12.7261 -10.3728 -10.3728 -10.3728 -10.3728]
+     [  0.       0.       0.       0.       0.       0.       0.       0.
+        0.       0.       0.       0.       0.       0.    ]
+     [  0.       0.       0.       0.       0.       0.       0.       0.
+        0.       0.       0.       0.       0.       0.    ]
+     [ 10.7358   6.6451   7.3582   7.3582   0.       0.       7.7796   7.5267
+        6.3209  10.5024   7.3582   7.3582   7.3582   7.3582]
+     [ -8.8687  -4.6075  -6.483   -6.483    0.       0.      -6.483   -6.8071
+       -4.5215  -8.8687  -6.483   -6.483   -6.483   -6.483 ]
+     [  2.8006   3.0794   3.0794   3.0794   3.5008   3.0794   0.       0.
+        2.7553   2.8006   3.0794   3.0794   3.0794   3.0794]
+     [ -2.3339  -1.8688  -2.269   -2.269   -2.1005  -2.5932   0.       0.
+       -2.4311  -1.8671  -2.269   -2.269   -2.269   -2.269 ]
+     [-13.4976  -7.9417 -10.6969 -10.6969 -11.7342  -8.7355 -11.0211 -10.859
+        0.       0.     -10.6969 -10.6969 -10.6969 -10.6969]
+     [ 17.6207  10.3728  12.7261  12.7261  15.8703  10.3404  12.4473  13.128
+        0.       0.      12.7261  12.7261  12.7261  12.7261]
+     [  0.       0.       0.       0.       0.       0.       0.       0.
+        0.       0.       0.       0.       0.       0.    ]
+     [  0.       0.       0.       0.       0.       0.       0.       0.
+        0.       0.       0.       0.       0.       0.    ]
+     [  0.       0.       0.       0.       0.       0.       0.       0.
+        0.       0.       0.       0.       0.       0.    ]
+     [  0.       0.       0.       0.       0.       0.       0.       0.
+        0.       0.       0.       0.       0.       0.    ]]
+    >>> sens.create_boxplot_and_heatplot() #doctest: +SKIP
+    >>> sens = PairwiseSensitivity(\
+            values_to_sample=values_to_sample,\
+            observable=observable,\
+            objective_function=obj_func_cell_cycle,\
+            solver=solver,\
+            sample_list=['k1', 'cdc0']\
+        )
+    >>> print(sens.b_matrix)
+    [[((0.9, 'k1'), (0.9, 'k1')) ((0.9, 'k1'), (1.1, 'k1'))
+      ((0.9, 'k1'), (0.9, 'cdc0')) ((0.9, 'k1'), (1.1, 'cdc0'))]
+     [((1.1, 'k1'), (0.9, 'k1')) ((1.1, 'k1'), (1.1, 'k1'))
+      ((1.1, 'k1'), (0.9, 'cdc0')) ((1.1, 'k1'), (1.1, 'cdc0'))]
+     [((0.9, 'cdc0'), (0.9, 'k1')) ((0.9, 'cdc0'), (1.1, 'k1'))
+      ((0.9, 'cdc0'), (0.9, 'cdc0')) ((0.9, 'cdc0'), (1.1, 'cdc0'))]
+     [((1.1, 'cdc0'), (0.9, 'k1')) ((1.1, 'cdc0'), (1.1, 'k1'))
+      ((1.1, 'cdc0'), (0.9, 'cdc0')) ((1.1, 'cdc0'), (1.1, 'cdc0'))]]
     """
 
     def __init__(self, solver, values_to_sample, objective_function,
-                 observable):
+                 observable, sens_type='initials', sample_list=None):
+        if not isinstance(solver, pysb.simulator.base.Simulator):
+            raise TypeError("solver must be a pysb.simulator object")
         self._model = solver.model
         self._logger = get_logger(__name__, model=self._model)
         self._logger.info('%s created for observable %s' % (
             self.__class__.__name__, observable))
         generate_equations(self._model)
-        self._ic_params_of_interest_cache = None
         self._values_to_sample = values_to_sample
-        if solver is None or not isinstance(solver,
-                                            pysb.simulator.base.Simulator):
-            raise(TypeError, "solver must be a pysb.simulator object")
         self._solver = solver
         self.objective_function = objective_function
-        self.observable = observable
+        self._observable = observable
+        self._sens_type = sens_type
+        if self._sens_type not in ('params', 'initials', 'all'):
+            if sample_list is None:
+                raise ValueError("Please provide 'sens_type' or 'sample_list'")
+        if sample_list is not None:
+            _valid_options = [i.name for i in self._model.parameters]
+            for i in sample_list:
+                if i not in _valid_options:
+                    raise ValueError("{} not in model.parameters".format(i))
+            self.index = sample_list
+        elif self._sens_type == 'params':
+            self.index = [i.name for i in self._model.parameters_rules()]
+        elif self._sens_type == 'initials':
+            self.index = [i[1].name for i in self._model.initial_conditions]
+        elif self._sens_type == 'all':
+            self.index = [i.name for i in self._model.parameters]
+
+        self.orig_vals = [i.value for i in self._model.parameters]
+        self.index_of_param = {i.name: n for n, i in
+                               enumerate(self._model.parameters)}
+        self._n_sam = len(self._values_to_sample)
+        self._n_species = len(self.index)
+        self._nm = self._n_species * self._n_sam
+        self._size_of_matrix = self._nm ** 2
+        self._shape_of_matrix = self._nm, self._nm
 
         # Outputs
         self.b_matrix = []
         self.b_prime_matrix = []
+        self.params_to_run = self._setup_simulations()
         self.p_prime_matrix = np.zeros(self._size_of_matrix)
         self.p_matrix = np.zeros(self._size_of_matrix)
-
-        self._original_initial_conditions = np.zeros(len(self._model.species))
-        self._index_of_species_of_interest = self._create_index_of_species()
-        self.simulation_initials = self._setup_simulations()
         # Stores the objective function value for the original unperturbed
         # model
         self._objective_fn_standard = None
-
-    @property
-    def _ic_params_of_interest(self):
-        if self._ic_params_of_interest_cache is None:
-            self._ic_params_of_interest_cache = list(
-                (i.value.name for i in self._model.initials))
-            self._ic_params_of_interest_cache = \
-                sorted(self._ic_params_of_interest_cache)
-
-        return self._ic_params_of_interest_cache
-
-    @property
-    def _n_species(self):
-        return len(self._ic_params_of_interest)
-
-    @property
-    def _n_sam(self):
-        return len(self._values_to_sample)
-
-    @property
-    def _nm(self):
-        return self._n_species * self._n_sam
-
-    @property
-    def _size_of_matrix(self):
-        return self._nm ** 2
-
-    @property
-    def _shape_of_matrix(self):
-        return self._nm, self._nm
 
     @property
     def sensitivity_multiset(self):
@@ -221,35 +317,34 @@ class InitialsSensitivity(object):
         out_dir : str, optional
             location to save output if required
         """
-        if out_dir is not None:
-            if not os.path.exists(out_dir):
-                os.mkdir(out_dir)
         self._solver.initials = None
         self._solver.param_values = None
         sim_results = self._solver.run(param_values=None, initials=None)
         self._objective_fn_standard = self.objective_function(
-            np.array(sim_results.observables[self.observable]))
+            np.array(sim_results.observables[self._observable])
+        )
 
-        traj = self._solver.run(initials=self.simulation_initials)
-        sensitivity_output = np.array(traj.observables)[self.observable].T
+        traj = self._solver.run(param_values=self.params_to_run)
+
+        output = np.array(traj.observables)[self._observable].T
         p_matrix = np.zeros(self._size_of_matrix)
         p_prime_matrix = np.zeros(self._size_of_matrix)
         counter = 0
         # places values in p matrix that are unique
         for i in range(len(p_matrix)):
-            if i in self.b_index:
-                tmp = self._calculate_objective(sensitivity_output[:, counter])
-                p_matrix[i] = tmp
+            if i in self._b_index:
+                p_matrix[i] = self._calculate_objective(output[:, counter])
                 counter += 1
+
         # places values in p matrix that are duplicated
         for i in range(len(p_matrix)):
-            if i in self.b_prime_not_in_b:
-                tmp = self._calculate_objective(
-                    sensitivity_output[:, self.b_prime_not_in_b[i]])
-                p_prime_matrix[i] = tmp
-            elif i in self.b_prime_in_b:
-                p_prime_matrix[i] = p_matrix[self.b_prime_in_b[i]]
-        # Reshape
+            if i in self._b_prime_not_in_b:
+                p_prime_matrix[i] = self._calculate_objective(
+                    output[:, self._b_prime_not_in_b[i]]
+                )
+            elif i in self._b_prime_in_b:
+                p_prime_matrix[i] = p_matrix[self._b_prime_in_b[i]]
+
         p_matrix = p_matrix.reshape(self._shape_of_matrix)
         # Project the mirrored image
         self.p_matrix = p_matrix + p_matrix.T
@@ -259,6 +354,8 @@ class InitialsSensitivity(object):
         if save_name is not None:
             if out_dir is None:
                 out_dir = '.'
+            elif not os.path.exists(out_dir):
+                os.mkdir(out_dir)
             p_name = os.path.join(out_dir, '{}_p_matrix.csv'.format(save_name))
             p_prime_name = os.path.join(
                 out_dir, '{}_p_prime_matrix.csv'.format(save_name))
@@ -268,27 +365,14 @@ class InitialsSensitivity(object):
             np.savetxt(p_name, self.p_matrix)
             np.savetxt(p_prime_name, self.p_prime_matrix)
 
-    def _create_index_of_species(self):
-        """ create dictionary of initial conditions by index """
-        index_of_init_condition = {}
-        for ic in self._model.initials:
-            for sp_idx, sp in enumerate(self._model.species):
-                if ic.pattern.is_equivalent_to(sp):
-                    self._original_initial_conditions[sp_idx] = ic.value.value
-                    if ic.value.name in self._ic_params_of_interest:
-                        index_of_init_condition[ic.value.name] = sp_idx
-        index_of_species_of_interest = collections.OrderedDict(
-            sorted(index_of_init_condition.items()))
-        return index_of_species_of_interest
-
     def _g_function(self):
-        """ creates sample matrix, index of samples values, and shows bij """
+        """ Create sample matrix, index of samples values, and shows bij """
         counter = -1
         sampled_values_index = set()
         bij_unique = dict()
         sampling_matrix = np.zeros(
-            (self._size_of_matrix, len(self._model.species)))
-        sampling_matrix[:, :] = self._original_initial_conditions
+            (self._size_of_matrix, len(self.orig_vals)))
+        sampling_matrix[:, :] = self.orig_vals
         matrix = self.b_matrix
         for j in range(len(matrix)):
             for i in matrix[j, :]:
@@ -298,13 +382,12 @@ class InitialsSensitivity(object):
                 s_2 = str(i[1]) + str(i[0])
                 counter += 1
 
-                if index_i == index_j:
-                    continue
-                elif s_1 in bij_unique or s_2 in bij_unique:
+                if index_i == index_j \
+                        or s_1 in bij_unique or s_2 in bij_unique:
                     continue
                 else:
-                    x = self._index_of_species_of_interest[index_i]
-                    y = self._index_of_species_of_interest[index_j]
+                    x = self.index_of_param[index_i]
+                    y = self.index_of_param[index_j]
                     sampling_matrix[counter, x] *= sigma_i
                     sampling_matrix[counter, y] *= sigma_j
                     bij_unique[s_1] = counter
@@ -324,26 +407,24 @@ class InitialsSensitivity(object):
         """
         # create matrix (cartesian product of sample vals vs index of species
         a_matrix = cartesian_product(self._values_to_sample,
-                                     self._index_of_species_of_interest)
-        # reshape to flatten
-        a_matrix = a_matrix.T.reshape(self._n_sam * self._n_species)
+                                     self.index).T.flatten()
+
         # creates matrix b
         self.b_matrix = cartesian_product(a_matrix, a_matrix)
 
         # create matrix a'
         a_prime = cartesian_product(np.ones(self._n_sam),
-                                    self._index_of_species_of_interest)
-        a_prime = a_prime.T.reshape(self._n_sam * self._n_species)
+                                    self.index).T.flatten()
 
         # creates matrix b prime
         self.b_prime_matrix = cartesian_product(a_prime, a_matrix)
 
-        b_to_run, self.b_index, in_b = self._g_function()
+        b_to_run, self._b_index, in_b = self._g_function()
 
-        n_b_index = len(self.b_index)
+        n_b_index = len(self._b_index)
 
-        b_prime = np.zeros((self._size_of_matrix, len(self._model.species)))
-        b_prime[:, :] = self._original_initial_conditions
+        b_prime = np.zeros((self._size_of_matrix, len(self.orig_vals)))
+        b_prime[:, :] = self.orig_vals
         counter = -1
 
         bp_not_in_b_raw = set()
@@ -368,28 +449,28 @@ class InitialsSensitivity(object):
                     bp_not_in_b_dict[counter] = bp_not_in_b_visited[s_1]
                 else:
                     new_sim_counter += 1
-                    x = self._index_of_species_of_interest[index_i]
-                    y = self._index_of_species_of_interest[index_j]
+                    x = self.index_of_param[index_i]
+                    y = self.index_of_param[index_j]
                     b_prime[new_sim_counter, x] *= sigma_i
                     b_prime[new_sim_counter, y] *= sigma_j
                     bp_not_in_b_visited[s_1] = new_sim_counter + n_b_index
                     bp_not_in_b_dict[counter] = new_sim_counter + n_b_index
                     bp_not_in_b_raw.add(new_sim_counter)
 
-        self.b_prime_in_b = bp_dict
-        self.b_prime_not_in_b = bp_not_in_b_dict
-        x = b_to_run[list(self.b_index)]
-        y = b_prime[list(bp_not_in_b_raw)]
+        self._b_prime_in_b = bp_dict
+        self._b_prime_not_in_b = bp_not_in_b_dict
+        x = b_to_run[sorted(self._b_index)]
+        y = b_prime[sorted(bp_not_in_b_raw)]
         simulations = np.vstack((x, y))
-        self._logger.debug("Number of simulations to run = %s" % len(
-                           simulations))
+        self._logger.debug("{} simulations to run".format(len(simulations)))
         return simulations
 
     def create_plot_p_h_pprime(self, save_name=None, out_dir=None, show=False):
         """
         Plot of P, H(B), and P'
 
-        See :class:`InitialsSensitivity` for descriptions of these matrices
+        See :class:`PairwiseSensitivity` attributes for descriptions of these
+        matrices
 
         Parameters
         ----------
@@ -478,10 +559,10 @@ class InitialsSensitivity(object):
             for m, i in enumerate(range(0, self._nm, self._n_sam)):
                 ax2 = plt.subplot(gs[n, m])
                 if n == 0:
-                    ax2.set_xlabel(self._ic_params_of_interest[m], fontsize=20)
+                    ax2.set_xlabel(self.index[m], fontsize=20)
                     ax2.xaxis.set_label_position('top')
                 if m == 0:
-                    ax2.set_ylabel(self._ic_params_of_interest[n], fontsize=20)
+                    ax2.set_ylabel(self.index[n], fontsize=20)
                 plt.xticks([])
                 plt.yticks([])
                 if i != j:
@@ -560,11 +641,11 @@ class InitialsSensitivity(object):
                         vmax=v_max, extent=[0, self._nm, 0, self._nm])
 
         shape_label = np.arange(self._n_sam / 2, self._nm, self._n_sam)
-        plt.xticks(shape_label, self._ic_params_of_interest,
+        plt.xticks(shape_label, self.index,
                    rotation='vertical', fontsize=12)
-        plt.yticks(shape_label, reversed(self._ic_params_of_interest),
+        plt.yticks(shape_label, reversed(self.index),
                    fontsize=12)
-        x_ticks = ([i for i in range(0, self._nm, self._n_sam)])
+        x_ticks = list(range(0, self._nm, self._n_sam))
         ax1.set_xticks(x_ticks, minor=True)
         ax1.set_yticks(x_ticks, minor=True)
         plt.grid(True, which='minor', linestyle='--')
@@ -583,7 +664,7 @@ class InitialsSensitivity(object):
         ax2.set_xlim(v_min - 2, v_max + 2)
         if x_axis_label is not None:
             ax2.set_xlabel(x_axis_label, fontsize=12)
-        plt.setp(ax2, yticklabels=reversed(self._ic_params_of_interest))
+        plt.setp(ax2, yticklabels=reversed(self.index))
         ax2.yaxis.tick_left()
         ax2.set_aspect(1. / ax2.get_data_ratio(), adjustable='box')
         if save_name is not None:
@@ -615,9 +696,19 @@ def cartesian_product(array_1, array_2):
 
     Returns
     -------
-    out : np.array
-        array of shape (len(array_1) x len(array_2))
+    np.array
+        array of shape (len(array_1), len(array_2))
     """
     a = list(product(array_1, array_2))
     a = np.asarray(a, dtype=','.join(['object'] * len(a[0])))
     return a.reshape(len(array_1), len(array_2))
+
+
+class InitialsSensitivity(PairwiseSensitivity):
+    """ Deprecated; use :class:`PairwiseSensitivity` instead. """
+    def __init__(self, *args, **kwargs):
+        warnings.warn("InitialsSensitivity will be removed in a future "
+                      "version of PySB. Use PairwiseSensitivity instead.",
+                      DeprecationWarning,
+                      stacklevel=2)
+        super(InitialsSensitivity, self).__init__(*args, **kwargs)
