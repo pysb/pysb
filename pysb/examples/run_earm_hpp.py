@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """ Run the Extrinsic Apoptosis Reaction Model (EARM) using BioNetGen's
 Hybrid-Particle Population (HPP) algorithm.
 

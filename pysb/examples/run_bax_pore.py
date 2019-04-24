@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Simulate the bax_pore model and plot the results."""
 
 from __future__ import print_function
