@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from __future__ import print_function
 from pysb.simulator import ScipyOdeSimulator
 from matplotlib.pyplot import plot, legend, show
