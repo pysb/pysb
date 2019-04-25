@@ -29,6 +29,7 @@ import logging
 import itertools
 import contextlib
 import importlib
+from concurrent.futures import ProcessPoolExecutor, Executor, Future
 
 
 class ScipyOdeSimulator(Simulator):
@@ -155,8 +156,7 @@ class ScipyOdeSimulator(Simulator):
         integrator = kwargs.pop('integrator', 'vode')
         compiler_mode = kwargs.pop('compiler', None)
         integrator_options = kwargs.pop('integrator_options', {})
-        cython_directives = kwargs.pop('cython_directives',
-                                       self.default_cython_directives)
+
         if kwargs:
             raise ValueError('Unknown keyword argument(s): {}'.format(
                 ', '.join(kwargs.keys())
@@ -183,14 +183,7 @@ class ScipyOdeSimulator(Simulator):
         else:
             self._compiler = compiler_mode
 
-        extra_compile_args = []
-        # Inhibit weave C compiler warnings unless log level <= EXTENDED_DEBUG.
-        # Note that since the output goes straight to stderr rather than via the
-        # logging system, the threshold must be lower than DEBUG or else the
-        # Nose logcapture plugin will cause the warnings to be shown and tests
-        # will fail due to unexpected output.
-        if not self._logger.isEnabledFor(EXTENDED_DEBUG):
-            extra_compile_args.append('-w')
+        self._compiler_directives = None
 
         # Use lambdarepr (Python code) with Cython, otherwise use C code
         eqn_repr = lambdarepr if self._compiler == 'cython' else sympy.ccode
@@ -207,21 +200,32 @@ class ScipyOdeSimulator(Simulator):
             ydot = np.zeros(len(self.model.species))
 
             if self._compiler == 'cython':
+                self._compiler_directives = kwargs.pop(
+                    'cython_directives', self.default_cython_directives
+                )
+
                 if not Cython:
                     raise ImportError('Cython library is not installed')
 
-                def rhs(t, y, p):
-                    # note that the evaluated code sets ydot as a side effect
-                    Cython.inline(
-                        code_eqs, quiet=True,
-                        cython_compiler_directives=cython_directives)
-
-                    return ydot
+                rhs = _get_rhs(self._compiler,
+                               code_eqs,
+                               ydot=ydot,
+                               compiler_directives=self._compiler_directives
+                               )
 
                 with _set_cflags_no_warnings(self._logger):
                     rhs(0.0, self.initials[0], self.param_values[0])
             else:
                 # Weave
+                self._compiler_directives = []
+                # Inhibit weave C compiler warnings unless log
+                # level <= EXTENDED_DEBUG. Note that since the output goes
+                # straight to stderr rather than via the logging system, the
+                # threshold must be lower than DEBUG or else the Nose
+                # logcapture plugin will cause the warnings to be shown and
+                # tests will fail due to unexpected output.
+                if not self._logger.isEnabledFor(EXTENDED_DEBUG):
+                    self._compiler_directives.append('-w')
                 if not weave_inline:
                     raise ImportError('Weave library is not installed')
                 for arr_name in ('ydot', 'y', 'p'):
@@ -229,16 +233,18 @@ class ScipyOdeSimulator(Simulator):
                     code_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                       '%s(\\1)' % macro, code_eqs)
 
-                def rhs(t, y, p):
-                    # note that the evaluated code sets ydot as a side effect
-                    weave_inline(code_eqs, ['ydot', 't', 'y', 'p'],
-                                 extra_compile_args=extra_compile_args)
-                    return ydot
+                rhs = _get_rhs(self._compiler,
+                               code_eqs,
+                               ydot=ydot,
+                               compiler_directives=self._compiler_directives
+                               )
 
                 # Call rhs once just to trigger the weave C compilation step
                 # while asserting control over distutils logging.
                 with self._patch_distutils_logging:
                     rhs(0.0, self.initials[0], self.param_values[0])
+
+            self._code_eqs = code_eqs
 
         elif self._compiler in ('theano', 'python'):
             self._symbols = sympy.symbols(','.join('__s%d' % sp_id for sp_id in
@@ -266,8 +272,8 @@ class ScipyOdeSimulator(Simulator):
                 code_eqs_py = sympy.lambdify(self._symbols,
                                              sympy.flatten(ode_mat))
 
-            def rhs(t, y, p):
-                return code_eqs_py(*itertools.chain(y, p))
+            rhs = _get_rhs(self._compiler, code_eqs_py)
+            self._code_eqs = code_eqs_py
         else:
             raise ValueError('Unknown compiler_mode: %s' % self._compiler)
 
@@ -276,6 +282,7 @@ class ScipyOdeSimulator(Simulator):
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
         jac_fn = None
+        self._jac_eqs = None
         if self._use_analytic_jacobian:
             species_symbols = [sympy.Symbol('__s%d' % i)
                                for i in range(len(self._model.species))]
@@ -289,7 +296,7 @@ class ScipyOdeSimulator(Simulator):
                     on_unused_input='ignore'
                 )
 
-                def jacobian(t, y, p):
+                def jac_fn(t, y, p):
                     jacmat = np.asarray(jac_eqs_py(*itertools.chain(y, p)))
                     jacmat.shape = (len(self.model.odes),
                                     len(self.model.species))
@@ -323,30 +330,33 @@ class ScipyOdeSimulator(Simulator):
                         jac_eqs = re.sub(r'\b%s\[(\d+)\]' % arr_name,
                                          '%s(\\1)' % macro, jac_eqs)
 
-                    def jacobian(t, y, p):
-                        weave_inline(jac_eqs, ['jac', 't', 'y', 'p'],
-                                     extra_compile_args=extra_compile_args)
-                        return jac
+                    jac_fn = _get_rhs(
+                        self._compiler,
+                        jac_eqs,
+                        compiler_directives=self._compiler_directives,
+                        jac=jac
+                    )
 
                     # Manage distutils logging, as above for rhs.
                     with self._patch_distutils_logging:
-                        jacobian(0.0, self.initials[0], self.param_values[0])
+                        jac_fn(0.0, self.initials[0], self.param_values[0])
                 else:
-                    def jacobian(t, y, p):
-                        Cython.inline(
-                            jac_eqs, quiet=True,
-                            cython_compiler_directives=cython_directives)
-                        return jac
+                    jac_fn = _get_rhs(
+                        self._compiler,
+                        jac_eqs,
+                        compiler_directives=self._compiler_directives,
+                        jac=jac
+                    )
 
                     with _set_cflags_no_warnings(self._logger):
-                        jacobian(0.0, self.initials[0], self.param_values[0])
+                        jac_fn(0.0, self.initials[0], self.param_values[0])
+                self._jac_eqs = jac_eqs
             else:
                 jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
 
-                def jacobian(t, y, p):
-                    return jac_eqs_py(*itertools.chain(y, p))
+                jac_fn = _get_rhs(self._compiler, jac_eqs_py)
 
-            jac_fn = jacobian
+                self._jac_eqs = jac_eqs_py
 
         # build integrator options list from our defaults and any kwargs
         # passed to this function
@@ -359,27 +369,8 @@ class ScipyOdeSimulator(Simulator):
         # defaults
         self.opts = options
 
-        # Integrator
-        if integrator == 'lsoda':
-            # lsoda is accessed via scipy.integrate.odeint which,
-            # as a function,
-            # requires that we pass its args at the point of call. Thus we need
-            # to stash stuff like the rhs and jacobian functions in self so we
-            # can pass them in later.
-            self.integrator = integrator
-            # lsoda's rhs and jacobian function arguments are in a different
-            # order to other integrators, so we define these shims that swizzle
-            # the argument order appropriately.
-            self.func = lambda t, y, p: rhs(y, t, p)
-            if jac_fn is None:
-                self.jac_fn = None
-            else:
-                self.jac_fn = lambda t, y, p: jac_fn(y, t, p)
-        else:
-            # The scipy.integrate.ode integrators on the other hand are object
-            # oriented and hold the functions and such internally. Once we set
-            # up the integrator object we only need to retain a reference to it
-            # and can forget about the other bits.
+        if integrator != 'lsoda':
+            # Only used to check the user has selected a valid integrator
             self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
             with warnings.catch_warnings():
                 warnings.filterwarnings('error', 'No integrator name match')
@@ -489,7 +480,8 @@ class ScipyOdeSimulator(Simulator):
             eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
         return eqns
 
-    def run(self, tspan=None, initials=None, param_values=None):
+    def run(self, tspan=None, initials=None, param_values=None,
+            num_processors=1):
         """
         Run a simulation and returns the result (trajectories)
 
@@ -504,6 +496,11 @@ class ScipyOdeSimulator(Simulator):
         initials
         param_values
             See parameter definitions in :class:`ScipyOdeSimulator`.
+        num_processors : int
+            Number of processes to use (default: 1). Set to a larger number
+            (e.g. the number of CPU cores available) for parallel execution of
+            simulations. This is only useful when simulating with more than one
+            set of initial conditions and/or parameters.
 
         Returns
         -------
@@ -514,38 +511,35 @@ class ScipyOdeSimulator(Simulator):
                                            param_values=param_values,
                                            _run_kwargs=[])
         n_sims = len(self.param_values)
-        trajectories = np.ndarray((n_sims, len(self.tspan),
-                              len(self._model.species)))
-        for n in range(n_sims):
-            self._logger.info('Running simulation %d of %d', n + 1, n_sims)
-            if self.integrator == 'lsoda':
-                trajectories[n] = scipy.integrate.odeint(
-                    self.func,
+
+        num_species = len(self._model.species)
+        num_odes = len(self._model.odes)
+        results = []
+        if num_processors == 1:
+            self._logger.debug('Single processor (serial) mode')
+        else:
+            self._logger.debug('Multi-processor (parallel) mode using {} '
+                               'processes'.format(num_processors))
+        with SerialExecutor() if num_processors == 1 else \
+                ProcessPoolExecutor(max_workers=num_processors) as executor:
+            for n in range(n_sims):
+                results.append(executor.submit(
+                    _integrator_process,
+                    self._code_eqs,
+                    self._jac_eqs,
+                    num_species,
+                    num_odes,
                     self.initials[n],
                     self.tspan,
-                    Dfun=self.jac_fn,
-                    args=(self.param_values[n],),
-                    **self.opts)
-            else:
-                self.integrator.set_initial_value(self.initials[n],
-                                                  self.tspan[0])
-                # Set parameter vectors for RHS func and Jacobian
-                self.integrator.set_f_params(self.param_values[n])
-                if self._use_analytic_jacobian:
-                    self.integrator.set_jac_params(self.param_values[n])
-                trajectories[n][0] = self.initials[n]
-                i = 1
-                while self.integrator.successful() and self.integrator.t < \
-                        self.tspan[-1]:
-                    self._logger.log(EXTENDED_DEBUG,
-                                     'Simulation %d/%d Integrating t=%g',
-                                     n + 1, n_sims, self.integrator.t)
-                    trajectories[n][i] = self.integrator.integrate(self.tspan[i])
-                    i += 1
-                if self.integrator.t < self.tspan[-1]:
-                    trajectories[n, i:, :] = 'nan'
+                    self.param_values[n],
+                    self._init_kwargs.get('integrator', 'vode'),
+                    compiler=self._compiler,
+                    integrator_opts=self.opts,
+                    compiler_directives=self._compiler_directives
+                ))
+            trajectories = [r.result() for r in results]
 
-        tout = np.array([self.tspan]*n_sims)
+        tout = np.array([self.tspan] * n_sims)
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, tout, trajectories)
 
@@ -618,3 +612,87 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
     # Provide 'fatal' to match up with distutils log functions.
     fatal = logging.LoggerAdapter.critical
 
+
+def _get_rhs(compiler, code_eqs, ydot=None, jac=None, compiler_directives=None):
+    if compiler == 'cython':
+        def rhs(t, y, p):
+            # note that the evaluated code sets ydot as a side effect
+            Cython.inline(code_eqs, quiet=True,
+                          cython_compiler_directives=compiler_directives)
+
+            return ydot if ydot is not None else jac
+    elif compiler == 'weave':
+        def rhs(t, y, p):
+            # note that the evaluated code sets ydot as a side effect
+            weave_inline(code_eqs, ['ydot' if ydot is not None else 'jac',
+                                    't', 'y', 'p'],
+                         extra_compile_args=compiler_directives)
+            return ydot if ydot is not None else jac
+    else:
+        def rhs(t, y, p):
+            return code_eqs(*itertools.chain(y, p))
+
+    return rhs
+
+
+def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
+                        tspan, param_values, integrator_name, compiler,
+                        integrator_opts, compiler_directives):
+    """ Single integrator process, for parallel execution """
+    rhs = _get_rhs(compiler, code_eqs, ydot=np.zeros(num_species),
+                   compiler_directives=compiler_directives)
+
+    jac_fn = None
+    if jac_eqs:
+        jac_eqs = _get_rhs(compiler, jac_eqs,
+                           jac=np.zeros((num_odes, num_species)),
+                           compiler_directives=compiler_directives)
+
+    # LSODA
+    if integrator_name == 'lsoda':
+        return scipy.integrate.odeint(
+            rhs,
+            initials,
+            tspan,
+            args=(param_values, ),
+            Dfun=jac_fn,
+            tfirst=True,
+            **integrator_opts
+        )
+
+    # All other integrators
+    integrator = scipy.integrate.ode(rhs, jac=jac_fn)
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error', 'No integrator name match')
+        integrator.set_integrator(integrator_name, **integrator_opts)
+    integrator.set_initial_value(initials, tspan[0])
+
+    # Set parameter vectors for RHS func and Jacobian
+    integrator.set_f_params(param_values)
+    if jac_eqs:
+        integrator.set_jac_params(param_values)
+
+    trajectory = np.ndarray((len(tspan), num_species))
+    trajectory[0] = initials
+    i = 1
+    while integrator.successful() and integrator.t < tspan[-1]:
+        trajectory[i] = integrator.integrate(tspan[i])
+        i += 1
+    if integrator.t < tspan[-1]:
+        trajectory[i:, :] = 'nan'
+
+    return trajectory
+
+
+class SerialExecutor(Executor):
+    """ Execute tasks in serial (immediately on submission) """
+    def submit(self, fn, *args, **kwargs):
+        f = Future()
+        try:
+            result = fn(*args, **kwargs)
+        except BaseException as e:
+            f.set_exception(e)
+        else:
+            f.set_result(result)
+
+        return f
