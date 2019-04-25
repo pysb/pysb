@@ -49,7 +49,7 @@ class KappaGenerator(object):
 
     def generate_parameters(self):
         for p in self.model.parameters:
-            self.__content += "%%var: '%s' %.17g\n" % (p.name, p.value)
+            self.__content += "%%var: '%s' %e\n" % (p.name, p.value)
         for e in self.model.expressions:
             str_expr = str(expression_to_muparser(e))
             self.__content += "%%var: '%s' %s\n" % (e.name, str_expr)
