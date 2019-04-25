@@ -263,8 +263,6 @@ class Monomer(Component):
     alphanumeric or underscores.
     """
     def __init__(self, name, sites=None, site_states=None, _export=True):
-        Component.__init__(self, name, _export)
-
         # Create default empty containers.
         if sites is None:
             sites = []
@@ -304,6 +302,7 @@ class Monomer(Component):
 
         self.sites = list(sites)
         self.site_states = site_states
+        Component.__init__(self, name, _export)
 
     def __call__(self, conditions=None, **kwargs):
         """
@@ -1100,8 +1099,8 @@ class Parameter(Component, sympy.Symbol):
         return (self.name, self.value, False)
 
     def __init__(self, name, value=0.0, _export=True):
-        Component.__init__(self, name, _export)
         self.value = float(value)
+        Component.__init__(self, name, _export)
     
     def get_value(self):
         return self.value
@@ -1157,7 +1156,6 @@ class Compartment(Component):
     """
 
     def __init__(self, name, parent=None, dimension=3, size=None, _export=True):
-        Component.__init__(self, name, _export)
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
         #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
@@ -1166,6 +1164,7 @@ class Compartment(Component):
         self.parent = parent
         self.dimension = dimension
         self.size = size
+        Component.__init__(self, name, _export)
 
     def __repr__(self):
         return '%s(name=%s, parent=%s, dimension=%s, size=%s)' % (
@@ -1214,7 +1213,6 @@ class Rule(Component):
     def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
                  delete_molecules=False, move_connected=False,
                  _export=True):
-        Component.__init__(self, name, _export)
         if not isinstance(rule_expression, RuleExpression):
             raise Exception("rule_expression is not a RuleExpression object")
         validate_expr(rate_forward, "forward rate")
@@ -1237,7 +1235,9 @@ class Rule(Component):
             for cp in rp.complex_patterns:
                 if not cp.is_concrete():
                     raise ValueError('Product {} of synthesis rule {} is not '
-                                     'concrete'.format(cp, self.name))
+                                     'concrete'.format(cp, name))
+
+        Component.__init__(self, name, _export)
 
     def is_synth(self):
         """Return a bool indicating whether this is a synthesis rule."""
@@ -1391,11 +1391,11 @@ class Expression(Component, sympy.Symbol):
         return (self.name, self.expr, False)
 
     def __init__(self, name, expr, _export=True):
-        Component.__init__(self, name, _export)
         if not isinstance(expr, sympy.Expr):
             raise ValueError('An Expression can only be created from a '
                              'sympy.Expr object')
         self.expr = expr
+        Component.__init__(self, name, _export)
 
     def expand_expr(self, expand_observables=False):
         """Return expr rewritten in terms of terminal symbols only."""

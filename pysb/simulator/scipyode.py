@@ -253,6 +253,12 @@ class ScipyOdeSimulator(Simulator):
                                           + ',') + tuple(model.parameters)
 
             if self._compiler == 'theano':
+                warnings.warn(
+                    "theano backend is deprecated; cython backend is "
+                    "recommended instead",
+                    category=DeprecationWarning,
+                    stacklevel=2
+                )
                 if theano is None:
                     raise ImportError('Theano library is not installed')
 
