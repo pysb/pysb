@@ -1694,13 +1694,6 @@ class Model(object):
         cset_used = (self.parameters_rules() | self.parameters_initial_conditions() |
                      self.parameters_compartments() | self.parameters_expressions())
         return self.parameters - cset_used
-
-#     def expressions_constant(self):
-#         """Return a ComponentSet of constant expressions."""
-#         cset = ComponentSet(e for e in self.expressions
-#                             if all(isinstance(a, (Parameter, sympy.Number))
-#                                    for a in e.expand_expr().atoms()))
-#         return cset
     
     def expressions_constant(self):
         """Return a ComponentSet of constant expressions."""
