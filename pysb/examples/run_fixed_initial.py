@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Demonstrate the effect of fixed initial conditions."""
 
 import copy
