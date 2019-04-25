@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """ Run the Extrinsic Apoptosis Reaction Model (EARM) using StochKit's
 stochastic simulation algorithm (SSA) implementation.
 """

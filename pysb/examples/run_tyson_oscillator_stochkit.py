@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """ Run The Tyson Oscillator model using StochKit's stochastic simulation
 algorithm (SSA) implementation.
 """
