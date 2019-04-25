@@ -12,11 +12,14 @@ import shutil
 from pysb.logging import get_logger
 
 # Some models don't match BNG originals exactly due to loss of numerical
-# precision.
+# precision. See https://github.com/pysb/pysb/issues/443
 REDUCED_PRECISION = {
     'CaOscillate_Func': 1e-4,
     'michment': 1e-8,
-    'motor': 1e-8
+    'motor': 1e-8,
+    'fceri_ji': 1e-4,
+    'test_paramname': 1e-4,
+    'tlmr': 1e-4
 }
 
 logger = get_logger(__name__)
