@@ -25,10 +25,11 @@ def main():
                     'pysb.testing', 'pysb.tests'],
           scripts=['scripts/pysb_export'],
           # We should really specify some minimum versions here.
-          install_requires=['numpy', 'scipy', 'sympy', 'networkx'],
+          install_requires=['numpy', 'scipy>=1.1', 'sympy', 'networkx',
+                            'futures; python_version == "2.7"'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
-                         'pandas', 'theano', 'h5py', 'mock', 'cython',
+                         'pandas', 'theano>=1.0.4', 'h5py', 'mock', 'cython',
                          'python-libsbml', 'libroadrunner'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],
