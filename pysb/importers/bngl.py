@@ -1,5 +1,5 @@
 from pysb.core import MonomerPattern, ComplexPattern, RuleExpression, \
-    ReactionPattern, ANY, WILD, MultiSite
+    ReactionPattern, ANY, WILD, MultiState
 from pysb.builder import Builder
 from pysb.bng import BngFileInterface
 import xml.etree.ElementTree
@@ -126,7 +126,7 @@ class BnglBuilder(Builder):
                 else:
                     mon_states[state_nm].append(last_bond)
 
-            mon_states = {k: MultiSite(*v) if len(v) > 1 else v[0]
+            mon_states = {k: MultiState(*v) if len(v) > 1 else v[0]
                           for k, v in mon_states.items()}
 
             mon_cpt = self.model.compartments.get(mon.get('compartment'))

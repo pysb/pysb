@@ -1,7 +1,7 @@
 import inspect
 import warnings
 import pysb
-from pysb.core import MultiSite
+from pysb.core import MultiState
 import sympy
 from sympy.printing import StrPrinter
 
@@ -233,7 +233,7 @@ def format_site_condition(site, state):
         elif state[1] == pysb.ANY:
             state = (state[0], '+')
         state_code = '~%s!%s' % state
-    elif isinstance(state, MultiSite):
+    elif isinstance(state, MultiState):
         return ','.join(format_site_condition(site, s) for s in state)
     # one or more unspecified bonds
     elif state is pysb.ANY:

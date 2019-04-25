@@ -199,9 +199,9 @@ class KappaGenerator(object):
         # Multi-bond (list of bonds)
         elif isinstance(state, list):
             raise KappaException("Kappa generator does not support multi-bonds")
-        # If there is a MultiBond, raise an Exception (not supported by Kappa)
-        elif isinstance(state, pysb.MultiSite):
-            raise KappaException("Kappa generator does not support MultiSites.")
+        # If there is a MultiState, raise an Exception (not supported by Kappa)
+        elif isinstance(state, pysb.MultiState):
+            raise KappaException("Kappa generator does not support MultiStates")
         # Site with state
         elif isinstance(state, basestring):
             state_code = '{%s}[.]' % state
