@@ -63,10 +63,10 @@ class KappaSimulator(Simulator):
         Examples
         --------
 
-        >>> from pysb.examples import robertson
+        >>> import numpy as np
+        >>> from pysb.examples import michment
         >>> from pysb.simulator.kappa import KappaSimulator
-        >>> model = robertson.model
-        >>> sim = KappaSimulator(model, tspan=np.linspace(0, 1))
+        >>> sim = KappaSimulator(michment.model, tspan=np.linspace(0, 1))
         >>> x = sim.run(n_runs=1)
 
 
