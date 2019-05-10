@@ -68,8 +68,8 @@ def test_compartment_species_equivalence():
     Initial(Q(x=None) ** C, p)
     Initial(R(y=None) ** C, p)
     generate_equations(model)
-    for i, (cp, param) in enumerate(model.initial_conditions):
-        ok_(cp.is_equivalent_to(model.species[i]))
+    for i, ic in enumerate(model.initials):
+        ok_(ic.pattern.is_equivalent_to(model.species[i]))
     ok_(model.species[2].is_equivalent_to(Q(x=1) ** C % R(y=1) ** C))
 
 
@@ -206,6 +206,17 @@ def test_bng_error():
         generate_equations,
         model
     )
+
+
+@with_model
+def test_fixed_species():
+    Monomer('A', ['a'])
+    Monomer('B', ['b'])
+    Initial(A(a=1) % B(b=1), Parameter('AB_0', 1), fixed=True)
+    Rule('rule1', A(a=1) % B(b=1) >> A(a=None) + B(b=None), Parameter('k', 1))
+    generate_equations(model)
+    num_non_zeros = model.stoichiometry_matrix[0].getnnz()
+    assert num_non_zeros == 0
 
 
 def _bng_print(expr):

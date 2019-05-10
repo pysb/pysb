@@ -9,6 +9,7 @@ import weakref
 import copy
 import itertools
 import sympy
+import numpy as np
 import scipy.sparse
 import networkx as nx
 
@@ -23,9 +24,6 @@ except NameError:
     basestring = str
     long = int
 
-def Initial(*args):
-    """Declare an initial condition (see Model.initial)."""
-    return SelfExporter.default_model.initial(*args)
 
 def MatchOnce(pattern):
     """Make a ComplexPattern match-once."""
@@ -108,14 +106,25 @@ class SelfExporter(object):
                 obj.name = module_name   # internal name for identification
                 export_name = 'model'    # symbol name for export
         elif isinstance(obj, Component):
-            if SelfExporter.default_model == None:
-                raise Exception("A Model must be declared before declaring any model components")
+            if SelfExporter.default_model is None:
+                raise ModelNotDefinedError
             SelfExporter.default_model.add_component(obj)
 
         # load obj into target namespace under obj.name
         if export_name in SelfExporter.target_globals:
             warnings.warn("'%s' already defined" % (export_name), SymbolExistsWarning, stacklevel)
         SelfExporter.target_globals[export_name] = obj
+
+    @staticmethod
+    def add_initial(initial):
+        """Add an Initial to the default model."""
+        if not SelfExporter.do_export:
+            return
+        if not isinstance(initial, Initial):
+            raise ValueError("initial must be an Initial object")
+        if SelfExporter.default_model is None:
+            raise ModelNotDefinedError
+        SelfExporter.default_model.add_initial(initial)
 
     @staticmethod
     def cleanup():
@@ -254,8 +263,6 @@ class Monomer(Component):
     alphanumeric or underscores.
     """
     def __init__(self, name, sites=None, site_states=None, _export=True):
-        Component.__init__(self, name, _export)
-
         # Create default empty containers.
         if sites is None:
             sites = []
@@ -275,9 +282,6 @@ class Monomer(Component):
                 raise ValueError('Invalid site name: ' + str(site))
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
-        sites_dup = [site for site, count in sites_seen.items() if count > 1]
-        if sites_dup:
-            raise ValueError("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
         unknown_sites = [site for site in site_states if not site in sites_seen]
@@ -295,6 +299,7 @@ class Monomer(Component):
 
         self.sites = list(sites)
         self.site_states = site_states
+        Component.__init__(self, name, _export)
 
     def __call__(self, conditions=None, **kwargs):
         """
@@ -330,6 +335,121 @@ def _check_state(monomer, site, state):
         template = "Invalid state choice '{}' in Monomer {}, site {}. Valid " \
                    "state choices: {}"
         raise ValueError(template.format(*args))
+    return True
+
+
+def _check_bond(bond):
+    """ A bond can either by a single int, WILD, ANY, or a list of ints """
+    return (
+        isinstance(bond, int)
+        or bond is WILD
+        or bond is ANY
+        or isinstance(bond, list) and all(isinstance(b, int) for b in bond)
+    )
+
+
+def is_state_bond_tuple(state):
+    """ Check the argument is a (state, bond) tuple for a Mononer site """
+    return (
+        isinstance(state, tuple)
+        and len(state) == 2
+        and isinstance(state[0], basestring)
+        and _check_bond(state[1])
+    )
+
+
+def _check_state_bond_tuple(monomer, site, state):
+    """ Check that 'state' is a (state, bond) tuple, and validate the state """
+    return is_state_bond_tuple(state) and _check_state(monomer, site, state[0])
+
+
+def validate_site_value(state, monomer=None, site=None, _in_multistate=False):
+    if state is None:
+        return True
+    elif isinstance(state, basestring):
+        if monomer and site:
+            if not _check_state(monomer, site, state):
+                return False
+        return True
+    elif _check_bond(state):
+        return True
+    elif is_state_bond_tuple(state):
+        if monomer and site:
+            _check_state(monomer, site, state[0])
+        return True
+    elif isinstance(state, MultiState):
+        if _in_multistate:
+            raise ValueError('Cannot nest MultiState within each other')
+
+        if monomer and site:
+            site_counts = collections.Counter(monomer.sites)
+            if len(state) > site_counts[site]:
+                raise ValueError(
+                    'MultiState for site "{}" on monomer "{}" has maximum '
+                    'length {}'.format(site, monomer.name, site_counts[site])
+                )
+
+            return all(validate_site_value(s, monomer, site, True) for s in
+                       state)
+
+        return True
+    else:
+        return False
+
+
+class MultiState(object):
+    """
+    MultiState for a Monomer (also known as duplicate sites)
+
+    MultiStates are duplicate copies of a site which each have the same name and
+    semantics. In BioNetGen, these are known as duplicate sites. MultiStates
+    are not supported by Kappa.
+
+    When declared, a MultiState instance is not connected to any Monomer or
+    site, so full validation is deferred until it is used as part of a
+    :py:class:`MonomerPattern` or :py:class:`ComplexPattern`.
+
+    Examples
+    --------
+
+    Define a Monomer "A" with MultiState "a", which has two copies, and
+    Monomer "B" with MultiState "b", which also has two copies but can take
+    state values "u" and "p":
+
+    >>> Model()  # doctest:+ELLIPSIS
+    <Model '_interactive_' (monomers: 0, ...
+    >>> Monomer('A', ['a', 'a'])  # BNG: A(a, a)
+    Monomer('A', ['a', 'a'])
+    >>> Monomer('B', ['b', 'b'], {'b': ['u', 'p']})  # BNG: B(b~u~p, b~u~p)
+    Monomer('B', ['b', 'b'], {'b': ['u', 'p']})
+
+    To specify MultiStates, use the MultiState class. Here are some valid
+    examples of MultiState patterns, with their BioNetGen equivalents:
+
+    >>> A(a=MultiState(1, 2))  # BNG: A(a!1,a!2)
+    A(a=MultiState(1, 2))
+    >>> B(b=MultiState('u', 'p'))  # BNG: A(A~u,A~p)
+    B(b=MultiState('u', 'p'))
+    >>> A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))  # BNG: A(a!1, a!2).B(b~u!1, b~2)
+    A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))
+    """
+    def __init__(self, *args):
+        if len(args) == 1:
+            raise ValueError('MultiState should not be used when only a single '
+                             'site is specified')
+        self.sites = args
+        for s in self.sites:
+            validate_site_value(s, _in_multistate=True)
+
+    def __len__(self):
+        return len(self.sites)
+
+    def __iter__(self):
+        return iter(self.sites)
+
+    def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__, ', '.join(
+            repr(s) for s in self))
 
 
 class MonomerPattern(object):
@@ -365,6 +485,7 @@ class MonomerPattern(object):
     * *tuple of (str, int)* : state with specified bond
     * *tuple of (str, WILD)* : state with wildcard bond
     * *tuple of (str, ANY)* : state with any bond
+    * MultiState : duplicate sites
 
     If a site is not listed in site_conditions then the pattern will match any
     state for that site, i.e. \"don't write, don't care\".
@@ -378,36 +499,15 @@ class MonomerPattern(object):
             raise Exception("MonomerPattern with unknown sites in " +
                             str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is one of: None, integer, list of integers, string,
-        # (string,integer), (string,WILD), ANY, WILD
         invalid_sites = []
         for (site, state) in site_conditions.items():
-            # pass through to next iteration if state type is ok
-            if state is None:
-                continue
-            elif isinstance(state, int):
-                continue
-            elif isinstance(state, list) and \
-                 all(isinstance(s, int) for s in state):
-                continue
-            elif isinstance(state, basestring):
-                _check_state(monomer, site, state)
-                continue
-            elif isinstance(state, tuple) and \
-                 isinstance(state[0], basestring) and \
-                 (isinstance(state[1], int) or state[1] is WILD or \
-                  state[1] is ANY):
-                _check_state(monomer, site, state[0])
-                continue
-            elif state is ANY:
-                continue
-            elif state is WILD:
-                continue
-            invalid_sites.append(site)
+            if not validate_site_value(state, monomer, site):
+                invalid_sites.append(site)
         if invalid_sites:
             raise ValueError("Invalid state value for sites: " +
                              '; '.join(['%s=%s' % (s, str(site_conditions[s]))
-                                       for s in invalid_sites]))
+                                       for s in invalid_sites]) +
+                             ' in {}'.format(monomer))
 
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
@@ -440,26 +540,40 @@ class MonomerPattern(object):
         Return a bool indicating whether the pattern is 'site-concrete'.
 
         'Site-concrete' means all sites have specified conditions."""
-        if len(self.site_conditions) != len(self.monomer.sites):
+        dup_sites = {k: v for k, v in
+                     collections.Counter(self.monomer.sites).items() if v > 1}
+        if len(self.site_conditions) != len(self.monomer.sites) and \
+                not dup_sites:
             return False
         for site_name, site_val in self.site_conditions.items():
-            if isinstance(site_val, basestring):
-                site_state = site_val
-                site_bond = None
-            elif isinstance(site_val, collections.Iterable):
-                site_state, site_bond = site_val
-            elif isinstance(site_val, int):
-                site_bond = site_val
-                site_state = None
-            else:
-                site_bond = site_val
-                site_state = None
+            if site_name in dup_sites:
+                if not isinstance(site_val, MultiState) or \
+                        len(site_val) < dup_sites[site_name]:
+                    return False
 
-            if site_bond is ANY or site_bond is WILD:
+                if not all(self._site_instance_concrete(site_name, s)
+                           for s in site_val):
+                    return False
+            elif not self._site_instance_concrete(site_name, site_val):
                 return False
-            if site_state is None and site_name in \
-                    self.monomer.site_states.keys():
-                return False
+
+        return True
+
+    def _site_instance_concrete(self, site_name, site_val):
+        if isinstance(site_val, basestring):
+            site_state = site_val
+            site_bond = None
+        elif isinstance(site_val, tuple):
+            site_state, site_bond = site_val
+        else:
+            site_bond = site_val
+            site_state = None
+
+        if site_bond is ANY or site_bond is WILD:
+            return False
+        if site_state is None and site_name in \
+                self.monomer.site_states.keys():
+            return False
 
         return True
 
@@ -552,9 +666,11 @@ class MonomerPattern(object):
 
     def __repr__(self):
         value = '%s(' % self.monomer.name
+        sites_unique = list(collections.OrderedDict.fromkeys(
+            self.monomer.sites))
         value += ', '.join([
                 k + '=' + repr(self.site_conditions[k])
-                for k in self.monomer.sites
+                for k in sites_unique
                 if k in self.site_conditions
                 ])
         value += ')'
@@ -700,6 +816,44 @@ class ComplexPattern(object):
         if self.compartment:
             species_cpt_node_id = add_or_get_compartment_node(self.compartment)
 
+        def _handle_site_instance(state_or_bond):
+            mon_site_id = next(node_count)
+            g.add_node(mon_site_id, id=site)
+            g.add_edge(mon_node_id, mon_site_id)
+            state = None
+            bond_num = None
+            if state_or_bond is WILD:
+                return
+            elif isinstance(state_or_bond, basestring):
+                state = state_or_bond
+            elif is_state_bond_tuple(state_or_bond):
+                state = state_or_bond[0]
+                bond_num = state_or_bond[1]
+            elif isinstance(state_or_bond, (int, list)):
+                bond_num = state_or_bond
+            elif state_or_bond is not ANY and state_or_bond is not None:
+                raise ValueError('Unrecognized state: {}'.format(
+                    state_or_bond))
+
+            if state_or_bond is ANY or bond_num is ANY:
+                bond_num = any_bond_tester
+                any_bond_tester_id = next(node_count)
+                g.add_node(any_bond_tester_id, id=any_bond_tester)
+                g.add_edge(mon_site_id, any_bond_tester_id)
+
+            if state is not None:
+                mon_site_state_id = next(node_count)
+                g.add_node(mon_site_state_id, id=state)
+                g.add_edge(mon_site_id, mon_site_state_id)
+
+            if bond_num is None:
+                bond_edges[NO_BOND].append(mon_site_id)
+            elif isinstance(bond_num, int):
+                bond_edges[bond_num].append(mon_site_id)
+            elif isinstance(bond_num, list):
+                for bond in bond_num:
+                    bond_edges[bond].append(mon_site_id)
+
         for mp in self.monomer_patterns:
             mon_node_id = next(node_count)
             g.add_node(mon_node_id, id=mp.monomer)
@@ -709,37 +863,11 @@ class ComplexPattern(object):
                 g.add_edge(mon_node_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
-                mon_site_id = next(node_count)
-                g.add_node(mon_site_id, id=site)
-                g.add_edge(mon_node_id, mon_site_id)
-                state = None
-                bond_num = None
-                if state_or_bond is WILD:
-                    continue
-                elif isinstance(state_or_bond, basestring):
-                    state = state_or_bond
-                elif isinstance(state_or_bond, collections.Iterable) and len(
-                        state_or_bond) == 2:
-                    state = state_or_bond[0]
-                    bond_num = state_or_bond[1]
-                elif isinstance(state_or_bond, int):
-                    bond_num = state_or_bond
-
-                if state_or_bond is ANY or bond_num is ANY:
-                    bond_num = any_bond_tester
-                    any_bond_tester_id = next(node_count)
-                    g.add_node(any_bond_tester_id, id=any_bond_tester)
-                    g.add_edge(mon_site_id, any_bond_tester_id)
-
-                if state is not None:
-                    mon_site_state_id = next(node_count)
-                    g.add_node(mon_site_state_id, id=state)
-                    g.add_edge(mon_site_id, mon_site_state_id)
-
-                if bond_num is None:
-                    bond_edges[NO_BOND].append(mon_site_id)
-                elif isinstance(bond_num, int):
-                    bond_edges[bond_num].append(mon_site_id)
+                if isinstance(state_or_bond, MultiState):
+                    # Duplicate sites
+                    [_handle_site_instance(s) for s in state_or_bond]
+                else:
+                    _handle_site_instance(state_or_bond)
 
         # Unbound edges
         unbound_sites = bond_edges.pop(NO_BOND, None)
@@ -1123,8 +1251,8 @@ class Parameter(Component, sympy.Symbol):
         return (self.name, self.value, False)
 
     def __init__(self, name, value=0.0, _export=True):
-        Component.__init__(self, name, _export)
         self.value = float(value)
+        Component.__init__(self, name, _export)
     
     def get_value(self):
         return self.value
@@ -1180,7 +1308,6 @@ class Compartment(Component):
     """
 
     def __init__(self, name, parent=None, dimension=3, size=None, _export=True):
-        Component.__init__(self, name, _export)
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
         #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
@@ -1189,6 +1316,7 @@ class Compartment(Component):
         self.parent = parent
         self.dimension = dimension
         self.size = size
+        Component.__init__(self, name, _export)
 
     def __repr__(self):
         return '%s(name=%s, parent=%s, dimension=%s, size=%s)' % (
@@ -1237,7 +1365,6 @@ class Rule(Component):
     def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
                  delete_molecules=False, move_connected=False,
                  _export=True):
-        Component.__init__(self, name, _export)
         if not isinstance(rule_expression, RuleExpression):
             raise Exception("rule_expression is not a RuleExpression object")
         validate_expr(rate_forward, "forward rate")
@@ -1260,7 +1387,9 @@ class Rule(Component):
             for cp in rp.complex_patterns:
                 if not cp.is_concrete():
                     raise ValueError('Product {} of synthesis rule {} is not '
-                                     'concrete'.format(cp, self.name))
+                                     'concrete'.format(cp, name))
+
+        Component.__init__(self, name, _export)
 
         # Get tags from rule expression
         tags = set()
@@ -1413,8 +1542,7 @@ class Observable(Component, sympy.Symbol):
         """ Expand observables in terms of species and coefficients """
         return sympy.Add(*[a * b for a, b in zip(
             self.coefficients,
-            sympy.symbols(','.join('__s%d' % sp_id for sp_id in
-                                   self.species) + ',')
+            [sympy.Symbol('__s%d' % sp_id) for sp_id in self.species]
         )])
 
     def __repr__(self):
@@ -1460,11 +1588,11 @@ class Expression(Component, sympy.Symbol):
         return (self.name, self.expr, False)
 
     def __init__(self, name, expr, _export=True):
-        Component.__init__(self, name, _export)
         if not isinstance(expr, sympy.Expr):
             raise ValueError('An Expression can only be created from a '
                              'sympy.Expr object')
         self.expr = expr
+        Component.__init__(self, name, _export)
 
     def expand_expr(self, expand_observables=False):
         """Return expr rewritten in terms of terminal symbols only."""
@@ -1542,6 +1670,61 @@ class Tag(Component, sympy.Symbol):
         return "{}({})".format(self.__class__.__name__, repr(self.name))
 
 
+class Initial(object):
+    """
+    An initial condition for a species.
+
+    An initial condition is made up of a species, its amount or concentration,
+    and whether it is to be held fixed during a simulation.
+
+    Species patterns must satisfy all of the following:
+    * Able to be cast as a ComplexPattern
+    * Concrete (see ComplexPattern.is_concrete)
+    * Distinct from any existing initial condition pattern
+    * match_once is False (nonsensical in this context)
+
+    Parameters
+    ----------
+    pattern : ComplexPattern
+        A concrete pattern defining the species to initialize.
+    value : Parameter or Expression Amount of the species the model will start
+        with. If an Expression is used, it must evaluate to a constant (can't
+        reference any Observables).
+    fixed : bool
+        Whether or not the species should be held fixed (never consumed).
+
+    Attributes
+    ----------
+    Identical to Parameters (see above).
+
+    """
+
+    def __init__(self, pattern, value, fixed=False, _export=True):
+        try:
+            pattern = as_complex_pattern(pattern)
+        except InvalidComplexPatternException as e:
+            raise InvalidInitialConditionError("Not a ComplexPattern")
+        if not pattern.is_concrete():
+            raise InvalidInitialConditionError("Pattern not concrete")
+        if pattern.match_once:
+            raise InvalidInitialConditionError("MatchOnce not allowed here")
+        validate_const_expr(value, "initial condition value")
+        self.pattern = pattern
+        self.value = value
+        self.fixed = fixed
+        self._export = _export
+        if self._export:
+            SelfExporter.add_initial(self)
+
+    def __repr__(self):
+        ret = '%s(%s, %s' % (self.__class__.__name__, repr(self.pattern),
+                             self.value.name)
+        if self.fixed:
+            ret += ', fixed=True'
+        ret += ')'
+        return ret
+
+
 class Model(object):
 
     """
@@ -1564,12 +1747,12 @@ class Model(object):
         See Parameter section above.
     monomers, compartments, parameters, rules, observables : ComponentSet
         The Component objects which make up the model.
-    initial_conditions : list of tuple of (ComplexPattern, Parameter)
+    initials : list of Initial
         Specifies which species are present in the model's starting
-        state (t=0) and how much there is of each one.  The
-        ComplexPattern defines the species identity, and it must be
-        concrete (see ComplexPattern.is_concrete).  The
-        Parameter defines the amount or concentration of the species.
+        state (t=0) and how much there is of each one.
+    initial_conditions : list of tuple of (ComplexPattern, Parameter)
+        The old representation of initial conditions, deprecated in favor of
+        `initials`.
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
         the initial conditions and successively applying the rules. Each 
@@ -1607,9 +1790,10 @@ class Model(object):
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
         self.tags = ComponentSet()
-        self.initial_conditions = []
+        self.initials = []
         self.annotations = []
         self._odes = OdeView(self)
+        self._initial_conditions = InitialConditionsView(self)
         self.reset_equations()
         #####
         self.diffusivities = []
@@ -1623,7 +1807,7 @@ class Model(object):
             for component in model_copy.all_components():
                 self.add_component(component)
                 component._do_export()
-            self.initial_conditions = model_copy.initial_conditions
+            self.initials = model_copy.initials
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -1723,7 +1907,7 @@ class Model(object):
 
     def parameters_initial_conditions(self):
         """Return a ComponentSet of initial condition parameters."""
-        cset = ComponentSet(ic[1] for ic in self.initial_conditions)
+        cset = ComponentSet(ic.value for ic in self.initials)
         # intersect with original parameter list to retain ordering
         return self.parameters & cset
 
@@ -1748,13 +1932,6 @@ class Model(object):
         cset_used = (self.parameters_rules() | self.parameters_initial_conditions() |
                      self.parameters_compartments() | self.parameters_expressions())
         return self.parameters - cset_used
-
-#     def expressions_constant(self):
-#         """Return a ComponentSet of constant expressions."""
-#         cset = ComponentSet(e for e in self.expressions
-#                             if all(isinstance(a, (Parameter, sympy.Number))
-#                                    for a in e.expand_expr().atoms()))
-#         return cset
     
     def expressions_constant(self):
         """Return a ComponentSet of constant expressions."""
@@ -1785,6 +1962,8 @@ class Model(object):
                     sm[r, i] -= 1
                 for p in reaction['products']:
                     sm[p, i] += 1
+            fixed = [i for i, ic in enumerate(self.initials) if ic.fixed]
+            sm[fixed, :] = 0
             self._stoichiometry_matrix = sm.tocsr()
         return self._stoichiometry_matrix
 
@@ -1825,59 +2004,38 @@ class Model(object):
             if component in cset:
                 cset.rename(component, new_name)
 
-    def _validate_initial_condition_pattern(self, pattern):
-        """
-        Make sure a pattern is valid for an initial condition.
-
-        Patterns must satisfy all of the following:
-        * Able to be cast as a ComplexPattern
-        * Concrete (see ComplexPattern.is_concrete)
-        * Distinct from any existing initial condition pattern
-        * match_once is False (nonsensical in this context)
-
-        Parameters
-        ----------
-        pattern : MonomerPattern or ComplexPattern
-            Pattern to validate
-
-        Returns
-        -------
-        The validated pattern, upgraded to a ComplexPattern.
-
-        """
-        try:
-            complex_pattern = as_complex_pattern(pattern)
-        except InvalidComplexPatternException as e:
-            raise InvalidInitialConditionError("Not a ComplexPattern")
-        if not complex_pattern.is_concrete():
-            raise InvalidInitialConditionError("Pattern not concrete")
-        if any(complex_pattern.is_equivalent_to(other_cp)
-               for other_cp, value in self.initial_conditions):
-            # FIXME until we get proper canonicalization this could produce
-            # false negatives
+    def add_initial(self, initial):
+        if initial in self.initials:
+            return
+        if any(
+            initial.pattern.is_equivalent_to(other.pattern)
+            for other in self.initials
+        ):
             raise InvalidInitialConditionError("Duplicate species")
-        if complex_pattern.match_once:
-            raise InvalidInitialConditionError("MatchOnce not allowed here")
-        return complex_pattern
+        self.initials.append(initial)
 
-    def initial(self, pattern, value):
-        """
-        Add an initial condition.
+    def initial(self, pattern, value, fixed=False):
+        """Add an initial condition.
 
-        An initial condition is made up of a species and its amount or
-        concentration.
-
-        Parameters
-        ----------
-        pattern : ComplexPattern
-            A concrete pattern defining the species to initialize.
-        value : Parameter
-            Amount of the species the model will start with.
+        This method is deprecated. Instead, create an Initial object
+        and pass it to add_initial.
 
         """
-        complex_pattern = self._validate_initial_condition_pattern(pattern)
-        validate_const_expr(value, "initial condition value")
-        self.initial_conditions.append( (complex_pattern, value) )
+        warnings.warn(
+            'Model.initial will be removed in a future version. Instead,'
+            ' create an Initial object and pass it to Model.add_initial.',
+            DeprecationWarning
+        )
+        self.add_initial(Initial(pattern, value, fixed, _export=False))
+
+    @property
+    def initial_conditions(self):
+        warnings.warn(
+            'Model.initial_conditions will be removed in a future version.'
+            ' Instead, you can get a list of Initial objects with'
+            ' Model.initials.', DeprecationWarning
+        )
+        return self._initial_conditions
 
     def update_initial_condition_pattern(self, before_pattern, after_pattern):
         """
@@ -1901,9 +2059,13 @@ class Model(object):
             before_pattern.
         """
 
+        before_pattern = as_complex_pattern(before_pattern)
+
         # Get the initial condition index
-        ic_index_list = [i for i, ic in enumerate(self.initial_conditions)
-                   if ic[0].is_equivalent_to(as_complex_pattern(before_pattern))]
+        ic_index_list = [
+            i for i, ic in enumerate(self.initials)
+            if ic.pattern.is_equivalent_to(before_pattern)
+        ]
 
         # If the initial condition to replace is not found, raise an error
         if not ic_index_list:
@@ -1914,19 +2076,10 @@ class Model(object):
         # error (this should never happen, because duplicate initial conditions
         # are not allowed to be created)
         assert len(ic_index_list) == 1
-        ic_index = ic_index_list[0]
 
-        # Make sure the new initial condition pattern is valid
-        after_pattern = self._validate_initial_condition_pattern(after_pattern)
-
-        # Since everything checks out, replace the old initial condition
-        # pattern with the new one.  Because initial_conditions are tuples (and
-        # hence immutable), we cannot simply replace the pattern; instead we
-        # must delete the old one and add the new one.
-        # We retain the old parameter object:
-        p = self.initial_conditions[ic_index][1]
-        del self.initial_conditions[ic_index]
-        self.initial_conditions.append( (after_pattern, p) )
+        # Replace the pattern in the initial condition
+        initial_index = ic_index_list[0]
+        self.initials[initial_index].pattern = after_pattern
 
     def get_species_index(self, complex_pattern):
         """
@@ -2024,8 +2177,18 @@ class UnknownSiteError(ValueError):
 class CompartmentAlreadySpecifiedError(ValueError):
     pass
 
+
 class TagAlreadySpecifiedError(ValueError):
     pass
+
+
+class ModelNotDefinedError(RuntimeError):
+    """SelfExporter method was called before a model was defined."""
+    def __init__(self):
+        ValueError.__init__(
+            self,
+            "A Model must be declared before declaring any model components"
+        )
 
 
 class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
@@ -2284,6 +2447,20 @@ class OdeView(collections.Sequence):
 
     def __len__(self):
         return len(self.model.species)
+
+
+class InitialConditionsView(collections.Sequence):
+    """Compatibility shim for the Model.initial_conditions property."""
+
+    def __init__(self, model):
+        self.model = model
+
+    def __getitem__(self, key):
+        initial = self.model.initials[key]
+        return (initial.pattern, initial.value)
+
+    def __len__(self):
+        return len(self.model.initials)
 
 
 class ComponentDuplicateNameError(ValueError):

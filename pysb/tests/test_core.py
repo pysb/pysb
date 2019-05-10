@@ -150,6 +150,14 @@ def test_observable_constructor_with_monomer():
     o = Observable('o', A, _export=False)
 
 @with_model
+def test_expand_obs_no_coeffs():
+    A = Monomer('A')
+    o = Observable('A_obs', A())
+    # Test that expand_obs works with observable when no coefficients or
+    # species are present
+    o.expand_obs()
+
+@with_model
 def test_compartment_initial_error():
     Monomer('A', ['s'])
     Parameter('A_0', 2.0)
@@ -402,3 +410,106 @@ def test_tags():
 
     # Test tag defined in rule expression but not in rate
     Rule('r2', None >> A(b=None).__matmul__(x), e_no_tag)
+
+
+@with_model
+def test_multi_bonds():
+    Monomer('A', ['a'])
+    a_pat = A(a=[1, 2])
+
+    # Check _as_graph() works for multi-bonds
+    a_pat._as_graph()
+
+    assert a_pat.is_concrete()
+
+
+@with_model
+def test_duplicate_sites():
+    Monomer('A', ['a', 'a'])
+    Monomer('B', ['b', 'b'], {'b': ['u', 'p']})
+
+    assert not A(a=1).is_concrete()
+    assert A(a=MultiState(1, 2)).is_concrete()
+    assert A(a=MultiState(1, None)).is_concrete()
+
+    assert not B(b=('u', 1)).is_concrete()
+
+    assert B(b=MultiState('u', 'p')).is_concrete()
+    assert B(b=MultiState(('u', 1), ('u', 2))).is_concrete()
+
+    # Check _as_graph() works for duplicate sites
+    B(b=MultiState(('u', 1), ('u', 2)))._as_graph()
+
+    assert B(b=MultiState('u', ('u', 1))).is_concrete()
+
+    # Syntax errors (should use MultiState)
+    assert_raises(ValueError, B, b=('u', 'p'))
+    assert_raises(ValueError, B, b=['u', 'p'])
+
+    # Syntax error (can't nest MultiState)
+    assert_raises(ValueError, MultiState, MultiState(1, 2), 'p')
+
+    # Duplicate sites with multi-bond
+    A(a=MultiState([1, 2], [1, 2]))
+
+
+@raises(ValueError)
+def test_duplicate_site_single_site():
+    MultiState('a')
+
+
+@with_model
+def test_invalid_rule():
+    Monomer('A')
+    assert_raises(ExpressionError, Rule, 'r1', None >> A(), 1.0)
+    assert len(model.rules) == 0
+
+    Parameter('kf', 1.0)
+    assert_raises(Exception, Rule, 'r1', 'invalid_rule_expr', kf)
+    assert len(model.rules) == 0
+
+
+@with_model
+def test_invalid_expression():
+    assert_raises(ValueError, Expression, 'e1', 'invalid_expr')
+    assert len(model.expressions) == 0
+
+
+@with_model
+def test_invalid_monomer_name():
+    assert_raises(ValueError, Monomer, 'a', 123)
+    assert len(model.monomers) == 0
+
+
+@with_model
+def test_invalid_parameter():
+    assert_raises(ValueError, Parameter, 'a', 'invalid_value')
+    assert len(model.parameters) == 0
+
+
+@with_model
+def test_invalid_compartment():
+    assert_raises(Exception, Compartment, 'c1', 'invalid_parent')
+    assert len(model.compartments) == 0
+
+
+@with_model
+def test_invalid_observable():
+    assert_raises(InvalidReactionPatternException,
+                  Observable, 'o1', 'invalid_pattern')
+    assert len(model.observables) == 0
+
+
+@with_model
+def test_update_initial_condition():
+    Monomer('A')
+    Monomer('B')
+    Parameter('k', 1.0)
+    Initial(A(), k)
+
+    model.update_initial_condition_pattern(A(), B())
+
+    assert len(model.initials) == 1
+    assert as_complex_pattern(B()).is_equivalent_to(
+        as_complex_pattern(model.initials[0].pattern))
+

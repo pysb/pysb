@@ -54,9 +54,8 @@ class Simulator(object):
     initials : vector-like or dict, optional
         Values to use for the initial condition of all species. Ordering is
         determined by the order of model.species. If not specified, initial
-        conditions will be taken from model.initial_conditions (with
-        initial condition parameter values taken from `param_values` if
-        specified).
+        conditions will be taken from model.initials (with initial condition
+        parameter values taken from `param_values` if specified).
     param_values : vector-like or dict, optional
         Values to use for every parameter in the model. Ordering is
         determined by the order of model.parameters.
@@ -108,15 +107,15 @@ class Simulator(object):
         self.tout = None
         # Per-run initial conditions/parameter/tspan override
         self._tspan = tspan
-        # Base initials and param values
-        self._initials = None
-        self.initials = initials
-        self._params = None
-        self.param_values = param_values
         # Per-run tspan, initials and param_values
         self._run_tspan = None
         self._run_initials = None
         self._run_params = None
+        # Base initials and param values
+        self._params = None
+        self.param_values = param_values
+        self._initials = None
+        self.initials = initials
         # Store init kwargs and run kwargs if needed for saving results
         self._init_kwargs = kwargs
         self._run_kwargs = None
@@ -158,8 +157,10 @@ class Simulator(object):
             # Network free simulators
             if self._initials:
                 return len(list(self._initials.values())[0])
+            elif self._run_initials:
+                return len(list(self._run_initials.values())[0])
             else:
-                return 1
+                return len(self.param_values)
 
     def _update_initials_dict(self, initials_dict, initials_source):
         if isinstance(initials_source, collections.Mapping):
@@ -189,8 +190,11 @@ class Simulator(object):
 
     @property
     def initials_dict(self):
-        initials_dict = {cp: [param.value] for cp, param in
-                         self.model.initial_conditions}
+        n_sims = self._check_run_initials_vs_base_initials_length()
+        if n_sims == 1:
+            n_sims = len(self.param_values)
+        initials_dict = {ic.pattern: [ic.value.value] * n_sims
+                         for ic in self.model.initials}
         # Apply any base initial overrides
         initials_dict = self._update_initials_dict(initials_dict,
                                                    self._initials)
@@ -199,6 +203,28 @@ class Simulator(object):
                                                    self._run_initials)
 
         return initials_dict
+
+    def _check_run_initials_vs_base_initials_length(self):
+        # Otherwise, build the list from the model, and any overrides
+        # specified in self._initials and self._run_initials
+        n_sims_initials = self._num_sims_calc(self._initials)
+        n_sims_run = self._num_sims_calc(self._run_initials)
+
+        if n_sims_initials is not None and n_sims_run is not None \
+                and n_sims_run != n_sims_initials:
+            raise ValueError(
+                "The base initials set with self.initials imply {} "
+                "simulations, but the run() initials imply {} simulations."
+                " Either set self.initials=None, or change the number of "
+                "simulations in the run() initials".format(
+                    n_sims_initials, n_sims_run))
+
+        if n_sims_initials is not None:
+            return n_sims_initials
+        elif n_sims_run is not None:
+            return n_sims_run
+        else:
+            return 1
 
     @property
     def initials(self):
@@ -217,24 +243,7 @@ class Simulator(object):
                 self._initials is not None:
             return self._initials
 
-        # Otherwise, build the list from the model, and any overrides
-        # specified in self._initials and self._run_initials
-        n_sims_initials = self._num_sims_calc(self._initials)
-        n_sims_run = self._num_sims_calc(self._run_initials)
-
-        if n_sims_initials is not None and n_sims_run is not None \
-                and n_sims_run != n_sims_initials:
-            raise ValueError(
-                "The base initials set with self.initials imply {} "
-                "simulations, but the run() initials imply {} simulations."
-                " Either set self.initials=None, or change the number of "
-                "simulations in the run() initials".format(
-                    n_sims_initials, n_sims_run))
-        if n_sims_initials is None:
-            if n_sims_run is None:
-                n_sims_initials = 1
-            else:
-                n_sims_initials = n_sims_run
+        n_sims_initials = self._check_run_initials_vs_base_initials_length()
 
         # At this point (after dimensionality check), we can return
         # self._run_initials if it's not a dictionary and not None
@@ -264,8 +273,8 @@ class Simulator(object):
                     for pv in self.param_values]
                 if len(subs) == 1 and n_sims_actual > 1:
                     subs = list(itertools.repeat(subs[0], n_sims_actual))
-            y0 = self._update_y0(y0, self._model.initial_conditions, subs,
-                                 n_sims_params)
+            ic_tuples = [(ic.pattern, ic.value) for ic in self._model.initials]
+            y0 = self._update_y0(y0, ic_tuples, subs, n_sims_params)
 
         # Any remaining unset initials should be set to zero
         y0 = np.nan_to_num(y0)
@@ -331,6 +340,14 @@ class Simulator(object):
         if new_initials is None:
             return None
 
+        # If new_initials is a pandas dataframe, convert to a dict
+        if pd and isinstance(new_initials, pd.DataFrame):
+            new_initials = new_initials.to_dict(orient='list')
+
+        # If new_initials is a list, convert to numpy array
+        if isinstance(new_initials, list):
+            new_initials = np.array(new_initials, copy=False)
+
         # Check if new_initials is a dict, and if so validate the keys
         # (ComplexPatterns)
         if isinstance(new_initials, dict):
@@ -355,9 +372,7 @@ class Simulator(object):
                 if not np.isfinite(val).all():
                     raise ValueError('Please check initial {} for non-finite '
                                      'values'.format(cplx_pat))
-        else:
-            if not isinstance(new_initials, np.ndarray):
-                new_initials = np.array(new_initials, copy=False)
+        elif isinstance(new_initials, np.ndarray):
             # if new_initials is a 1D array, convert to a 2D array of length 1
             if len(new_initials.shape) == 1:
                 new_initials = np.resize(new_initials, (1, len(new_initials)))
@@ -369,6 +384,11 @@ class Simulator(object):
             if not np.isfinite(new_initials).all():
                 raise ValueError('Please check initials array '
                                  'for non-finite values')
+        else:
+            raise ValueError(
+                'Implicit conversion of data type "{}" is not '
+                'supported. Please supply initials as a numpy array, list, '
+                'or a pandas DataFrame.'.format(type(new_initials)))
 
         if n_sims > 1:
             if not self._supports['multi_initials']:
@@ -460,6 +480,15 @@ class Simulator(object):
     def _process_incoming_params(self, new_params):
         if new_params is None:
             return None
+
+        # Convert pandas dataframe to dictionary
+        if pd and isinstance(new_params, pd.DataFrame):
+            new_params = new_params.to_dict(orient='list')
+
+        # If new_params is a list, convert to numpy array
+        if isinstance(new_params, list):
+            new_params = np.array(new_params)
+
         if isinstance(new_params, dict):
             n_sims = 1
             if len(new_params) > 0:
@@ -476,9 +505,7 @@ class Simulator(object):
                 if len(val) != n_sims:
                     raise ValueError("all arrays in params dictionary "
                                      "must be equal length")
-        else:
-            if not isinstance(new_params, np.ndarray):
-                new_params = np.array(new_params)
+        elif isinstance(new_params, np.ndarray):
             # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
                 new_params = np.resize(new_params, (1, len(new_params)))
@@ -487,6 +514,11 @@ class Simulator(object):
             if new_params.shape[1] != len(self._model.parameters):
                 raise ValueError("new_params must be the same length as "
                                  "model.parameters")
+        else:
+            raise ValueError(
+                'Implicit conversion of data type "{}" is not '
+                'supported. Please supply parameters as a numpy array, list, '
+                'or a pandas DataFrame.'.format(type(new_params)))
 
         # Check whether simulator supports multiple param_values
         if n_sims > 1 and not self._supports['multi_param_values']:
@@ -552,10 +584,7 @@ class Simulator(object):
             new_params = np.repeat(self.param_values,
                                    self.initials_length,
                                    axis=0)
-            if self._run_params is None:
-                self._params = new_params
-            else:
-                self._run_params = new_params
+            self._run_params = new_params
 
         # Error checks on 'param_values' and 'initials'
         if len(self.param_values) != self.initials_length:

@@ -1,5 +1,5 @@
 from pysb.core import MonomerPattern, ComplexPattern, RuleExpression, \
-    ReactionPattern, ANY, WILD
+    ReactionPattern, ANY, WILD, MultiState
 from pysb.builder import Builder
 from pysb.bng import BngFileInterface
 import xml.etree.ElementTree
@@ -10,6 +10,7 @@ import warnings
 import pysb.logging
 import collections
 import numbers
+import os
 
 
 def _ns(tag_string):
@@ -31,6 +32,7 @@ class BnglBuilder(Builder):
     """
     def __init__(self, filename, force=False, cleanup=True):
         super(BnglBuilder, self).__init__()
+        filename = os.path.abspath(filename)
         with BngFileInterface(model=None, cleanup=cleanup) as con:
             con.action('readFile', file=filename, skip_actions=1)
             con.action('writeXML', evaluate_expressions=0)
@@ -38,6 +40,8 @@ class BnglBuilder(Builder):
             self._x = xml.etree.ElementTree.parse('%s.xml' %
                                                   con.base_filename)\
                                            .getroot().find(_ns('{0}model'))
+
+        self.model.name = os.path.splitext(os.path.basename(filename))[0]
         self._force = force
         self._model_env = {}
         self._renamed_states = collections.defaultdict(dict)
@@ -64,6 +68,7 @@ class BnglBuilder(Builder):
         if re.match(r'^[\w\s()/+\-._*]*$', expression):
             return sympy.sympify(expression, locals=self._model_env,
                                  evaluate=False)
+            # return parse_expr(expression, self._model_env)
         else:
             self._warn_or_except('Security check on expression "%s" failed' %
                                  expression)
@@ -88,34 +93,44 @@ class BnglBuilder(Builder):
         for mon in species_xml.iterfind(_ns('{0}ListOfMolecules/{0}Molecule')):
             mon_name = mon.get('name')
             mon_obj = self.model.monomers[mon_name]
-            mon_states = {}
+            mon_states = collections.defaultdict(list)
             for comp in mon.iterfind(_ns('{0}ListOfComponents/{0}Component')):
+                # BioNetGen component (state) labels are not supported yet
+                if 'label' in comp.attrib.keys():
+                    self._warn_or_except('BioNetGen component/state labels '
+                                         'are not yet supported in PySB')
+
                 state_nm = comp.get('name')
                 bonds = comp.get('numberOfBonds')
                 if bonds == "0":
-                    mon_states[state_nm] = None
+                    last_bond = None
                 elif bonds == "?":
-                    mon_states[state_nm] = WILD
+                    last_bond = WILD
                 elif bonds == "+":
-                    mon_states[state_nm] = ANY
+                    last_bond = ANY
                 else:
                     bond_list = bond_ids[comp.get('id')]
                     assert int(bonds) == len(bond_list)
                     if len(bond_list) == 1:
-                        mon_states[state_nm] = bond_list[0]
+                        last_bond = bond_list[0]
                     else:
-                        mon_states[state_nm] = bond_list
+                        last_bond = bond_list
                 state = comp.get('state')
                 if state and state != '?':
                     # If we changed the state string, use the updated version
                     state = self._renamed_states.get(mon_name, {}).get(
                         state, state)
-                    if mon_states[state_nm]:
+                    if last_bond:
                         # Site has a bond and a state
-                        mon_states[state_nm] = (state, mon_states[state_nm])
+                        mon_states[state_nm].append((state, last_bond))
                     else:
                         # Site only has a state, no bond
-                        mon_states[state_nm] = state
+                        mon_states[state_nm].append(state)
+                else:
+                    mon_states[state_nm].append(last_bond)
+
+            mon_states = {k: MultiState(*v) if len(v) > 1 else v[0]
+                          for k, v in mon_states.items()}
 
             mon_cpt = self.model.compartments.get(mon.get('compartment'))
             mon_pats.append(MonomerPattern(mon_obj, mon_states, mon_cpt))
@@ -132,7 +147,7 @@ class BnglBuilder(Builder):
                                       '{0}MoleculeType')):
             mon_name = m.get('id')
             sites = []
-            states = collections.defaultdict(list)
+            states = collections.defaultdict(dict)
             for ctype in m.iterfind(_ns('{0}ListOfComponentTypes/'
                                         '{0}ComponentType')):
                 c_name = ctype.get('id')
@@ -142,13 +157,15 @@ class BnglBuilder(Builder):
                     for s in states_list.iterfind(_ns('{}AllowedState')):
                         state = s.get('id')
                         if re.match('[0-9]*$', state):
-                            new_state = '_' + state
-                            while new_state in states[c_name]:
-                                new_state = '_' + new_state
-                            self._renamed_states[mon_name][state] = \
-                                new_state
-                            state = new_state
-                        states[c_name].append(state)
+                            if state not in states[c_name]:
+                                new_state = '_' + state
+                                while new_state in states[c_name].values():
+                                    new_state = '_' + new_state
+                                states[c_name][state] = new_state
+                                self._renamed_states[mon_name][state] = \
+                                    new_state
+                        else:
+                            states[c_name][state] = state
                     if self._renamed_states[mon_name]:
                         self._log.info('Monomer "{}" states were renamed as '
                                        'follows: {}'.format(
@@ -156,7 +173,10 @@ class BnglBuilder(Builder):
                             self._renamed_states[mon_name])
                         )
             try:
-                self.monomer(mon_name, sites, dict(states))
+                # self.monomer(mon_name, sites, dict(states))
+                self.monomer(mon_name, sites,
+                             {c_name: list(statedict.values())
+                              for c_name, statedict in states.items()})
             except Exception as e:
                 if str(e).startswith('Duplicate sites specified'):
                     self._warn_or_except('Molecule %s has multiple '
@@ -171,7 +191,14 @@ class BnglBuilder(Builder):
             p_name = p.get('id')
             if p.get('type') == 'Constant':
                 p_value = p.get('value').replace('10^', '1e')
-                self.parameter(name=p_name, value=p_value)
+                try:
+                    self.parameter(name=p_name, value=p_value)
+                except ValueError:
+                    # Despite the "Constant" label, some constant expressions
+                    # appear here e.g. ln(2)/120 in BNG's Repressilator model
+                    self.expression(name=p_name,
+                                    expr=self._eval_in_model_env(
+                                        p.get('value')))
             elif p.get('type') == 'ConstantExpression':
                 self.expression(name=p_name,
                                 expr=self._eval_in_model_env(p.get('value')))
@@ -182,24 +209,26 @@ class BnglBuilder(Builder):
     def _parse_observables(self):
         for o in self._x.iterfind(_ns('{0}ListOfObservables/{0}Observable')):
             o_name = o.get('name')
+            match_mode = o.get('type').lower()
+            # Some BNG observables have same name as a monomer, but in PySB
+            # these must be unique
+            if o_name in self.model.monomers.keys():
+                o_name = 'Obs_{}'.format(o_name)
             cplx_pats = []
             for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
+                cpt = self.model.compartments.get(mp.get('compartment'))
                 match_once = mp.get('matchOnce')
-                match_once = True if match_once == "1" else False
+                match_once = True if match_once == "1" and \
+                    match_mode != 'species' else False
                 cplx_pats.append(ComplexPattern(self._parse_species(mp),
-                                                compartment=None,
+                                                compartment=cpt,
                                                 match_once=match_once))
             self.observable(o_name,
                             ReactionPattern(cplx_pats),
-                            match=o.get('type').lower())
+                            match=match_mode)
 
     def _parse_initials(self):
         for i in self._x.iterfind(_ns('{0}ListOfSpecies/{0}Species')):
-            if i.get('Fixed') is not None and i.get('Fixed') == "1":
-                self._warn_or_except('Species %s is fixed, but will be '
-                                     'treated as an ordinary species in '
-                                     'PySB.' % i.get('name'))
-
             value_param = i.get('concentration')
             try:
                 value = float(value_param)
@@ -219,7 +248,9 @@ class BnglBuilder(Builder):
                         'concentration')]
             mon_pats = self._parse_species(i)
             species_cpt = self.model.compartments.get(i.get('compartment'))
-            self.initial(ComplexPattern(mon_pats, species_cpt), value_param)
+            cp = ComplexPattern(mon_pats, species_cpt)
+            fixed = i.get('Fixed') == "1"
+            self.initial(cp, value_param, fixed)
 
     def _parse_compartments(self):
         for c in self._x.iterfind(_ns('{0}ListOfCompartments/{0}compartment')):
@@ -302,6 +333,14 @@ class BnglBuilder(Builder):
                     delete_molecules = True
                     break
 
+            # Process any MoveConnected declaration
+            move_connected = False
+            for change_cpt_ops in r.iterfind(_ns('{0}ListOfOperations/'
+                                                 '{0}ChangeCompartment')):
+                if change_cpt_ops.get('moveConnected') == "1":
+                    move_connected = True
+                    break
+
             # Give warning/error if ListOfExcludeReactants or
             # ListOfExcludeProducts is present
             if r.find(_ns('{}ListOfExcludeReactants')) is not None or \
@@ -321,7 +360,8 @@ class BnglBuilder(Builder):
                                      'in PySB.')
 
             self.rule(r_name, rule_exp, r_rate,
-                      delete_molecules=delete_molecules)
+                      delete_molecules=delete_molecules,
+                      move_connected=move_connected)
 
         # Set the reverse rates
         for r_name, rev_rate in rev_rates.items():
@@ -331,9 +371,10 @@ class BnglBuilder(Builder):
             rule.rate_reverse = rev_rate
 
     def _parse_expressions(self):
-        expr_namespace = {e.name: e for e in
-                          self.model.expressions_constant()}
-        expr_namespace.update({o.name: o for o in self.model.observables})
+        expr_namespace = dict(
+            self.model.parameters | self.model.expressions_constant()
+            | self.model.observables
+        )
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             is_local = False
@@ -367,7 +408,6 @@ class BnglBuilder(Builder):
                 self.expression(expr_name, expr_val)
 
     def _parse_bng_xml(self):
-        self.model.name = self._x.get(_ns('id'))
         self._parse_monomers()
         self._parse_parameters()
         self._parse_compartments()

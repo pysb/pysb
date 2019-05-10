@@ -6,6 +6,7 @@ from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator import ScipyOdeSimulator
 from pysb.examples import robertson, earm_1_0
 import unittest
+import pandas as pd
 
 
 class TestScipySimulatorBase(object):
@@ -75,9 +76,10 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
     def test_y0_as_list(self):
         """Test y0 with list of initial conditions"""
         # Test the initials getter method before anything is changed
-        assert np.allclose(self.sim.initials[0][0:2],
-                           [ic[1].value for ic in
-                            self.model.initial_conditions])
+        assert np.allclose(
+            self.sim.initials[0][0:2],
+            [ic.value.value for ic in self.model.initials]
+        )
 
         initials = [10, 20, 0]
         simres = self.sim.run(initials=initials)
@@ -111,6 +113,18 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
                                self.mon('B')(b=None): 0})
         assert np.allclose(simres.observables['AB_complex'][0], 100)
 
+    def test_y0_as_dataframe(self):
+        initials_dict = {self.mon('A')(a=None): [0],
+                         self.mon('B')(b=1) % self.mon('A')(a=1): [100],
+                         self.mon('B')(b=None): [0]}
+        initials_df = pd.DataFrame(initials_dict)
+        simres = self.sim.run(initials=initials_df)
+        assert np.allclose(simres.observables['AB_complex'][0], 100)
+
+    @raises(ValueError)
+    def test_y0_as_pandas_series(self):
+        self.sim.run(initials=pd.Series())
+
     @raises(TypeError)
     def test_y0_non_numeric_value(self):
         """Test y0 with non-numeric value."""
@@ -121,6 +135,14 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run(param_values={'kbindAB': 0})
         # kbindAB=0 should ensure no AB_complex is produced.
         assert np.allclose(simres.observables["AB_complex"], 0)
+
+    def test_param_values_as_dataframe(self):
+        simres = self.sim.run(param_values=pd.DataFrame({'kbindAB': [0]}))
+        assert np.allclose(simres.observables['AB_complex'], 0)
+
+    @raises(ValueError)
+    def test_param_values_as_pandas_series(self):
+        self.sim.run(param_values=pd.Series())
 
     def test_param_values_as_list_ndarray(self):
         """Test param_values as a list and ndarray."""
@@ -333,6 +355,25 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
                         [90, 100, 110, 5, 6],
                         [90, 100, 110, 5, 6]]
         self.sim.run(initials=initials, param_values=param_values)
+
+    @unittest.skipIf(sys.version_info.major < 3,
+                     'Parallel execution requires Python >= 3.3')
+    def test_parallel(self):
+        for integrator in ('vode', 'lsoda'):
+            for use_analytic_jacobian in (True, False):
+                yield self._check_parallel, integrator, use_analytic_jacobian
+
+    def _check_parallel(self, integrator, use_analytic_jacobian):
+        initials = [[10, 20, 30], [50, 60, 70]]
+        sim = ScipyOdeSimulator(
+            self.model, self.sim.tspan,
+            initials=initials,
+            integrator=integrator,
+            use_analytic_jacobian=use_analytic_jacobian
+        )
+        base_res = sim.run(initials=initials)
+        res = sim.run(initials=initials, num_processors=2)
+        assert np.allclose(res.species, base_res.species)
 
 
 @with_model

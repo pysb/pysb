@@ -1,6 +1,6 @@
 from pysb.testing import *
 import numpy as np
-from pysb import Monomer, Parameter, Initial, Observable, Rule
+from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator.bng import BngSimulator, PopulationMap
 from pysb.bng import generate_equations
 from pysb.examples import robertson, expression_observables, earm_1_0
@@ -88,20 +88,68 @@ def test_bng_ode_with_expressions():
     assert len(x.observables) == 50
 
 
-def test_nfsim():
-    model = robertson.model
-    # Reset equations from any previous network generation
-    model.reset_equations()
+class TestNfSim(object):
+    def setUp(self):
+        self.model = robertson.model
+        self.model.reset_equations()
+        self.sim = BngSimulator(self.model, tspan=np.linspace(0, 1))
+        self.param_values_2sets = [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12]]
 
-    sim = BngSimulator(model, tspan=np.linspace(0, 1))
-    x = sim.run(n_runs=1, method='nf', seed=_BNG_SEED)
-    observables = np.array(x.observables)
-    assert len(observables) == 50
+    def test_nfsim_2runs(self):
+        x = self.sim.run(n_runs=1, method='nf', seed=_BNG_SEED)
+        observables = np.array(x.observables)
+        assert len(observables) == 50
 
-    A = model.monomers['A']
-    x = sim.run(n_runs=2, method='nf', tspan=np.linspace(0, 1),
-                initials={A(): 100}, seed=_BNG_SEED)
-    assert np.allclose(x.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])
+        A = self.model.monomers['A']
+        x = self.sim.run(n_runs=2, method='nf', tspan=np.linspace(0, 1),
+                    initials={A(): 100}, seed=_BNG_SEED)
+        assert (x.nsims == 2)
+        assert np.allclose(x.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])
+
+    def test_nfsim_2initials(self):
+        # Test with two initials
+        A = self.model.monomers['A']
+        x2 = self.sim.run(method='nf', tspan=np.linspace(0, 1),
+                     initials={A(): [100, 200]}, seed=_BNG_SEED)
+        assert x2.nsims == 2
+        assert np.allclose(x2.dataframe.loc[0, 0.0], [100.0, 0.0, 0.0])
+        assert np.allclose(x2.dataframe.loc[1, 0.0], [200.0, 0.0, 0.0])
+
+    def test_nfsim_2params(self):
+        # Test with two param_values
+        x3 = self.sim.run(method='nf', tspan=np.linspace(0, 1),
+                          param_values=self.param_values_2sets, seed=_BNG_SEED)
+        assert x3.nsims == 2
+        assert np.allclose(x3.param_values, self.param_values_2sets)
+
+    def test_nfsim_2initials_2params(self):
+        # Test with two initials and two param_values
+        A = self.model.monomers['A']
+        x = self.sim.run(method='nf',
+                         tspan=np.linspace(0, 1),
+                         initials={A(): [101, 201]},
+                         param_values=[[1, 2, 3, 4, 5, 6],
+                                       [7, 8, 9, 10, 11, 12]],
+                         seed=_BNG_SEED)
+        assert x.nsims == 2
+        assert np.allclose(x.dataframe.loc[0, 0.0], [101.0, 0.0, 0.0])
+
+    @raises(ValueError)
+    def test_nfsim_different_initials_lengths(self):
+        A = self.model.monomers['A']
+        B = self.model.monomers['B']
+
+        sim = BngSimulator(self.model, tspan=np.linspace(0, 1),
+                           initials={B(): [150, 250, 350]})
+        sim.run(initials={A(): [275, 375]})
+
+    @raises(ValueError)
+    def test_nfsim_different_initials_params_lengths(self):
+        A = self.model.monomers['A']
+
+        sim = BngSimulator(self.model, tspan=np.linspace(0, 1),
+                           initials={A(): [150, 250, 350]},
+                           param_values=self.param_values_2sets)
 
 
 def test_hpp():
@@ -122,3 +170,21 @@ def test_hpp():
                 seed=_BNG_SEED)
     observables = np.array(x.observables)
     assert len(observables) == 50
+
+
+def test_stop_if():
+    Model()
+    Monomer('A')
+    Rule('A_synth', None >> A(), Parameter('k', 1))
+    Observable('Atot', A())
+    Expression('exp_const', k + 1)
+    Expression('exp_dyn', Atot + 1)
+    sim = BngSimulator(model, verbose=5)
+    tspan = np.linspace(0, 100, 101)
+    x = sim.run(tspan, stop_if='Atot>9', seed=_BNG_SEED)
+    # All except the last Atot value should be <=9
+    assert all(x.observables['Atot'][:-1] <= 9)
+    assert x.observables['Atot'][-1] > 9
+    # Starting with Atot > 9 should terminate simulation immediately
+    y = sim.run(tspan, initials=x.species[-1], stop_if='Atot>9')
+    assert len(y.observables) == 1

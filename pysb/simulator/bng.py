@@ -17,8 +17,11 @@ class BngSimulator(Simulator):
     }
     _SIMULATOR_TYPES = ['ssa', 'nf', 'pla', 'ode']
 
-    def __init__(self, model, tspan=None, cleanup=True, verbose=False):
+    def __init__(self, model, tspan=None, initials=None, param_values=None,
+                 cleanup=True, verbose=False):
         super(BngSimulator, self).__init__(model, tspan=tspan,
+                                           initials=initials,
+                                           param_values=param_values,
                                            verbose=verbose)
         self.cleanup = cleanup
         self._outdir = None
@@ -228,7 +231,10 @@ class BngSimulator(Simulator):
                                    1:(len(self.model.species) + 1)])
                 if len(self.model.observables) or len(self.model.expressions):
                     obs_exp_out.append(yfull_view[:,
-                                       (len(self.model.species) + 1):])
+                                        (len(self.model.species) + 1):
+                                        (len(self.model.species) + 1) +
+                                        len(self.model.observables) +
+                                        len(self.model.expressions_dynamic())])
 
         return SimulationResult(self, tout=tout, trajectories=species_out,
                                 observables_and_expressions=obs_exp_out,

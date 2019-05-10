@@ -9,15 +9,34 @@ import warnings
 import mock
 import tempfile
 import shutil
+from pysb.logging import get_logger
+
+# Some models don't match BNG originals exactly due to loss of numerical
+# precision. See https://github.com/pysb/pysb/issues/443
+REDUCED_PRECISION = {
+    'CaOscillate_Func': 1e-4,
+    'michment': 1e-8,
+    'motor': 1e-8,
+    'fceri_ji': 1e-4,
+    'test_paramname': 1e-4,
+    'tlmr': 1e-4
+}
+
+logger = get_logger(__name__)
 
 
 def bngl_import_compare_simulations(bng_file, force=False,
+                                    precision=1e-12,
                                     sim_times=range(0, 100, 10)):
     """
     Test BNGL file import by running an ODE simulation on the imported model
     and on the BNGL file directly to compare trajectories.
     """
     m = model_from_bngl(bng_file, force=force)
+
+    if sim_times is None:
+        # Skip simulation check
+        return
 
     # Simulate using the BNGL file directly
     with BngFileInterface(model=None) as bng:
@@ -34,16 +53,32 @@ def bngl_import_compare_simulations(bng_file, force=False,
         bng.execute()
         yfull2 = bng.read_simulation_results()
 
-    # Check all species trajectories are equal (within numerical tolerance)
-    for species in range(len(yfull1)):
-        for tp in range(len(yfull1[species])):
-            if not numpy.isclose(yfull1[species][tp],
-                                 yfull2[species][tp], atol=1e-4, rtol=1e-4):
-                print(species)
-                print(tp)
-                print(yfull1[species][tp])
-                print(yfull2[species][tp])
-                raise Exception('Trajectory mismatch')
+    # Don't check trajectories on forced examples
+    if force:
+        return
+
+    # # Check all species trajectories are equal (within numerical tolerance)
+    # for species in range(len(yfull1)):
+    #     for tp in range(len(yfull1[species])):
+    #         if not numpy.isclose(yfull1[species][tp],
+    #                              yfull2[species][tp], atol=1e-4, rtol=1e-4):
+    #             print(species)
+    #             print(tp)
+    #             print(yfull1[species][tp])
+    #             print(yfull2[species][tp])
+    #             raise Exception('Trajectory mismatch')
+
+    assert len(yfull1.dtype.names) == len(yfull2.dtype.names)
+    for species in yfull1.dtype.names:
+        logger.debug(species)
+        logger.debug(yfull1[species])
+        if species in yfull2.dtype.names:
+            renamed_species = species
+        else:
+            renamed_species = 'Obs_{}'.format(species)
+        logger.debug(yfull2[renamed_species])
+        assert numpy.allclose(yfull1[species], yfull2[renamed_species],
+                              atol=precision, rtol=precision)
 
 
 def bngl_import_compare_nfsim(bng_file):
@@ -106,7 +141,9 @@ def _sbml_location(filename):
 
 
 def test_bngl_import_expected_passes_with_force():
-    for filename in ('continue',
+    for filename in (
+                     'Haugh2b',
+                     'Motivating_example',
                      ):
         full_filename = _bngl_location(filename)
         with warnings.catch_warnings():
@@ -116,63 +153,68 @@ def test_bngl_import_expected_passes_with_force():
 
 # TODO: Fix error in BNGXML generator that causes error with sim. below
 
-# def test_bngl_import_expected_passes_nfsim():
-#     for filename in ('isingspin_localfcn',):
-#         full_filename = _bngl_location(filename)
-#         yield (bngl_import_compare_nfsim, full_filename)
+def test_bngl_import_expected_passes_nfsim():
+    for filename in (
+            'ANx',
+            'isingspin_localfcn',):
+        full_filename = _bngl_location(filename)
+        yield (bngl_import_compare_nfsim, full_filename)
+
+
+def test_bngl_import_expected_passes_no_sim():
+    """ These models convert properly, but we cannot generate network """
+    for filename in ('blbr',
+                     'hybrid_test',  # Population maps are not converted
+                     'tlbr'):
+        full_filename = _bngl_location(filename)
+        yield (bngl_import_compare_simulations, full_filename, False, None,
+               None)
 
 
 def test_bngl_import_expected_passes():
     for filename in ('CaOscillate_Func',
+                     'continue',
                      'deleteMolecules',
                      'egfr_net',
                      'empty_compartments_block',
+                     'gene_expr',
+                     'gene_expr_func',
                      'gene_expr_simple',
                      'isomerization',
+                     'localfunc',
                      'michment',
+                     'Motivating_example_cBNGL',
                      'motor',
                      'simple_system',
                      'test_compartment_XML',
                      'test_setconc',
+                     'test_synthesis_cBNGL_simple',
+                     'test_synthesis_complex',
                      'test_synthesis_complex_0_cBNGL',
+                     'test_synthesis_complex_source_cBNGL',
+                     'test_synthesis_simple',
                      'toy-jim',
                      'univ_synth',
-                     'visualize'):
+                     'visualize',
+                     'Repressilator',
+                     'fceri_ji',
+                     'test_paramname',
+                     'tlmr'):
         full_filename = _bngl_location(filename)
-        yield (bngl_import_compare_simulations, full_filename)
+        yield (bngl_import_compare_simulations, full_filename, False,
+               REDUCED_PRECISION.get(filename, 1e-12))
 
 
 def test_bngl_import_expected_errors():
-    errtype = {'localfn': 'Function \w* is local',
-               'ratelawtype': 'Rate law \w* has unknown type',
+    errtype = {'ratelawtype': 'Rate law \w* has unknown type',
                'ratelawmissing': 'Rate law missing for rule',
-               'dupsites': 'Molecule \w* has multiple sites with the same name',
-               'excludereactants': 'ListOfExcludeReactants .* not supported',
-               'fixed': 'Species .* is fixed'
-               }
+               'statelabels': 'BioNetGen component/state labels are not yet supported',
+              }
     expected_errors = {'CaOscillate_Sat': errtype['ratelawtype'],
-                       'Haugh2b': errtype['excludereactants'],
-                       'Repressilator': errtype['dupsites'],
-                       'Motivating_example': errtype['fixed'],
-                       'Motivating_example_cBNGL': errtype['fixed'],
-                       'test_synthesis_cBNGL_simple': errtype['fixed'],
-                       'blbr': errtype['dupsites'],
-                       'fceri_ji': errtype['dupsites'],
-                       'gene_expr': errtype['fixed'],
-                       'gene_expr_func': errtype['fixed'],
-                       'heise': errtype['dupsites'],
-                       'hybrid_test': errtype['dupsites'],
+                       'heise': errtype['statelabels'],
                        'isingspin_energy': errtype['ratelawmissing'],
-                       'localfunc': errtype['dupsites'],
                        'test_MM': errtype['ratelawtype'],
                        'test_sat': errtype['ratelawtype'],
-                       'test_fixed': errtype['dupsites'],
-                       'test_paramname': errtype['dupsites'],
-                       'test_synthesis_complex': errtype['fixed'],
-                       'test_synthesis_complex_source_cBNGL': errtype['fixed'],
-                       'test_synthesis_simple': errtype['fixed'],
-                       'tlbr': errtype['dupsites'],
-                       'tlmr': errtype['dupsites']
                        }
 
     for filename, errmsg in expected_errors.items():

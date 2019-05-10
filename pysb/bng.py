@@ -95,8 +95,10 @@ class BngBaseInterface(object):
         """
         if not self.model.rules:
             raise NoRulesError()
-        if not self.model.initial_conditions and not any(r.is_synth() for r
-                                                         in self.model.rules):
+        if (
+            not self.model.initials
+            and not any(r.is_synth() for r in self.model.rules)
+        ):
             raise NoInitialConditionsError()
 
     @classmethod
@@ -224,7 +226,7 @@ class BngBaseInterface(object):
 
             # Read concentrations data
             try:
-                cdat_arr = numpy.loadtxt(base_filename + '.cdat', skiprows=1)
+                cdat_arr = numpy.loadtxt(base_filename + '.cdat', skiprows=1, ndmin=2)
                 # -1 for time column
                 names += ['__s%d' % i for i in range(cdat_arr.shape[1] - 1)]
             except IOError:
@@ -236,7 +238,7 @@ class BngBaseInterface(object):
                     # Exclude \# and time column
                     names += f.readline().split()[2:]
                     # Exclude first column (time)
-                    gdat_arr = numpy.loadtxt(f)
+                    gdat_arr = numpy.loadtxt(f, ndmin=2)
                     if cdat_arr is None:
                         cdat_arr = numpy.ndarray((len(gdat_arr), 0))
                     else:
@@ -845,7 +847,7 @@ def _parse_species(model, line):
     monomer_patterns = []
     for ms in monomer_strings:
         monomer_name, site_strings, monomer_compartment_name = \
-            re.match(r'(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
+            re.match(r'\$?(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
         site_conditions = collections.defaultdict(list)
         if len(site_strings):
             for ss in site_strings.split(','):
@@ -871,6 +873,7 @@ def _parse_species(model, line):
                 else:
                     site_name, condition = ss, None
                 site_conditions[site_name].append(condition)
+
         site_conditions = {k: v[0] if len(v) == 1 else tuple(v)
                            for k, v in site_conditions.items()}
         monomer = model.monomers[monomer_name]
