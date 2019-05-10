@@ -282,9 +282,6 @@ class Monomer(Component):
                 raise ValueError('Invalid site name: ' + str(site))
             sites_seen.setdefault(site, 0)
             sites_seen[site] += 1
-        sites_dup = [site for site, count in sites_seen.items() if count > 1]
-        if sites_dup:
-            raise ValueError("Duplicate sites specified: " + str(sites_dup))
 
         # ensure site_states keys are all known sites
         unknown_sites = [site for site in site_states if not site in sites_seen]
@@ -338,6 +335,121 @@ def _check_state(monomer, site, state):
         template = "Invalid state choice '{}' in Monomer {}, site {}. Valid " \
                    "state choices: {}"
         raise ValueError(template.format(*args))
+    return True
+
+
+def _check_bond(bond):
+    """ A bond can either by a single int, WILD, ANY, or a list of ints """
+    return (
+        isinstance(bond, int)
+        or bond is WILD
+        or bond is ANY
+        or isinstance(bond, list) and all(isinstance(b, int) for b in bond)
+    )
+
+
+def is_state_bond_tuple(state):
+    """ Check the argument is a (state, bond) tuple for a Mononer site """
+    return (
+        isinstance(state, tuple)
+        and len(state) == 2
+        and isinstance(state[0], basestring)
+        and _check_bond(state[1])
+    )
+
+
+def _check_state_bond_tuple(monomer, site, state):
+    """ Check that 'state' is a (state, bond) tuple, and validate the state """
+    return is_state_bond_tuple(state) and _check_state(monomer, site, state[0])
+
+
+def validate_site_value(state, monomer=None, site=None, _in_multistate=False):
+    if state is None:
+        return True
+    elif isinstance(state, basestring):
+        if monomer and site:
+            if not _check_state(monomer, site, state):
+                return False
+        return True
+    elif _check_bond(state):
+        return True
+    elif is_state_bond_tuple(state):
+        if monomer and site:
+            _check_state(monomer, site, state[0])
+        return True
+    elif isinstance(state, MultiState):
+        if _in_multistate:
+            raise ValueError('Cannot nest MultiState within each other')
+
+        if monomer and site:
+            site_counts = collections.Counter(monomer.sites)
+            if len(state) > site_counts[site]:
+                raise ValueError(
+                    'MultiState for site "{}" on monomer "{}" has maximum '
+                    'length {}'.format(site, monomer.name, site_counts[site])
+                )
+
+            return all(validate_site_value(s, monomer, site, True) for s in
+                       state)
+
+        return True
+    else:
+        return False
+
+
+class MultiState(object):
+    """
+    MultiState for a Monomer (also known as duplicate sites)
+
+    MultiStates are duplicate copies of a site which each have the same name and
+    semantics. In BioNetGen, these are known as duplicate sites. MultiStates
+    are not supported by Kappa.
+
+    When declared, a MultiState instance is not connected to any Monomer or
+    site, so full validation is deferred until it is used as part of a
+    :py:class:`MonomerPattern` or :py:class:`ComplexPattern`.
+
+    Examples
+    --------
+
+    Define a Monomer "A" with MultiState "a", which has two copies, and
+    Monomer "B" with MultiState "b", which also has two copies but can take
+    state values "u" and "p":
+
+    >>> Model()  # doctest:+ELLIPSIS
+    <Model '_interactive_' (monomers: 0, ...
+    >>> Monomer('A', ['a', 'a'])  # BNG: A(a, a)
+    Monomer('A', ['a', 'a'])
+    >>> Monomer('B', ['b', 'b'], {'b': ['u', 'p']})  # BNG: B(b~u~p, b~u~p)
+    Monomer('B', ['b', 'b'], {'b': ['u', 'p']})
+
+    To specify MultiStates, use the MultiState class. Here are some valid
+    examples of MultiState patterns, with their BioNetGen equivalents:
+
+    >>> A(a=MultiState(1, 2))  # BNG: A(a!1,a!2)
+    A(a=MultiState(1, 2))
+    >>> B(b=MultiState('u', 'p'))  # BNG: A(A~u,A~p)
+    B(b=MultiState('u', 'p'))
+    >>> A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))  # BNG: A(a!1, a!2).B(b~u!1, b~2)
+    A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))
+    """
+    def __init__(self, *args):
+        if len(args) == 1:
+            raise ValueError('MultiState should not be used when only a single '
+                             'site is specified')
+        self.sites = args
+        for s in self.sites:
+            validate_site_value(s, _in_multistate=True)
+
+    def __len__(self):
+        return len(self.sites)
+
+    def __iter__(self):
+        return iter(self.sites)
+
+    def __repr__(self):
+        return '{}({})'.format(self.__class__.__name__, ', '.join(
+            repr(s) for s in self))
 
 
 class MonomerPattern(object):
@@ -373,6 +485,7 @@ class MonomerPattern(object):
     * *tuple of (str, int)* : state with specified bond
     * *tuple of (str, WILD)* : state with wildcard bond
     * *tuple of (str, ANY)* : state with any bond
+    * MultiState : duplicate sites
 
     If a site is not listed in site_conditions then the pattern will match any
     state for that site, i.e. \"don't write, don't care\".
@@ -386,36 +499,15 @@ class MonomerPattern(object):
             raise Exception("MonomerPattern with unknown sites in " +
                             str(monomer) + ": " + str(unknown_sites))
 
-        # ensure each value is one of: None, integer, list of integers, string,
-        # (string,integer), (string,WILD), ANY, WILD
         invalid_sites = []
         for (site, state) in site_conditions.items():
-            # pass through to next iteration if state type is ok
-            if state is None:
-                continue
-            elif isinstance(state, int):
-                continue
-            elif isinstance(state, list) and \
-                 all(isinstance(s, int) for s in state):
-                continue
-            elif isinstance(state, basestring):
-                _check_state(monomer, site, state)
-                continue
-            elif isinstance(state, tuple) and \
-                 isinstance(state[0], basestring) and \
-                 (isinstance(state[1], int) or state[1] is WILD or \
-                  state[1] is ANY):
-                _check_state(monomer, site, state[0])
-                continue
-            elif state is ANY:
-                continue
-            elif state is WILD:
-                continue
-            invalid_sites.append(site)
+            if not validate_site_value(state, monomer, site):
+                invalid_sites.append(site)
         if invalid_sites:
             raise ValueError("Invalid state value for sites: " +
                              '; '.join(['%s=%s' % (s, str(site_conditions[s]))
-                                       for s in invalid_sites]))
+                                       for s in invalid_sites]) +
+                             ' in {}'.format(monomer))
 
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
@@ -447,26 +539,40 @@ class MonomerPattern(object):
         Return a bool indicating whether the pattern is 'site-concrete'.
 
         'Site-concrete' means all sites have specified conditions."""
-        if len(self.site_conditions) != len(self.monomer.sites):
+        dup_sites = {k: v for k, v in
+                     collections.Counter(self.monomer.sites).items() if v > 1}
+        if len(self.site_conditions) != len(self.monomer.sites) and \
+                not dup_sites:
             return False
         for site_name, site_val in self.site_conditions.items():
-            if isinstance(site_val, basestring):
-                site_state = site_val
-                site_bond = None
-            elif isinstance(site_val, collections.Iterable):
-                site_state, site_bond = site_val
-            elif isinstance(site_val, int):
-                site_bond = site_val
-                site_state = None
-            else:
-                site_bond = site_val
-                site_state = None
+            if site_name in dup_sites:
+                if not isinstance(site_val, MultiState) or \
+                        len(site_val) < dup_sites[site_name]:
+                    return False
 
-            if site_bond is ANY or site_bond is WILD:
+                if not all(self._site_instance_concrete(site_name, s)
+                           for s in site_val):
+                    return False
+            elif not self._site_instance_concrete(site_name, site_val):
                 return False
-            if site_state is None and site_name in \
-                    self.monomer.site_states.keys():
-                return False
+
+        return True
+
+    def _site_instance_concrete(self, site_name, site_val):
+        if isinstance(site_val, basestring):
+            site_state = site_val
+            site_bond = None
+        elif isinstance(site_val, tuple):
+            site_state, site_bond = site_val
+        else:
+            site_bond = site_val
+            site_state = None
+
+        if site_bond is ANY or site_bond is WILD:
+            return False
+        if site_state is None and site_name in \
+                self.monomer.site_states.keys():
+            return False
 
         return True
 
@@ -545,16 +651,17 @@ class MonomerPattern(object):
 
     def __repr__(self):
         value = '%s(' % self.monomer.name
+        sites_unique = list(collections.OrderedDict.fromkeys(
+            self.monomer.sites))
         value += ', '.join([
                 k + '=' + repr(self.site_conditions[k])
-                for k in self.monomer.sites
+                for k in sites_unique
                 if k in self.site_conditions
                 ])
         value += ')'
         if self.compartment is not None:
             value += ' ** ' + self.compartment.name
         return value
-
 
 
 class ComplexPattern(object):
@@ -691,6 +798,44 @@ class ComplexPattern(object):
         if self.compartment:
             species_cpt_node_id = add_or_get_compartment_node(self.compartment)
 
+        def _handle_site_instance(state_or_bond):
+            mon_site_id = next(node_count)
+            g.add_node(mon_site_id, id=site)
+            g.add_edge(mon_node_id, mon_site_id)
+            state = None
+            bond_num = None
+            if state_or_bond is WILD:
+                return
+            elif isinstance(state_or_bond, basestring):
+                state = state_or_bond
+            elif is_state_bond_tuple(state_or_bond):
+                state = state_or_bond[0]
+                bond_num = state_or_bond[1]
+            elif isinstance(state_or_bond, (int, list)):
+                bond_num = state_or_bond
+            elif state_or_bond is not ANY and state_or_bond is not None:
+                raise ValueError('Unrecognized state: {}'.format(
+                    state_or_bond))
+
+            if state_or_bond is ANY or bond_num is ANY:
+                bond_num = any_bond_tester
+                any_bond_tester_id = next(node_count)
+                g.add_node(any_bond_tester_id, id=any_bond_tester)
+                g.add_edge(mon_site_id, any_bond_tester_id)
+
+            if state is not None:
+                mon_site_state_id = next(node_count)
+                g.add_node(mon_site_state_id, id=state)
+                g.add_edge(mon_site_id, mon_site_state_id)
+
+            if bond_num is None:
+                bond_edges[NO_BOND].append(mon_site_id)
+            elif isinstance(bond_num, int):
+                bond_edges[bond_num].append(mon_site_id)
+            elif isinstance(bond_num, list):
+                for bond in bond_num:
+                    bond_edges[bond].append(mon_site_id)
+
         for mp in self.monomer_patterns:
             mon_node_id = next(node_count)
             g.add_node(mon_node_id, id=mp.monomer)
@@ -700,37 +845,11 @@ class ComplexPattern(object):
                 g.add_edge(mon_node_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
-                mon_site_id = next(node_count)
-                g.add_node(mon_site_id, id=site)
-                g.add_edge(mon_node_id, mon_site_id)
-                state = None
-                bond_num = None
-                if state_or_bond is WILD:
-                    continue
-                elif isinstance(state_or_bond, basestring):
-                    state = state_or_bond
-                elif isinstance(state_or_bond, collections.Iterable) and len(
-                        state_or_bond) == 2:
-                    state = state_or_bond[0]
-                    bond_num = state_or_bond[1]
-                elif isinstance(state_or_bond, int):
-                    bond_num = state_or_bond
-
-                if state_or_bond is ANY or bond_num is ANY:
-                    bond_num = any_bond_tester
-                    any_bond_tester_id = next(node_count)
-                    g.add_node(any_bond_tester_id, id=any_bond_tester)
-                    g.add_edge(mon_site_id, any_bond_tester_id)
-
-                if state is not None:
-                    mon_site_state_id = next(node_count)
-                    g.add_node(mon_site_state_id, id=state)
-                    g.add_edge(mon_site_id, mon_site_state_id)
-
-                if bond_num is None:
-                    bond_edges[NO_BOND].append(mon_site_id)
-                elif isinstance(bond_num, int):
-                    bond_edges[bond_num].append(mon_site_id)
+                if isinstance(state_or_bond, MultiState):
+                    # Duplicate sites
+                    [_handle_site_instance(s) for s in state_or_bond]
+                else:
+                    _handle_site_instance(state_or_bond)
 
         # Unbound edges
         unbound_sites = bond_edges.pop(NO_BOND, None)

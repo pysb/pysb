@@ -157,8 +157,10 @@ class Simulator(object):
             # Network free simulators
             if self._initials:
                 return len(list(self._initials.values())[0])
+            elif self._run_initials:
+                return len(list(self._run_initials.values())[0])
             else:
-                return 1
+                return len(self.param_values)
 
     def _update_initials_dict(self, initials_dict, initials_source):
         if isinstance(initials_source, collections.Mapping):
@@ -188,7 +190,10 @@ class Simulator(object):
 
     @property
     def initials_dict(self):
-        initials_dict = {ic.pattern: [ic.value.value]
+        n_sims = self._check_run_initials_vs_base_initials_length()
+        if n_sims == 1:
+            n_sims = len(self.param_values)
+        initials_dict = {ic.pattern: [ic.value.value] * n_sims
                          for ic in self.model.initials}
         # Apply any base initial overrides
         initials_dict = self._update_initials_dict(initials_dict,
@@ -198,6 +203,28 @@ class Simulator(object):
                                                    self._run_initials)
 
         return initials_dict
+
+    def _check_run_initials_vs_base_initials_length(self):
+        # Otherwise, build the list from the model, and any overrides
+        # specified in self._initials and self._run_initials
+        n_sims_initials = self._num_sims_calc(self._initials)
+        n_sims_run = self._num_sims_calc(self._run_initials)
+
+        if n_sims_initials is not None and n_sims_run is not None \
+                and n_sims_run != n_sims_initials:
+            raise ValueError(
+                "The base initials set with self.initials imply {} "
+                "simulations, but the run() initials imply {} simulations."
+                " Either set self.initials=None, or change the number of "
+                "simulations in the run() initials".format(
+                    n_sims_initials, n_sims_run))
+
+        if n_sims_initials is not None:
+            return n_sims_initials
+        elif n_sims_run is not None:
+            return n_sims_run
+        else:
+            return 1
 
     @property
     def initials(self):
@@ -216,24 +243,7 @@ class Simulator(object):
                 self._initials is not None:
             return self._initials
 
-        # Otherwise, build the list from the model, and any overrides
-        # specified in self._initials and self._run_initials
-        n_sims_initials = self._num_sims_calc(self._initials)
-        n_sims_run = self._num_sims_calc(self._run_initials)
-
-        if n_sims_initials is not None and n_sims_run is not None \
-                and n_sims_run != n_sims_initials:
-            raise ValueError(
-                "The base initials set with self.initials imply {} "
-                "simulations, but the run() initials imply {} simulations."
-                " Either set self.initials=None, or change the number of "
-                "simulations in the run() initials".format(
-                    n_sims_initials, n_sims_run))
-        if n_sims_initials is None:
-            if n_sims_run is None:
-                n_sims_initials = 1
-            else:
-                n_sims_initials = n_sims_run
+        n_sims_initials = self._check_run_initials_vs_base_initials_length()
 
         # At this point (after dimensionality check), we can return
         # self._run_initials if it's not a dictionary and not None
@@ -566,10 +576,7 @@ class Simulator(object):
             new_params = np.repeat(self.param_values,
                                    self.initials_length,
                                    axis=0)
-            if self._run_params is None:
-                self._params = new_params
-            else:
-                self._run_params = new_params
+            self._run_params = new_params
 
         # Error checks on 'param_values' and 'initials'
         if len(self.param_values) != self.initials_length:
