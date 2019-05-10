@@ -466,3 +466,15 @@ def test_invalid_observable():
                   Observable, 'o1', 'invalid_pattern')
     assert len(model.observables) == 0
 
+@with_model
+def test_update_initial_condition():
+    Monomer('A')
+    Monomer('B')
+    Parameter('k', 1.0)
+    Initial(A(), k)
+
+    model.update_initial_condition_pattern(A(), B())
+
+    assert len(model.initials) == 1
+    assert as_complex_pattern(B()).is_equivalent_to(
+        as_complex_pattern(model.initials[0].pattern))

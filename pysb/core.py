@@ -1955,13 +1955,9 @@ class Model(object):
         # are not allowed to be created)
         assert len(ic_index_list) == 1
 
-        # Build the new InitialCondition and replace the old one.
+        # Replace the pattern in the initial condition
         initial_index = ic_index_list[0]
-        initial_old = self.initials[initial_index]
-        initial_new = InitialCondition(
-            after_pattern, initial_old.value, initial_old.fixed
-        )
-        self.initials[initial_index] = initial_new
+        self.initials[initial_index].pattern = after_pattern
 
     def get_species_index(self, complex_pattern):
         """
