@@ -1,6 +1,7 @@
 import inspect
 import warnings
 import pysb
+from pysb.core import MultiState
 import sympy
 from sympy.printing import StrPrinter
 
@@ -10,8 +11,8 @@ try:
 except NameError:
     basestring = str
 
-class BngGenerator(object):
 
+class BngGenerator(object):
     def __init__(self, model, additional_initials=None, population_maps=None):
         self.model = model
         if additional_initials is None:
@@ -232,6 +233,8 @@ def format_site_condition(site, state):
         elif state[1] == pysb.ANY:
             state = (state[0], '+')
         state_code = '~%s!%s' % state
+    elif isinstance(state, MultiState):
+        return ','.join(format_site_condition(site, s) for s in state)
     # one or more unspecified bonds
     elif state is pysb.ANY:
         state_code = '!+'
@@ -241,7 +244,8 @@ def format_site_condition(site, state):
     elif state is pysb.WILD:
         state_code = '!?'
     else:
-        raise Exception("BNG generator has encountered an unknown element in a rule pattern site condition.")
+        raise ValueError("BNG generator has encountered an unknown element in "
+                         "a rule pattern site condition.")
     return '%s%s' % (site, state_code)
 
 def warn_caller(message):
