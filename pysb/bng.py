@@ -786,7 +786,7 @@ def _parse_species(model, line):
     for ms in monomer_strings:
         monomer_name, site_strings, monomer_compartment_name = \
             re.match(r'\$?(\w+)\(([^)]*)\)(?:@(\w+))?', ms).groups()
-        site_conditions = {}
+        site_conditions = collections.defaultdict(list)
         if len(site_strings):
             for ss in site_strings.split(','):
                 # FIXME this should probably be done with regular expressions
@@ -810,7 +810,10 @@ def _parse_species(model, line):
                     site_name, condition = ss.split('~')
                 else:
                     site_name, condition = ss, None
-                site_conditions[site_name] = condition
+                site_conditions[site_name].append(condition)
+
+        site_conditions = {k: v[0] if len(v) == 1 else tuple(v)
+                           for k, v in site_conditions.items()}
         monomer = model.monomers[monomer_name]
         monomer_compartment = model.compartments.get(monomer_compartment_name)
         # Compartment prefix notation in BNGL means "assign this compartment to

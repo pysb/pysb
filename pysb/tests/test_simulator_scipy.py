@@ -356,6 +356,25 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
                         [90, 100, 110, 5, 6]]
         self.sim.run(initials=initials, param_values=param_values)
 
+    @unittest.skipIf(sys.version_info.major < 3,
+                     'Parallel execution requires Python >= 3.3')
+    def test_parallel(self):
+        for integrator in ('vode', 'lsoda'):
+            for use_analytic_jacobian in (True, False):
+                yield self._check_parallel, integrator, use_analytic_jacobian
+
+    def _check_parallel(self, integrator, use_analytic_jacobian):
+        initials = [[10, 20, 30], [50, 60, 70]]
+        sim = ScipyOdeSimulator(
+            self.model, self.sim.tspan,
+            initials=initials,
+            integrator=integrator,
+            use_analytic_jacobian=use_analytic_jacobian
+        )
+        base_res = sim.run(initials=initials)
+        res = sim.run(initials=initials, num_processors=2)
+        assert np.allclose(res.species, base_res.species)
+
 
 @with_model
 def test_integrate_with_expression():

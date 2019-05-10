@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Integrates Robertson's example, as defined in robertson.py, and plots the
 trajectories.
 """

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Reproduce figures 4A and 4B from the EARM 1.0 publication (Albeck et
 al. 2008)."""
 
