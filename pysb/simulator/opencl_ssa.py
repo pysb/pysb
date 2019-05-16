@@ -185,14 +185,14 @@ class OpenCLSimulator(SSABase):
 
         species_matrix_gpu = ocl_array.to_device(
             self.queue,
-            self.initials.astype(np.int32).flatten(order='C')
+            self.initials.astype(np.uint32).flatten(order='C')
         )
 
         result_gpu = ocl_array.zeros(
             self.queue,
             order='C',
             shape=(self.num_sim * len(t_out) * self._n_species,),
-            dtype=np.int32
+            dtype=np.uint32
         )
 
         elasped_t = time.time() - timer_start

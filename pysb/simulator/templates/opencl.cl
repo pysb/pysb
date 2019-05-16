@@ -33,23 +33,23 @@ int constant stoch_matrix[]={{
 
 double sum_propensities(double *a){{
     double a0 = 0;
-    for(int j=0; j<NREACT; j++){{
+    for(unsigned int j=0; j<NREACT; j++){{
         a0 += a[j];
     }}
     return a0;
 }}
 
-double propensities(int *y, double *h, double *param_vec)
+double propensities(unsigned int *y, double *h, double *param_vec)
 {{
 {hazards}
 return sum_propensities(h);
 }}
 
 
-void stoichiometry(int *y, int r){{
-    int step = r*num_species;
+void stoichiometry(unsigned int *y, unsigned int r){{
+    unsigned int step = r*num_species;
 
-    for(int i=0; i<num_species; i++){{
+    for(unsigned int i=0; i<num_species; i++){{
         y[i]+=stoch_matrix[step + i];
     }}
 
@@ -57,7 +57,7 @@ void stoichiometry(int *y, int r){{
 
 
 long sample(double* a, double u){{
-    long i = 0;
+    unsigned int i = 0;
     for(;i < NREACT_MIN_ONE && u > a[i]; i++){{
         u -= a[i];
         }}
@@ -67,8 +67,8 @@ long sample(double* a, double u){{
 
 
 __kernel  void Gillespie_all_steps(
-        __global const int* species_matrix,
-         __global int* result,
+        __global const unsigned int* species_matrix,
+         __global unsigned int* result,
          __global const double* time,
          __global const double* param_values,
          __global const long* random_seed,
@@ -80,27 +80,27 @@ __kernel  void Gillespie_all_steps(
     key_t k = {{{{ random_seed[tid], 0xdecafbad}}}};
     ctr_t c = {{{{0, 0xdecafbad}}}};
 
-    int y[num_species];
-    int prev[num_species];
+    unsigned int y[num_species];
+    unsigned int prev[num_species];
     double A[NREACT] = {{0.0}};
     double param_vec[NPARAM] =  {{0.0}};
 
     // init parameters for thread
     int param_stride = tid*NPARAM;
 
-    for(int i=0; i<NPARAM; i++){{
+    for(unsigned int i=0; i<NPARAM; i++){{
         param_vec[i] = param_values[param_stride + i];
         }}
 
     // init species counter for thread
-    int species_stride = tid*num_species;
-    for(int i=0; i<num_species; i++){{
+    unsigned int species_stride = tid*num_species;
+    for(unsigned int i=0; i<num_species; i++){{
         y[i] = species_matrix[species_stride + i];
         prev[i] = y[i];
         }}
 
     double t = time[0] ;
-    int time_index = 0;
+    unsigned int time_index = 0;
     double a0;
     // beginning of loop
     while (time_index < n_timepoints){{
@@ -111,7 +111,7 @@ __kernel  void Gillespie_all_steps(
                 t = time[n_timepoints-1];
                 continue;
             }}
-            for(int j=0; j<num_species; j++){{
+            for(unsigned int j=0; j<num_species; j++){{
                 prev[j] = y[j];
                 }}
 
@@ -121,17 +121,17 @@ __kernel  void Gillespie_all_steps(
             double tau = -log(r1)/a0;  // find time of next reaction
             t += tau;  // update time
 
-            int k = sample(A, a0*r2);  // find next reaction
+            unsigned int k = sample(A, a0*r2);  // find next reaction
             stoichiometry(y, k); // update species matrix
             }}
 
         // resets to correct start
-        int index = tid * n_timepoints * num_species;
+        unsigned int index = tid * n_timepoints * num_species;
         // add an entire species timepoint stride
         index += time_index * num_species;
 //        if (tid==1){{ printf("\n Time %f\t%i\n", t, index); }}
         // iterates through each species
-        for(int j=0; j<num_species; j++){{
+        for(unsigned int j=0; j<num_species; j++){{
             result[index + j] = prev[j];
          }}
         time_index+=1;
