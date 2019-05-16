@@ -8,8 +8,21 @@ typedef double output_t;
 typedef double4 output_vec_t;
 typedef philox2x32_ctr_t ctr_t;
 typedef philox2x32_key_t key_t;
+/*
+The code to generate random numbers is taken from pyopencl and based on
+Random123 library.
 
-#define GET_RANDOM_NUM(gen) ( ((double) 2.3283064365386963e-10) * convert_double4(gen)+ ((double) 5.421010862427522e-20) * convert_double4(gen))
+Unlike cuda, there is not an easy to use library (curand) that allows one to
+keep track of RNG across threads.
+
+gen_bits
+
+https://github.com/inducer/pyopencl/blob/master/pyopencl/clrandom.py
+
+http://www.thesalmons.org/john/random123/releases/latest/docs/index.html
+*/
+#define GET_RANDOM_NUM(gen) ( ((double) 2.3283064365386963e-10) * convert_double4(gen)
+                                + ((double) 5.421010862427522e-20) * convert_double4(gen))
 
 uint4 gen_bits(key_t *key, ctr_t *ctr)
 {{
@@ -76,7 +89,8 @@ __kernel  void Gillespie_all_steps(
 
     bool verbose = false;
     const int tid = get_global_id(0);
-
+    // Arbitrary starting values from
+    // https://stackoverflow.com/questions/11268023/random-numbers-with-opencl-using-random123
     key_t k = {{{{ random_seed[tid], 0xdecafbad}}}};
     ctr_t c = {{{{0, 0xdecafbad}}}};
 

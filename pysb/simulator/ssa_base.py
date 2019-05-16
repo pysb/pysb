@@ -35,8 +35,7 @@ class SSABase(Simulator):
     def _get_template_args(self):
         """ converts pysb reactions to pycuda/pyopencl format """
         p = re.compile('\s')
-        stoich_matrix = self._get_stoch(self.model)
-
+        stoich_matrix = self._get_stoich(self.model)
         all_reactions = []
         for rxn_number, rxn in enumerate(stoich_matrix.T):
             changes = []
@@ -66,6 +65,7 @@ class SSABase(Simulator):
             rate = sympy.fcode(rxn["rate"])
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
+            # Create expression strings with observables
             expr_strings = {
                 e.name: '(%s)' % sympy.ccode(
                     e.expand_expr(expand_observables=True)
@@ -87,6 +87,7 @@ class SSABase(Simulator):
             rate = re.sub(r'_*s(\d+)',
                           lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
+            # replace param names with vector notation
             for q, prm in enumerate(params_names):
                 rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
             items = rate.split('*')
@@ -136,7 +137,7 @@ class SSABase(Simulator):
                                  _run_kwargs=locals())
 
     @staticmethod
-    def _get_stoch(model):
+    def _get_stoich(model):
         """
         Left hand side
         """

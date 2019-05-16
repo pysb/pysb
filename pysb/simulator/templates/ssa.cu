@@ -66,7 +66,6 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
     curandState randState;
 //    curandStateMRG32k3a randState;
     curand_init(clock64(), tid, 0, &randState);
-//    curand_init(0, 0, 0, &randState);
 
 
     int y[num_species];

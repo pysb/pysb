@@ -68,8 +68,8 @@ class OpenCLSimulator(SSABase):
                  **kwargs):
 
         if cl is None:
-            raise SimulatorException('pyopencl library required for {}'
-                                     ''.format(self.__class__.__name__))
+            raise ImportError('pyopencl library required for {}'
+                              ''.format(self.__class__.__name__))
         super(OpenCLSimulator, self).__init__(model, verbose, **kwargs)
 
         generate_equations(self._model)
