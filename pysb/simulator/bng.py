@@ -19,8 +19,11 @@ class BngSimulator(Simulator):
     }
     _SIMULATOR_TYPES = ['ssa', 'nf', 'pla', 'ode']
 
-    def __init__(self, model, tspan=None, cleanup=True, verbose=False):
+    def __init__(self, model, tspan=None, initials=None, param_values=None,
+                 cleanup=True, verbose=False):
         super(BngSimulator, self).__init__(model, tspan=tspan,
+                                           initials=initials,
+                                           param_values=param_values,
                                            verbose=verbose)
         self.cleanup = cleanup
         self._outdir = None
