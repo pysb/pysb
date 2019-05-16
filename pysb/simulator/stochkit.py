@@ -197,6 +197,10 @@ class StochKitSimulator(Simulator):
 
             traj_dir = os.path.join(prefix_outdir, 'trajectories')
             try:
+                if 'time approx' in stdout:
+                    out = stdout.split("time approx.")[1]
+                    out = out.split(' seconds')[0]
+                    self._time = float(out)
                 trajectories.extend([np.loadtxt(os.path.join(
                     traj_dir, f)) for f in sorted(os.listdir(traj_dir))])
             except Exception as e:
