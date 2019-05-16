@@ -21,8 +21,7 @@ https://github.com/inducer/pyopencl/blob/master/pyopencl/clrandom.py
 
 http://www.thesalmons.org/john/random123/releases/latest/docs/index.html
 */
-#define GET_RANDOM_NUM(gen) ( ((double) 2.3283064365386963e-10) * convert_double4(gen)
-                                + ((double) 5.421010862427522e-20) * convert_double4(gen))
+#define GET_RANDOM_NUM(gen) ( ((double) 2.3283064365386963e-10) * convert_double4(gen) + ((double) 5.421010862427522e-20) * convert_double4(gen))
 
 uint4 gen_bits(key_t *key, ctr_t *ctr)
 {{
