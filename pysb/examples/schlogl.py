@@ -1,6 +1,6 @@
-""" Schlögl model
+""" Schlogl model
 
-Schlögl, F., 1972. Chemical reaction models for non-equilibrium phase
+Schlogl, F., 1972. Chemical reaction models for non-equilibrium phase
 transitions. Zeitschrift für physik, 253(2), pp.147-161.
 
 https://link.springer.com/article/10.1007/BF01379769
