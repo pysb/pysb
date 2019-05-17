@@ -1,9 +1,6 @@
 """ Schlogl model
 
-Schlogl, F., 1972. Chemical reaction models for non-equilibrium phase
-transitions. Zeitschrift für physik, 253(2), pp.147-161.
-
-https://link.springer.com/article/10.1007/BF01379769
+Schlogl, F. Z. Physik (1972) 253: 147. https://doi.org/10.1007/BF01379769
 """
 from pysb import *
 
