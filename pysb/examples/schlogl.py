@@ -1,6 +1,7 @@
-""" Schlogl model
+# -*- coding: utf-8 -*-
+""" Schlögl model
 
-Schlogl, F. Z. Physik (1972) 253: 147. https://doi.org/10.1007/BF01379769
+Schlögl, F. Z. Physik (1972) 253: 147. https://doi.org/10.1007/BF01379769
 """
 from pysb import *
 
