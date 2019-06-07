@@ -115,37 +115,39 @@ __kernel  void Gillespie_all_steps(
     double t = time[0] ;
     unsigned int time_index = 0;
     double a0;
+    unsigned int index = tid * n_timepoints * num_species;
     // beginning of loop
     while (time_index < n_timepoints){{
         while (t < time[time_index]){{
-                    // calculate propensities
-            a0 = propensities(y, A, param_vec);
-            if (a0 <= 0.0){{
-                t = time[n_timepoints-1];
-                continue;
-            }}
+            // create backup
             for(unsigned int j=0; j<num_species; j++){{
                 prev[j] = y[j];
                 }}
+            // calculate propensities
+            a0 = propensities(y, A, param_vec);
 
-            output_vec_t ran = GET_RANDOM_NUM(gen_bits(&k, &c));
-            double r1 = ran.s0;
-	        double r2 = ran.s1;
-            double tau = -log(r1)/a0;  // find time of next reaction
-            t += tau;  // update time
+            if (a0 <= 0.0){{
+                t = time[n_timepoints-1];
+            }}
+            else{{
 
-            unsigned int k = sample(A, a0*r2);  // find next reaction
-            stoichiometry(y, k); // update species matrix
+                output_vec_t ran = GET_RANDOM_NUM(gen_bits(&k, &c));
+                double r1 = ran.s0;
+                double r2 = ran.s1;
+                double tau = -log(r1)/a0;  // find time of next reaction
+                t += tau;  // update time
+
+                unsigned int k = sample(A, a0*r2);  // find next reaction
+                stoichiometry(y, k); // update species matrix
+                }}
             }}
 
-        // resets to correct start
-        unsigned int index = tid * n_timepoints * num_species;
         // add an entire species timepoint stride
-        index += time_index * num_species;
-//        if (tid==1){{ printf("\n Time %f\t%i\n", t, index); }}
+        unsigned int current_index = index + time_index * num_species;
+
         // iterates through each species
         for(unsigned int j=0; j<num_species; j++){{
-            result[index + j] = prev[j];
+            result[current_index + j] = prev[j];
          }}
         time_index+=1;
         }}

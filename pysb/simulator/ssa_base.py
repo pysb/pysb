@@ -120,16 +120,15 @@ class SSABase(Simulator):
         elif initials is None and not num_sim:
             num_sim = np.array(param_values).shape[0]
 
-        if param_values is None:
+        if param_values is None and initials is None:
             # Run simulation using same param_values
+            # initials will be taken care of on SimulatorBase side
             param_values = np.repeat(self.param_values, num_sim, axis=0)
         elif len(param_values.shape) == 1:
+            # initials taken care of on SimulatorBase side
             param_values = np.repeat([param_values], num_sim, axis=0)
-
-        if initials is None:
-            # Run simulation using same initial conditions
-            initials = np.repeat(self.initials, num_sim, axis=0)
         elif len(initials.shape) == 1:
+            # parameters taken care of on SimulatorBase side
             initials = np.repeat([initials], num_sim, axis=0)
         self.num_sim = num_sim
         super(SSABase, self).run(tspan=tspan, initials=initials,

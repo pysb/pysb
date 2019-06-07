@@ -92,18 +92,18 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
     // beginning of loop
     while (time_index < NRESULTS){{
         while (t < time[time_index]){{
+            // store last state to be saved to output
+            #pragma unroll
+            for(int j=0; j<num_species; j++){{
+                prev[j] = y[j];
+            }}
+
             // calculate propensities
             double a0 = propensities(y, A, param_vec);
             if (a0 <= 0.0){{
                 t = time[NRESULTS-1];
                 continue;
             }}
-
-            // store last state to be saved to output
-            #pragma unroll
-            for(int j=0; j<num_species; j++){{
-                prev[j] = y[j];
-                }}
 
             // calculate two random numbers
             double r1 =  curand_uniform(&randState);
