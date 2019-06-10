@@ -1,6 +1,6 @@
 import numpy as np
 from nose.plugins.attrib import attr
-
+from nose.tools import ok_
 from pysb.examples.schlogl import model
 from pysb.simulator import CUDASimulator, OpenCLSimulator
 
@@ -31,6 +31,23 @@ class TestGpu(object):
             initials[species_names.index(str(ic[0]))] = int(ic[1].value)
         initials = np.repeat([initials], self.n_sim, axis=0)
         self.simulator.run(self.tspan, initials=initials)
+
+    def test_run_by_multi_initials_df(self):
+        initials = dict()
+        n_sim = 10
+        for ic in self.model.initial_conditions:
+            initials[ic[0]] = [ic[1].value] * n_sim
+        self.simulator.run(self.tspan, initials=initials)
+        ok_(self.simulator.initials.shape[0] == n_sim)
+
+    def test_run_by_multi_params_df(self):
+
+        n_sim = 10
+        params = dict()
+        for ic in self.model.parameters:
+            params[ic.name] = [ic.value] * n_sim
+        self.simulator.run(self.tspan, param_values=params)
+        ok_(self.simulator.param_values.shape[0] == n_sim)
 
     def test_run_by_params_set_n_sim(self):
         param_values = np.array(

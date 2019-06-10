@@ -116,18 +116,21 @@ class SSABase(Simulator):
             raise SimulatorException("Please provide a multi-dimension set of "
                                      "parameters, initials, or number_sim>0")
         elif param_values is None and not num_sim:
-            num_sim = np.array(initials).shape[0]
+            self.initials = initials
+            num_sim = self.initials.shape[0]
         elif initials is None and not num_sim:
-            num_sim = np.array(param_values).shape[0]
+            self.param_values = param_values
+            num_sim = self.param_values.shape[0]
 
         if param_values is None and initials is None:
             # Run simulation using same param_values
             # initials will be taken care of on SimulatorBase side
             param_values = np.repeat(self.param_values, num_sim, axis=0)
-        elif len(param_values.shape) == 1:
+        elif isinstance(param_values, np.ndarray) and len(
+                param_values.shape) == 1:
             # initials taken care of on SimulatorBase side
             param_values = np.repeat([param_values], num_sim, axis=0)
-        elif len(initials.shape) == 1:
+        elif isinstance(initials, np.ndarray) and len(initials.shape) == 1:
             # parameters taken care of on SimulatorBase side
             initials = np.repeat([initials], num_sim, axis=0)
         self.num_sim = num_sim
