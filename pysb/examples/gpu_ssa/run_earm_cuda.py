@@ -1,24 +1,24 @@
-import logging
+"""
+Example of using CUDASimulator for SSA simulations.
 
+
+This example uses the earm_1_0 model.
+We recommend using a dedicated GPU without a display attached at there can
+be time outs. For testing, one can change the tspan = np.linspace(0,5000,101).
+
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 
 from pysb.examples.earm_1_0 import model
-from pysb.logging import setup_logger
-from pysb.simulator.opencl_ssa import OpenCLSimulator
-from pysb.simulator.scipyode import ScipyOdeSimulator
+from pysb.simulator import CUDASimulator, ScipyOdeSimulator
 
-setup_logger(logging.INFO)
-
-obs = ['cSmac_total', 'tBid_total', 'CPARP_total',
-       'Bid_unbound', 'PARP_unbound', 'mSmac_unbound']
-
-
-def run(n_sim=1000):
-    tspan = np.linspace(0, 20000, 101)
+if __name__ == "__main__":
+    n_sim = 100
+    tspan = np.linspace(0, 5000, 101)
     name = 'tBid_total'
 
-    sim = OpenCLSimulator(model, tspan=tspan, verbose=True, device='cpu')
+    sim = CUDASimulator(model, tspan=tspan, verbose=True)
     traj = sim.run(tspan=tspan, number_sim=n_sim)
 
     result = np.array(traj.observables)[name]
@@ -37,10 +37,5 @@ def run(n_sim=1000):
 
     plt.legend(loc=0)
     plt.tight_layout()
-    plt.savefig('example_ssa_earm.png', dpi=200, bbox_inches='tight')
+    plt.savefig('example_ssa_earm_cuda.png', dpi=200, bbox_inches='tight')
     plt.show()
-
-
-if __name__ == "__main__":
-    n_sim = 10
-    run(n_sim)

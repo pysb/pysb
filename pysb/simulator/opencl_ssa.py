@@ -68,8 +68,8 @@ class OpenCLSimulator(SSABase):
                  **kwargs):
 
         if cl is None:
-            raise SimulatorException('pyopencl library required for {}'
-                                     ''.format(self.__class__.__name__))
+            raise ImportError('pyopencl library required for {}'
+                              ''.format(self.__class__.__name__))
         super(OpenCLSimulator, self).__init__(model, verbose, **kwargs)
 
         generate_equations(self._model)
@@ -185,14 +185,14 @@ class OpenCLSimulator(SSABase):
 
         species_matrix_gpu = ocl_array.to_device(
             self.queue,
-            self.initials.astype(np.int64).flatten(order='C')
+            self.initials.astype(np.uint32).flatten(order='C')
         )
 
         result_gpu = ocl_array.zeros(
             self.queue,
             order='C',
             shape=(self.num_sim * len(t_out) * self._n_species,),
-            dtype=np.int64
+            dtype=np.uint32
         )
 
         elasped_t = time.time() - timer_start

@@ -35,8 +35,7 @@ class SSABase(Simulator):
     def _get_template_args(self):
         """ converts pysb reactions to pycuda/pyopencl format """
         p = re.compile('\s')
-        stoich_matrix = self._get_stoch(self.model)
-
+        stoich_matrix = self._get_stoich(self.model)
         all_reactions = []
         for rxn_number, rxn in enumerate(stoich_matrix.T):
             changes = []
@@ -66,6 +65,7 @@ class SSABase(Simulator):
             rate = sympy.fcode(rxn["rate"])
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
+            # Create expression strings with observables
             expr_strings = {
                 e.name: '(%s)' % sympy.ccode(
                     e.expand_expr(expand_observables=True)
@@ -87,6 +87,7 @@ class SSABase(Simulator):
             rate = re.sub(r'_*s(\d+)',
                           lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
+            # replace param names with vector notation
             for q, prm in enumerate(params_names):
                 rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
             items = rate.split('*')
@@ -115,20 +116,22 @@ class SSABase(Simulator):
             raise SimulatorException("Please provide a multi-dimension set of "
                                      "parameters, initials, or number_sim>0")
         elif param_values is None and not num_sim:
-            num_sim = np.array(initials).shape[0]
+            self.initials = initials
+            num_sim = self.initials.shape[0]
         elif initials is None and not num_sim:
-            num_sim = np.array(param_values).shape[0]
+            self.param_values = param_values
+            num_sim = self.param_values.shape[0]
 
-        if param_values is None:
+        if param_values is None and initials is None:
             # Run simulation using same param_values
+            # initials will be taken care of on SimulatorBase side
             param_values = np.repeat(self.param_values, num_sim, axis=0)
-        elif len(param_values.shape) == 1:
+        elif isinstance(param_values, np.ndarray) and len(
+                param_values.shape) == 1:
+            # initials taken care of on SimulatorBase side
             param_values = np.repeat([param_values], num_sim, axis=0)
-
-        if initials is None:
-            # Run simulation using same initial conditions
-            initials = np.repeat(self.initials, num_sim, axis=0)
-        elif len(initials.shape) == 1:
+        elif isinstance(initials, np.ndarray) and len(initials.shape) == 1:
+            # parameters taken care of on SimulatorBase side
             initials = np.repeat([initials], num_sim, axis=0)
         self.num_sim = num_sim
         super(SSABase, self).run(tspan=tspan, initials=initials,
@@ -136,7 +139,7 @@ class SSABase(Simulator):
                                  _run_kwargs=locals())
 
     @staticmethod
-    def _get_stoch(model):
+    def _get_stoich(model):
         """
         Left hand side
         """

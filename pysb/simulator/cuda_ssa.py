@@ -66,8 +66,8 @@ class CUDASimulator(SSABase):
 
     def __init__(self, model, verbose=False, tspan=None, **kwargs):
         if pycuda is None:
-            raise SimulatorException('pycuda library required for {}'
-                                     ''.format(self.__class__.__name__))
+            raise ImportError('pycuda library required for {}'
+                              ''.format(self.__class__.__name__))
         super(CUDASimulator, self).__init__(model, verbose, **kwargs)
 
         self.tspan = tspan
