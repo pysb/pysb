@@ -162,30 +162,43 @@ class Simulator(object):
             else:
                 return len(self.param_values)
 
-    def _update_initials_dict(self, initials_dict, initials_source):
+    def _update_initials_dict(self, initials_dict, initials_source, subs=None):
         if isinstance(initials_source, collections.Mapping):
             # Can't just use .update() as we need to test
             # equality with .is_equivalent_to()
-            for cp, val in initials_source.items():
-                found = False
-                for existing_cp in initials_dict.keys():
-                    if existing_cp.is_equivalent_to(as_complex_pattern(cp)):
-                        initials_dict[existing_cp] = val
-                        found = True
-                        break
-                if not found:
-                    initials_dict[cp] = val
+            for cp, value_obj in initials_source.items():
+                cp = as_complex_pattern(cp)
+                if any(existing_cp.is_equivalent_to(cp)
+                       for existing_cp in initials_dict):
+                    continue
+
+                if isinstance(value_obj, (collections.Sequence, np.ndarray))\
+                        and all(isinstance(v, numbers.Number) for v in value_obj):
+                    value = value_obj
+                elif isinstance(value_obj, Expression):
+                    value = [value_obj.expand_expr().evalf(subs=subs[sim]) for sim in range(len(subs))]
+                elif isinstance(value_obj, Parameter):
+                    # Set parameter using param_values
+                    pi = self._model.parameters.index(value_obj)
+                    value = [self.param_values[sim][pi] for sim in range(len(self.param_values))]
+                else:
+                    raise TypeError("Unexpected initial condition "
+                                    "value type: %s" % type(value_obj))
+
+                initials_dict[cp] = value
         elif initials_source is not None:
             # Update from array-like structure, which we can only do if we
             # have the species available (e.g. not in network-free simulations)
             if not self.model.species:
                 raise ValueError(
                     'Cannot update initials from an array-like source without '
-                    'model species. ')
-            initials_dict = {}
+                    'model species.')
             for cp_idx, cp in enumerate(self.model.species):
-                initials_dict[cp] = [initials_source[n][cp_idx] for n in
-                                     range(len(initials_source))]
+                if any(existing_cp.is_equivalent_to(cp) for existing_cp in
+                       initials_dict):
+                    continue
+                initials_dict[cp] = [initials_source[n][cp_idx]
+                                     for n in range(len(initials_source))]
         return initials_dict
 
     @property
@@ -193,14 +206,37 @@ class Simulator(object):
         n_sims = self._check_run_initials_vs_base_initials_length()
         if n_sims == 1:
             n_sims = len(self.param_values)
-        initials_dict = {ic.pattern: [ic.value.value] * n_sims
-                         for ic in self.model.initials}
+
+        # Apply any per-run initial overrides
+        initials_dict = self._update_initials_dict({}, self._run_initials)
+
         # Apply any base initial overrides
         initials_dict = self._update_initials_dict(initials_dict,
                                                    self._initials)
-        # Apply any per-run initial overrides
-        initials_dict = self._update_initials_dict(initials_dict,
-                                                   self._run_initials)
+
+        model_initials = {ic.pattern: ic.value
+                          for ic in self.model.initials}
+
+        # Otherwise, populate initials from the model
+        n_sims_params = len(self.param_values)
+        n_sims_actual = max(n_sims_params, n_sims)
+
+        # Get remaining initials from the model itself and
+        # self.param_values, if necessary
+        subs = None
+        if any(isinstance(v, Expression) for v in model_initials.values()):
+            # Only need parameter substitutions if model initials include
+            # expressions
+            subs = [
+                dict((p, pv[i]) for i, p in
+                     enumerate(self._model.parameters))
+                for pv in self.param_values]
+            if len(subs) == 1 and n_sims_actual > 1:
+                subs = list(itertools.repeat(subs[0], n_sims_actual))
+
+        initials_dict = self._update_initials_dict(
+            initials_dict, model_initials, subs=subs
+        )
 
         return initials_dict
 
@@ -243,92 +279,21 @@ class Simulator(object):
                 self._initials is not None:
             return self._initials
 
-        n_sims_initials = self._check_run_initials_vs_base_initials_length()
-
         # At this point (after dimensionality check), we can return
         # self._run_initials if it's not a dictionary and not None
         if self._run_initials is not None and not isinstance(
                 self._run_initials, collections.Mapping):
             return self._run_initials
 
+        n_sims_initials = self._check_run_initials_vs_base_initials_length()
         n_sims_params = len(self.param_values)
         n_sims_actual = max(n_sims_params, n_sims_initials)
 
-        y0 = np.full((n_sims_actual, len(self.model.species)), np.nan)
+        y0 = np.full((n_sims_actual, len(self.model.species)), 0.0)
 
-        # Process any overrides
-        y0 = self._update_y0(y0, self._run_initials)
-        y0 = self._update_y0(y0, self._initials)
-
-        # Fast NaN check with short circuit
-        if np.isnan(np.sum(y0)):
-            # Get remaining initials from the model itself and
-            # self.param_values, if necessary
-            subs = None
-            if self._model.expressions:
-                # Only need parameter substitutions if model has expressions
-                subs = [
-                    dict((p, pv[i]) for i, p in
-                         enumerate(self._model.parameters))
-                    for pv in self.param_values]
-                if len(subs) == 1 and n_sims_actual > 1:
-                    subs = list(itertools.repeat(subs[0], n_sims_actual))
-            ic_tuples = [(ic.pattern, ic.value) for ic in self._model.initials]
-            y0 = self._update_y0(y0, ic_tuples, subs, n_sims_params)
-
-        # Any remaining unset initials should be set to zero
-        y0 = np.nan_to_num(y0)
-
-        return y0
-
-    def _update_y0(self, y0, initials_source, subs=None, n_sims_params=None):
-        """ Update the initial conditions list y0 using initials_source """
-        if initials_source is None:
-            return y0
-
-        if isinstance(initials_source, np.ndarray) and \
-                initials_source.shape != 1:
-            # If initials_source is a multi-dimensional array, we can set
-            # the y0 values directly
-            nan_pos = np.isnan(y0)
-            y0[nan_pos] = initials_source[nan_pos]
-            return y0
-
-        if isinstance(initials_source, collections.Mapping):
-            initials_source = initials_source.items()
-
-        for cp, value_obj in initials_source:
-            cp = as_complex_pattern(cp)
-            si = self._model.get_species_index(cp)
-            if si is None:
-                raise IndexError("Species not found in model: %s" % repr(cp))
-
-            # Loop over all simulations
-            for sim in range(len(y0)):
-                # If this initial condition has already been set, skip it
-                if not np.isnan(y0[sim][si]):
-                    continue
-
-                if isinstance(value_obj, (collections.Sequence, np.ndarray))\
-                        and isinstance(value_obj[sim], numbers.Number):
-                    value = value_obj[sim]
-                elif isinstance(value_obj, Expression):
-                    value = value_obj.expand_expr().evalf(subs=subs[sim])
-                elif isinstance(value_obj, Parameter):
-                    if sim > 0 and n_sims_params == 1:
-                        # Parameters can be copied from previous
-                        # simulation if they have not been specified
-                        # explicitly in self.param_values
-                        value = y0[sim - 1][si]
-                    else:
-                        # Set parameter using param_values
-                        pi = self._model.parameters.index(value_obj)
-                        value = self.param_values[sim][pi]
-                else:
-                    raise TypeError("Unexpected initial condition "
-                                    "value type: %s" % type(value_obj))
-
-                y0[sim][si] = value
+        for species, vals in self.initials_dict.items():
+            species_index = self._model.get_species_index(species)
+            y0[:, species_index] = vals
 
         return y0
 
