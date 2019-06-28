@@ -163,6 +163,9 @@ class KappaSimulator(Simulator):
                     # Sanity check that observables are in correct order
                     assert data.dtype.names == kappa_col_names
                     data = data.view('<f8')
+                    # Handle case with single row output
+                    if data.ndim == 1:
+                        data.shape = (1, data.shape[0])
                     # Parse into format
                     tout.append(data[:, 0])
                     observable_traj.append(data[:, 1:])

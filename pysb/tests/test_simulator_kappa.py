@@ -40,9 +40,17 @@ def test_kappa_2initials():
 
 def test_kappa_2params():
     base_param_values = np.array(
-        [p.value for p in michment.model.parameters]
-    ).repeat(2).reshape(2, len(michment.model.parameters))
+        [p.value for p in michment.model.parameters] * 2
+    ).reshape(2, len(michment.model.parameters))
     sim = KappaSimulator(michment.model, tspan=np.linspace(0, 100, 101))
 
     res = sim.run(param_values=base_param_values, seed=KAPPA_SEED)
     assert res.nsims == 2
+    assert res.dataframe.loc[0].equals(res.dataframe.loc[1])
+
+
+def test_kappa_1timepoint():
+    sim = KappaSimulator(michment.model, tspan=[0, 1])
+    # This set of parameter values causes Kappa to abort after 1st time point
+    res = sim.run(param_values=[100, 100, 10, 10, 100, 100], seed=KAPPA_SEED)
+    assert res.dataframe.shape == (1, 4)
