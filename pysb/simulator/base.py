@@ -851,8 +851,12 @@ class SimulationResult(object):
         a numpy.ndarray with record-style data-type for return to the user.
         """
         if self._yfull is None:
-            sp_names = ['__s%d' % i for i in range(len(self._model.species))]
-            yfull_dtype = list(zip(sp_names, itertools.repeat(float)))
+            if self._y is None:
+                yfull_dtype = []
+            else:
+                sp_names = ['__s%d' % i
+                            for i in range(len(self._model.species))]
+                yfull_dtype = list(zip(sp_names, itertools.repeat(float)))
             if len(self._model.observables):
                 yfull_dtype += self._yobs[0].dtype.descr
             if len(self._model.expressions_dynamic()):

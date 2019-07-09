@@ -1,6 +1,7 @@
 from pysb.simulator import KappaSimulator
 from pysb.kappa import run_simulation
 from pysb.examples import michment
+from pysb.bng import generate_equations
 import numpy as np
 
 
@@ -50,7 +51,16 @@ def test_kappa_2params():
 
 
 def test_kappa_1timepoint():
+    michment.model.reset_equations()
     sim = KappaSimulator(michment.model, tspan=[0, 1])
     # This set of parameter values causes Kappa to abort after 1st time point
     res = sim.run(param_values=[100, 100, 10, 10, 100, 100], seed=KAPPA_SEED)
-    assert res.dataframe.shape == (1, 4)
+    assert res.dataframe.shape == (1, 4), res.dataframe.shape
+
+
+def test_kappa_1timepoint_with_netgen():
+    generate_equations(michment.model)
+    sim = KappaSimulator(michment.model, tspan=[0, 1])
+    # This set of parameter values causes Kappa to abort after 1st time point
+    res = sim.run(param_values=[100, 100, 10, 10, 100, 100], seed=KAPPA_SEED)
+    assert res.dataframe.shape == (1, 4), res.dataframe.shape
