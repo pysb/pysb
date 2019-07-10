@@ -191,11 +191,14 @@ class Component(object):
             mod_name = frame.f_globals.get('__name__', '__unnamed__')
             if mod_name in ['IPython.core.interactiveshell', '__main__']:
                 break
-            if mod_name not in ['pysb.core', 'pysb.macros'] and not \
+            if mod_name not in ['pysb.core'] and not \
                     mod_name.startswith('importlib.'):
                 self._modules.append(mod_name)
                 if self._function is None:
-                    self._function = frame.f_code.co_name
+                    if mod_name == 'pysb.macros':
+                        self._function = frame.f_back.f_code.co_name
+                    else:
+                        self._function = frame.f_code.co_name
             frame = frame.f_back
 
     def __getstate__(self):
