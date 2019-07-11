@@ -68,7 +68,6 @@ class BnglBuilder(Builder):
         if re.match(r'^[\w\s()/+\-._*]*$', expression):
             return sympy.sympify(expression, locals=self._model_env,
                                  evaluate=False)
-            # return parse_expr(expression, self._model_env)
         else:
             self._warn_or_except('Security check on expression "%s" failed' %
                                  expression)

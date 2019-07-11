@@ -57,17 +57,6 @@ def bngl_import_compare_simulations(bng_file, force=False,
     if force:
         return
 
-    # # Check all species trajectories are equal (within numerical tolerance)
-    # for species in range(len(yfull1)):
-    #     for tp in range(len(yfull1[species])):
-    #         if not numpy.isclose(yfull1[species][tp],
-    #                              yfull2[species][tp], atol=1e-4, rtol=1e-4):
-    #             print(species)
-    #             print(tp)
-    #             print(yfull1[species][tp])
-    #             print(yfull2[species][tp])
-    #             raise Exception('Trajectory mismatch')
-
     assert len(yfull1.dtype.names) == len(yfull2.dtype.names)
     for species in yfull1.dtype.names:
         logger.debug(species)
