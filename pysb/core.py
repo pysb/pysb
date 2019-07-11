@@ -191,7 +191,7 @@ class Component(object):
             mod_name = frame.f_globals.get('__name__', '__unnamed__')
             if mod_name in ['IPython.core.interactiveshell', '__main__']:
                 break
-            if mod_name not in ['pysb.core'] and not \
+            if mod_name != 'pysb.core' and not \
                     mod_name.startswith('importlib.'):
                 self._modules.append(mod_name)
                 if self._function is None:
