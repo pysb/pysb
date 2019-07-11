@@ -2056,8 +2056,7 @@ class CompartmentAlreadySpecifiedError(ValueError):
 class ModelNotDefinedError(RuntimeError):
     """SelfExporter method was called before a model was defined."""
     def __init__(self):
-        ValueError.__init__(
-            self,
+        super(RuntimeError, self).__init__(
             "A Model must be declared before declaring any model components"
         )
 
