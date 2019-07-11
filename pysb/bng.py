@@ -780,7 +780,7 @@ def _parse_parameter(model, line):
     index, pname, pval, hash, ptype = line.strip().split()
     par_names = model.components.keys()
     if pname not in par_names:
-        if ptype == 'Constant':
+        if ptype == 'Constant' and pname not in model._derived_parameters.keys():
             try:
                 p = pysb.core.Parameter(pname, pval, _export=False)
             except ValueError:
@@ -788,7 +788,8 @@ def _parse_parameter(model, line):
                                         eval(pval.replace('^', '**')),
                                         _export=False)
             model._derived_parameters.add(p)
-        elif ptype == 'ConstantExpression':
+        elif ptype == 'ConstantExpression' and \
+                pname not in model._derived_expressions.keys():
             pval = _fix_booleans(pval)
             p = pysb.core.Expression(pname, sympy.sympify(pval),
                                      _export=False)
@@ -874,7 +875,7 @@ def _parse_species(model, line):
                     site_name, condition = ss, None
                 site_conditions[site_name].append(condition)
 
-        site_conditions = {k: v[0] if len(v) == 1 else tuple(v)
+        site_conditions = {k: v[0] if len(v) == 1 else pysb.core.MultiState(*v)
                            for k, v in site_conditions.items()}
         monomer = model.monomers[monomer_name]
         monomer_compartment = model.compartments.get(monomer_compartment_name)

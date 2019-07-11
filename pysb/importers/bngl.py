@@ -117,6 +117,12 @@ class BnglBuilder(Builder):
                         last_bond = bond_list
                 state = comp.get('state')
                 if state and state != '?':
+                    if state in ('PLUS', 'MINUS'):
+                        self._warn_or_except(
+                            'PLUS/MINUS state values are non-standard BNGL '
+                            'used to increment or decrement a numeric state '
+                            'value. They are not supported in PySB.'
+                        )
                     # If we changed the state string, use the updated version
                     state = self._renamed_states.get(mon_name, {}).get(
                         state, state)
@@ -373,7 +379,6 @@ class BnglBuilder(Builder):
     def _parse_expressions(self):
         expr_namespace = dict(
             self.model.parameters | self.model.expressions_constant()
-            | self.model.observables
         )
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):

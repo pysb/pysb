@@ -622,6 +622,9 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
 
 def _get_rhs(compiler, code_eqs, ydot=None, jac=None, compiler_directives=None):
     if compiler == 'cython':
+        if 'math.' in code_eqs:
+            code_eqs = 'import math\n' + code_eqs
+
         def rhs(t, y, p):
             # note that the evaluated code sets ydot as a side effect
             Cython.inline(code_eqs, quiet=True,

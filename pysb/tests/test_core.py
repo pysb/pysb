@@ -512,4 +512,3 @@ def test_update_initial_condition():
     assert len(model.initials) == 1
     assert as_complex_pattern(B()).is_equivalent_to(
         as_complex_pattern(model.initials[0].pattern))
-

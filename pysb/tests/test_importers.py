@@ -141,8 +141,7 @@ def _sbml_location(filename):
 
 
 def test_bngl_import_expected_passes_with_force():
-    for filename in (
-                     'Haugh2b',
+    for filename in ('Haugh2b',
                      'Motivating_example',
                      ):
         full_filename = _bngl_location(filename)
@@ -151,21 +150,17 @@ def test_bngl_import_expected_passes_with_force():
             yield (bngl_import_compare_simulations, full_filename, True)
 
 
-# TODO: Fix error in BNGXML generator that causes error with sim. below
-
 def test_bngl_import_expected_passes_nfsim():
-    for filename in (
-            'ANx',
-            'isingspin_localfcn',):
+    for filename in ('isingspin_localfcn', ):
         full_filename = _bngl_location(filename)
         yield (bngl_import_compare_nfsim, full_filename)
 
 
 def test_bngl_import_expected_passes_no_sim():
     """ These models convert properly, but we cannot generate network """
-    for filename in ('blbr',
+    for filename in ('blbr',         # Uses max_stoich option for netgen
                      'hybrid_test',  # Population maps are not converted
-                     'tlbr'):
+                     'tlbr'):        # Uses max_iter option for netgen
         full_filename = _bngl_location(filename)
         yield (bngl_import_compare_simulations, full_filename, False, None,
                None)
@@ -208,9 +203,11 @@ def test_bngl_import_expected_passes():
 def test_bngl_import_expected_errors():
     errtype = {'ratelawtype': 'Rate law \w* has unknown type',
                'ratelawmissing': 'Rate law missing for rule',
+               'plusminus': 'PLUS/MINUS state values',
                'statelabels': 'BioNetGen component/state labels are not yet supported',
               }
-    expected_errors = {'CaOscillate_Sat': errtype['ratelawtype'],
+    expected_errors = {'ANx': errtype['plusminus'],
+                       'CaOscillate_Sat': errtype['ratelawtype'],
                        'heise': errtype['statelabels'],
                        'isingspin_energy': errtype['ratelawmissing'],
                        'test_MM': errtype['ratelawtype'],
