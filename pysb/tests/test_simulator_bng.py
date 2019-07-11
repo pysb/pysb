@@ -132,7 +132,10 @@ class TestNfSim(object):
                                        [7, 8, 9, 10, 11, 12]],
                          seed=_BNG_SEED)
         assert x.nsims == 2
-        assert np.allclose(x.dataframe.loc[0, 0.0], [101.0, 0.0, 0.0])
+        # Initials for A should be set by initials dict, and from param_values
+        # for B and C
+        assert np.allclose(x.dataframe.loc[0, 0.0], [101.0, 5.0, 6.0])
+        assert np.allclose(x.dataframe.loc[1, 0.0], [201.0, 11.0, 12.0])
 
     @raises(ValueError)
     def test_nfsim_different_initials_lengths(self):
@@ -188,3 +191,36 @@ def test_stop_if():
     # Starting with Atot > 9 should terminate simulation immediately
     y = sim.run(tspan, initials=x.species[-1], stop_if='Atot>9')
     assert len(y.observables) == 1
+
+
+def test_set_initials_by_params():
+    # This tests setting initials by changing their underlying parameter values
+    # BNG Simulator uses a dictionary for initials, unlike e.g.
+    # ScipyOdeSimulator, so a separate test is needed
+
+    model = robertson.model
+    t = np.linspace(0, 40, 51)
+    ic_params = model.parameters_initial_conditions()
+    param_values = np.array([p.value for p in model.parameters])
+    ic_mask = np.array([p in ic_params for p in model.parameters])
+
+    bng_sim = BngSimulator(model, tspan=t, verbose=0)
+
+    # set all initial conditions to 1
+    param_values[ic_mask] = np.array([1, 1, 1])
+    traj = bng_sim.run(param_values=param_values)
+
+    # set properly here
+    assert np.allclose(traj.initials, [1, 1, 1])
+
+    # overwritten in bng file. lines 196-202.
+    # Values from initials_dict are used, but it should take them from
+    # self.initials, so I don't see how they are getting overwritten?
+    print(traj.dataframe.loc[0])
+    assert np.allclose(traj.dataframe.loc[0][0:3], [1, 1, 1])
+
+    # Same here
+    param_values[ic_mask] = np.array([0, 1, 1])
+    traj = bng_sim.run(param_values=param_values)
+    assert np.allclose(traj.initials, [0, 1, 1])
+    assert np.allclose(traj.dataframe.loc[0][0:3], [0, 1, 1])
