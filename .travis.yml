@@ -13,7 +13,7 @@ before_install:
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda install --yes -c conda-forge python="$PYVER"
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
-    pydot coveralls mock cython
+    pydot codecov mock cython
 - if [[ $PYVER == 2.7 ]]; then pip install weave; fi
 - conda install --yes -c SBMLTeam python-libsbml
 - pip install libroadrunner twine
@@ -29,4 +29,4 @@ script:
   nosetests build/lib/pysb --with-coverage --cover-inclusive
   --cover-package=build/lib/pysb -a '!gpu'
 after_success:
-  coveralls
+  codecov
