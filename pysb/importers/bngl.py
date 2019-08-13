@@ -4,7 +4,8 @@ from pysb.builder import Builder
 from pysb.bng import BngFileInterface
 import xml.etree.ElementTree
 import re
-from sympy.parsing.sympy_parser import parse_expr
+import sympy
+import sympy.parsing.sympy_parser as sympy_parser
 import warnings
 import pysb.logging
 import collections
@@ -65,7 +66,7 @@ class BnglBuilder(Builder):
 
         # Quick security check on the expression
         if re.match(r'^[\w\s()/+\-._*]*$', expression):
-            return parse_expr(expression, self._model_env)
+            return parse_bngl_expr(expression, self._model_env)
         else:
             self._warn_or_except('Security check on expression "%s" failed' %
                                  expression)
@@ -356,26 +357,27 @@ class BnglBuilder(Builder):
             rule.rate_reverse = rev_rate
 
     def _parse_expressions(self):
-        expr_namespace = dict(
-            self.model.parameters | self.model.expressions_constant()
+        expr_namespace = (
+            self.model.parameters
+            | self.model.expressions
             | self.model.observables
         )
+        expr_symbols = {e.name: sympy.Symbol(e.name) for e in expr_namespace}
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             if e.find(_ns('{0}ListOfArguments/{0}Argument')) is not None:
                 self._warn_or_except('Function %s is local, which is not '
                                      'supported in PySB' % e.get('id'))
             expr_name = e.get('id')
-            expr_text = e.find(_ns('{0}Expression')).text.replace('^', '**')
+            expr_text = e.find(_ns('{0}Expression')).text
             expr_val = 0
             try:
-                expr_val = parse_expr(expr_text, local_dict=expr_namespace)
+                expr_val = parse_bngl_expr(expr_text, local_dict=expr_symbols)
             except Exception as ex:
-                self._warn_or_except('Could not parse expression %s: '
-                                     '%s\n\nError: %s' % (expr_name,
-                                                          expr_text,
-                                                          ex.message))
-            expr_namespace[expr_name] = expr_val
+                self._warn_or_except(
+                    'Could not parse expression %s: %s\n\nError: %s'
+                    % (expr_name, expr_text, ex.message)
+                )
             if isinstance(expr_val, numbers.Number):
                 self.parameter(expr_name, expr_val)
             else:
@@ -389,6 +391,36 @@ class BnglBuilder(Builder):
         self._parse_observables()
         self._parse_expressions()
         self._parse_rules()
+
+
+def parse_bngl_expr(text, *args, **kwargs):
+    """Convert a BNGL math expression string to a sympy Expr."""
+    # Translate a few operators with simple text replacement.
+    text = text.replace('()', '')
+    text = text.replace('^', '**')
+    text = text.replace('==', '=')
+    text = re.sub(r'\band\b', '&', text)
+    text = re.sub(r'\bor\b', '|', text)
+    text = re.sub(r'\bif\b', 'bngl_if', text)
+    # Use sympy to parse the text into an Expr.
+    trans = (
+        sympy_parser.standard_transformations
+        + (sympy_parser.convert_equals_signs,)
+    )
+    expr = sympy_parser.parse_expr(text, *args, transformations=trans, **kwargs)
+    # Transforming 'if' to Piecewise requires subexpression rearrangement, so we
+    # use sympy's replace functionality rather than attempt it using text
+    # replacements above.
+    expr = expr.replace(
+        sympy.Function('bngl_if'),
+        lambda cond, t, f: sympy.Piecewise((t, cond), (f, True))
+    )
+    # Check for unsupported constructs.
+    if expr.has('time'):
+        raise ValueError(
+            "Expressions referencing simulation time are not supported"
+        )
+    return expr
 
 
 def model_from_bngl(filename, force=False, cleanup=True):
