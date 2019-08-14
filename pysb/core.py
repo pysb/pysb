@@ -1542,7 +1542,7 @@ class Expression(Component, sympy.Symbol):
                 subs[a] = a.value
             elif isinstance(a, Expression) and a.is_constant_expression():
                 subs[a] = a.get_value()
-        return self.expr.evalf()
+        return self.expr.evalf(subs=subs)
 
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.

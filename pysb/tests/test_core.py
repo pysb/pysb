@@ -358,6 +358,14 @@ def test_valid_state_values():
 def test_expression_type():
     assert_raises(ValueError, Expression, 'A', 1)
 
+@with_model
+def test_expression_evaluation():
+    Parameter('k1', 10)
+    Expression('k2', 2 * k1)
+    Expression('k3', k2/2)
+    assert int(k2.get_value()) == 20
+    assert int(k3.get_value()) == 10
+
 
 @with_model
 def test_synth_requires_concrete():
