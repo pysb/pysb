@@ -32,6 +32,32 @@ def test_component_names_invalid():
     for name in 'a!', '!B', 'A!bC~`\\', '_!', '_!7', '__a01b  999x_x___!':
         assert_raises(InvalidComponentNameError, Component, name, _export=False)
 
+@with_model
+def test_function_introspection():
+    # Case 1: Component defined inside function
+    Monomer('A')
+    assert A._function == 'test_function_introspection'
+
+    # Case 2: Component defined inside nested function
+    def define_monomer_b():
+        Monomer('B')
+    define_monomer_b()
+    assert B._function == 'define_monomer_b'
+
+    # Case 3: Component defined by macro
+    from pysb.macros import equilibrate
+    equilibrate(A(), B(), [1, 1])
+
+    assert model.rules['equilibrate_A_to_B']._function == 'equilibrate'
+
+    # Case 4: Component defined by macro inside function
+    def define_macro_inside_function():
+        Monomer('C')
+        equilibrate(A(), C(), [2, 2])
+    define_macro_inside_function()
+    assert model.rules['equilibrate_A_to_C']._function == 'equilibrate'
+
+
 def test_monomer():
     sites = ['x', 'y', 'z']
     states = {'y': ['foo', 'bar', 'baz'], 'x': ['e']}
