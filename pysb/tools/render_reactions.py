@@ -63,7 +63,7 @@ except ImportError:
     pygraphviz = None
 
 
-def run(model):
+def run(model, include_rate_species=False):
     """
     Render the reactions produced by a model into the "dot" graph format.
 
@@ -71,6 +71,9 @@ def run(model):
     ----------
     model : pysb.core.Model
         The model to render.
+    include_rate_species : bool
+        If True, add dashed edges from species used in expression rates to
+        the node representing the reaction.
 
     Returns
     -------
@@ -117,18 +120,19 @@ def run(model):
         rule = model.rules.get(reaction['rule'][0])
         # Add a dashed edge when reaction forward and/or reverse parameters are
         # expressions that contain observables
-        sps_forward = set()
-        if isinstance(rule.rate_forward, pysb.core.Expression):
-            sps_forward = sp_from_expression(rule.rate_forward)
-            for s in sps_forward:
-                r_link(graph, s, i, **{'style': 'dashed'})
+        if include_rate_species:
+            sps_forward = set()
+            if isinstance(rule.rate_forward, pysb.core.Expression):
+                sps_forward = sp_from_expression(rule.rate_forward)
+                for s in sps_forward:
+                    r_link(graph, s, i, **{'style': 'dashed'})
 
-        if isinstance(rule.rate_reverse, pysb.core.Expression):
-            sps_reverse = sp_from_expression(rule.rate_reverse)
-            # Don't add edges that were added with forward parameters
-            sps_reverse = sps_reverse - sps_forward
-            for s in sps_reverse:
-                r_link(graph, s, i, **{'style': 'dashed'})
+            if isinstance(rule.rate_reverse, pysb.core.Expression):
+                sps_reverse = sp_from_expression(rule.rate_reverse)
+                # Don't add edges that were added with forward parameters
+                sps_reverse = sps_reverse - sps_forward
+                for s in sps_reverse:
+                    r_link(graph, s, i, **{'style': 'dashed'})
 
         for s in reactants:
             r_link(graph, s, i, **attr_reversible)
@@ -164,7 +168,7 @@ if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print(usage, end=' ')
         exit()
-    model_filename = sys.argv[1]
+    model_filename = sys.argv[-1]
     if not os.path.exists(model_filename):
         raise Exception("File '%s' doesn't exist" % model_filename)
     if not re.search(r'\.py$', model_filename):
@@ -185,7 +189,10 @@ if __name__ == '__main__':
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    print(run(model))
+    include_rate_species = False
+    if '--include-rate-species' in sys.argv:
+        include_rate_species = True
+    print(run(model, include_rate_species))
 
 
 
