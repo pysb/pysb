@@ -358,6 +358,7 @@ def test_valid_state_values():
 def test_expression_type():
     assert_raises(ValueError, Expression, 'A', 1)
 
+
 @with_model
 def test_expression_evaluation():
     Parameter('k1', 10)
