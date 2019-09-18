@@ -1538,7 +1538,14 @@ class Expression(Component, sympy.Symbol):
                    for a in self.expr.atoms())
 
     def get_value(self):
-        return self.expr.evalf()
+        # Use parameter and expression values for evaluation
+        subs = {}
+        for a in self.expr.atoms():
+            if isinstance(a, Parameter):
+                subs[a] = a.value
+            elif isinstance(a, Expression) and a.is_constant_expression():
+                subs[a] = a.get_value()
+        return self.expr.xreplace(subs)
 
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
