@@ -807,7 +807,7 @@ def _parse_species(model, line):
                     site_name, condition = ss, None
                 site_conditions[site_name].append(condition)
 
-        site_conditions = {k: v[0] if len(v) == 1 else tuple(v)
+        site_conditions = {k: v[0] if len(v) == 1 else pysb.core.MultiState(*v)
                            for k, v in site_conditions.items()}
         monomer = model.monomers[monomer_name]
         monomer_compartment = model.compartments.get(monomer_compartment_name)
