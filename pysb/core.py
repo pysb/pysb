@@ -191,11 +191,14 @@ class Component(object):
             mod_name = frame.f_globals.get('__name__', '__unnamed__')
             if mod_name in ['IPython.core.interactiveshell', '__main__']:
                 break
-            if mod_name not in ['pysb.core', 'pysb.macros'] and not \
+            if mod_name != 'pysb.core' and not \
                     mod_name.startswith('importlib.'):
                 self._modules.append(mod_name)
                 if self._function is None:
-                    self._function = frame.f_code.co_name
+                    if mod_name == 'pysb.macros':
+                        self._function = frame.f_back.f_code.co_name
+                    else:
+                        self._function = frame.f_code.co_name
             frame = frame.f_back
 
     def __getstate__(self):
@@ -1613,7 +1616,14 @@ class Expression(Component, sympy.Symbol):
                    for a in self.expr.atoms())
 
     def get_value(self):
-        return self.expr.evalf()
+        # Use parameter and expression values for evaluation
+        subs = {}
+        for a in self.expr.atoms():
+            if isinstance(a, Parameter):
+                subs[a] = a.value
+            elif isinstance(a, Expression) and a.is_constant_expression():
+                subs[a] = a.get_value()
+        return self.expr.xreplace(subs)
 
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
@@ -2185,8 +2195,7 @@ class TagAlreadySpecifiedError(ValueError):
 class ModelNotDefinedError(RuntimeError):
     """SelfExporter method was called before a model was defined."""
     def __init__(self):
-        ValueError.__init__(
-            self,
+        super(RuntimeError, self).__init__(
             "A Model must be declared before declaring any model components"
         )
 

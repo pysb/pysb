@@ -63,7 +63,7 @@ class PysbFlatExporter(Exporter):
         output.write("\n")
         output.write("from pysb import Model, Monomer, Parameter, Expression, "
                      "Compartment, Rule, Observable, Initial, MatchOnce, "
-                     "Annotation, Tag, ANY, WILD\n")
+                     "Annotation, MultiState, Tag, ANY, WILD\n")
         output.write("\n")
         output.write("Model()\n")
         output.write("\n")
