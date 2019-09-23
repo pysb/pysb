@@ -1,7 +1,7 @@
 from pysb.core import MonomerPattern, ComplexPattern, RuleExpression, \
     ReactionPattern, ANY, WILD, MultiState
 from pysb.builder import Builder
-from pysb.bng import BngFileInterface
+from pysb.bng import BngFileInterface, parse_bngl_expr
 import xml.etree.ElementTree
 import re
 import sympy
@@ -66,8 +66,8 @@ class BnglBuilder(Builder):
 
         # Quick security check on the expression
         if re.match(r'^[\w\s()/+\-._*]*$', expression):
-            return sympy.sympify(expression, locals=self._model_env,
-                                 evaluate=False)
+            return parse_bngl_expr(expression, local_dict=self._model_env,
+                                   evaluate=False)
         else:
             self._warn_or_except('Security check on expression "%s" failed' %
                                  expression)
@@ -178,7 +178,6 @@ class BnglBuilder(Builder):
                             self._renamed_states[mon_name])
                         )
             try:
-                # self.monomer(mon_name, sites, dict(states))
                 self.monomer(mon_name, sites,
                              {c_name: list(statedict.values())
                               for c_name, statedict in states.items()})
@@ -376,36 +375,30 @@ class BnglBuilder(Builder):
             rule.rate_reverse = rev_rate
 
     def _parse_expressions(self):
-        expr_namespace = dict(
-            self.model.parameters | self.model.expressions_constant()
+        expr_namespace = (
+            self.model.parameters | self.model.expressions
+            | self.model.observables
         )
+        expr_symbols = {e.name: sympy.Symbol(e.name) for e in expr_namespace}
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
-            is_local = False
             for arg in e.iterfind(_ns('{0}ListOfArguments/{0}Argument')):
-                is_local = True
                 tag_name = arg.get('id')
                 try:
                     self.model.tags[tag_name]
                 except KeyError:
                     tag = self.tag(tag_name)
-                    expr_namespace[tag_name] = tag
+                    expr_symbols[tag_name] = tag
             expr_name = e.get('id')
-            expr_text = e.find(_ns('{0}Expression')).text.replace('^', '**')
+            expr_text = e.find(_ns('{0}Expression')).text
             expr_val = 0
             try:
-                expr_val = parse_expr(expr_text, local_dict=expr_namespace)
+                expr_val = parse_bngl_expr(expr_text, local_dict=expr_symbols)
             except Exception as ex:
-                try:
-                    msg = ex.message
-                except AttributeError:
-                    msg = '(no further message)'
                 self._warn_or_except('Could not parse expression %s: '
                                      '%s\n\nError: %s' % (expr_name,
                                                           expr_text,
-                                                          msg))
-            if not is_local:
-                expr_namespace[expr_name] = expr_val
+                                                          str(ex)))
             if isinstance(expr_val, numbers.Number):
                 self.parameter(expr_name, expr_val)
             else:

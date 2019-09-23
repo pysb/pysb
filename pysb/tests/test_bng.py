@@ -8,7 +8,6 @@ from nose.tools import assert_raises_regexp
 from pysb.generator.bng import BngPrinter
 import sympy
 import math
-from pysb.bng import _fix_booleans
 
 
 @with_model
@@ -314,12 +313,19 @@ def test_bng_printer():
     assert _bng_print(sympy.Max(x, y)) == 'max(x, y)'
 
 
-def test_eval_booleans():
-    assert _fix_booleans('((10 > 0) && (0 < 100)) * 10 + k_basal') == \
-        '1 * 10 + k_basal'
-    assert _fix_booleans('((10 > 0) || (100 < 100)) * 10 + k_basal') == \
-        '1 * 10 + k_basal'
-    assert _fix_booleans('(10!=2)+1') == '1+1'
-    assert _fix_booleans('(10==2)|| (12 > 1)') == '1'
-    assert _fix_booleans('1 || 0') == '1'
-    assert _fix_booleans('1.2 && 0') == '0'
+def test_parse_bngl_expression_if():
+    x, y = sympy.symbols('x y')
+    assert parse_bngl_expr('if(x>y, 1, 3)') == \
+        sympy.Piecewise((1, x > y), (3, True))
+
+
+def test_parse_bngl_expression_exponentiate():
+    x, y = sympy.symbols('x y')
+    assert parse_bngl_expr('x ^ y') == sympy.Pow(x, y)
+
+
+def test_parse_bngl_expression_and_or_equals():
+    x, y = sympy.symbols('x y')
+    assert parse_bngl_expr('x and y') == sympy.And(x, y)
+    assert parse_bngl_expr('x or y') == sympy.Or(x, y)
+    assert parse_bngl_expr('x == y') == sympy.Eq(x, y)
