@@ -1,5 +1,6 @@
 from pysb.testing import *
 from pysb import *
+from pysb.core import as_complex_pattern
 from pysb.bng import *
 import os
 import unittest
@@ -216,6 +217,42 @@ def test_fixed_species():
     generate_equations(model)
     num_non_zeros = model.stoichiometry_matrix[0].getnnz()
     assert num_non_zeros == 0
+
+
+@with_model
+def test_multistate():
+    Monomer('A', ['a', 'a'], {'a': ['u', 'p']})
+    Parameter('k1', 100)
+    Parameter('A_0', 200)
+    Rule('r1', None >> A(a=MultiState('u', 'p')), k1)
+    Initial(A(a=MultiState(('u', 1), 'p')) %
+            A(a=MultiState(('u', 1), 'u')), A_0)
+
+    generate_equations(model)
+
+    assert model.species[0].is_equivalent_to(
+        A(a=MultiState(('u', 1), 'p')) % A(a=MultiState(('u', 1), 'u')))
+    assert model.species[1].is_equivalent_to(
+        as_complex_pattern(A(a=MultiState('u', 'p'))))
+
+
+@with_model
+def test_multibonds():
+    Monomer('A', ['a'])
+    Monomer('B', ['b'])
+    Parameter('k1', 100)
+    Parameter('A_0', 200)
+    Parameter('B_0', 50)
+    Rule('r1', A(a=None) + A(a=None) + B(b=None) >>
+            A(a=1) % A(a=[1, 2]) % B(b=2), k1)
+    Initial(A(a=None), A_0)
+    Initial(B(b=None), B_0)
+
+    generate_equations(model)
+
+    assert model.species[2].is_equivalent_to(
+        A(a=1) % A(a=[1, 2]) % B(b=2)
+    )
 
 
 def _bng_print(expr):
