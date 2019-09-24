@@ -659,7 +659,7 @@ class MonomerPattern(object):
         if not isinstance(other, Tag):
             return NotImplemented
 
-        if self._tag is not None:
+        if self._tag:
             raise TagAlreadySpecifiedError()
 
         # Need to upgrade to a ComplexPattern
@@ -679,7 +679,7 @@ class MonomerPattern(object):
         value += ')'
         if self.compartment is not None:
             value += ' ** ' + self.compartment.name
-        if self._tag is not None:
+        if self._tag:
             value = '{} @ {}'.format(self._tag.name, value)
         return value
 
@@ -1009,7 +1009,7 @@ class ComplexPattern(object):
             return NotImplemented
 
     def __mod__(self, other):
-        if self._tag is not None:
+        if self._tag:
             raise ValueError('Tag should be specified at the end of the complex')
         if isinstance(other, MonomerPattern):
             return ComplexPattern(self.monomer_patterns + [other], self.compartment, self.match_once)
@@ -1058,7 +1058,7 @@ class ComplexPattern(object):
         if not isinstance(other, Tag):
             return NotImplemented
 
-        if self._tag is not None:
+        if self._tag:
             raise TagAlreadySpecifiedError()
 
         cp_new = self.copy()
@@ -1066,7 +1066,13 @@ class ComplexPattern(object):
         return cp_new
 
     def __repr__(self):
-        ret = ' % '.join([repr(p) for p in self.monomer_patterns])
+        # Monomer patterns need to be in parentheses if they have a tag,
+        # except in the first position, to preserve operator precedence
+        ret = ' % '.join(
+            [repr(p)
+             if idx == 0 or p._tag is None
+             else '({})'.format(repr(p))
+             for idx, p in enumerate(self.monomer_patterns)])
         if self.compartment is not None:
             ret = '(%s) ** %s' % (ret, self.compartment.name)
         if self.match_once:
@@ -1669,7 +1675,7 @@ class Tag(Component, sympy.Symbol):
         if not isinstance(other, MonomerPattern):
             return NotImplemented
 
-        if other._tag is not None:
+        if other._tag:
             raise TagAlreadySpecifiedError()
 
         new_mp = other()
