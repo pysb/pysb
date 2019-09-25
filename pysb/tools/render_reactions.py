@@ -5,6 +5,10 @@ Usage
 
 Usage: ``python -m pysb.tools.render_reactions mymodel.py > mymodel.dot``
 
+If your model uses species as expression rates, you can visualize
+these interactions by including the --include-rate-species option::
+    python -m pysb.tools.render_reactions --include-rate-species mymodel.py > mymodel.dot
+
 Renders the reactions produced by a model into the "dot" graph format which can
 be visualized with Graphviz.
 
@@ -72,8 +76,8 @@ def run(model, include_rate_species=False):
     model : pysb.core.Model
         The model to render.
     include_rate_species : bool
-        If True, add dashed edges from species used in expression rates to
-        the node representing the reaction.
+        If True, enable multigraph and add dashed edges from species used in
+         expression rates to the node representing the reaction.
 
     Returns
     -------
@@ -85,8 +89,12 @@ def run(model, include_rate_species=False):
                           'function')
 
     pysb.bng.generate_equations(model)
+    # Enable multigraph when include_rate_species is True
+    strict = True
+    if include_rate_species:
+        strict = False
 
-    graph = pygraphviz.AGraph(directed=True, rankdir="LR")
+    graph = pygraphviz.AGraph(directed=True, rankdir="LR", strict=strict)
     ic_species = [ic.pattern for ic in model.initials]
     for i, cp in enumerate(model.species):
         species_node = 's%d' % i
