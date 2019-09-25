@@ -446,6 +446,11 @@ def test_tags():
     # Test tag defined in rule expression but not in rate
     Rule('r2', None >> A(b=None).__matmul__(x), e_no_tag)
 
+    # Test tag with compartment
+    Compartment('c')
+    assert repr((A().__matmul__(x)) ** c) == 'A() ** c @ x'
+    assert repr((A() ** c).__matmul__(x)) == 'A() ** c @ x'
+
 
 @with_model
 def test_multi_bonds():

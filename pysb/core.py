@@ -945,7 +945,11 @@ class ComplexPattern(object):
         The new object will have references to the original compartment, and
         copies of the monomer_patterns.
         """
-        return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
+        cp = ComplexPattern([mp() for mp in self.monomer_patterns],
+                            self.compartment,
+                            self.match_once)
+        cp._tag = self._tag
+        return cp
 
     def __call__(self, conditions=None, **kwargs):
         """Build a new ComplexPattern with updated site conditions."""
@@ -1073,8 +1077,10 @@ class ComplexPattern(object):
              if idx == 0 or p._tag is None
              else '({})'.format(repr(p))
              for idx, p in enumerate(self.monomer_patterns)])
-        if self.compartment is not None:
-            ret = '(%s) ** %s' % (ret, self.compartment.name)
+        if self.compartment:
+            if len(self.monomer_patterns) > 1:
+                ret = '(%s)' % ret
+            ret += ' ** %s' % self.compartment.name
         if self.match_once:
             ret = 'MatchOnce(%s)' % ret
         if self._tag:
