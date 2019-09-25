@@ -786,7 +786,7 @@ def _parse_parameter(model, line):
             model._derived_parameters.add(p)
         elif ptype == 'ConstantExpression' and \
                 pname not in model._derived_expressions.keys():
-            p = pysb.core.Expression(pname, sympy.sympify(pval),
+            p = pysb.core.Expression(pname, parse_bngl_expr(pval),
                                      _export=False)
             model._derived_expressions.add(p)
         else:
