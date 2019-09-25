@@ -188,7 +188,7 @@ class BngSimulator(Simulator):
 
             sim_prefix = 0
             for pset_idx in range(n_param_sets):
-                for n in range(len(self.param_values[pset_idx])):
+                for n in range(len(params_names)):
                     bngfile.set_parameter(params_names[n],
                                           self.param_values[pset_idx][n])
                 for cp, values in self.initials_dict.items():

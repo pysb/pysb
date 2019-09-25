@@ -6,6 +6,20 @@ import sysconfig
 use_path = 'PYSB_PATHFINDER_IGNORE_PATH' not in os.environ
 
 _path_config = {
+    'atomizer': {
+        'name': 'Atomizer',
+        'executable': {
+            'posix': 'sbmlTranslator',
+            'nt': 'sbmlTranslator.exe'
+        },
+        'env_var': 'BNGPATH',
+        'env_var_subdir': 'bin',
+        'search_paths': {
+            'posix': ('/usr/local/share/BioNetGen/bin',),
+            'nt': ('c:/Program Files/BioNetGen/bin',)
+        },
+        'conda_install_cmd': 'conda install -c alubbock atomizer'
+    },
     'bng': {
         'name': 'BioNetGen',
         'executable': 'BNG2.pl',
@@ -14,7 +28,8 @@ _path_config = {
         'search_paths': {
             'posix': ('/usr/local/share/BioNetGen', ),
             'nt': ('c:/Program Files/BioNetGen', )
-        }
+        },
+        'conda_install_cmd': 'conda install -c alubbock bionetgen'
     },
     'kasa': {
         'name': 'KaSa (Kappa)',
@@ -26,7 +41,8 @@ _path_config = {
         'search_paths': {
             'posix': ('/usr/local/share/KaSa', ),
             'nt': ('c:/Program Files/KaSa', )
-        }
+        },
+        'conda_install_cmd': 'conda install -c alubbock kappa'
     },
     'kasim': {
         'name': 'KaSim (Kappa)',
@@ -38,7 +54,8 @@ _path_config = {
         'search_paths': {
             'posix': ('/usr/local/share/KaSim',),
             'nt': ('c:/Program Files/KaSim',)
-        }
+        },
+        'conda_install_cmd': 'conda install -c alubbock kappa'
     },
     'cupsoda': {
         'name': 'cupSODA',
@@ -50,7 +67,8 @@ _path_config = {
         'search_paths': {
             'posix': ('/usr/local/share/cupSODA',),
             'nt': ('c:/Program Files/cupSODA',)
-        }
+        },
+        'conda_install_cmd': 'conda install -c alubbock cupsoda'
     },
     'stochkit_ssa': {
         'name': 'StochKit [SSA]',
@@ -63,7 +81,8 @@ _path_config = {
         'search_paths': {
             'posix': ('/usr/local/share/StochKit', ),
             'nt': ('c:/Program Files/StochKit',)
-        }
+        },
+        'conda_install_cmd': 'conda install -c alubbock stochkit'
     },
     'stochkit_tau_leaping': {
         'name': 'StochKit [Tau Leaping]',
@@ -76,7 +95,8 @@ _path_config = {
         'search_paths': {
             'posix': ('/usr/local/share/StochKit',),
             'nt': ('c:/Program Files/StochKit',)
-        }
+        },
+        'conda_install_cmd': 'conda install -c alubbock stochkit'
     }
 }
 _path_cache = {}
@@ -116,18 +136,33 @@ def get_path(prog_name):
     # Try environment variable, if set
     if path_conf['env_var'] in os.environ:
         env_var_val = os.environ[path_conf['env_var']]
+        subdir_msg = ''
         try:
             _path_cache[prog_name] = _validate_path(prog_name, env_var_val)
             return _path_cache[prog_name]
         except ValueError:
+            try:
+                _path_cache[prog_name] = _validate_path(
+                    prog_name, os.path.join(env_var_val,
+                                            path_conf['env_var_subdir']))
+                return _path_cache[prog_name]
+            except KeyError:
+                # No subdirectory set
+                pass
+            except ValueError:
+                # Subdirectory set, but no binary found
+                subdir_msg = ', or in that path\'s "%s" subdirectory' %\
+                             path_conf['env_var_subdir']
             raise ValueError('Environment variable %s is set to %s, but the '
                              'program %s or its executable %s could not be '
-                             'found there. Check file existence and '
+                             'found there%s. Check file existence and '
                              'permissions.' % (
                                 path_conf['env_var'],
                                 env_var_val,
                                 path_conf['name'],
-                                _get_executable(prog_name)))
+                                _get_executable(prog_name),
+                                subdir_msg)
+                             )
 
     # Check the Anaconda environment, if applicable, or BINDIR
     try:
@@ -160,15 +195,24 @@ def get_path(prog_name):
         except ValueError:
             pass
 
+    try:
+        conda_install_help = '\n\nConda users can install %s using the ' \
+                             'following command:\n\n%s' % \
+                             (path_conf['name'], path_conf['conda_install_cmd'])
+    except KeyError:
+        conda_install_help = ''
+
     raise Exception('The program %s was not found in the default search '
                     'path(s) for your operating system:\n\n%s\n\nEither '
                     'install it to one of those paths, or set a custom path '
                     'using the environment variable %s or by calling the '
-                    'function %s.%s()' % (path_conf['name'],
-                                          "\n".join(search_paths),
-                                          path_conf['env_var'],
-                                          set_path.__module__,
-                                          set_path.__name__))
+                    'function %s.%s()%s' % (path_conf['name'],
+                                            "\n".join(search_paths),
+                                            path_conf['env_var'],
+                                            set_path.__module__,
+                                            set_path.__name__,
+                                            conda_install_help)
+                    )
 
 
 def set_path(prog_name, full_path):
