@@ -311,3 +311,21 @@ def test_bng_printer():
     # Min/max
     assert _bng_print(sympy.Min(x, y)) == 'min(x, y)'
     assert _bng_print(sympy.Max(x, y)) == 'max(x, y)'
+
+
+def test_parse_bngl_expression_if():
+    x, y = sympy.symbols('x y')
+    assert parse_bngl_expr('if(x>y, 1, 3)') == \
+        sympy.Piecewise((1, x > y), (3, True))
+
+
+def test_parse_bngl_expression_exponentiate():
+    x, y = sympy.symbols('x y')
+    assert parse_bngl_expr('x ^ y') == sympy.Pow(x, y)
+
+
+def test_parse_bngl_expression_and_or_equals():
+    x, y = sympy.symbols('x y')
+    assert parse_bngl_expr('x and y') == sympy.And(x, y)
+    assert parse_bngl_expr('x or y') == sympy.Or(x, y)
+    assert parse_bngl_expr('x == y') == sympy.Eq(x, y)

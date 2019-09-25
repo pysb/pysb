@@ -63,7 +63,7 @@ class PysbFlatExporter(Exporter):
         output.write("\n")
         output.write("from pysb import Model, Monomer, Parameter, Expression, "
                      "Compartment, Rule, Observable, Initial, MatchOnce, "
-                     "Annotation, MultiState, ANY, WILD\n")
+                     "Annotation, MultiState, Tag, ANY, WILD\n")
         output.write("\n")
         output.write("Model()\n")
         output.write("\n")
@@ -72,6 +72,7 @@ class PysbFlatExporter(Exporter):
         write_cset(self.model.expressions_constant())
         write_cset(self.model.compartments)
         write_cset(self.model.observables)
+        write_cset(self.model.tags)
         write_cset(self.model.expressions_dynamic())
         write_cset(self.model.rules)
         for ic in self.model.initials:

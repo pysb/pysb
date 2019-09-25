@@ -5,7 +5,7 @@ import sympy
 import collections
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
-                      Parameter, Expression
+                      Parameter, Expression, Tag
 from pysb.logging import get_logger, EXTENDED_DEBUG
 import pickle
 from pysb import __version__ as PYSB_VERSION
@@ -371,14 +371,15 @@ class Simulator(object):
 
     @property
     def param_values(self):
-        if self._params is not None and \
-                not isinstance(self._params, dict) and \
-                self._run_params is None:
-            return self._params
-        elif self._run_params is not None and \
-                not isinstance(self._run_params, dict) and \
-                self._params is None:
-            return self._run_params
+        if not self.model._derived_parameters:
+            if self._params is not None and \
+                    not isinstance(self._params, dict) and \
+                    self._run_params is None:
+                return self._params
+            elif self._run_params is not None and \
+                    not isinstance(self._run_params, dict) and \
+                    self._params is None:
+                return self._run_params
 
         # create parameter vector from the values in the model
         param_values_dict = {}
@@ -405,7 +406,12 @@ class Simulator(object):
         # _run_params, if it's not a dict
         if self._run_params is not None:
             if not isinstance(self._run_params, dict):
-                return self._run_params
+                if not self._model._derived_parameters:
+                    return self._run_params
+                else:
+                    param_values_dict.update(dict(zip(
+                        self.model.parameters.keys(), self._run_params
+                    )))
             else:
                 param_values_dict.update(self._run_params)
 
@@ -413,7 +419,10 @@ class Simulator(object):
             n_sims = 1
 
         # Get the base parameters from the model
-        param_values = np.array([p.value for p in self._model.parameters])
+        param_values = np.array(
+            [p.value for p in self._model.parameters] +
+            [p.value for p in self._model._derived_parameters]
+        )
         param_values = np.repeat([param_values], n_sims, axis=0)
         # Process overrides
         for key in param_values_dict.keys():
@@ -427,7 +436,6 @@ class Simulator(object):
             for n in range(n_sims):
                 param_values[n][pi] = param_values_dict[key][n]
 
-        # return array
         return param_values
 
     @param_values.setter
@@ -551,7 +559,9 @@ class Simulator(object):
                     "len(initials): %d" %
                     (len(self.param_values), self.initials_length))
         elif len(self.param_values.shape) != 2 or \
-                self.param_values.shape[1] != len(self._model.parameters):
+                self.param_values.shape[1] != (
+                    len(self._model.parameters) +
+                    len(self._model._derived_parameters)):
             raise ValueError(
                     "'param_values' must be a 2D array of dimension N_SIMS x "
                     "len(model.parameters).\n"
@@ -752,7 +762,7 @@ class SimulationResult(object):
             self._y = None
 
         # Calculate ``yobs`` and ``yexpr`` based on values of ``y``
-        exprs = self._model.expressions_dynamic()
+        exprs = self._model.expressions_dynamic(include_local=False)
         expr_names = [expr.name for expr in exprs]
         model_obs = self._model.observables
         obs_names = list(model_obs.keys())
