@@ -15,6 +15,7 @@ from warnings import warn
 import shutil
 import collections
 import pysb.pathfinder as pf
+import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
 
 try:
@@ -915,17 +916,16 @@ def _parse_group(model, line):
 
 
 def _convert_tokens(tokens, local_dict, global_dict):
-    from tokenize import NAME, OP
     for pos, tok in enumerate(tokens):
-        if tok == (NAME, 'if'):
-            tokens[pos] = (NAME, '__bngl_if')
+        if tok == (tokenize.NAME, 'if'):
+            tokens[pos] = (tokenize.NAME, '__bngl_if')
             local_dict['__bngl_if'] = sympy.Function('bngl_if')
-        elif tok == (OP, '^'):
-            tokens[pos] = (OP, '**')
-        elif tok == (NAME, 'and'):
-            tokens[pos] = (OP, '&')
-        elif tok == (NAME, 'or'):
-            tokens[pos] = (OP, '|')
+        elif tok == (tokenize.OP, '^'):
+            tokens[pos] = (tokenize.OP, '**')
+        elif tok == (tokenize.NAME, 'and'):
+            tokens[pos] = (tokenize.OP, '&')
+        elif tok == (tokenize.NAME, 'or'):
+            tokens[pos] = (tokenize.OP, '|')
     return tokens
 
 
