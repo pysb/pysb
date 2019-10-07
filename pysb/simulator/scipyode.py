@@ -167,6 +167,8 @@ class ScipyOdeSimulator(Simulator):
         # ODE RHS -----------------------------------------------
         self._eqn_subs = {e: e.expand_expr(expand_observables=True) for
                           e in self._model.expressions}
+        self._eqn_subs.update({e: e.expand_expr(expand_observables=True) for
+                               e in self._model._derived_expressions})
         ode_mat = sympy.Matrix(self.model.odes).subs(self._eqn_subs)
 
         if compiler_mode is None:
@@ -315,6 +317,8 @@ class ScipyOdeSimulator(Simulator):
                             i, j, eqn_repr(entry))
                         jac_eqs_list.append(jac_eq_str)
                 jac_eqs = str(self._eqn_substitutions('\n'.join(jac_eqs_list)))
+                if '# Not supported in Python' in jac_eqs:
+                    raise ValueError('Analytic Jacobian calculation failed')
 
                 # Allocate jac array here, once, and initialize to zeros.
                 jac = np.zeros(
@@ -478,6 +482,9 @@ class ScipyOdeSimulator(Simulator):
         # Substitute 'p[i]' for any named parameters
         for i, p in enumerate(self._model.parameters):
             eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
+        for i, p in enumerate(self._model._derived_parameters):
+            eqns = re.sub(r'\b(%s)\b' % p.name,
+                          'p[%d]' % (i + len(self._model.parameters)), eqns)
         return eqns
 
     def run(self, tspan=None, initials=None, param_values=None,
@@ -615,6 +622,9 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
 
 def _get_rhs(compiler, code_eqs, ydot=None, jac=None, compiler_directives=None):
     if compiler == 'cython':
+        if 'math.' in code_eqs:
+            code_eqs = 'import math\n' + code_eqs
+
         def rhs(t, y, p):
             # note that the evaluated code sets ydot as a side effect
             Cython.inline(code_eqs, quiet=True,

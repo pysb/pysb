@@ -2,6 +2,8 @@ from pysb.testing import *
 from pysb.core import *
 from functools import partial
 from nose.tools import assert_raises
+import operator
+import unittest
 
 
 @with_model
@@ -31,6 +33,32 @@ def test_component_name_existing_attribute():
 def test_component_names_invalid():
     for name in 'a!', '!B', 'A!bC~`\\', '_!', '_!7', '__a01b  999x_x___!':
         assert_raises(InvalidComponentNameError, Component, name, _export=False)
+
+@with_model
+def test_function_introspection():
+    # Case 1: Component defined inside function
+    Monomer('A')
+    assert A._function == 'test_function_introspection'
+
+    # Case 2: Component defined inside nested function
+    def define_monomer_b():
+        Monomer('B')
+    define_monomer_b()
+    assert B._function == 'define_monomer_b'
+
+    # Case 3: Component defined by macro
+    from pysb.macros import equilibrate
+    equilibrate(A(), B(), [1, 1])
+
+    assert model.rules['equilibrate_A_to_B']._function == 'equilibrate'
+
+    # Case 4: Component defined by macro inside function
+    def define_macro_inside_function():
+        Monomer('C')
+        equilibrate(A(), C(), [2, 2])
+    define_macro_inside_function()
+    assert model.rules['equilibrate_A_to_C']._function == 'equilibrate'
+
 
 def test_monomer():
     sites = ['x', 'y', 'z']
@@ -360,6 +388,15 @@ def test_expression_type():
 
 
 @with_model
+def test_expression_evaluation():
+    Parameter('k1', 10)
+    Expression('k2', 2 * k1)
+    Expression('k3', k2/2)
+    assert int(k2.get_value()) == 20
+    assert int(k3.get_value()) == 10
+
+
+@with_model
 def test_synth_requires_concrete():
     Monomer('A', ['s'], {'s': ['a', 'b']})
     Parameter('kA', 1.0)
@@ -377,6 +414,42 @@ def test_rulepattern_match_none_against_state():
     # A(phospho=None) should match unbound A regardless of phospho state,
     # so this should be a valid rule pattern
     A(phospho=None) + A(phospho=None) >> A(phospho=1) % A(phospho=1)
+
+
+@with_model
+def test_tags():
+    Monomer('A', ['b'])
+    Tag('x')
+
+    # Use __matmul__ instead of @ for Python 2.7 support in tests
+    assert repr(x) == "Tag('x')"
+    assert repr(x.__matmul__(A()) % A()) == 'x @ A() % A()'
+    assert repr((A() % A()).__matmul__(x)) == 'A() % A() @ x'
+
+    # Postfix tags should auto-upgrade a MonomerPattern to a ComplexPattern
+    assert isinstance(A().__matmul__(x), ComplexPattern)
+
+    # Trying to extend a tagged complex should fail - the tag should always
+    # be specified last
+    assert_raises(ValueError, operator.mod, (A(b=1) % A(b=1)).__matmul__(x),
+                  A(b=1))
+
+    Observable('o1', A(b=None))
+
+    # Create an expression containing a tag
+    Expression('e_no_tag', o1 ** 2)
+    Expression('e_tag', o1(x) ** 2)
+
+    # Test tag defined in rate but not in rule expression
+    assert_raises(ValueError, Rule, 'r1', None >> A(b=None), e_tag)
+
+    # Test tag defined in rule expression but not in rate
+    Rule('r2', None >> A(b=None).__matmul__(x), e_no_tag)
+
+    # Test tag with compartment
+    Compartment('c')
+    assert repr((A().__matmul__(x)) ** c) == 'A() ** c @ x'
+    assert repr((A() ** c).__matmul__(x)) == 'A() ** c @ x'
 
 
 @with_model
@@ -465,6 +538,7 @@ def test_invalid_observable():
     assert_raises(InvalidReactionPatternException,
                   Observable, 'o1', 'invalid_pattern')
     assert len(model.observables) == 0
+
 
 @with_model
 def test_update_initial_condition():
