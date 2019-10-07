@@ -26,7 +26,7 @@ class KappaSimulator(Simulator):
             output_dir=None, output_file_basename=None,
             cleanup=None, **additional_args):
         """
-        Simulate a model using BioNetGen
+        Simulate a model using Kappa
 
         Parameters
         ----------
@@ -57,18 +57,19 @@ class KappaSimulator(Simulator):
         additional_args: kwargs, optional
             Additional arguments to pass to Kappa
 
-            * seed : int, optional
-                Random number seed for Kappa simulation
-            * perturbation : string, optional
-                Optional perturbation language syntax to be appended to the
-                Kappa file. See KaSim manual for more details.
+                * seed : int, optional
+                    Random number seed for Kappa simulation
+
+                * perturbation : string, optional
+                    Optional perturbation language syntax to be appended to the
+                    Kappa file. See KaSim manual for more details.
 
         Examples
         --------
 
         >>> import numpy as np
         >>> from pysb.examples import michment
-        >>> from pysb.simulator.kappa import KappaSimulator
+        >>> from pysb.simulator import KappaSimulator
         >>> sim = KappaSimulator(michment.model, tspan=np.linspace(0, 1))
         >>> x = sim.run(n_runs=1)
 
