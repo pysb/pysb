@@ -59,6 +59,9 @@ class KappaSimulator(Simulator):
 
             * seed : int, optional
                 Random number seed for Kappa simulation
+            * perturbation : string, optional
+                Optional perturbation language syntax to be appended to the
+                Kappa file. See KaSim manual for more details.
 
         Examples
         --------
@@ -103,13 +106,26 @@ class KappaSimulator(Simulator):
 
         base_args = ['-u', 'time', '-l', str(time), '-p', '%.5f' % plot_period]
         if 'seed' in additional_args:
-            base_args.extend(['-seed', str(additional_args['seed'])])
+            seed = additional_args.pop('seed')
+            base_args.extend(['-seed', str(seed)])
 
         kasim_path = pf.get_path('kasim')
         n_param_sets = self.initials_length
 
         gen = KappaGenerator(self.model, _exclude_ic_param=True)
         file_data_base = gen.get_content()
+
+        # Check if a perturbation has been set
+        try:
+            perturbation = additional_args.pop('perturbation')
+        except KeyError:
+            perturbation = None
+
+        # Check no unknown arguments have been set
+        if additional_args:
+            raise ValueError('Unknown argument(s): {}'.format(
+                ', '.join(additional_args.keys())
+            ))
 
         # Kappa column names, for sanity check
         kappa_col_names = tuple(['time'] +
@@ -128,6 +144,11 @@ class KappaSimulator(Simulator):
                     file_data += "%init: {} {}\n".format(
                         values[pset_idx], gen.format_complexpattern(cp)
                     )
+
+                # If any perturbation language code has been passed in, add it
+                # to the Kappa file:
+                if perturbation:
+                    file_data += '%s\n' % perturbation
 
                 # Generate the Kappa model code from the PySB model and write
                 # it to the Kappa file:

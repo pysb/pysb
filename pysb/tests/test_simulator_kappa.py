@@ -3,6 +3,7 @@ from pysb.kappa import run_simulation
 from pysb.examples import michment
 from pysb.bng import generate_equations
 import numpy as np
+from nose.tools import raises
 
 
 KAPPA_SEED = 123
@@ -16,12 +17,21 @@ def _compare_kappa_sims(run_simulation_output, kappasimulator_output):
 
 
 def test_kappa_sim_michment():
-    orig_sim = run_simulation(michment.model, time=100, points=100, seed=123)
+    perturbation = '%init: 12 E(s[.])'
+
+    orig_sim = run_simulation(michment.model, time=100, points=100,
+                              seed=KAPPA_SEED, perturbation=perturbation)
 
     sim = KappaSimulator(michment.model, tspan=np.linspace(0, 100, 101))
-    x = sim.run(seed=KAPPA_SEED)
+    x = sim.run(seed=KAPPA_SEED, perturbation=perturbation)
 
     _compare_kappa_sims(orig_sim, x)
+
+
+@raises(ValueError)
+def test_kappa_sim_invalid_arg():
+    sim = KappaSimulator(michment.model, tspan=range(10))
+    sim.run(spam='eggs')
 
 
 def test_kappa_2sims():
