@@ -150,7 +150,7 @@ class KappaSimulator(Simulator):
                                          stderr=subprocess.PIPE,
                                          cwd=base_directory)
 
-                    for line in iter(p.stdout.readline, b''):
+                    for line in p.stdout:
                         self._logger.debug('@@' + line.decode('utf8')[:-1])
                     (p_out, p_err) = p.communicate()
 
