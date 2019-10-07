@@ -15,7 +15,7 @@ import shutil
 from pysb.pathfinder import get_path
 import sympy
 import collections
-
+import itertools
 try:
     import pandas as pd
 except ImportError:
@@ -553,6 +553,9 @@ class CupSodaSimulator(Simulator):
             time_max.write(str(float(self.tspan[-1])))
 
     def _get_cmatrix(self):
+        if self.model.tags:
+            raise ValueError('cupSODA does not currently support local '
+                             'functions')
         self._logger.debug("Constructing the c_matrix:")
         c_matrix = np.zeros((len(self.param_values), self._len_rxns))
         par_names = [p.name for p in self._model_parameters_rules]

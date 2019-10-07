@@ -146,6 +146,10 @@ class CompartmentsNotSupported(ExportError, NotImplementedError):
     """ Compartments are not supported by this exporter """
 
 
+class LocalFunctionsNotSupported(ExportError, NotImplementedError):
+    """ Local functions are not supported by this exporter """
+
+
 def export(model, format, docstring=None):
     """Top-level function for exporting a model to a given format.
 
