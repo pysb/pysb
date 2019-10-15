@@ -2514,6 +2514,10 @@ class RedundantSiteConditionsError(ValueError):
 class DanglingBondError(ValueError):
     pass
 
+
+class ReusedBondError(ValueError):
+    pass
+
 # Some light infrastructure for defining symbols that act like "keywords", i.e.
 # they are immutable singletons that stringify to their own name. Regular old
 # classes almost fit the bill, except that their __str__ method prepends the
