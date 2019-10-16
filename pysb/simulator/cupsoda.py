@@ -15,7 +15,6 @@ import shutil
 from pysb.pathfinder import get_path
 import sympy
 import collections
-import itertools
 try:
     import pandas as pd
 except ImportError:

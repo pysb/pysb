@@ -782,15 +782,15 @@ def _parse_parameter(model, line):
     _, pname, pval, _, ptype = line.strip().split()
     par_names = model.components.keys()
     if pname not in par_names:
+        # Need to parse the value even for constants, since BNG considers some
+        # expressions to be "Constant", e.g. "2^2"
+        parsed_expr = parse_bngl_expr(pval)
         if ptype == 'Constant' and pname not in model._derived_parameters.keys():
-            # Need to parse the value, since BNG considers some expressions
-            # to be "Constant", e.g. "2^2"
-            p = pysb.core.Parameter(pname, parse_bngl_expr(pval), _export=False)
+            p = pysb.core.Parameter(pname, parsed_expr, _export=False)
             model._derived_parameters.add(p)
         elif ptype == 'ConstantExpression' and \
                 pname not in model._derived_expressions.keys():
-            p = pysb.core.Expression(pname, parse_bngl_expr(pval),
-                                     _export=False)
+            p = pysb.core.Expression(pname, parsed_expr, _export=False)
             model._derived_expressions.add(p)
         else:
             raise ValueError('Unknown type {} for parameter {}'.format(
