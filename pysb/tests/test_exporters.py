@@ -47,6 +47,8 @@ def check_convert(model, format):
         pass
     except export.CompartmentsNotSupported:
         pass
+    except export.LocalFunctionsNotSupported:
+        pass
     except Exception as e:
         # Some example models are deliberately incomplete, so here we
         # will treat any of these "expected" exceptions as a success.

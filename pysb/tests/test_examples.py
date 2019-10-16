@@ -3,6 +3,7 @@ from pysb.core import SelfExporter
 import traceback
 import os
 import importlib
+import sys
 
 
 def test_generate_network():
@@ -18,6 +19,11 @@ def get_example_models():
         if filename.endswith('.py') and not filename.startswith('run_') \
                and not filename.startswith('__'):
             modelname = filename[:-3]  # strip .py
+
+            if modelname == 'localfunc' and sys.version_info.major < 3:
+                # Uses __matmul__ for local function, skip it on Python 2.7
+                continue
+
             package = 'pysb.examples.' + modelname
             module = importlib.import_module(package)
             # Reset do_export to the default in case the model changed it.
