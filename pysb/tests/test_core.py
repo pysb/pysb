@@ -556,3 +556,12 @@ def test_update_initial_condition():
 
 def test_model_not_defined():
     assert_raises(ModelNotDefinedError, Monomer, 'A')
+
+
+@raises(ReusedBondError)
+@with_model
+def test_bind_multiple():
+    Monomer('A', ['a'])
+    Monomer('B', ['b'])
+
+    as_reaction_pattern(A(a=1) % B(b=1) % B(b=1))

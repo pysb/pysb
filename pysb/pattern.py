@@ -1,6 +1,7 @@
 import collections
 from .core import ComplexPattern, MonomerPattern, Monomer, \
-    ReactionPattern, ANY, as_complex_pattern, DanglingBondError, Rule
+    ReactionPattern, ANY, as_complex_pattern, DanglingBondError, \
+    ReusedBondError, Rule
 import networkx as nx
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
@@ -254,6 +255,12 @@ def check_dangling_bonds(pattern):
     if dangling_bonds:
         raise DanglingBondError('Dangling bond(s) {} in {}'
                                 .format(dangling_bonds, pattern))
+
+    reused_bonds = [bond for bond, count in bond_counts.items()
+                    if count > 2]
+    if reused_bonds:
+        raise ReusedBondError('Bond(s) {} used more than twice in pattern '
+                              '{}'.format(reused_bonds, pattern))
 
 
 def _match_graphs(pattern, candidate, exact, count):
