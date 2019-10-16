@@ -6,7 +6,7 @@ from sympy.core import S
 import collections
 import re
 import pysb.logging
-from pysb.export import CompartmentsNotSupported
+from pysb.export import CompartmentsNotSupported, LocalFunctionsNotSupported
 # Alias basestring under Python 3 for forwards compatibility
 try:
     basestring
@@ -19,8 +19,11 @@ class KappaGenerator(object):
     # Dialect can be either 'complx' or 'kasim' (default)
     def __init__(self, model, dialect='kasim', _warn_no_ic=True,
                  _exclude_ic_param=False):
-        if model and model.compartments:
-            raise CompartmentsNotSupported()
+        if model:
+            if model.compartments:
+                raise CompartmentsNotSupported()
+            if model.tags:
+                raise LocalFunctionsNotSupported()
         self.model = model
         self.__content = None
         self.dialect = dialect
