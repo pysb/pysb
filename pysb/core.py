@@ -1842,6 +1842,8 @@ class Model(object):
     def __setstate__(self, state):
         # restore the 'model' weakrefs on all components
         self.__dict__.update(state)
+        # Set "tags" attribute, for pickled models from PySB <1.10
+        self.__dict__.setdefault('tags', ComponentSet())
         for c in self.all_components():
             c.model = weakref.ref(self)
 
