@@ -14,6 +14,7 @@ try:
 except ImportError:
     roadrunner = None
 from nose.plugins.skip import SkipTest
+from pysb.importers.json import model_from_json
 
 
 # Pairs of model, format that are expected to be incompatible.
@@ -98,3 +99,6 @@ def check_convert(model, format):
                     print(pd.DataFrame(dict(rr=rr_obs, pysb=py_obs)))
                     raise ValueError('Model {}, observable__o{} "{}" trajectories do not match:'.format(
                         model.name, obs_idx, model.observables[obs_idx].name))
+        elif format == 'json':
+            # Round-trip the model by re-importing the JSON
+            model_from_json(exported_file)
