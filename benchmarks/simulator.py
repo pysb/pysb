@@ -1,4 +1,4 @@
-from pysb.examples import earm_1_0, schlogl
+from pysb.examples import earm_1_0, schloegl
 from pysb.simulator import ScipyOdeSimulator, CupSodaSimulator, \
     StochKitSimulator, CUDASimulator, OpenCLSimulator
 import numpy as np
@@ -52,7 +52,7 @@ class SSASchlogl(object):
     def setup(self):
         self.nsims = 100
         self.timer = timeit.default_timer
-        self.model = schlogl.model
+        self.model = schloegl.model
         self.tspan = np.linspace(0, 100, 101)
         self.stochkit_sim = StochKitSimulator(self.model, tspan=self.tspan)
         self.cuda_ssa_sim = CUDASimulator(self.model, tspan=self.tspan)

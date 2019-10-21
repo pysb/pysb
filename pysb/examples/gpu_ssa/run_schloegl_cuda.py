@@ -1,5 +1,5 @@
 """
-Example of using OpenCLSimulator for SSA simulations.
+Example of using CUDASimulator for SSA simulations.
 
 
 This example uses the schlogl model.
@@ -9,9 +9,9 @@ the model.
 """
 import matplotlib.pyplot as plt
 import numpy as np
-from pysb.examples.schlogl import model
+from pysb.examples.schloegl import model
 from pysb.integrate import odesolve
-from pysb.simulator import OpenCLSimulator
+from pysb.simulator.cuda_ssa import CUDASimulator
 
 
 def run(n_sim=100, x_0=100):
@@ -30,10 +30,10 @@ def run(n_sim=100, x_0=100):
     tspan = np.linspace(0, 100, 101)
     x_0 = int(x_0)
     model.parameters['X_0'].value = x_0
-    savename = 'schlogl_{}'.format(int(x_0))
+    savename = 'schloegl_{}'.format(int(x_0))
 
     # create simulator and run simulations
-    traj = OpenCLSimulator(model).run(tspan, number_sim=n_sim)
+    traj = CUDASimulator(model).run(tspan, number_sim=n_sim)
     x = traj.dataframe[obs_name].unstack(0).values
 
     # create line traces
@@ -89,5 +89,5 @@ def vary_x():
 
 
 if __name__ == '__main__':
-    run(100, 100)
-    # vary_x()
+    # run(100, 100)
+    vary_x()

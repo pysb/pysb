@@ -59,24 +59,23 @@ class SSABase(Simulator):
             stoich_string += '\n'
         hazards_string = ''
         pattern = "(__s\d+)\*\*(\d+)"
+        expr_strings = {
+            e.name: '(%s)' % sympy.ccode(
+                e.expand_expr(expand_observables=True)
+            ) for e in self.model.expressions}
         for n, rxn in enumerate(self._model.reactions):
-
             hazards_string += "\th[%s] = " % repr(n)
             rate = sympy.fcode(rxn["rate"])
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
             # Create expression strings with observables
-            expr_strings = {
-                e.name: '(%s)' % sympy.ccode(
-                    e.expand_expr(expand_observables=True)
-                ) for e in self.model.expressions}
             # expand only expressions used in the rate eqn
             for e in {sym for sym in rxn["rate"].atoms()
                       if isinstance(sym, Expression)}:
                 rate = re.sub(r'\b%s\b' % e.name,
                               expr_strings[e.name],
                               rate)
-
+            # replace x**2 with (x-1)*x
             matches = re.findall(pattern, rate)
             for m in matches:
                 repl = m[0]
@@ -90,18 +89,12 @@ class SSABase(Simulator):
             # replace param names with vector notation
             for q, prm in enumerate(params_names):
                 rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
-            items = rate.split('*')
 
-            # create rate string. Places param_vec upfront to ensure that
-            # the resulting value is a double (type of param_vec) and not
-            # degraded to an int
-            rate = [i for i in sorted(items) if i.startswith('param_vec')]
-            rate += [i for i in sorted(items) if not i.startswith('param_vec')]
-            rate = "*".join(rate)
             rate = re.sub('\*$', '', rate)
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
             rate = rate.replace('pow', 'powf')
+            rate = '(double)' + rate
             hazards_string += rate + ";\n"
         return dict(n_species=self._n_species, n_params=self._parameter_number,
                     n_reactions=_reaction_number, hazards=hazards_string,

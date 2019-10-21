@@ -1,6 +1,4 @@
 from __future__ import print_function
-
-#
 try:
     import pycuda
     import pycuda.autoinit
@@ -15,10 +13,11 @@ except ImportError:
 import numpy as np
 import os
 import time
+import warnings
 from pysb.logging import setup_logger
 import logging
 from pysb.pathfinder import get_path
-from pysb.simulator.base import SimulationResult, SimulatorException
+from pysb.simulator.base import SimulationResult
 from pysb.simulator.ssa_base import SSABase
 
 
@@ -52,6 +51,9 @@ class CUDASimulator(SSABase):
         model.parameters.
     verbose : bool, optional (default: False)
         Verbose output.
+    precision : (np.float64, np.flaot32)
+        Precision for ssa simulation. Default is np.float64. float32 should
+        be used with caution.
 
     Attributes
     ----------
@@ -64,7 +66,8 @@ class CUDASimulator(SSABase):
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
-    def __init__(self, model, verbose=False, tspan=None, **kwargs):
+    def __init__(self, model, verbose=False, tspan=None, precision=np.float64,
+                 **kwargs):
         if pycuda is None:
             raise ImportError('pycuda library required for {}'
                               ''.format(self.__class__.__name__))
@@ -72,15 +75,26 @@ class CUDASimulator(SSABase):
 
         self.tspan = tspan
         self.verbose = verbose
-
         # private attribute
-        self._parameter_number = len(self._model.parameters)
-        self._n_species = len(self._model.species)
-        self._n_reactions = len(self._model.reactions)
         self._step_0 = True
 
         template_code = _load_template()
         self._code = template_code.format(**self._get_template_args())
+
+        if precision not in (np.float64, np.float32):
+            raise TypeError("CUDASimulator can only use np.float64 or "
+                            "np.float32 precisions")
+        self._dtype = precision
+        if self._dtype == np.float32:
+            self._code = self._code.replace('double', 'float')
+            self._code = self._code.replace('USE_DP', 'USE_FLOAT')
+            warnings.warn("Should be cautious using single precision")
+        if verbose == 2:
+            self._code = self._code.replace('//#define VERBOSE',
+                                            '#define VERBOSE')
+        elif verbose > 3:
+            self._code = self._code.replace('//#define VERBOSE',
+                                            '#define VERBOSE_MAX')
 
         self._ssa_all = None
         self._kernel = None
@@ -141,7 +155,7 @@ class CUDASimulator(SSABase):
             tspan = self.tspan
 
         tout = [tspan] * self.num_sim
-        t_out = np.array(tspan, dtype=np.float64)
+        t_out = np.array(tspan, dtype=self._dtype)
 
         # set default threads per block
         if threads_per_block is None:
@@ -164,7 +178,7 @@ class CUDASimulator(SSABase):
         timer_start = time.time()
         param_array_gpu = gpuarray.to_gpu(
             self._create_gpu_array(self.param_values, total_threads,
-                                   np.float64)
+                                   self._dtype)
         )
 
         species_matrix_gpu = gpuarray.to_gpu(
@@ -172,7 +186,7 @@ class CUDASimulator(SSABase):
         )
 
         # allocate and upload time to GPU
-        time_points_gpu = gpuarray.to_gpu(np.array(t_out, dtype=np.float64))
+        time_points_gpu = gpuarray.to_gpu(np.array(t_out, dtype=self._dtype))
 
         # allocate space on GPU for results
         result = driver.managed_zeros(

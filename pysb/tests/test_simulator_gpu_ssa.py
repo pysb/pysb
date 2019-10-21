@@ -1,7 +1,7 @@
 import numpy as np
 from nose.plugins.attrib import attr
 from nose.tools import ok_
-from pysb.examples.schlogl import model
+from pysb.examples.schloegl import model
 from pysb.simulator import CUDASimulator, OpenCLSimulator
 
 

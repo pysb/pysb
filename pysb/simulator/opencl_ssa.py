@@ -1,9 +1,9 @@
 from __future__ import print_function
-
 import random
 import numpy as np
 import os
 import time
+import warnings
 try:
     import pyopencl as cl
     from pyopencl import array as ocl_array
@@ -14,7 +14,7 @@ except ImportError:
     ocl_array = None
 
 from pysb.bng import generate_equations
-from pysb.simulator.base import SimulationResult, SimulatorException
+from pysb.simulator.base import SimulationResult
 from pysb.simulator.cuda_ssa import SSABase
 
 
@@ -48,10 +48,10 @@ class OpenCLSimulator(SSABase):
         model.parameters.
     verbose : bool, optional (default: False)
         Verbose output.
-    device : str
-        {'cpu', 'gpu'}
-    multi_gpu : bool
-        If device=gpu, will use multiple gpus for opencl run
+    precision : (np.float64, np.flaot32)
+        Precision for ssa simulation. Default is np.float64. float32 should
+        be used with caution.
+
     Attributes
     ----------
     verbose: bool
@@ -63,8 +63,7 @@ class OpenCLSimulator(SSABase):
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
-    def __init__(self, model, verbose=False, tspan=None, device='gpu',
-                 multi_gpu=False,
+    def __init__(self, model, verbose=False, tspan=None, precision=np.float64,
                  **kwargs):
 
         if cl is None:
@@ -77,20 +76,22 @@ class OpenCLSimulator(SSABase):
         self.tout = None
         self.tspan = tspan
         self.verbose = verbose
-        self.multi_gpu = multi_gpu
 
         # private attribute
-        self._parameter_number = len(self._model.parameters)
-        self._n_species = len(self._model.species)
-        self._n_reactions = len(self._model.reactions)
         self._step_0 = True
         template_code = _load_template()
         self._code = template_code.format(**self._get_template_args())
-        if device is None:
-            device = 'gpu'
-        if device not in ('gpu', 'cpu'):
-            raise AssertionError("device arg must be 'cpu' or 'gpu'")
-        self._device = device
+        self._dtype = precision
+        if self._dtype == np.float32:
+            self._code = self._code.replace('double', 'float')
+            self._code = self._code.replace('USE_DP', 'USE_FLOAT')
+            warnings.warn("Should be cautious using single precision")
+        if verbose == 2:
+            self._code = self._code.replace('//#define VERBOSE',
+                                            '#define VERBOSE')
+        elif verbose > 3:
+            self._code = self._code.replace('//#define VERBOSE',
+                                            '#define VERBOSE_MAX')
         self._logger.info("Initialized OpenCLSimulator class")
 
     def _compile(self):
@@ -99,34 +100,36 @@ class OpenCLSimulator(SSABase):
             self._logger.info("Output OpenCl file to ssa_opencl_code.cl")
             with open("ssa_opencl_code.cl", "w") as source_file:
                 source_file.write(self._code)
-        # This prints off all the options per device and platform
-        self._logger.info("Platforms availables")
 
-        to_device = {'cpu': device_type.CPU, 'gpu': device_type.GPU}
-        device = to_device[self._device.lower()]
-        platforms = [i for i in cl.get_platforms()
-                     if len(i.get_devices(device_type=device))]
-        if not len(platforms):
-            raise Exception("Cannot find a platform with {} "
-                            "devices".format(self._device))
-        for i in platforms:
-            if len(i.get_devices(device_type=to_device[self._device])) > 0:
-                self._logger.info("\t{}".format(i.name))
-                for j in i.get_devices():
-                    self._logger.info("\t\t{}".format(j.name))
-                devices = i.get_devices(device_type=to_device[self._device])
-        if len(devices) > 1:
-            if not self.multi_gpu:
-                self._logger.info("Only use 1 of {} gpus".format(len(devices)))
-                devices = [devices[0]]
-        self._logger.info("Using platform {}".format(platforms[0].name))
-        self._logger.info("Using device(s) {}".format(
-            ','.join(i.name for i in devices))
+        # allow users to select platform and devices
+        self.context = cl.create_some_context(True)
+        devices = self.context.get_info(cl.context_info.DEVICES)
+        # get platform of device (only one platform can be used, so using
+        # first device will work )
+        platform = devices[0].get_info(cl.device_info.PLATFORM)
+
+        # check if a cpu, if so, we will change the work group size in run
+        cpu_devices = platform.get_devices(device_type.CPU)
+        use_cpu = len([i for i in cpu_devices if i in devices])
+
+        # have not used FPGA but assumption is that it will require more
+        # work, so assume gpu for now
+        if use_cpu:
+            self._local_work_size = (1, 1)
+        # cuda uses a workgroup of 32, while amd/intel uses 64. Use in run
+        elif 'CUDA' in platform.name.upper():
+            self._local_work_size = (32, 1)
+        else:
+            self._local_work_size = (64, 1)
+
+        self.queue = cl.CommandQueue(self.context, )
+
+        self.program = cl.Program(self.context, self._code).build(
+            options=[
+                '-cl-no-signed-zeros',
+                '-cl-mad-enable',
+            ]
         )
-        # need to let the users select this
-        self.context = cl.Context(devices)
-        self.queue = cl.CommandQueue(self.context)
-        self.program = cl.Program(self.context, self._code).build()
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0):
         """
@@ -153,9 +156,13 @@ class OpenCLSimulator(SSABase):
         super(OpenCLSimulator, self).run(tspan=tspan, initials=initials,
                                          param_values=param_values,
                                          number_sim=number_sim)
-
+        if tspan is None:
+            if self.tspan is None:
+                raise Exception("Please provide tspan")
+            else:
+                tspan = self.tspan
         # tspan for each simulation
-        t_out = np.array(tspan, dtype=np.float64)
+        t_out = np.array(tspan, dtype=self._dtype)
         # compile kernel and send parameters to GPU
         if self._step_0:
             self._setup()
@@ -166,13 +173,14 @@ class OpenCLSimulator(SSABase):
         # transfer the array of time points to the device
         time_points_gpu = ocl_array.to_device(
             self.queue,
-            np.array(t_out, dtype=np.float64)
+            np.array(t_out, dtype=self._dtype)
         )
 
-        # transfer the array of time points to the device
+        # transfer the array of seeds to the device
         random_seeds_gpu = ocl_array.to_device(
             self.queue,
-            np.array(random.sample(range(2 ** 32), self.num_sim))
+            np.array(random.sample(range(2 ** 32 - 1), self.num_sim),
+                     dtype=np.uint32)
         )
 
         # transfer the data structure of
@@ -180,7 +188,7 @@ class OpenCLSimulator(SSABase):
         # to the device
         param_array_gpu = ocl_array.to_device(
             self.queue,
-            self.param_values.astype(np.float64).flatten(order='C')
+            self.param_values.astype(self._dtype).flatten(order='C')
         )
 
         species_matrix_gpu = ocl_array.to_device(
@@ -191,26 +199,35 @@ class OpenCLSimulator(SSABase):
         result_gpu = ocl_array.zeros(
             self.queue,
             order='C',
-            shape=(self.num_sim * len(t_out) * self._n_species,),
+            shape=(self.num_sim * t_out.shape[0] * self._n_species,),
             dtype=np.uint32
         )
 
         elasped_t = time.time() - timer_start
         self._logger.info("Completed transfer in: {:.4f}s".format(elasped_t))
+        global_work_size = (self.num_sim, 1)
 
-        self._logger.info("Starting {} simulations".format(number_sim))
+        self._logger.debug("Starting {} simulations with {} workers "
+                           "and {} steps".format(number_sim, global_work_size,
+                                                 self._local_work_size))
         timer_start = time.time()
+        if self.num_sim < self._local_work_size[0]:
+            local_work_size = (self.num_sim, 1)
+        else:
+            local_work_size = self._local_work_size
+
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
             self.queue,
-            (self.num_sim, 1,),
-            None,
+            global_work_size,
+            local_work_size,
             species_matrix_gpu.data,
             result_gpu.data,
             time_points_gpu.data,
             param_array_gpu.data,
             random_seeds_gpu.data,
-            np.int64(len(t_out)),
+            np.uint32(len(t_out)),
+            np.uint32(self.num_sim)
         )
         complete_event.wait()
         self._time = time.time() - timer_start
@@ -218,10 +235,12 @@ class OpenCLSimulator(SSABase):
                           "in {:.4f}s".format(number_sim, self._time))
 
         # retrieve and store results
-        tout = np.array([tspan] * self.num_sim)
-        res = result_gpu.get(self.queue)
+        timer_start = time.time()
+        res = result_gpu.get(self.queue, async_=True)
+        self._logger.info("Retrieved trajectories in {:.4f}s"
+                          "".format(time.time() - timer_start))
         res = res.reshape((self.num_sim, len(t_out), self._n_species))
-
+        tout = np.array([tspan] * self.num_sim)
         return SimulationResult(self, tout, res)
 
     def _setup(self):
