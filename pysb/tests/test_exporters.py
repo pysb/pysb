@@ -6,6 +6,7 @@ Based on code submitted in a PR by @keszybz in pysb/pysb#113
 """
 from pysb.tests.test_examples import get_example_models, expected_exceptions
 from pysb import export
+from pysb.export.json import JsonExporter
 from pysb.simulator import ScipyOdeSimulator
 import numpy as np
 import pandas as pd
@@ -43,7 +44,10 @@ def check_convert(model, format):
     """ Test exporters run without error """
     exported_file = None
     try:
-        exported_file = export.export(model, format)
+        if format == 'json':
+            exported_file = JsonExporter(model).export(include_netgen=True)
+        else:
+            exported_file = export.export(model, format)
     except export.ExpressionsNotSupported:
         pass
     except export.CompartmentsNotSupported:

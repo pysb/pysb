@@ -7,8 +7,9 @@ for :py:mod:`pysb.export`.
 
 from __future__ import absolute_import
 from pysb.export import Exporter
+from pysb.bng import generate_equations
 import json
-from pysb.core import Model, MultiState, KeywordMeta
+from pysb.core import Model, MultiState, KeywordMeta, Parameter, Expression
 
 
 class JsonExporter(Exporter):
@@ -18,16 +19,23 @@ class JsonExporter(Exporter):
     basic functionality for all exporters.
     """
 
-    def export(self):
+    def export(self, include_netgen=False):
         """Generate the corresponding JSON for the PySB model associated
         with the exporter.
+
+        Parameters
+        ----------
+        include_netgen: bool
+            Include cached network generation data (reactions, species,
+            local function-derived parameters and expressions) if True.
 
         Returns
         -------
         string
             The JSON output for the model.
         """
-        return json.dumps(self.model, cls=PySBJSONEncoder)
+        return json.dumps(self.model, cls=PySBJSONWithNetworkEncoder
+                          if include_netgen else PySBJSONEncoder)
 
 
 class PySBJSONEncoder(json.JSONEncoder):
@@ -186,3 +194,35 @@ class PySBJSONEncoder(json.JSONEncoder):
             return self.encode_keyword(o)
 
         return super(PySBJSONEncoder, self).default(o)
+
+
+class PySBJSONWithNetworkEncoder(PySBJSONEncoder):
+    @classmethod
+    def encode_reaction(cls, rxn):
+        rxn = rxn.copy()
+        rxn['rate'] = rxn['rate'].name \
+            if isinstance(rxn['rate'], (Parameter, Expression)) \
+            else str(rxn['rate'])
+        return rxn
+
+    @classmethod
+    def encode_model(cls, model):
+        d = super(PySBJSONWithNetworkEncoder, cls).encode_model(model)
+
+        # Ensure network generation has taken place
+        generate_equations(model)
+
+        additional_encoders = {
+            '_derived_parameters': cls.encode_parameter,
+            '_derived_expressions': cls.encode_expression,
+            'reactions': cls.encode_reaction,
+            'reactions_bidirectional': cls.encode_reaction,
+            'species': cls.encode_complex_pattern
+        }
+
+        for component_type, encoder in additional_encoders.items():
+            d[component_type] = [encoder(component)
+                                 for component in
+                                 getattr(model, component_type)]
+
+        return d

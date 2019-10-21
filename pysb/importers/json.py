@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from json import JSONDecoder
 from pysb.builder import Builder
 from pysb.core import RuleExpression, ReactionPattern, ComplexPattern, \
-    MonomerPattern, MultiState, ANY, WILD
+    MonomerPattern, MultiState, ANY, WILD, Parameter, Expression
 from pysb.annotation import Annotation
 import sympy
 import collections
@@ -53,18 +53,23 @@ class PySBJSONDecoder(JSONDecoder):
     def decode_parameter(self, par):
         self.b.parameter(par['name'], par['value'])
 
-    def decode_expression(self, expr):
-        e = expr['expr']
+    def decode_derived_parameter(self, par):
+        self.b.model._derived_parameters.add(
+            Parameter(par['name'], par['value'], _export=False)
+        )
+
+    def _parse_expr(self, e, e_name):
         # Quick security check on the expression
         if not re.match(r'^[\w\s()/+\-._*]*$', e):
             raise PySBJSONDecodeError(
-                'Security check on expression "%s" failed' % expr['name']
+                'Security check on %s failed' % e_name
             )
 
         expr_symbols = {
             s.name: s for s in
             (self.b.model.parameters | self.b.model.expressions |
-             self.b.model.tags)
+             self.b.model.tags | self.b.model._derived_parameters |
+             self.b.model._derived_expressions)
         }
 
         expression = parse_expr(e, local_dict=expr_symbols)
@@ -74,10 +79,24 @@ class PySBJSONDecoder(JSONDecoder):
         expression = expression.xreplace(
             {sympy.Symbol(s.name): s for s in self.b.model.observables})
 
-        self.b.expression(
-            expr['name'],
-            expression
-        )
+        return expression
+
+    def decode_expression(self, expr, derived=False):
+        expression = self._parse_expr(expr['expr'],
+                                      'expression "{}"'.format(expr['name']))
+
+        if derived:
+            self.b.model._derived_expressions.add(
+                Expression(expr['name'], expression, _export=False)
+            )
+        else:
+            self.b.expression(
+                expr['name'],
+                expression
+            )
+
+    def decode_derived_expression(self, expr):
+        return self.decode_expression(expr, derived=True)
 
     def decode_observable(self, obs):
         self.b.observable(
@@ -105,6 +124,9 @@ class PySBJSONDecoder(JSONDecoder):
         )
         cp_obj._tag = self._modelget(cp['tag'])
         return cp_obj
+
+    def decode_species(self, sp):
+        self.b.model.species.append(self.decode_complex_pattern(sp))
 
     def decode_reaction_pattern(self, rp):
         return ReactionPattern(
@@ -156,6 +178,10 @@ class PySBJSONDecoder(JSONDecoder):
             )
         )
 
+    def decode_reaction(self, rxn):
+        rxn['rate'] = self._parse_expr(rxn['rate'], 'reaction rate')
+        self.b.model.reactions.append(rxn)
+
     def decode(self, s):
         res = super(PySBJSONDecoder, self).decode(s)
 
@@ -184,17 +210,22 @@ class PySBJSONDecoder(JSONDecoder):
         decoders = collections.OrderedDict((
             ('monomers', self.decode_monomer),
             ('parameters', self.decode_parameter),
+            ('_derived_parameters', self.decode_derived_parameter),
             ('compartments', self.decode_compartment),
             ('observables', self.decode_observable),
             ('tags', self.decode_tag),
             ('expressions', self.decode_expression),
+            ('_derived_expressions', self.decode_derived_expression),
             ('rules', self.decode_rule),
             ('initials', self.decode_initial),
             ('annotations', self.decode_annotation),
+            ('reactions', self.decode_reaction),
+            ('reactions_bidirectional', self.decode_reaction),
+            ('species', self.decode_species)
         ))
 
         for component_type, decoder in decoders.items():
-            for component in res[component_type]:
+            for component in res.get(component_type, []):
                 decoder(component)
 
         return self.b.model

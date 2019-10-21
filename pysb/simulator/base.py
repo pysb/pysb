@@ -1117,7 +1117,7 @@ class SimulationResult(object):
 
         # np.void maps to bytes in HDF5.
         enpickle = lambda obj: np.void(pickle.dumps(obj, -1))
-        model_json = JsonExporter(self._model).export()
+        model_json = JsonExporter(self._model).export(include_netgen=True)
 
         with h5py.File(filename, 'a' if append else 'w-') as hdf:
             # Get or create the group
@@ -1261,7 +1261,6 @@ class SimulationResult(object):
 
             if '_model_json' in grp:
                 model = model_from_json(grp['_model_json'][()])
-                generate_equations(model)
             else:
                 warn('The SimulationResult file uses an old model '
                      'format (pickled). It\'s recommended you re-save '
