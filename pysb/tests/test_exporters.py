@@ -101,4 +101,8 @@ def check_convert(model, format):
                         model.name, obs_idx, model.observables[obs_idx].name))
         elif format == 'json':
             # Round-trip the model by re-importing the JSON
-            model_from_json(exported_file)
+            m = model_from_json(exported_file)
+            # Check network generation and single-step integrator
+            if model.name not in ('pysb.examples.tutorial_b',
+                                  'pysb.examples.tutorial_c'):
+                ScipyOdeSimulator(m)

@@ -8,6 +8,7 @@ import sympy
 import collections
 import json
 import re
+from sympy.parsing.sympy_parser import parse_expr
 try:
     basestring
 except NameError:
@@ -60,11 +61,22 @@ class PySBJSONDecoder(JSONDecoder):
                 'Security check on expression "%s" failed' % expr['name']
             )
 
+        expr_symbols = {
+            s.name: s for s in
+            (self.b.model.parameters | self.b.model.expressions |
+             self.b.model.tags)
+        }
+
+        expression = parse_expr(e, local_dict=expr_symbols)
+
+        # Replace observables now, to enable expand_expr()
+        # Replacing as part of expr_symbols breaks local functions!
+        expression = expression.xreplace(
+            {sympy.Symbol(s.name): s for s in self.b.model.observables})
+
         self.b.expression(
             expr['name'],
-            sympy.sympify(e, locals={
-                c.name: c for c in self.b.model.components
-            }, evaluate=False)
+            expression
         )
 
     def decode_observable(self, obs):
@@ -172,11 +184,11 @@ class PySBJSONDecoder(JSONDecoder):
         decoders = collections.OrderedDict((
             ('monomers', self.decode_monomer),
             ('parameters', self.decode_parameter),
-            ('expressions', self.decode_expression),
             ('compartments', self.decode_compartment),
-            ('tags', self.decode_tag),
-            ('rules', self.decode_rule),
             ('observables', self.decode_observable),
+            ('tags', self.decode_tag),
+            ('expressions', self.decode_expression),
+            ('rules', self.decode_rule),
             ('initials', self.decode_initial),
             ('annotations', self.decode_annotation),
         ))
