@@ -7,8 +7,11 @@ Based on code submitted in a PR by @keszybz in pysb/pysb#113
 from pysb.tests.test_examples import get_example_models, expected_exceptions
 from pysb import export
 from pysb.simulator import ScipyOdeSimulator
+from pysb.importers.bngl import model_from_bngl
 import numpy as np
 import pandas as pd
+import tempfile
+import os
 try:
     import roadrunner
 except ImportError:
@@ -98,3 +101,20 @@ def check_convert(model, format):
                     print(pd.DataFrame(dict(rr=rr_obs, pysb=py_obs)))
                     raise ValueError('Model {}, observable__o{} "{}" trajectories do not match:'.format(
                         model.name, obs_idx, model.observables[obs_idx].name))
+        elif format == 'bngl':
+            if model.name.endswith('tutorial_b') or \
+                    model.name.endswith('tutorial_c'):
+                # Models have no rules
+                return
+            with tempfile.NamedTemporaryFile(suffix='.bngl',
+                                             delete=False) as tf:
+                tf.write(exported_file.encode('utf8'))
+                # Cannot have two simultaneous file handled on Windows
+                tf.close()
+
+                try:
+                    m = model_from_bngl(tf.name)
+                    # Generate network, single-step the integrator
+                    ScipyOdeSimulator(m)
+                finally:
+                    os.unlink(tf.name)

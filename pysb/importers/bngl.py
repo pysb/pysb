@@ -65,7 +65,7 @@ class BnglBuilder(Builder):
         self._model_env.update(components)
 
         # Quick security check on the expression
-        if re.match(r'^[\w\s()/+\-._*]*$', expression):
+        if re.match(r'^[\w\s()/+\-._*^]*$', expression):
             return parse_bngl_expr(expression, local_dict=self._model_env,
                                    evaluate=False)
         else:
@@ -375,11 +375,8 @@ class BnglBuilder(Builder):
             rule.rate_reverse = rev_rate
 
     def _parse_expressions(self):
-        expr_namespace = (
-            self.model.parameters | self.model.expressions
-            | self.model.observables
-        )
-        expr_symbols = {e.name: sympy.Symbol(e.name) for e in expr_namespace}
+        expr_namespace = (self.model.parameters | self.model.expressions)
+        expr_symbols = {e.name: e for e in expr_namespace}
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             for arg in e.iterfind(_ns('{0}ListOfArguments/{0}Argument')):
@@ -399,6 +396,11 @@ class BnglBuilder(Builder):
                                      '%s\n\nError: %s' % (expr_name,
                                                           expr_text,
                                                           str(ex)))
+            # Replace observables now, so they get expanded by .expand_expr()
+            # Doing this as part of expr_symbols breaks local functions!
+            expr_val = expr_val.xreplace(
+                {sympy.Symbol(o.name): o for o in self.model.observables})
+
             if isinstance(expr_val, numbers.Number):
                 self.parameter(expr_name, expr_val)
             else:
