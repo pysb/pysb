@@ -91,7 +91,7 @@ class PySBJSONDecoder(JSONDecoder):
             )
         else:
             self.b.expression(
-                expr['name'],
+                str(expr['name']),  # Need str() to avoid unicode errors on Py2
                 expression
             )
 
