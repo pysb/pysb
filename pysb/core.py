@@ -714,6 +714,11 @@ class ComplexPattern(object):
         if compartment and not isinstance(compartment, Compartment):
             raise Exception("compartment is not a Compartment object")
 
+        # Drop species cpt, if redundant
+        if compartment and len(monomer_patterns) == 1 and \
+                monomer_patterns[0].compartment == compartment:
+            compartment = None
+
         self.monomer_patterns = monomer_patterns
         self.compartment = compartment
         self.match_once = match_once
