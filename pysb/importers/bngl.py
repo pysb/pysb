@@ -45,6 +45,7 @@ class BnglBuilder(Builder):
         self._force = force
         self._model_env = {}
         self._renamed_states = collections.defaultdict(dict)
+        self._renamed_observables = {}
         self._log = pysb.logging.get_logger(__name__)
         self._parse_bng_xml()
 
@@ -65,7 +66,7 @@ class BnglBuilder(Builder):
         self._model_env.update(components)
 
         # Quick security check on the expression
-        if re.match(r'^[\w\s()/+\-._*]*$', expression):
+        if re.match(r'^[\w\s()/+\-._*^]*$', expression):
             return parse_bngl_expr(expression, local_dict=self._model_env,
                                    evaluate=False)
         else:
@@ -217,7 +218,9 @@ class BnglBuilder(Builder):
             # Some BNG observables have same name as a monomer, but in PySB
             # these must be unique
             if o_name in self.model.monomers.keys():
+                o_name_old = o_name
                 o_name = 'Obs_{}'.format(o_name)
+                self._renamed_observables[o_name_old] = o_name
             cplx_pats = []
             for mp in o.iterfind(_ns('{0}ListOfPatterns/{0}Pattern')):
                 cpt = self.model.compartments.get(mp.get('compartment'))
@@ -375,11 +378,8 @@ class BnglBuilder(Builder):
             rule.rate_reverse = rev_rate
 
     def _parse_expressions(self):
-        expr_namespace = (
-            self.model.parameters | self.model.expressions
-            | self.model.observables
-        )
-        expr_symbols = {e.name: sympy.Symbol(e.name) for e in expr_namespace}
+        expr_namespace = (self.model.parameters | self.model.expressions)
+        expr_symbols = {e.name: e for e in expr_namespace}
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             for arg in e.iterfind(_ns('{0}ListOfArguments/{0}Argument')):
@@ -399,6 +399,18 @@ class BnglBuilder(Builder):
                                      '%s\n\nError: %s' % (expr_name,
                                                           expr_text,
                                                           str(ex)))
+            # Replace observables now, so they get expanded by .expand_expr()
+            # Doing this as part of expr_symbols breaks local functions!
+            observables = {
+                sympy.Symbol(o.name): o for o in self.model.observables
+            }
+            # Add renamed observables
+            observables.update({
+                sympy.Symbol(obs_old): self.model.observables[obs_new]
+                for obs_old, obs_new in self._renamed_observables.items()
+            })
+            expr_val = expr_val.xreplace(observables)
+
             if isinstance(expr_val, numbers.Number):
                 self.parameter(expr_name, expr_val)
             else:

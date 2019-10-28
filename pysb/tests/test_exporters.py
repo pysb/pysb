@@ -8,8 +8,11 @@ from pysb.tests.test_examples import get_example_models, expected_exceptions
 from pysb import export
 from pysb.export.json import JsonExporter
 from pysb.simulator import ScipyOdeSimulator
+from pysb.importers.bngl import model_from_bngl
 import numpy as np
 import pandas as pd
+import tempfile
+import os
 try:
     import roadrunner
 except ImportError:
@@ -110,3 +113,20 @@ def check_convert(model, format):
             if model.name not in ('pysb.examples.tutorial_b',
                                   'pysb.examples.tutorial_c'):
                 ScipyOdeSimulator(m)
+        elif format == 'bngl':
+            if model.name.endswith('tutorial_b') or \
+                    model.name.endswith('tutorial_c'):
+                # Models have no rules
+                return
+            with tempfile.NamedTemporaryFile(suffix='.bngl',
+                                             delete=False) as tf:
+                tf.write(exported_file.encode('utf8'))
+                # Cannot have two simultaneous file handled on Windows
+                tf.close()
+
+                try:
+                    m = model_from_bngl(tf.name)
+                    # Generate network, single-step the integrator
+                    ScipyOdeSimulator(m)
+                finally:
+                    os.unlink(tf.name)
