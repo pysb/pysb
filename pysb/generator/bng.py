@@ -287,9 +287,11 @@ class BngPrinter(StrPrinter):
 
         if_stmt = expr.args[-1][0]
         for pos in range(len(expr.args) - 2, -1, -1):
-            if_stmt = 'if({},{},{})'.format(expr.args[pos][1],
-                                            expr.args[pos][0],
-                                            if_stmt)
+            if_stmt = 'if({},{},{})'.format(
+                self._print(expr.args[pos][1]),
+                self._print(expr.args[pos][0]),
+                self._print(if_stmt)
+            )
 
         return if_stmt
 
