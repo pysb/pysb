@@ -112,7 +112,7 @@ def check_convert(model, format):
             # Check network generation and single-step integrator
             if model.name not in ('pysb.examples.tutorial_b',
                                   'pysb.examples.tutorial_c'):
-                ScipyOdeSimulator(m)
+                ScipyOdeSimulator(m, compiler='cython')
         elif format == 'bngl':
             if model.name.endswith('tutorial_b') or \
                     model.name.endswith('tutorial_c'):
@@ -127,6 +127,6 @@ def check_convert(model, format):
                 try:
                     m = model_from_bngl(tf.name)
                     # Generate network, single-step the integrator
-                    ScipyOdeSimulator(m)
+                    ScipyOdeSimulator(m, compiler='cython')
                 finally:
                     os.unlink(tf.name)
