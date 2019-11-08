@@ -21,6 +21,11 @@ class PySBJSONDecodeError(ValueError):
 
 
 class PySBJSONDecoder(JSONDecoder):
+    """
+    Decode a JSON-encoded PySB model
+
+    See :py:mod:`pysb.export.json` for implementation details.
+    """
     MAX_SUPPORTED_PROTOCOL = 1
 
     def _modelget(self, name):

@@ -39,6 +39,24 @@ class JsonExporter(Exporter):
 
 
 class PySBJSONEncoder(json.JSONEncoder):
+    """
+    Encode a PySB model in JSON
+
+    This encoder stores the model without caching the reaction network. To also
+    store the reaction network, see :py:class:`PySBJSONWithNetworkEncoder`.
+
+    Attributes correspond to their PySB equivalents (monomers, parameters, etc.)
+    and are mostly stored verbatim, with the following exceptions.
+
+    * MultiStates and the ANY and WILD state values use a special object format
+    * References to other components are stored using the component name
+    * Sympy expressions are encoded as strings using the default encoder
+
+    The protocol number (currently: 1) specifies semantic model compatibility,
+    and should be incremented if new features are added which affect how a model
+    is simulated or prevent a model being loaded by
+    :py:func:`pysb.importers.json.PySBJSONDecoder`.
+    """
     PROTOCOL = 1
 
     @classmethod
@@ -197,6 +215,14 @@ class PySBJSONEncoder(json.JSONEncoder):
 
 
 class PySBJSONWithNetworkEncoder(PySBJSONEncoder):
+    """
+    Encode a PySB model and its reaction network in JSON
+
+    This encoder stores the model including the cached reaction network. To
+    encode the model without the reaction network, see
+    :py:class:`PySBJSONEncoder`, which also includes implementation details.
+    """
+
     @classmethod
     def encode_reaction(cls, rxn):
         rxn = rxn.copy()
