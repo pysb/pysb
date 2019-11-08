@@ -21,7 +21,7 @@ class PySBJSONDecodeError(ValueError):
 
 
 class PySBJSONDecoder(JSONDecoder):
-    MAX_SUPPORTED_FORMAT = 1
+    MAX_SUPPORTED_PROTOCOL = 1
 
     def _modelget(self, name):
         if name is None:
@@ -187,20 +187,20 @@ class PySBJSONDecoder(JSONDecoder):
 
         if not isinstance(res, dict):
             raise PySBJSONDecodeError('Decode error (not dictionary)')
-        if 'format' not in res:
+        if 'protocol' not in res:
             raise PySBJSONDecodeError(
-                'No "format" entry found - is this a PySB model?')
-        if not isinstance(res['format'], int):
-            raise PySBJSONDecodeError('"format" attribute is not an integer')
+                'No "protocol" entry found - is this a PySB model?')
+        if not isinstance(res['protocol'], int):
+            raise PySBJSONDecodeError('"protocol" attribute is not an integer')
 
-        if res['format'] < 1:
-            raise PySBJSONDecodeError('"Invalid format value: {}'.format(
-                res['format']))
+        if res['protocol'] < 1:
+            raise PySBJSONDecodeError('"Invalid "protocol" value: {}'.format(
+                res['protocol']))
 
-        if res['format'] > self.MAX_SUPPORTED_FORMAT:
+        if res['protocol'] > self.MAX_SUPPORTED_PROTOCOL:
             raise PySBJSONDecodeError(
-                'Format {} is not supported (max: {})'.format(
-                    res['format'], self.MAX_SUPPORTED_FORMAT
+                'Protocol {} is not supported (max: {})'.format(
+                    res['protocol'], self.MAX_SUPPORTED_PROTOCOL
                 )
             )
 

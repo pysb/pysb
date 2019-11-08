@@ -39,7 +39,7 @@ class JsonExporter(Exporter):
 
 
 class PySBJSONEncoder(json.JSONEncoder):
-    FORMAT = 1
+    PROTOCOL = 1
 
     @classmethod
     def encode_keyword(cls, keyword):
@@ -164,7 +164,7 @@ class PySBJSONEncoder(json.JSONEncoder):
 
     @classmethod
     def encode_model(cls, model):
-        d = dict(format=cls.FORMAT, name=model.name)
+        d = dict(protocol=cls.PROTOCOL, name=model.name)
 
         encoders = {
             'monomers': cls.encode_monomer,
