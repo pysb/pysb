@@ -565,3 +565,12 @@ def test_bind_multiple():
     Monomer('B', ['b'])
 
     as_reaction_pattern(A(a=1) % B(b=1) % B(b=1))
+
+
+@raises(ValueError)
+@with_model
+def test_reverse_rate_non_reversible_rule():
+    Monomer('A')
+    Parameter('kf', 1)
+    Parameter('kr', 2)
+    Rule('r1', None >> A(), kf, kr)

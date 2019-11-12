@@ -1390,6 +1390,9 @@ class Rule(Component):
         validate_expr(rate_forward, "forward rate")
         if rule_expression.is_reversible:
             validate_expr(rate_reverse, "reverse rate")
+        elif rate_reverse:
+            raise ValueError('Reverse rate specified, but rule expression is '
+                             'not reversible. Use | instead of >>.')
         self.rule_expression = rule_expression
         self.reactant_pattern = rule_expression.reactant_pattern
         self.product_pattern = rule_expression.product_pattern
