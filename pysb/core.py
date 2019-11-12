@@ -1271,8 +1271,16 @@ class Parameter(Component, sympy.Symbol):
         return (self.name, self.value, False)
 
     def __init__(self, name, value=0.0, _export=True):
-        self.value = float(value)
+        self.value = value
         Component.__init__(self, name, _export)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, new_value):
+        self._value = float(new_value)
     
     def get_value(self):
         return self.value

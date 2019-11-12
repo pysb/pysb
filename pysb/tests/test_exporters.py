@@ -19,6 +19,7 @@ except ImportError:
     roadrunner = None
 from nose.plugins.skip import SkipTest
 from pysb.importers.json import model_from_json
+from pysb.testing import check_model_against_component_list
 
 
 # Pairs of model, format that are expected to be incompatible.
@@ -113,6 +114,7 @@ def check_convert(model, format):
             if model.name not in ('pysb.examples.tutorial_b',
                                   'pysb.examples.tutorial_c'):
                 ScipyOdeSimulator(m, compiler='cython')
+                check_model_against_component_list(m, model.all_components())
         elif format == 'bngl':
             if model.name.endswith('tutorial_b') or \
                     model.name.endswith('tutorial_c'):
