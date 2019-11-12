@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import tempfile
 import os
+import sys
 try:
     import roadrunner
 except ImportError:
@@ -114,7 +115,11 @@ def check_convert(model, format):
             if model.name not in ('pysb.examples.tutorial_b',
                                   'pysb.examples.tutorial_c'):
                 ScipyOdeSimulator(m, compiler='cython')
-                check_model_against_component_list(m, model.all_components())
+                if sys.version_info.major >= 3:
+                    # Only check on Python 3 to avoid string-to-unicode encoding
+                    # issues
+                    check_model_against_component_list(
+                        m, model.all_components())
         elif format == 'bngl':
             if model.name.endswith('tutorial_b') or \
                     model.name.endswith('tutorial_c'):
