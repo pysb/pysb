@@ -2,6 +2,7 @@ from __future__ import print_function
 try:
     import pycuda
     import pycuda.autoinit
+    from pycuda.autoinit import device
     import pycuda as cuda
     import pycuda.compiler
     import pycuda.tools as tools
@@ -72,7 +73,7 @@ class CUDASimulator(SSABase):
             raise ImportError('pycuda library required for {}'
                               ''.format(self.__class__.__name__))
         super(CUDASimulator, self).__init__(model, verbose, **kwargs)
-
+        self._device = device.name()
         self.tspan = tspan
         self.verbose = verbose
         # private attribute
@@ -151,6 +152,8 @@ class CUDASimulator(SSABase):
                                        param_values=param_values,
                                        number_sim=number_sim)
 
+        self._logger.info("Using device {}".format(device.name()))
+
         if tspan is None:
             tspan = self.tspan
 
@@ -216,6 +219,10 @@ class CUDASimulator(SSABase):
         return SimulationResult(self, tout, result[:self.num_sim, :, :])
 
     def _print_verbose(self, threads):
+        # Beyond this point is just pretty printing
+        self._logger.debug("Attributes for device {}".format(device.name()))
+        for (key, value) in device.get_attributes().items():
+            self._logger.debug("{}:{}".format(key, value))
         self._logger.debug("threads = {}".format(threads))
         kern = self._ssa
         self._logger.debug("Local memory  = {}".format(kern.local_size_bytes))
