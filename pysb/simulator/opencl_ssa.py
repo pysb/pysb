@@ -175,7 +175,13 @@ class OpenCLSimulator(SSABase):
             self.queue,
             np.array(t_out, dtype=self._dtype)
         )
+        if self.num_sim < self._local_work_size[0]:
+            local_work_size = (self.num_sim, 1)
+        else:
+            local_work_size = self._local_work_size
 
+        blocks, threads = self.get_blocks(self.num_sim, local_work_size[0])
+        total_threads = int(blocks * threads)
         # transfer the array of seeds to the device
         random_seeds_gpu = ocl_array.to_device(
             self.queue,
@@ -188,33 +194,31 @@ class OpenCLSimulator(SSABase):
         # to the device
         param_array_gpu = ocl_array.to_device(
             self.queue,
-            self.param_values.astype(self._dtype).flatten(order='C')
+            self._create_gpu_array(self.param_values, total_threads,
+                                   self._dtype).flatten(order='C')
         )
 
         species_matrix_gpu = ocl_array.to_device(
             self.queue,
-            self.initials.astype(np.uint32).flatten(order='C')
+            self._create_gpu_array(self.initials, total_threads,
+                                   np.uint32).flatten(order='C')
         )
 
         result_gpu = ocl_array.zeros(
             self.queue,
             order='C',
-            shape=(self.num_sim * t_out.shape[0] * self._n_species,),
+            shape=(total_threads * t_out.shape[0] * self._n_species,),
             dtype=np.uint32
         )
 
         elasped_t = time.time() - timer_start
         self._logger.info("Completed transfer in: {:.4f}s".format(elasped_t))
-        global_work_size = (self.num_sim, 1)
+        global_work_size = (total_threads, 1)
 
         self._logger.debug("Starting {} simulations with {} workers "
                            "and {} steps".format(number_sim, global_work_size,
                                                  self._local_work_size))
         timer_start = time.time()
-        if self.num_sim < self._local_work_size[0]:
-            local_work_size = (self.num_sim, 1)
-        else:
-            local_work_size = self._local_work_size
 
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
@@ -239,9 +243,35 @@ class OpenCLSimulator(SSABase):
         res = result_gpu.get(self.queue, async_=True)
         self._logger.info("Retrieved trajectories in {:.4f}s"
                           "".format(time.time() - timer_start))
-        res = res.reshape((self.num_sim, len(t_out), self._n_species))
+
+        res = res.reshape((total_threads, len(t_out), self._n_species))
+        res = res[:self.num_sim]
         tout = np.array([tspan] * self.num_sim)
         return SimulationResult(self, tout, res)
+
+    @staticmethod
+    def _create_gpu_array(values, total_threads, prec):
+
+        # Create species matrix on GPU
+        # will make according to number of total threads, not n_simulations
+        gpu_array = np.zeros((total_threads, values.shape[1]), dtype=prec)
+        # Filling species matrix
+        # Note that this might not fill entire array that was created.
+        # The rest of the array will be zeros to fill up GPU.
+        gpu_array[:len(values)] = values
+        return gpu_array
+
+    @staticmethod
+    def get_blocks(n_simulations, threads_per_block):
+        max_tpb = 256
+        if n_simulations < max_tpb:
+            block_count = 1
+            threads_per_block = max_tpb
+        elif n_simulations % threads_per_block == 0:
+            block_count = int(n_simulations // threads_per_block)
+        else:
+            block_count = int(n_simulations // threads_per_block + 1)
+        return block_count, threads_per_block
 
     def _setup(self):
         self._compile()
