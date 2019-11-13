@@ -1,5 +1,5 @@
 from nose.tools import *
-from pysb.core import Model, SelfExporter
+from pysb.core import Model, SelfExporter, Parameter
 import pickle
 
 def with_model(func):
