@@ -39,7 +39,7 @@ Parameter('deg', 0.01)            # degradation of receptor dimers
 
 
 Monomer('EGF', ['R'])
-Monomer('EGFR', ['L','CR1','Y1068'], {'Y1068':('U','P')})
+Monomer('EGFR', ['L','CR1','Y1068'], {'Y1068': ['U', 'P']})
 Monomer('Grb2', ['SH2','SH3'])
 Monomer('Sos1', ['PxxP'])
 
