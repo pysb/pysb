@@ -111,7 +111,7 @@ def check_convert(model, format):
         elif format == 'json':
             # Round-trip the model by re-importing the JSON
             m = model_from_json(exported_file)
-            # Check network generation and single-step integrator
+            # Check network generation and force RHS evaluation
             if model.name not in ('pysb.examples.tutorial_b',
                                   'pysb.examples.tutorial_c'):
                 ScipyOdeSimulator(m, compiler='cython')
@@ -133,7 +133,7 @@ def check_convert(model, format):
 
                 try:
                     m = model_from_bngl(tf.name)
-                    # Generate network, single-step the integrator
+                    # Generate network and force RHS evaluation
                     ScipyOdeSimulator(m, compiler='cython')
                 finally:
                     os.unlink(tf.name)
