@@ -4,7 +4,8 @@ from .cupsoda import CupSodaSimulator
 from .stochkit import StochKitSimulator
 from .bng import BngSimulator, PopulationMap
 from .kappa import KappaSimulator
+from .amici import AmiciSimulator
 
 __all__ = ['BngSimulator', 'CupSodaSimulator', 'ScipyOdeSimulator',
            'StochKitSimulator', 'KappaSimulator',
-           'SimulationResult', 'PopulationMap']
+           'SimulationResult', 'PopulationMap', 'AmiciSimulator']
