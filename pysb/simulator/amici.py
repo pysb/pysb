@@ -1,4 +1,5 @@
 from pysb.simulator.base import Simulator, SimulationResult
+import pysb.bng
 
 import numpy as np
 
@@ -74,6 +75,7 @@ class AmiciSimulator(Simulator):
         self.modeldir_is_temp = 'modeldir' not in kwargs
         self.modeldir = kwargs.pop('modeldir',
                                     mkdtemp(prefix=f'pysbamici_{model.name}_'))
+        force_recompile = kwargs.pop('force_recompile', False)
 
         if kwargs:
             raise ValueError('Unknown keyword argument(s): {}'.format(
@@ -81,20 +83,36 @@ class AmiciSimulator(Simulator):
             ))
 
         # Generate the equations for the model
+        os.environ['AMICI_CXXFLAGS'] = '-O0'
 
-        amici.pysb2amici(model,
-                         self.modeldir,
-                         verbose=True,
-                         observables=list(model.expressions.keys()))
+        if force_recompile or not os.path.exists(os.path.join(self.modeldir,
+                                                              model.name,
+                                                              '__init__.py')):
+            amici.pysb2amici(model,
+                             self.modeldir,
+                             verbose=False,
+                             observables=[],
+                             constant_parameters=[],
+                             compute_conservation_laws=True)
+            mode = 'compilation'
+            help = 'file an issue at https://github.com/ICB-DCM/AMICI/issues.'
+        else:
+            pysb.bng.generate_equations(model)
+            mode = 'loading'
+            help = 'try recompiling the model by passing ' \
+                   '`force_recompile=True`.'
 
         # Load the generated model package
         sys.path.insert(0, self.modeldir)
-        modelModulePYSB = importlib.import_module(self.modeldir)
+        try:
+            modelModulePYSB = importlib.import_module(model.name)
+        except Exception as e:
+            raise RuntimeError(f'Model {mode} failed. Please {help}')
 
-        self.pysb_model = model
+        self._model = model
         self.amici_model = modelModulePYSB.getModel()
         self.amici_solver = self.amici_model.getSolver()
-        self.amici_model.setTimepoints(tspan)
+        self.amici_model.setTimepoints(tspan if tspan is not None else [])
 
     def __del__(self):
         # if we generated a temporary directory using mkdtemp, we are
@@ -134,32 +152,70 @@ class AmiciSimulator(Simulator):
                                         _run_kwargs=[])
         n_sims = len(self.param_values)
 
+        num_processors = max(n_sims, num_processors)
+
         if num_processors == 1:
             self._logger.debug('Single processor (serial) mode')
         else:
             self._logger.debug('Multi-processor (parallel) mode using {} '
                                'processes'.format(num_processors))
 
-        edatas = self.simulationspecs_to_edatas(
-            self._run_tspan,
-            self._run_initials,
-            self._run_params,
-        )
+        edatas = self.simulationspecs_to_edatas()
 
         rdatas = amici.runAmiciSimulations(
-            model=self.amici_model, solver=self.amici_solver, edatas=edatas,
-            failfast=False, num_threads=num_processors
+            model=self.amici_model, solver=self.amici_solver,
+            edata_list=edatas, failfast=False, num_threads=num_processors
         )
 
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, np.array([self.tspan] * n_sims),
                                 self.rdatas_to_trajectories(rdatas))
 
-    def simulationspecs_to_edatas(self, tspan, initials, param_values):
-        return []
+    def simulationspecs_to_edatas(self):
+        n_sims = len(self.param_values)
 
+        edatas = [
+            amici.ExpData(self.amici_model.get())
+            for _ in range(n_sims)
+        ]
+
+        for isim, edata in enumerate(edatas):
+            edata.setTimepoints(self.tspan)
+            edata.parameters = self.pysb2amici_parameters(
+                self.param_values[isim]
+            )
+            edata.fixedParameters = self.pysb2amici_fixed_parameters(
+                self.param_values[isim]
+            )
+            edata.x0 = self.pysb2amici_initials(
+                self.initials[max(isim, len(self.initials) - 1)]
+            )
+
+        return edatas
+
+    def pysb2amici_parameters(self, parameters):
+        return [
+            parameters[self.model.parameters.keys().index(amici_par_name)]
+            for amici_par_name in self.amici_model.getParameterIds()
+        ]
+
+    def pysb2amici_fixed_parameters(self, parameters):
+        return [
+            parameters[self.model.parameters.keys().index(amici_par_name)]
+            for amici_par_name in self.amici_model.getFixedParameterIds()
+        ]
+
+    def pysb2amici_initials(self, initials):
+        states = [f'__s{ix}' for ix in range(len(self.model.species))]
+        return [
+            initials[states.index(amici_par_name)]
+            for amici_par_name in self.amici_model.getStateIds()
+        ]
 
     def rdatas_to_trajectories(self, rdatas):
-        return []
+        return [
+            np.asarray(rdata['x'])
+            for rdata in rdatas
+        ]
 
 
