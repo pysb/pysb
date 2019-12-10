@@ -1,4 +1,5 @@
 from pysb.simulator.base import Simulator, SimulationResult
+from typing import List
 import pysb.bng
 
 import numpy as np
@@ -88,6 +89,12 @@ class AmiciSimulator(Simulator):
         if force_recompile or not os.path.exists(os.path.join(self.modeldir,
                                                               model.name,
                                                               '__init__.py')):
+            if not force_recompile and not self.modeldir_is_temp and \
+                    os.path.exists(os.path.join(self.modeldir)):
+                raise RuntimeError('Model directory already exists. Stopping '
+                                   'to prevent data loss. To ignore this '
+                                   'warning, pass `force_recompile=True`')
+
             amici.pysb2amici(model,
                              self.modeldir,
                              verbose=False,
@@ -160,7 +167,7 @@ class AmiciSimulator(Simulator):
             self._logger.debug('Multi-processor (parallel) mode using {} '
                                'processes'.format(num_processors))
 
-        edatas = self.simulationspecs_to_edatas()
+        edatas = self._simulationspecs_to_edatas()
 
         rdatas = amici.runAmiciSimulations(
             model=self.amici_model, solver=self.amici_solver,
@@ -169,9 +176,11 @@ class AmiciSimulator(Simulator):
 
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, np.array([self.tspan] * n_sims),
-                                self.rdatas_to_trajectories(rdatas))
+                                self._rdatas_to_trajectories(rdatas))
 
-    def simulationspecs_to_edatas(self):
+    def _simulationspecs_to_edatas(self) -> List[amici.ExpData]:
+        """ Converts tspan, param_values and initials into amici.ExpData
+        objects """
         n_sims = len(self.param_values)
 
         edatas = [
@@ -181,38 +190,42 @@ class AmiciSimulator(Simulator):
 
         for isim, edata in enumerate(edatas):
             edata.setTimepoints(self.tspan)
-            edata.parameters = self.pysb2amici_parameters(
+            edata.parameters = self._pysb2amici_parameters(
                 self.param_values[isim]
             )
-            edata.fixedParameters = self.pysb2amici_fixed_parameters(
+            edata.fixedParameters = self._pysb2amici_fixed_parameters(
                 self.param_values[isim]
             )
-            edata.x0 = self.pysb2amici_initials(
+            edata.x0 = self._pysb2amici_initials(
                 self.initials[max(isim, len(self.initials) - 1)]
             )
 
         return edatas
 
-    def pysb2amici_parameters(self, parameters):
+    def _pysb2amici_parameters(self, parameters: List[float]):
+        """ Reorders and maps pysb parameters to amici parameters """
         return [
             parameters[self.model.parameters.keys().index(amici_par_name)]
             for amici_par_name in self.amici_model.getParameterIds()
         ]
 
-    def pysb2amici_fixed_parameters(self, parameters):
+    def _pysb2amici_fixed_parameters(self, parameters: List[float]):
+        """ Reorders and maps pysb parameters to amici constants """
         return [
             parameters[self.model.parameters.keys().index(amici_par_name)]
             for amici_par_name in self.amici_model.getFixedParameterIds()
         ]
 
-    def pysb2amici_initials(self, initials):
+    def _pysb2amici_initials(self, initials: List[float]):
+        """ Reorders and maps pysb species to amici states variables """
         states = [f'__s{ix}' for ix in range(len(self.model.species))]
         return [
             initials[states.index(amici_par_name)]
             for amici_par_name in self.amici_model.getStateIds()
         ]
 
-    def rdatas_to_trajectories(self, rdatas):
+    def _rdatas_to_trajectories(self, rdatas: List[amici.ReturnData]) -> List:
+        """ Extracts state trajectories from lists of amici.Re  """
         return [
             np.asarray(rdata['x'])
             for rdata in rdatas
