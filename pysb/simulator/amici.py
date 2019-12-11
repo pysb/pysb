@@ -86,8 +86,6 @@ class AmiciSimulator(Simulator):
             ))
 
         # Generate the equations for the model
-        os.environ['AMICI_CXXFLAGS'] = '-O0'
-
         if force_recompile or not os.path.exists(os.path.join(self.modeldir,
                                                               model.name,
                                                               '__init__.py')):
@@ -161,7 +159,7 @@ class AmiciSimulator(Simulator):
                                         _run_kwargs=[])
         n_sims = len(self.param_values)
 
-        num_processors = max(n_sims, num_processors)
+        num_processors = min(n_sims, num_processors)
 
         if num_processors == 1:
             self._logger.debug('Single processor (serial) mode')
