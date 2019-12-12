@@ -13,8 +13,9 @@ before_install:
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda install --yes -c conda-forge python="$PYVER"
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
-    pydot codecov mock cython amici
+    pydot codecov mock cython
 - if [[ $PYVER == 2.7 ]]; then pip install weave; fi
+- if [[ $PYVER >= 3.6 ]]; then pip install amici; fi
 - conda install --yes -c SBMLTeam python-libsbml
 - pip install libroadrunner twine
 - mkdir -p ~/.config/matplotlib
