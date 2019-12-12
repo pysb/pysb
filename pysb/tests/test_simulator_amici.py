@@ -28,13 +28,27 @@ class TestScipySimulatorBase(object):
 
     def test_temp_compilations(self):
         self.sim = AmiciSimulator(model=self.model)
+        self.sim.run(tspan=[0, 1])
+        tempdir = self.sim.modeldir
+        assert os.path.exists(tempdir)
+        self.sim = None
+        assert not os.path.exists(tempdir)
 
     def test_simulation_default_params(self):
         self.sim.run(tspan=[0, 1])
 
-    def test_simulation_default_parallel(self):
-        self.sim.run(
+    def test_simulation_default_parallel_multiparam(self):
+        result = self.sim.run(
             tspan=[0, 1],
             param_values=[self.sim.param_values[0, :],
                           self.sim.param_values[0, :]]
         )
+        assert result.nsims == 2
+
+    def test_simulation_default_parallel_multiinitial(self):
+        result = self.sim.run(
+            tspan=[0, 1],
+            initials=[self.sim.initials[0, :],
+                      self.sim.initials[0, :]]
+        )
+        assert result.nsims == 2
