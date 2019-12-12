@@ -574,3 +574,16 @@ def test_reverse_rate_non_reversible_rule():
     Parameter('kf', 1)
     Parameter('kr', 2)
     Rule('r1', None >> A(), kf, kr)
+
+import sympy as sp
+
+@with_model
+def test_parameter_assumptions():
+    par1 = Parameter('k1', 0.0)
+    assert par1.is_real
+    assert par1.is_positive
+    assert not par1.is_Integer
+    par2 = Parameter('k2', 0.0, positive=False)
+    assert not par2.is_positive
+    par3 = Parameter('k2', 0.0, positive=False)
+    assert

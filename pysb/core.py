@@ -1264,8 +1264,10 @@ class Parameter(Component, sympy.Symbol):
 
     """
 
-    def __new__(cls, name, value=0.0, _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+    def __new__(cls, name, value=0.0, positive=True, integer=False,
+                _export=True):
+        return sympy.Symbol.__new__(cls, name, real=True, positive=positive,
+                                    integer=integer)
 
     def __getnewargs__(self):
         return (self.name, self.value, False)
