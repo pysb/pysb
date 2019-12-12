@@ -1266,7 +1266,7 @@ class Parameter(Component, sympy.Symbol):
 
     def __new__(cls, name, value=0.0, positive=True, integer=False,
                 _export=True):
-        return sympy.Symbol.__new__(cls, name, real=True, positive=positive,
+        return super(Parameter, cls).__new__(cls, name, real=True, positive=positive,
                                     integer=integer)
 
     def __getnewargs__(self):
@@ -1547,7 +1547,7 @@ class Observable(Component, sympy.Symbol):
     """
 
     def __new__(cls, name, reaction_pattern, match='molecules', _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+        return super(Observable, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return (self.name, self.reaction_pattern, self.match, False)
@@ -1615,7 +1615,7 @@ class Expression(Component, sympy.Symbol):
     """
 
     def __new__(cls, name, expr, _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+        return super(Expression, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return (self.name, self.expr, False)
@@ -1687,7 +1687,7 @@ class Expression(Component, sympy.Symbol):
 class Tag(Component, sympy.Symbol):
     """Tag for labelling MonomerPatterns and ComplexPatterns"""
     def __new__(cls, name, _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+        return super(Tag, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return self.name, False
