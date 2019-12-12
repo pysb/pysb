@@ -1257,6 +1257,14 @@ class Parameter(Component, sympy.Symbol):
         The numerical value of the parameter. Defaults to 0.0 if not specified.
         The provided value is converted to a float before being stored, so any
         value that cannot be coerced to a float will trigger an exception.
+    nonnegative : bool, optional
+        Sets the assumption whether this parameter is nonnegative (>=0).
+        Affects simplifications of expressions that involve this parameter.
+        By default, parameters are assumed to be non-negative.
+    integer : bool, optional
+        Sets the assumption whether this parameter takes integer values,
+        which affects simplifications of expressions that involve this
+        parameter. By default, parameters are assumed to take integer values.
 
     Attributes
     ----------
@@ -1264,15 +1272,16 @@ class Parameter(Component, sympy.Symbol):
 
     """
 
-    def __new__(cls, name, value=0.0, positive=True, integer=False,
+    def __new__(cls, name, value=0.0, nonnegative=True, integer=False,
                 _export=True):
-        return super(Parameter, cls).__new__(cls, name, real=True, positive=positive,
-                                    integer=integer)
+        return super(Parameter, cls).__new__(cls, name, real=True,
+                                             nonnegative=nonnegative,
+                                             integer=integer)
 
     def __getnewargs__(self):
         return (self.name, self.value, False)
 
-    def __init__(self, name, value=0.0, _export=True):
+    def __init__(self, name, value=0.0, _export=True, **kwargs):
         self.value = value
         Component.__init__(self, name, _export)
 
@@ -1282,6 +1291,15 @@ class Parameter(Component, sympy.Symbol):
 
     @value.setter
     def value(self, new_value):
+        if self.is_integer:
+            if not float(new_value).is_integer():
+                raise ValueError('Cannot assign an non-integer value to a '
+                                 'parameter assumed to be an integer')
+        if self.is_nonnegative:
+            if float(new_value) < 0:
+                raise ValueError('Cannot assign a negative value to a '
+                                 'parameter assumed to be nonnegative')
+
         self._value = float(new_value)
     
     def get_value(self):
@@ -1547,7 +1565,7 @@ class Observable(Component, sympy.Symbol):
     """
 
     def __new__(cls, name, reaction_pattern, match='molecules', _export=True):
-        return super(Observable, cls).__new__(cls, name)
+        return super(Observable, cls).__new__(cls, name, real=True)
 
     def __getnewargs__(self):
         return (self.name, self.reaction_pattern, self.match, False)
@@ -1615,7 +1633,7 @@ class Expression(Component, sympy.Symbol):
     """
 
     def __new__(cls, name, expr, _export=True):
-        return super(Expression, cls).__new__(cls, name)
+        return super(Expression, cls).__new__(cls, name, real=True)
 
     def __getnewargs__(self):
         return (self.name, self.expr, False)
