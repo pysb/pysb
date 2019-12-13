@@ -1674,7 +1674,7 @@ class Expression(Component, Symbol):
         return sympy.Function(self.name)(tag)
 
 
-class Tag(Component, sympy.Dummy):
+class Tag(Component, Symbol):
     """Tag for labelling MonomerPatterns and ComplexPatterns"""
     def __new__(cls, name, _export=True):
         return super(Tag, cls).__new__(cls, name)
