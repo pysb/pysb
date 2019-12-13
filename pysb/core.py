@@ -154,8 +154,11 @@ class SelfExporter(object):
 
 
 class Symbol(sympy.Dummy):
-    def __new__(cls, name, value=0.0, _export=True):
-        return super(Symbol, cls).__new__(cls, name)
+    def __new__(cls, name, value=0.0, _export=True, **kwargs):
+        kwargs.pop('value', None)
+        kwargs.pop('_export', None)
+        real = kwargs.pop('real', True)
+        return super(Symbol, cls).__new__(cls, name, real=real, **kwargs)
 
     def _lambdacode(self, printer, **kwargs):
         """ custom printer method that ensures that the dummyid is not
@@ -1569,7 +1572,7 @@ class Observable(Component, Symbol):
     """
 
     def __new__(cls, name, reaction_pattern, match='molecules', _export=True):
-        return super(Observable, cls).__new__(cls, name, real=True)
+        return super(Observable, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return (self.name, self.reaction_pattern, self.match, False)
@@ -1631,7 +1634,7 @@ class Expression(Component, Symbol):
     """
 
     def __new__(cls, name, expr, _export=True):
-        return super(Expression, cls).__new__(cls, name, real=True)
+        return super(Expression, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return (self.name, self.expr, False)
