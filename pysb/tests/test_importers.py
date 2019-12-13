@@ -67,7 +67,7 @@ def bngl_import_compare_simulations(bng_file, force=False,
             renamed_species = 'Obs_{}'.format(species)
         logger.debug(yfull2[renamed_species])
         assert numpy.allclose(yfull1[species], yfull2[renamed_species],
-                              atol=precision, rtol=precision)
+                              atol=precision*10, rtol=precision*10)
 
 
 def bngl_import_compare_nfsim(bng_file):
