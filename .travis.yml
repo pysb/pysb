@@ -6,6 +6,7 @@ addons:
   apt:
     packages:
       - libatlas-base-dev
+      - swig3.0
 env:
 - PYVER=2.7
 - PYVER=3.6
@@ -25,6 +26,8 @@ before_install:
 - pip install libroadrunner twine
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
+# create swig alias for swig3.0
+- mkdir -p ~/bin/ && ln -s /usr/bin/swig3.0 ~/bin/swig && export PATH=~/bin/:$PATH;
 # Install BioNetGen, Kappa, StochKit and Atomizer
 - conda install --yes -c alubbock kappa stochkit bionetgen atomizer
 install:
