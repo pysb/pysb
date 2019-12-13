@@ -3,6 +3,8 @@ from pysb.simulator import AmiciSimulator
 
 import os
 import shutil
+import unittest
+import sys
 
 
 class TestScipySimulatorBase(object):
@@ -26,6 +28,8 @@ class TestScipySimulatorBase(object):
     def tearDown(self):
         self.sim = None
 
+    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
+                                                  'Python 2')
     def test_temp_compilations(self):
         self.sim = AmiciSimulator(model=self.model)
         self.sim.run(tspan=[0, 1])
@@ -34,9 +38,13 @@ class TestScipySimulatorBase(object):
         self.sim = None
         assert not os.path.exists(tempdir)
 
+    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
+                                                  'Python 2')
     def test_simulation_default_params(self):
         self.sim.run(tspan=[0, 1])
 
+    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
+                                                  'Python 2')
     def test_simulation_default_parallel_multiparam(self):
         result = self.sim.run(
             tspan=[0, 1],
@@ -45,6 +53,8 @@ class TestScipySimulatorBase(object):
         )
         assert result.nsims == 2
 
+    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
+                                                  'Python 2')
     def test_simulation_default_parallel_multiinitial(self):
         result = self.sim.run(
             tspan=[0, 1],
