@@ -76,8 +76,9 @@ class AmiciSimulator(Simulator):
                                              **kwargs)
 
         self.modeldir_is_temp = 'modeldir' not in kwargs
-        self.modeldir = kwargs.pop('modeldir',
-                                    mkdtemp(prefix=f'pysbamici_{model.name}_'))
+        self.modeldir = kwargs.pop('modeldir', mkdtemp(
+            prefix='pysbamici_{name}_'.format(name=model.name)
+        ))
         force_recompile = kwargs.pop('force_recompile', False)
 
         if kwargs:
