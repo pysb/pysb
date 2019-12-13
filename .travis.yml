@@ -1,6 +1,11 @@
 language: python
 sudo: required
 dist: trusty
+compiler: gcc
+addons:
+  apt:
+    packages:
+      - libatlas-base-dev
 env:
 - PYVER=2.7
 - PYVER=3.6
