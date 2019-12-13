@@ -12,7 +12,7 @@ import importlib
 
 try:
     import amici
-except ImportError:
+except:
     amici = None
 
 
@@ -166,6 +166,13 @@ class AmiciSimulator(Simulator):
         if num_processors == 1:
             self._logger.debug('Single processor (serial) mode')
         else:
+            if not amici.compiledWithOpenMP():
+                raise EnvironmentError(
+                    'AMICI/model was not compiled with openMP support, which '
+                    'is required for parallel simulation. Please see '
+                    'https://github.com/ICB-DCM/AMICI/blob/master'
+                    '/documentation/PYTHON.md for details on how to compile '
+                    'AMICI with openMP support.')
             self._logger.debug('Multi-processor (parallel) mode using {} '
                                'processes'.format(num_processors))
 
@@ -232,5 +239,3 @@ class AmiciSimulator(Simulator):
             np.asarray(rdata['x'])
             for rdata in rdatas
         ]
-
-

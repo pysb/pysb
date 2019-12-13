@@ -6,16 +6,21 @@ import shutil
 import unittest
 import sys
 
+try:
+    import amici
+except:
+    amici = None
 
-class TestScipySimulatorBase(object):
+
+class TestAmiciSimulatorBase(object):
     def __init__(self):
         self.model = bngwiki_egfr_simple.model
         self.model.name = 'amici_simulator_test_bngwiki_egfr_simple'
         self.modeldir = os.path.join(
             os.path.dirname(os.path.realpath(__file__)), self.model.name
         )
-
-        self.sim = AmiciSimulator(model=self.model, modeldir=self.modeldir)
+        if amici is not None:
+            self.sim = AmiciSimulator(model=self.model, modeldir=self.modeldir)
 
     def __del__(self):
         if os.path.exists(self.modeldir):
@@ -28,8 +33,7 @@ class TestScipySimulatorBase(object):
     def tearDown(self):
         self.sim = None
 
-    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
-                                                  'Python 2')
+    @unittest.skipIf(amici is None, 'amici not installed')
     def test_temp_compilations(self):
         self.sim = AmiciSimulator(model=self.model)
         self.sim.run(tspan=[0, 1])
@@ -38,14 +42,12 @@ class TestScipySimulatorBase(object):
         self.sim = None
         assert not os.path.exists(tempdir)
 
-    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
-                                                  'Python 2')
+    @unittest.skipIf(amici is None, 'amici not installed')
     def test_simulation_default_params(self):
         self.sim.run(tspan=[0, 1])
 
-    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
-                                                  'Python 2')
-    def test_simulation_default_parallel_multiparam(self):
+    @unittest.skipIf(amici is None, 'amici not installed')
+    def test_simulation_default_sequential_multiparam(self):
         result = self.sim.run(
             tspan=[0, 1],
             param_values=[self.sim.param_values[0, :],
@@ -53,12 +55,21 @@ class TestScipySimulatorBase(object):
         )
         assert result.nsims == 2
 
-    @unittest.skipIf(sys.version_info.major <= 3, 'amici not available for '
-                                                  'Python 2')
-    def test_simulation_default_parallel_multiinitial(self):
+    @unittest.skipIf(amici is None, 'amici not installed')
+    def test_simulation_default_sequential_multiinitial(self):
         result = self.sim.run(
             tspan=[0, 1],
             initials=[self.sim.initials[0, :],
                       self.sim.initials[0, :]]
+        )
+        assert result.nsims == 2
+
+    @unittest.skipIf(amici is None, 'amici not installed')
+    def test_simulation_default_parallel_multiparam(self):
+        result = self.sim.run(
+            tspan=[0, 1],
+            param_values=[self.sim.param_values[0, :],
+                          self.sim.param_values[0, :]],
+            num_processors=2
         )
         assert result.nsims == 2
