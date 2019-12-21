@@ -714,13 +714,19 @@ class ComplexPattern(object):
         if compartment and not isinstance(compartment, Compartment):
             raise Exception("compartment is not a Compartment object")
 
-        # Drop species cpt, if redundant
-        if compartment and len(monomer_patterns) == 1 and \
-                monomer_patterns[0].compartment == compartment:
-            compartment = None
+        for mp in monomer_patterns:
+            if mp.compartment is None:
+                mp.compartment = compartment
 
         self.monomer_patterns = monomer_patterns
-        self.compartment = compartment
+        self.compartments = {
+            mp.compartment for mp in self.monomer_patterns
+        }
+        # if monomer patterns span multiple compartments, cBNGL defines
+        # the species compartment as the surface compartment
+        self.compartment = next(comp for comp in self.compartments
+                                if len(self.compartments) == 1
+                                or comp.dimension == 2)
         self.match_once = match_once
         self._graph = None
         self._tag = None
@@ -820,10 +826,6 @@ class ComplexPattern(object):
                 g.add_node(cpt_node_id, id=cpt)
                 return cpt_node_id
 
-        species_cpt_node_id = None
-        if self.compartment:
-            species_cpt_node_id = add_or_get_compartment_node(self.compartment)
-
         def _handle_site_instance(state_or_bond):
             mon_site_id = next(node_count)
             g.add_node(mon_site_id, id=site)
@@ -865,9 +867,8 @@ class ComplexPattern(object):
         for mp in self.monomer_patterns:
             mon_node_id = next(node_count)
             g.add_node(mon_node_id, id=mp.monomer)
-            if mp.compartment or self.compartment:
-                cpt_node_id = add_or_get_compartment_node(mp.compartment or
-                                                          self.compartment)
+            if mp.compartment:
+                cpt_node_id = add_or_get_compartment_node(mp.compartment)
                 g.add_edge(mon_node_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
@@ -894,12 +895,6 @@ class ComplexPattern(object):
                 g.add_edge(site_nodes[0], any_bond_tester_id)
             for n1, n2 in itertools.combinations(site_nodes, 2):
                 g.add_edge(n1, n2)
-
-        # Remove the species compartment if all monomer nodes have a
-        # compartment
-        if species_cpt_node_id is not None and \
-                        g.degree(species_cpt_node_id) == 0:
-            g.remove_node(species_cpt_node_id)
 
         self._graph = g
         return self._graph
