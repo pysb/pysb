@@ -9,9 +9,10 @@ import weakref
 import copy
 import itertools
 import sympy
-import numpy as np
 import scipy.sparse
 import networkx as nx
+from collections import OrderedDict
+
 
 try:
     reload
@@ -517,7 +518,12 @@ class MonomerPattern(object):
             raise ValueError("compartment is not a Compartment object")
 
         self.monomer = monomer
-        self.site_conditions = site_conditions
+        self.site_conditions = OrderedDict(
+            (k, tuple(sorted(v, key=str)))
+            if isinstance(v, MultiState)
+            else (k, v)
+            for k, v in sorted(site_conditions.items(), key=lambda x: x[0])
+        )
         self.compartment = compartment
         self._graph = None
         self._tag = None
@@ -719,7 +725,8 @@ class ComplexPattern(object):
                 monomer_patterns[0].compartment == compartment:
             compartment = None
 
-        self.monomer_patterns = monomer_patterns
+        self.monomer_patterns = sorted(monomer_patterns,
+                                       key=lambda x: x.__repr__())
         self.compartment = compartment
         self.match_once = match_once
         self._graph = None
