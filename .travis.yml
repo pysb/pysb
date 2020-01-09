@@ -23,8 +23,7 @@ before_install:
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
     pydot codecov mock cython
 - if [[ $PYVER == 2.7 ]]; then pip install weave; fi
-- export AMICI_CXXFLAGS=-fopenmp export AMICI_LDFLAGS=-fopenmp pip3 install
-  amici
+- export AMICI_CXXFLAGS=-fopenmp; export AMICI_LDFLAGS=-fopenmp; pip3 install amici
 - conda install --yes -c SBMLTeam python-libsbml
 - pip install libroadrunner twine
 - mkdir -p ~/.config/matplotlib
