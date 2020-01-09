@@ -188,7 +188,7 @@ class AmiciSimulator(Simulator):
         return SimulationResult(self, np.array([self.tspan] * n_sims),
                                 self._rdatas_to_trajectories(rdatas))
 
-    def _simulationspecs_to_edatas(self):
+    def _simulationspecs_to_edatas(self) -> List[amici.ExpData]:
         """ Converts tspan, param_values and initials into amici.ExpData
         objects """
         n_sims = len(self.param_values)
@@ -212,21 +212,21 @@ class AmiciSimulator(Simulator):
 
         return edatas
 
-    def _pysb2amici_parameters(self, parameters):
+    def _pysb2amici_parameters(self, parameters: List[float]):
         """ Reorders and maps pysb parameters to amici parameters """
         return [
             parameters[self.model.parameters.keys().index(amici_par_name)]
             for amici_par_name in self.amici_model.getParameterIds()
         ]
 
-    def _pysb2amici_fixed_parameters(self, parameters):
+    def _pysb2amici_fixed_parameters(self, parameters: List[float]):
         """ Reorders and maps pysb parameters to amici constants """
         return [
             parameters[self.model.parameters.keys().index(amici_par_name)]
             for amici_par_name in self.amici_model.getFixedParameterIds()
         ]
 
-    def _pysb2amici_initials(self, initials):
+    def _pysb2amici_initials(self, initials: List[float]):
         """ Reorders and maps pysb species to amici states variables """
         states = [f'__s' + str(ix) for ix in range(len(self.model.species))]
         return [
@@ -234,7 +234,7 @@ class AmiciSimulator(Simulator):
             for amici_par_name in self.amici_model.getStateIds()
         ]
 
-    def _rdatas_to_trajectories(self, rdatas):
+    def _rdatas_to_trajectories(self, rdatas: List[amici.ReturnData]) -> List:
         """ Extracts state trajectories from lists of amici.Re  """
         return [
             np.asarray(rdata['x'])
