@@ -115,9 +115,7 @@ class AmiciSimulator(Simulator):
         try:
             modelModulePYSB = importlib.import_module(model.name)
         except Exception as e:
-            raise RuntimeError('Model {mode} failed. Please {help}'.format(
-                mode=mode, help=help
-            ))
+            raise RuntimeError(f'Model {mode} failed. Please {help}')
 
         self._model = model
         self.amici_model = modelModulePYSB.getModel()
@@ -228,7 +226,7 @@ class AmiciSimulator(Simulator):
 
     def _pysb2amici_initials(self, initials: List[float]):
         """ Reorders and maps pysb species to amici states variables """
-        states = [f'__s' + str(ix) for ix in range(len(self.model.species))]
+        states = [f'__s{ix}' for ix in range(len(self.model.species))]
         return [
             initials[states.index(amici_par_name)]
             for amici_par_name in self.amici_model.getStateIds()
