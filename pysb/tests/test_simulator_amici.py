@@ -42,7 +42,7 @@ class TestAmiciSimulatorBase(object):
     def test_simulation_default_params(self):
         self.sim.run(tspan=[0, 1])
 
-    def test_simulation_default_parallel_multiparam(self):
+    def test_simulation_default_sequential_multiparam(self):
         result = self.sim.run(
             tspan=[0, 1],
             param_values=[self.sim.param_values[0, :],
@@ -50,7 +50,7 @@ class TestAmiciSimulatorBase(object):
         )
         assert result.nsims == 2
 
-    def test_simulation_default_parallel_multiinitial(self):
+    def test_simulation_default_sequential_multiinitial(self):
         result = self.sim.run(
             tspan=[0, 1],
             initials=[self.sim.initials[0, :],
