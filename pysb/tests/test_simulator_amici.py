@@ -3,8 +3,6 @@ from pysb.simulator import AmiciSimulator
 
 import os
 import shutil
-import unittest
-import sys
 
 try:
     import amici
@@ -33,7 +31,6 @@ class TestAmiciSimulatorBase(object):
     def tearDown(self):
         self.sim = None
 
-    @unittest.skipIf(amici is None, 'amici not installed')
     def test_temp_compilations(self):
         self.sim = AmiciSimulator(model=self.model)
         self.sim.run(tspan=[0, 1])
@@ -42,12 +39,10 @@ class TestAmiciSimulatorBase(object):
         self.sim = None
         assert not os.path.exists(tempdir)
 
-    @unittest.skipIf(amici is None, 'amici not installed')
     def test_simulation_default_params(self):
         self.sim.run(tspan=[0, 1])
 
-    @unittest.skipIf(amici is None, 'amici not installed')
-    def test_simulation_default_sequential_multiparam(self):
+    def test_simulation_default_parallel_multiparam(self):
         result = self.sim.run(
             tspan=[0, 1],
             param_values=[self.sim.param_values[0, :],
@@ -55,8 +50,7 @@ class TestAmiciSimulatorBase(object):
         )
         assert result.nsims == 2
 
-    @unittest.skipIf(amici is None, 'amici not installed')
-    def test_simulation_default_sequential_multiinitial(self):
+    def test_simulation_default_parallel_multiinitial(self):
         result = self.sim.run(
             tspan=[0, 1],
             initials=[self.sim.initials[0, :],
@@ -64,7 +58,6 @@ class TestAmiciSimulatorBase(object):
         )
         assert result.nsims == 2
 
-    @unittest.skipIf(amici is None, 'amici not installed')
     def test_simulation_default_parallel_multiparam(self):
         result = self.sim.run(
             tspan=[0, 1],
