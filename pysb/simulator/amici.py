@@ -1,4 +1,5 @@
 from pysb.simulator.base import Simulator, SimulationResult
+from typing import List
 import pysb.bng
 
 import numpy as np
