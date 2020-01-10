@@ -95,6 +95,9 @@ class AmiciSimulator(Simulator):
                                    'to prevent data loss. To ignore this '
                                    'warning, pass `force_recompile=True`')
 
+            print(os.environ['AMICI_CXXFLAGS'])
+            print(os.environ['AMICI_LDFLAGS'])
+
             amici.pysb2amici(model,
                              self.modeldir,
                              verbose=False,
