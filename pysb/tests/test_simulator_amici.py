@@ -10,11 +10,8 @@ try:
 except:
     amici = None
 
-if platform.system() != 'Windows':
-    def test_amici_import():
-        assert amici is not None
 
-if amici is not None:
+if platform.system() != 'Windows':
     class TestAmiciSimulatorBase(object):
         def __init__(self):
             self.model = bngwiki_egfr_simple.model
