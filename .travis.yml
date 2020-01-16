@@ -10,9 +10,9 @@ addons:
       - g++-5
       - libc6-dbg
 env:
-- PYVER=2.7
 - PYVER=3.6
 - PYVER=3.7
+- PYVER=3.8
 before_install:
 - wget http://repo.continuum.io/miniconda/Miniconda${PYVER:0:1}-latest-Linux-x86_64.sh
     -O miniconda.sh
@@ -22,11 +22,12 @@ before_install:
 - conda install --yes -c conda-forge python="$PYVER"
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
     pydot codecov mock cython
-- if [[ $PYVER == 2.7 ]]; then pip install weave; fi
-- conda install --yes -c SBMLTeam python-libsbml
+- if [[ $PYVER != 3.8 ]]; then conda install --yes -c SBMLTeam python-libsbml; else pip install python-libsbml; fi
+# libroadrunner is not currently available for Python 3.8
+- if [[ $PYVER != 3.8 ]]; then pip install libroadrunner twine; else pip install twine; fi
 # enable openmp parallelization in amici install
 - export AMICI_CXXFLAGS=-fopenmp; export AMICI_LDFLAGS=-fopenmp
-- pip install libroadrunner twine amici
+- pip install amici
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
 # create swig alias for swig3.0
