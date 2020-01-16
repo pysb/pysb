@@ -185,7 +185,7 @@ class AmiciSimulator(Simulator):
         return SimulationResult(self, np.array([self.tspan] * n_sims),
                                 self._rdatas_to_trajectories(rdatas))
 
-    def _simulationspecs_to_edatas(self) -> List[amici.ExpData]:
+    def _simulationspecs_to_edatas(self) -> List:
         """ Converts tspan, param_values and initials into amici.ExpData
         objects """
         n_sims = len(self.param_values)
@@ -231,8 +231,8 @@ class AmiciSimulator(Simulator):
             for amici_par_name in self.amici_model.getStateIds()
         ]
 
-    def _rdatas_to_trajectories(self, rdatas: List[amici.ReturnData]) -> List:
-        """ Extracts state trajectories from lists of amici.Re  """
+    def _rdatas_to_trajectories(self, rdatas: List) -> List:
+        """ Extracts state trajectories from lists of amici.ReturnData  """
         return [
             np.asarray(rdata['x'])
             for rdata in rdatas
