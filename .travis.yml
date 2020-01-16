@@ -2,7 +2,6 @@ language: python
 sudo: required
 dist: trusty
 env:
-- PYVER=2.7
 - PYVER=3.6
 - PYVER=3.7
 - PYVER=3.8
@@ -15,7 +14,6 @@ before_install:
 - conda install --yes -c conda-forge python="$PYVER"
     numpy scipy matplotlib sympy nose h5py pexpect pandas theano networkx
     pydot codecov mock cython
-- if [[ $PYVER == 2.7 ]]; then pip install weave; fi
 - if [[ $PYVER != 3.8 ]]; then conda install --yes -c SBMLTeam python-libsbml; else pip install python-libsbml; fi
 # libroadrunner is not currently available for Python 3.8
 - if [[ $PYVER != 3.8 ]]; then pip install libroadrunner twine; else pip install twine; fi
