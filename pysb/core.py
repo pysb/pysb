@@ -154,7 +154,7 @@ class SelfExporter(object):
 
 
 class Symbol(sympy.Dummy):
-    def __new__(cls, name, value=0.0, _export=True):
+    def __new__(cls, name):
         return super(Symbol, cls).__new__(cls, name)
 
     def _lambdacode(self, printer, **kwargs):
