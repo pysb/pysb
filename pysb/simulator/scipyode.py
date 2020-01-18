@@ -264,18 +264,14 @@ class ScipyOdeSimulator(Simulator):
                 if theano is None:
                     raise ImportError('Theano library is not installed')
 
-                code_eqs_py = theano_function(
+                self._code_eqs = theano_function(
                     self._symbols,
                     [o if not o.is_zero else theano.tensor.zeros(1)
                      for o in ode_mat],
                     on_unused_input='ignore'
                 )
             else:
-                code_eqs_py = sympy.lambdify(self._symbols,
-                                             sympy.flatten(ode_mat))
-
-            rhs = _get_rhs(self._compiler, code_eqs_py)
-            self._code_eqs = code_eqs_py
+                self._code_eqs = (self._symbols, sympy.flatten(ode_mat))
         else:
             raise ValueError('Unknown compiler_mode: %s' % self._compiler)
 
@@ -283,7 +279,6 @@ class ScipyOdeSimulator(Simulator):
         # We'll keep the code for putting together the matrix in Sympy
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
-        jac_fn = None
         self._jac_eqs = None
         if self._use_analytic_jacobian:
             species_symbols = [sympy.Symbol('__s%d' % i)
@@ -356,11 +351,7 @@ class ScipyOdeSimulator(Simulator):
                         jac_fn(0.0, self.initials[0], self.param_values[0])
                 self._jac_eqs = jac_eqs
             else:
-                jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
-
-                jac_fn = _get_rhs(self._compiler, jac_eqs_py)
-
-                self._jac_eqs = jac_eqs_py
+                self._jac_eqs = (self._symbols, jac_matrix, "numpy")
 
         # build integrator options list from our defaults and any kwargs
         # passed to this function
@@ -375,7 +366,7 @@ class ScipyOdeSimulator(Simulator):
 
         if integrator != 'lsoda':
             # Only used to check the user has selected a valid integrator
-            self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
+            self.integrator = scipy.integrate.ode(None)
             with warnings.catch_warnings():
                 warnings.filterwarnings('error', 'No integrator name match')
                 self.integrator.set_integrator(integrator, **options)
@@ -649,12 +640,18 @@ def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
                         tspan, param_values, integrator_name, compiler,
                         integrator_opts, compiler_directives):
     """ Single integrator process, for parallel execution """
+    if compiler == 'python':
+        code_eqs = sympy.lambdify(*code_eqs)
+        if jac_eqs:
+            jac_eqs = sympy.lambdify(*jac_eqs)
+
     rhs = _get_rhs(compiler, code_eqs, ydot=np.zeros(num_species),
                    compiler_directives=compiler_directives)
 
     jac_fn = None
     if jac_eqs:
-        jac_eqs = _get_rhs(compiler, jac_eqs,
+        jac_eqs = _get_rhs(compiler,
+                           jac_eqs,
                            jac=np.zeros((num_odes, num_species)),
                            compiler_directives=compiler_directives)
 
