@@ -207,8 +207,6 @@ def format_complexpattern(cp, fixed=False):
     ret = '.'.join([format_monomerpattern(mp) for mp in cp.monomer_patterns])
     if fixed:
         ret = '$' + ret
-    if cp.compartment is not None:
-        ret = '@%s:%s' % (cp.compartment.name, ret)
     if cp._tag:
         ret = '%{}:{}'.format(cp._tag.name, ret)
     if cp.match_once:

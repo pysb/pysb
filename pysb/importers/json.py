@@ -124,7 +124,7 @@ class PySBJSONDecoder(JSONDecoder):
     def decode_complex_pattern(self, cp):
         cp_obj = ComplexPattern(
             [self.decode_monomer_pattern(mp) for mp in cp['monomer_patterns']],
-            self._modelget(cp['compartment']),
+            cp.get('compartment', None),
             cp['match_once']
         )
         cp_obj._tag = self._modelget(cp['tag'])

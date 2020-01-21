@@ -719,17 +719,28 @@ class ComplexPattern(object):
                 mp.compartment = compartment
 
         self.monomer_patterns = monomer_patterns
-        self.compartments = {
-            mp.compartment for mp in self.monomer_patterns
-        }
         # if monomer patterns span multiple compartments, cBNGL defines
         # the species compartment as the surface compartment
-        self.compartment = next(comp for comp in self.compartments
-                                if len(self.compartments) == 1
-                                or comp.dimension == 2)
         self.match_once = match_once
         self._graph = None
         self._tag = None
+
+    @property
+    def compartment(self):
+        compartments = {
+            mp.compartment for mp in self.monomer_patterns
+        }
+        return next((
+            comp for comp in compartments
+            if len(compartments) == 1 or comp.dimension == 2
+        ), None)
+
+    @compartment.setter
+    def compartment(self, value):
+        for mp in self.monomer_patterns:
+            if mp.compartment is None:
+                mp.compartment = value
+
 
     def is_concrete(self):
         """
@@ -1077,10 +1088,6 @@ class ComplexPattern(object):
              if idx == 0 or p._tag is None
              else '({})'.format(repr(p))
              for idx, p in enumerate(self.monomer_patterns)])
-        if self.compartment:
-            if len(self.monomer_patterns) > 1:
-                ret = '(%s)' % ret
-            ret += ' ** %s' % self.compartment.name
         if self.match_once:
             ret = 'MatchOnce(%s)' % ret
         if self._tag:

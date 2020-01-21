@@ -115,7 +115,6 @@ class PySBJSONEncoder(json.JSONEncoder):
         return {
             'monomer_patterns': [cls.encode_monomer_pattern(mp)
                                  for mp in cp.monomer_patterns],
-            'compartment': cp.name if cp.compartment else None,
             'match_once': cp.match_once,
             'tag': cp._tag.name if cp._tag else None
         }
