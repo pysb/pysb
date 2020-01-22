@@ -69,7 +69,7 @@ def check_convert(model, format):
     if exported_file is not None:
         if format == 'python':
             # linspace arguments picked to avoid VODE warning
-            exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n')
+            exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n', {'numpy': np})
         elif format == 'pysb_flat':
             exec(exported_file, {'__name__': model.name})
         elif format == 'sbml':
