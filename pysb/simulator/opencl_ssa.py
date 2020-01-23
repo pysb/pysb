@@ -176,7 +176,7 @@ class OpenCLSimulator(SSABase):
             np.array(t_out, dtype=self._dtype)
         )
         if self.num_sim < self._local_work_size[0]:
-            local_work_size = (self.num_sim, 1)
+            local_work_size = (1, 1)
         else:
             local_work_size = self._local_work_size
 

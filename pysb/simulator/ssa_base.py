@@ -57,14 +57,14 @@ class SSABase(Simulator):
                 if not (i == l_lim and j == r_lim):
                     stoich_string += ','
             stoich_string += '\n'
-        hazards_string = ''
-        pattern = "(__s\d+)\*\*(\d+)"
+        output_string = ''
+
         expr_strings = {
             e.name: '(%s)' % sympy.ccode(
                 e.expand_expr(expand_observables=True)
             ) for e in self.model.expressions}
         for n, rxn in enumerate(self._model.reactions):
-            hazards_string += "\th[%s] = " % repr(n)
+            output_string += "\th[%s] = " % repr(n)
             rate = sympy.fcode(rxn["rate"])
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
@@ -75,29 +75,30 @@ class SSABase(Simulator):
                 rate = re.sub(r'\b%s\b' % e.name,
                               expr_strings[e.name],
                               rate)
+
             # replace x**2 with (x-1)*x
+            pattern = "(__s\d+)\*\*(\d+)"
             matches = re.findall(pattern, rate)
             for m in matches:
                 repl = m[0]
                 for i in range(1, int(m[1])):
                     repl += "*(%s-%d)" % (m[0], i)
                 rate = re.sub(pattern, repl, rate)
-
-            rate = re.sub(r'_*s(\d+)',
-                          lambda m: 'y[%s]' % (int(m.group(1))),
+            # replace species string with matrix index (`_si` with `y[i]`)
+            rate = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
             # replace param names with vector notation
             for q, prm in enumerate(params_names):
                 rate = re.sub(r'\b(%s)\b' % prm, 'param_vec[%s]' % q, rate)
 
-            rate = re.sub('\*$', '', rate)
-            rate = re.sub('d0', '', rate)
-            rate = p.sub('', rate)
+            # Calculate the fast approximate, better performance on GPUs
             rate = rate.replace('pow', 'powf')
+            # If a parameter is a float and appears first, the result output
+            # will lose precision. Casting to double ensures precision
             rate = '(double)' + rate
-            hazards_string += rate + ";\n"
+            output_string += rate + ";\n"
         return dict(n_species=self._n_species, n_params=self._parameter_number,
-                    n_reactions=_reaction_number, hazards=hazards_string,
+                    n_reactions=_reaction_number, propensities=output_string,
                     stoch=stoich_string)
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0):

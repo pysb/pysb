@@ -7,6 +7,8 @@
 #define NREACT {n_reactions}
 #define NREACT_MIN_ONE NREACT-1
 
+// used as place holder. WIll be uncommented if simulator created with verbose>0
+//#define VERBOSE false
 
 
 
@@ -27,7 +29,7 @@ __device__ double sum_propensities(double *a){{
 
 __device__ double propensities(int *y, double *h, double *param_vec)
 {{
-{hazards}
+{propensities}
 return sum_propensities(h);
 }}
 
@@ -64,7 +66,6 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     curandState randState;
-//    curandStateMRG32k3a randState;
     curand_init(clock64(), tid, 0, &randState);
 
 
@@ -72,6 +73,8 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
     int prev[num_species];
     double A[NREACT] = {{0.0}};
     double param_vec[NPARAM] =  {{0.0}};
+
+    // spacing from global
     const int result_stepping = tid*NRESULTS*num_species;
 
     // init parameters for thread
@@ -100,28 +103,33 @@ __global__ void Gillespie_all_steps(const int* species_matrix,  int* result,
 
             // calculate propensities
             double a0 = propensities(y, A, param_vec);
-            if (a0 <= 0.0){{
-                t = time[NRESULTS-1];
-                continue;
-            }}
+            if (a0 > (double)0.0){{
 
-            // calculate two random numbers
-            double r1 =  curand_uniform(&randState);
-            double r2 =  curand_uniform(&randState);
+                // calculate two random numbers
+                double r1 =  curand_uniform(&randState);
+                double r2 =  curand_uniform(&randState);
 
-            // find time of next reaction and update time
-            double tau = -__logf(r1)/a0;
-            t += tau;
+                // find time of next reaction and update time
+                double tau = -__logf(r1)/a0;
+                t += tau;
 
-            // find next reaction and update species matrix
-            double k = sample(A, a0*r2);
-            stoichiometry(y, k);
-            }}
+                // find next reaction and update species matrix
+                double k = sample(A, a0*r2);
+                stoichiometry(y, k);
+        #ifdef VERBOSE
+                    if (tid == 0){{ printf(" %d %f %f %f %f %f %d\n ", tid, a0, r1, r2, tau, t, rxn_k); }}
+        #endif
+        #ifdef VERBOSE_MAX
+                    printf(" %d %.17g %.17g %.17g %.17g %.17g %d\n ", tid, a0, r1, r2, tau, t, rxn_k);
+        #endif
+                }}
+
+
+        else{{ t = time[NRESULTS-1]; }}
+        }}
 
         update_results(result, prev, result_stepping, time_index);
         time_index++;
-        }}
-
-    }}
-
+        }} // while(time_index < NRESULTS) close
+}} // function close
 }} // extern c close

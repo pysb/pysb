@@ -17,8 +17,7 @@ if __name__ == "__main__":
     n_sim = 100
     tspan = np.linspace(0, 5000, 101)
     name = 'tBid_total'
-    # you can use device= 'cpu' or 'gpu', depending on resources available
-    sim = OpenCLSimulator(model, tspan=tspan, verbose=True, device='gpu')
+    sim = OpenCLSimulator(model, tspan=tspan, verbose=True)
     traj = sim.run(tspan=tspan, number_sim=n_sim)
 
     result = np.array(traj.observables)[name]

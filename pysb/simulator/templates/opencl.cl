@@ -11,6 +11,8 @@
 #define num_params {n_params}
 #define num_reaction {n_reactions}
 #define n_reaction_min_1 num_reaction-1
+
+// used as place holder. WIll be uncommented if simulator created with verbose>0
 //#define VERBOSE false
 #define USE_DP
 
@@ -18,27 +20,36 @@ typedef double4 output_vec_t;
 typedef philox4x32_ctr_t ctr_t;
 typedef philox4x32_key_t key_t;
 /*
-The code to generate random numbers is taken from pyopencl and based on
-Random123 library.
 
 Unlike cuda, there is not an easy to use library (curand) that allows one to
 keep track of RNG across threads.
 
+The code to generate random numbers is taken from pyopencl and based on
+Random123 library.
 gen_bits
 
-https://github.com/inducer/pyopencl/blob/master/pyopencl/clrandom.py
+
 
 http://www.thesalmons.org/john/random123/releases/latest/docs/index.html
+https://software.intel.com/en-us/mkl-vsnotes-philox4x32-10
+
 */
+
+// Max integers based on single or double precision
 __constant double RAND_MAX_INT = (double) 1./(double) UINT_MAX;
 __constant double RAND_MAX_LONG = (double) 1./(double) ULONG_MAX;
-// convert int to double or float (depending on precision level)
+
+
+// convert int to double or float (0-1] (depending on precision level)
 #ifdef USE_DP
     #define GET_RANDOM_NUM(gen) (double) 1 * (RAND_MAX_INT * convert_double4(gen) + RAND_MAX_LONG * convert_double4(gen));
 #else
     #define GET_RANDOM_NUM(gen) (double) 1 * (RAND_MAX_INT * convert_double4(gen));
 #endif
 
+
+// gen_bits implemented in pyopencl
+// https://github.com/inducer/pyopencl/blob/master/pyopencl/clrandom.py
 uint4 gen_bits(key_t *key, ctr_t *ctr)
 {{
     union {{
@@ -69,7 +80,7 @@ __constant int stoch_matrix[]={{
 
 double calc_propensities(int *y, double *h, double *param_vec)
 {{
-{hazards}
+{propensities}
 return sum_propensities(h);
 }}
 
@@ -104,7 +115,6 @@ __kernel  void Gillespie_all_steps(
          const unsigned int max_sim                     // total number of simulations
          ){{
 
-//    const int tid = get_global_id(0);
     const int tid = get_global_id(0) * get_global_size(1) + get_global_id(1);
     if (tid > max_sim){{
         return;
@@ -122,11 +132,6 @@ __kernel  void Gillespie_all_steps(
     }};
 #endif
 
-//    printf("%d %d %d %d %d %d %d \n ",tid,
-//                get_global_id(0), get_global_id(1),
-//                get_local_id(0), get_local_id(1),
-//                get_group_id(0), get_group_id(1));
-
     double propensities[num_reaction] = {{0.0}};
     double param_vec[num_params] =  {{0.0}};
 
@@ -140,7 +145,9 @@ __kernel  void Gillespie_all_steps(
     // init species state per thread
     int species_state[num_species];
     int prev_state[num_species];
-    unsigned int species_stride = tid*num_species; // spacing from global
+
+    // spacing from global
+    unsigned int species_stride = tid*num_species;
 
     #pragma unroll num_species
     for(unsigned int i=0; i<num_species; i++){{
@@ -158,7 +165,6 @@ __kernel  void Gillespie_all_steps(
     // Arbitrary starting values from
     // https://stackoverflow.com/questions/11268023/random-numbers-with-opencl-using-random123
     key_t k = {{{{random_seed[tid], 0}}}};
-//    key_t k = {{{{0, 0}}}};
     ctr_t c = {{{{0, 0}}}};
     output_vec_t rand_ns;
 
