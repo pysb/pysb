@@ -57,7 +57,6 @@ def bngl_import_compare_simulations(bng_file, force=False,
     if force:
         return
 
-    # Check all species trajectories are equal (within numerical tolerance)
     assert len(yfull1.dtype.names) == len(yfull2.dtype.names)
     for species in yfull1.dtype.names:
         logger.debug(species)
@@ -69,6 +68,35 @@ def bngl_import_compare_simulations(bng_file, force=False,
         logger.debug(yfull2[renamed_species])
         assert numpy.allclose(yfull1[species], yfull2[renamed_species],
                               atol=precision, rtol=precision)
+
+
+def bngl_import_compare_nfsim(bng_file):
+    m = model_from_bngl(bng_file)
+
+    BNG_SEED = 123
+
+    # Simulate using the BNGL file directly
+    with BngFileInterface(model=None) as bng:
+        bng.action('readFile', file=bng_file, skip_actions=1)
+        bng.action('simulate', method='nf', n_steps=10, t_end=100,
+                   seed=BNG_SEED)
+        bng.execute()
+        yfull1 = bng.read_simulation_results()
+
+    # Convert to a PySB model, then simulate using BNG
+    with BngFileInterface(model=m) as bng:
+        bng.action('simulate', method='nf', n_steps=10, t_end=100,
+                   seed=BNG_SEED)
+        bng.execute()
+        yfull2 = bng.read_simulation_results()
+
+    # Check all species trajectories are equal (within numerical tolerance)
+    for i in range(len(m.observables)):
+        print(i)
+        print(yfull1[i])
+        print(yfull2[i])
+        print(yfull1[i] == yfull2[i])
+        assert yfull1[i] == yfull2[i]
 
 
 def _bng_validate_directory():
@@ -111,11 +139,17 @@ def test_bngl_import_expected_passes_with_force():
             yield (bngl_import_compare_simulations, full_filename, True)
 
 
+def test_bngl_import_expected_passes_nfsim():
+    for filename in ('isingspin_localfcn', ):
+        full_filename = _bngl_location(filename)
+        yield (bngl_import_compare_nfsim, full_filename)
+
+
 def test_bngl_import_expected_passes_no_sim():
     """ These models convert properly, but we cannot generate network """
-    for filename in ('blbr',
+    for filename in ('blbr',         # Uses max_stoich option for netgen
                      'hybrid_test',  # Population maps are not converted
-                     'tlbr'):
+                     'tlbr'):        # Uses max_iter option for netgen
         full_filename = _bngl_location(filename)
         yield (bngl_import_compare_simulations, full_filename, False, None,
                None)
@@ -131,6 +165,7 @@ def test_bngl_import_expected_passes():
                      'gene_expr_func',
                      'gene_expr_simple',
                      'isomerization',
+                     'localfunc',
                      'michment',
                      'Motivating_example_cBNGL',
                      'motor',
@@ -155,18 +190,15 @@ def test_bngl_import_expected_passes():
 
 
 def test_bngl_import_expected_errors():
-    errtype = {'localfn': 'Function \w* is local',
-               'ratelawtype': 'Rate law \w* has unknown type',
+    errtype = {'ratelawtype': 'Rate law \w* has unknown type',
                'ratelawmissing': 'Rate law missing for rule',
+               'plusminus': 'PLUS/MINUS state values',
                'statelabels': 'BioNetGen component/state labels are not yet supported',
-               'dupsites': 'Molecule \w* has multiple sites with the same name'
               }
-    expected_errors = {'ANx': errtype['localfn'],
+    expected_errors = {'ANx': errtype['plusminus'],
                        'CaOscillate_Sat': errtype['ratelawtype'],
                        'heise': errtype['statelabels'],
                        'isingspin_energy': errtype['ratelawmissing'],
-                       'isingspin_localfcn': errtype['localfn'],
-                       'localfunc': errtype['localfn'],
                        'test_MM': errtype['ratelawtype'],
                        'test_sat': errtype['ratelawtype'],
                        }

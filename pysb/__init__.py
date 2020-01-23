@@ -3,7 +3,7 @@ from pysb.annotation import Annotation
 
 __all__ = ['Observable', 'Initial', 'MatchOnce', 'Model', 'Monomer',
            'Parameter', 'Compartment', 'Rule', 'Expression', 'ANY', 'WILD',
-           'Annotation', 'MultiState']
+           'Annotation', 'MultiState', 'Tag']
 
 try:
     import reinteract         # fails if reinteract not installed

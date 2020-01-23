@@ -4,7 +4,7 @@ import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator import ScipyOdeSimulator
-from pysb.examples import robertson, earm_1_0
+from pysb.examples import robertson, earm_1_0, tyson_oscillator
 import unittest
 import pandas as pd
 
@@ -500,3 +500,12 @@ if sys.version_info[0] < 3:
         sim = ScipyOdeSimulator(rob_copy)
         simres = sim.run(tspan=t)
 
+
+def test_multiprocessing_lambdify():
+    model = tyson_oscillator.model
+    pars = [p.value for p in model.parameters]
+    tspan = np.linspace(0, 100, 100)
+    ScipyOdeSimulator(
+        model, tspan=tspan, compiler='python',
+        use_analytic_jacobian=True
+    ).run(param_values=[pars, pars], num_processors=2)

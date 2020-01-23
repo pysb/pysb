@@ -14,6 +14,7 @@ import numpy as np
 import sympy
 import re
 from collections import defaultdict
+import itertools
 try:
     import lxml.etree as etree
     pretty_print = True
@@ -146,12 +147,19 @@ class StochKitExporter(Exporter):
         if param_values is None:
             # Get parameter values from model if not supplied
             param_values = [p.value for p in self.model.parameters]
-        else:
-            # Validate length
-            if len(param_values) != len(self.model.parameters):
-                raise Exception('param_values must be a list of numeric '
-                                'parameter values the same length as '
-                                'model.parameters')
+
+        # Add in derived parameters if needed
+        if self.model._derived_parameters and len(param_values) == len(
+                self.model.parameters):
+            param_values += [p.value for p in self.model._derived_parameters]
+        elif len(param_values) != len(self.model.parameters) + len(
+                self.model._derived_parameters
+        ):
+            raise ValueError('param_values must be a list of numeric '
+                             'parameter values the same length as '
+                             'model.parameters, optionally including '
+                             'derived parameters on the end (if model contains '
+                             'local functions)')
 
         # Get initial species concentrations from model if not supplied
         if initials is None:
@@ -190,7 +198,8 @@ class StochKitExporter(Exporter):
 
         # Parameters
         params = etree.Element('ParametersList')
-        for p_id, param in enumerate(self.model.parameters):
+        for p_id, param in enumerate(itertools.chain(
+                self.model.parameters, self.model._derived_parameters)):
             p_name = param.name
             if p_name == 'vol':
                 p_name = '__vol'
@@ -207,7 +216,11 @@ class StochKitExporter(Exporter):
             e.name: '(%s)' % sympy.ccode(
                 e.expand_expr(expand_observables=True)
             )
-            for e in self.model.expressions
+            for e in itertools.chain(
+                self.model.expressions_constant(),
+                self.model.expressions_dynamic(include_local=False),
+                self.model._derived_expressions
+            )
         }
 
         # Reactions

@@ -5,15 +5,20 @@ import sympy
 import collections
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
-                      Parameter, Expression
+                      Parameter, Expression, Model, ComponentSet
 from pysb.logging import get_logger, EXTENDED_DEBUG
 import pickle
+from pysb.export.json import JsonExporter
+from pysb.importers.json import model_from_json
 from pysb import __version__ as PYSB_VERSION
 from datetime import datetime
 import dateutil.parser
 import copy
 from warnings import warn
 from pysb.pattern import SpeciesPatternMatcher
+from pysb.bng import generate_equations
+from contextlib import contextmanager
+import weakref
 try:
     basestring
 except NameError:
@@ -162,30 +167,43 @@ class Simulator(object):
             else:
                 return len(self.param_values)
 
-    def _update_initials_dict(self, initials_dict, initials_source):
+    def _update_initials_dict(self, initials_dict, initials_source, subs=None):
         if isinstance(initials_source, collections.Mapping):
             # Can't just use .update() as we need to test
             # equality with .is_equivalent_to()
-            for cp, val in initials_source.items():
-                found = False
-                for existing_cp in initials_dict.keys():
-                    if existing_cp.is_equivalent_to(as_complex_pattern(cp)):
-                        initials_dict[existing_cp] = val
-                        found = True
-                        break
-                if not found:
-                    initials_dict[cp] = val
+            for cp, value_obj in initials_source.items():
+                cp = as_complex_pattern(cp)
+                if any(existing_cp.is_equivalent_to(cp)
+                       for existing_cp in initials_dict):
+                    continue
+
+                if isinstance(value_obj, (collections.Sequence, np.ndarray))\
+                        and all(isinstance(v, numbers.Number) for v in value_obj):
+                    value = value_obj
+                elif isinstance(value_obj, Expression):
+                    value = [value_obj.expand_expr().evalf(subs=subs[sim]) for sim in range(len(subs))]
+                elif isinstance(value_obj, Parameter):
+                    # Set parameter using param_values
+                    pi = self._model.parameters.index(value_obj)
+                    value = [self.param_values[sim][pi] for sim in range(len(self.param_values))]
+                else:
+                    raise TypeError("Unexpected initial condition "
+                                    "value type: %s" % type(value_obj))
+
+                initials_dict[cp] = value
         elif initials_source is not None:
             # Update from array-like structure, which we can only do if we
             # have the species available (e.g. not in network-free simulations)
             if not self.model.species:
                 raise ValueError(
                     'Cannot update initials from an array-like source without '
-                    'model species. ')
-            initials_dict = {}
+                    'model species.')
             for cp_idx, cp in enumerate(self.model.species):
-                initials_dict[cp] = [initials_source[n][cp_idx] for n in
-                                     range(len(initials_source))]
+                if any(existing_cp.is_equivalent_to(cp) for existing_cp in
+                       initials_dict):
+                    continue
+                initials_dict[cp] = [initials_source[n][cp_idx]
+                                     for n in range(len(initials_source))]
         return initials_dict
 
     @property
@@ -193,14 +211,37 @@ class Simulator(object):
         n_sims = self._check_run_initials_vs_base_initials_length()
         if n_sims == 1:
             n_sims = len(self.param_values)
-        initials_dict = {ic.pattern: [ic.value.value] * n_sims
-                         for ic in self.model.initials}
+
+        # Apply any per-run initial overrides
+        initials_dict = self._update_initials_dict({}, self._run_initials)
+
         # Apply any base initial overrides
         initials_dict = self._update_initials_dict(initials_dict,
                                                    self._initials)
-        # Apply any per-run initial overrides
-        initials_dict = self._update_initials_dict(initials_dict,
-                                                   self._run_initials)
+
+        model_initials = {ic.pattern: ic.value
+                          for ic in self.model.initials}
+
+        # Otherwise, populate initials from the model
+        n_sims_params = len(self.param_values)
+        n_sims_actual = max(n_sims_params, n_sims)
+
+        # Get remaining initials from the model itself and
+        # self.param_values, if necessary
+        subs = None
+        if any(isinstance(v, Expression) for v in model_initials.values()):
+            # Only need parameter substitutions if model initials include
+            # expressions
+            subs = [
+                dict((p, pv[i]) for i, p in
+                     enumerate(self._model.parameters))
+                for pv in self.param_values]
+            if len(subs) == 1 and n_sims_actual > 1:
+                subs = list(itertools.repeat(subs[0], n_sims_actual))
+
+        initials_dict = self._update_initials_dict(
+            initials_dict, model_initials, subs=subs
+        )
 
         return initials_dict
 
@@ -243,92 +284,21 @@ class Simulator(object):
                 self._initials is not None:
             return self._initials
 
-        n_sims_initials = self._check_run_initials_vs_base_initials_length()
-
         # At this point (after dimensionality check), we can return
         # self._run_initials if it's not a dictionary and not None
         if self._run_initials is not None and not isinstance(
                 self._run_initials, collections.Mapping):
             return self._run_initials
 
+        n_sims_initials = self._check_run_initials_vs_base_initials_length()
         n_sims_params = len(self.param_values)
         n_sims_actual = max(n_sims_params, n_sims_initials)
 
-        y0 = np.full((n_sims_actual, len(self.model.species)), np.nan)
+        y0 = np.full((n_sims_actual, len(self.model.species)), 0.0)
 
-        # Process any overrides
-        y0 = self._update_y0(y0, self._run_initials)
-        y0 = self._update_y0(y0, self._initials)
-
-        # Fast NaN check with short circuit
-        if np.isnan(np.sum(y0)):
-            # Get remaining initials from the model itself and
-            # self.param_values, if necessary
-            subs = None
-            if self._model.expressions:
-                # Only need parameter substitutions if model has expressions
-                subs = [
-                    dict((p, pv[i]) for i, p in
-                         enumerate(self._model.parameters))
-                    for pv in self.param_values]
-                if len(subs) == 1 and n_sims_actual > 1:
-                    subs = list(itertools.repeat(subs[0], n_sims_actual))
-            ic_tuples = [(ic.pattern, ic.value) for ic in self._model.initials]
-            y0 = self._update_y0(y0, ic_tuples, subs, n_sims_params)
-
-        # Any remaining unset initials should be set to zero
-        y0 = np.nan_to_num(y0)
-
-        return y0
-
-    def _update_y0(self, y0, initials_source, subs=None, n_sims_params=None):
-        """ Update the initial conditions list y0 using initials_source """
-        if initials_source is None:
-            return y0
-
-        if isinstance(initials_source, np.ndarray) and \
-                initials_source.shape != 1:
-            # If initials_source is a multi-dimensional array, we can set
-            # the y0 values directly
-            nan_pos = np.isnan(y0)
-            y0[nan_pos] = initials_source[nan_pos]
-            return y0
-
-        if isinstance(initials_source, collections.Mapping):
-            initials_source = initials_source.items()
-
-        for cp, value_obj in initials_source:
-            cp = as_complex_pattern(cp)
-            si = self._model.get_species_index(cp)
-            if si is None:
-                raise IndexError("Species not found in model: %s" % repr(cp))
-
-            # Loop over all simulations
-            for sim in range(len(y0)):
-                # If this initial condition has already been set, skip it
-                if not np.isnan(y0[sim][si]):
-                    continue
-
-                if isinstance(value_obj, (collections.Sequence, np.ndarray))\
-                        and isinstance(value_obj[sim], numbers.Number):
-                    value = value_obj[sim]
-                elif isinstance(value_obj, Expression):
-                    value = value_obj.expand_expr().evalf(subs=subs[sim])
-                elif isinstance(value_obj, Parameter):
-                    if sim > 0 and n_sims_params == 1:
-                        # Parameters can be copied from previous
-                        # simulation if they have not been specified
-                        # explicitly in self.param_values
-                        value = y0[sim - 1][si]
-                    else:
-                        # Set parameter using param_values
-                        pi = self._model.parameters.index(value_obj)
-                        value = self.param_values[sim][pi]
-                else:
-                    raise TypeError("Unexpected initial condition "
-                                    "value type: %s" % type(value_obj))
-
-                y0[sim][si] = value
+        for species, vals in self.initials_dict.items():
+            species_index = self._model.get_species_index(species)
+            y0[:, species_index] = vals
 
         return y0
 
@@ -406,14 +376,15 @@ class Simulator(object):
 
     @property
     def param_values(self):
-        if self._params is not None and \
-                not isinstance(self._params, dict) and \
-                self._run_params is None:
-            return self._params
-        elif self._run_params is not None and \
-                not isinstance(self._run_params, dict) and \
-                self._params is None:
-            return self._run_params
+        if not self.model._derived_parameters:
+            if self._params is not None and \
+                    not isinstance(self._params, dict) and \
+                    self._run_params is None:
+                return self._params
+            elif self._run_params is not None and \
+                    not isinstance(self._run_params, dict) and \
+                    self._params is None:
+                return self._run_params
 
         # create parameter vector from the values in the model
         param_values_dict = {}
@@ -440,7 +411,12 @@ class Simulator(object):
         # _run_params, if it's not a dict
         if self._run_params is not None:
             if not isinstance(self._run_params, dict):
-                return self._run_params
+                if not self._model._derived_parameters:
+                    return self._run_params
+                else:
+                    param_values_dict.update(dict(zip(
+                        self.model.parameters.keys(), self._run_params
+                    )))
             else:
                 param_values_dict.update(self._run_params)
 
@@ -448,7 +424,10 @@ class Simulator(object):
             n_sims = 1
 
         # Get the base parameters from the model
-        param_values = np.array([p.value for p in self._model.parameters])
+        param_values = np.array(
+            [p.value for p in self._model.parameters] +
+            [p.value for p in self._model._derived_parameters]
+        )
         param_values = np.repeat([param_values], n_sims, axis=0)
         # Process overrides
         for key in param_values_dict.keys():
@@ -462,7 +441,6 @@ class Simulator(object):
             for n in range(n_sims):
                 param_values[n][pi] = param_values_dict[key][n]
 
-        # return array
         return param_values
 
     @param_values.setter
@@ -586,7 +564,9 @@ class Simulator(object):
                     "len(initials): %d" %
                     (len(self.param_values), self.initials_length))
         elif len(self.param_values.shape) != 2 or \
-                self.param_values.shape[1] != len(self._model.parameters):
+                self.param_values.shape[1] != (
+                    len(self._model.parameters) +
+                    len(self._model._derived_parameters)):
             raise ValueError(
                     "'param_values' must be a 2D array of dimension N_SIMS x "
                     "len(model.parameters).\n"
@@ -787,7 +767,7 @@ class SimulationResult(object):
             self._y = None
 
         # Calculate ``yobs`` and ``yexpr`` based on values of ``y``
-        exprs = self._model.expressions_dynamic()
+        exprs = self._model.expressions_dynamic(include_local=False)
         expr_names = [expr.name for expr in exprs]
         model_obs = self._model.observables
         obs_names = list(model_obs.keys())
@@ -886,8 +866,12 @@ class SimulationResult(object):
         a numpy.ndarray with record-style data-type for return to the user.
         """
         if self._yfull is None:
-            sp_names = ['__s%d' % i for i in range(len(self._model.species))]
-            yfull_dtype = list(zip(sp_names, itertools.repeat(float)))
+            if self._y is None:
+                yfull_dtype = []
+            else:
+                sp_names = ['__s%d' % i
+                            for i in range(len(self._model.species))]
+                yfull_dtype = list(zip(sp_names, itertools.repeat(float)))
             if len(self._model.observables):
                 yfull_dtype += self._yobs[0].dtype.descr
             if len(self._model.expressions_dynamic()):
@@ -1080,7 +1064,7 @@ class SimulationResult(object):
         multiple SimulationResults for a specific model.
 
         A group is first created in the HDF file root (see group_name
-        argument). Within that group, a dataset "_model" has a pickled
+        argument). Within that group, a dataset "_model" has a JSON
         version of the PySB model. SimulationResult are stored as groups
         within the model group.
 
@@ -1133,15 +1117,22 @@ class SimulationResult(object):
 
         # np.void maps to bytes in HDF5.
         enpickle = lambda obj: np.void(pickle.dumps(obj, -1))
+        model_json = JsonExporter(self._model).export(include_netgen=True)
 
         with h5py.File(filename, 'a' if append else 'w-') as hdf:
             # Get or create the group
             try:
                 grp = hdf.create_group(group_name)
-                grp.create_dataset('_model', data=enpickle(self._model))
+                grp.create_dataset('_model_json', data=model_json)
+                if '_model' in grp:
+                    raise ValueError()
             except ValueError:
                 grp = hdf[group_name]
-                model = pickle.loads(grp['_model'][()])
+                if '_model_json' in grp:
+                    model = model_from_json(grp['_model_json'][()])
+                else:
+                    with _patch_model_setstate():
+                        model = pickle.loads(grp['_model'][()])
                 if model.name != self._model.name:
                     raise ValueError('SimulationResult model has name "{}", '
                                      'but the model in HDF5 file group "{}" '
@@ -1231,8 +1222,8 @@ class SimulationResult(object):
             grp = hdf[group_name]
 
             if dataset_name is None:
-                datasets = list(grp.keys())
-                datasets.remove('_model')
+                datasets = [k for k in grp.keys() if k not in
+                            ('_model', '_model_json')]
                 if len(datasets) > 1:
                     raise ValueError("dataset_name must be specified when "
                                      "group contains more than one dataset. "
@@ -1268,9 +1259,18 @@ class SimulationResult(object):
             except KeyError:
                 initials = pickle.loads(dset['initials_dict'][()])
 
+            if '_model_json' in grp:
+                model = model_from_json(grp['_model_json'][()])
+            else:
+                warn('The SimulationResult file uses an old model '
+                     'format (pickled). It\'s recommended you re-save '
+                     'the SimulationResult to use the new format (JSON).')
+                with _patch_model_setstate():
+                    model = pickle.loads(grp['_model'][()])
+
             simres = cls(
                 simulator=None,
-                model=pickle.loads(grp['_model'][()]),
+                model=model,
                 initials=initials,
                 param_values=np.array(dset['param_values']),
                 tout=np.array(dset['tout']),
@@ -1309,3 +1309,24 @@ def _allow_unicode_recarray():
     except TypeError:
         return False
     return True
+
+
+def _model_setstate_monkey_patch(self, state):
+    """Monkey patch for Model.__setstate__ for restoring from older pickles"""
+
+    # restore the 'model' weakrefs on all components
+    self.__dict__.update(state)
+    # Set "tags" attribute for older, pickled models
+    self.__dict__.setdefault('tags', ComponentSet())
+    for c in self.all_components():
+        c.model = weakref.ref(self)
+
+
+@contextmanager
+def _patch_model_setstate():
+    old_setstate = Model.__setstate__
+    Model.__setstate__ = _model_setstate_monkey_patch
+    try:
+        yield
+    finally:
+        Model.__setstate__ = old_setstate

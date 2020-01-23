@@ -167,6 +167,8 @@ class ScipyOdeSimulator(Simulator):
         # ODE RHS -----------------------------------------------
         self._eqn_subs = {e: e.expand_expr(expand_observables=True) for
                           e in self._model.expressions}
+        self._eqn_subs.update({e: e.expand_expr(expand_observables=True) for
+                               e in self._model._derived_expressions})
         ode_mat = sympy.Matrix(self.model.odes).subs(self._eqn_subs)
 
         if compiler_mode is None:
@@ -262,18 +264,14 @@ class ScipyOdeSimulator(Simulator):
                 if theano is None:
                     raise ImportError('Theano library is not installed')
 
-                code_eqs_py = theano_function(
+                self._code_eqs = theano_function(
                     self._symbols,
                     [o if not o.is_zero else theano.tensor.zeros(1)
                      for o in ode_mat],
                     on_unused_input='ignore'
                 )
             else:
-                code_eqs_py = sympy.lambdify(self._symbols,
-                                             sympy.flatten(ode_mat))
-
-            rhs = _get_rhs(self._compiler, code_eqs_py)
-            self._code_eqs = code_eqs_py
+                self._code_eqs = (self._symbols, sympy.flatten(ode_mat))
         else:
             raise ValueError('Unknown compiler_mode: %s' % self._compiler)
 
@@ -281,7 +279,6 @@ class ScipyOdeSimulator(Simulator):
         # We'll keep the code for putting together the matrix in Sympy
         # in case we want to do manipulations of the matrix later (e.g., to
         # put together the sensitivity matrix)
-        jac_fn = None
         self._jac_eqs = None
         if self._use_analytic_jacobian:
             species_symbols = [sympy.Symbol('__s%d' % i)
@@ -315,6 +312,8 @@ class ScipyOdeSimulator(Simulator):
                             i, j, eqn_repr(entry))
                         jac_eqs_list.append(jac_eq_str)
                 jac_eqs = str(self._eqn_substitutions('\n'.join(jac_eqs_list)))
+                if '# Not supported in Python' in jac_eqs:
+                    raise ValueError('Analytic Jacobian calculation failed')
 
                 # Allocate jac array here, once, and initialize to zeros.
                 jac = np.zeros(
@@ -352,11 +351,7 @@ class ScipyOdeSimulator(Simulator):
                         jac_fn(0.0, self.initials[0], self.param_values[0])
                 self._jac_eqs = jac_eqs
             else:
-                jac_eqs_py = sympy.lambdify(self._symbols, jac_matrix, "numpy")
-
-                jac_fn = _get_rhs(self._compiler, jac_eqs_py)
-
-                self._jac_eqs = jac_eqs_py
+                self._jac_eqs = (self._symbols, jac_matrix, "numpy")
 
         # build integrator options list from our defaults and any kwargs
         # passed to this function
@@ -371,7 +366,7 @@ class ScipyOdeSimulator(Simulator):
 
         if integrator != 'lsoda':
             # Only used to check the user has selected a valid integrator
-            self.integrator = scipy.integrate.ode(rhs, jac=jac_fn)
+            self.integrator = scipy.integrate.ode(None)
             with warnings.catch_warnings():
                 warnings.filterwarnings('error', 'No integrator name match')
                 self.integrator.set_integrator(integrator, **options)
@@ -478,6 +473,9 @@ class ScipyOdeSimulator(Simulator):
         # Substitute 'p[i]' for any named parameters
         for i, p in enumerate(self._model.parameters):
             eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
+        for i, p in enumerate(self._model._derived_parameters):
+            eqns = re.sub(r'\b(%s)\b' % p.name,
+                          'p[%d]' % (i + len(self._model.parameters)), eqns)
         return eqns
 
     def run(self, tspan=None, initials=None, param_values=None,
@@ -615,6 +613,9 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
 
 def _get_rhs(compiler, code_eqs, ydot=None, jac=None, compiler_directives=None):
     if compiler == 'cython':
+        if 'math.' in code_eqs:
+            code_eqs = 'import math\n' + code_eqs
+
         def rhs(t, y, p):
             # note that the evaluated code sets ydot as a side effect
             Cython.inline(code_eqs, quiet=True,
@@ -639,12 +640,18 @@ def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
                         tspan, param_values, integrator_name, compiler,
                         integrator_opts, compiler_directives):
     """ Single integrator process, for parallel execution """
+    if compiler == 'python':
+        code_eqs = sympy.lambdify(*code_eqs)
+        if jac_eqs:
+            jac_eqs = sympy.lambdify(*jac_eqs)
+
     rhs = _get_rhs(compiler, code_eqs, ydot=np.zeros(num_species),
                    compiler_directives=compiler_directives)
 
     jac_fn = None
     if jac_eqs:
-        jac_eqs = _get_rhs(compiler, jac_eqs,
+        jac_eqs = _get_rhs(compiler,
+                           jac_eqs,
                            jac=np.zeros((num_odes, num_species)),
                            compiler_directives=compiler_directives)
 

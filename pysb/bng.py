@@ -1,22 +1,21 @@
 from __future__ import absolute_import
 from __future__ import print_function as _
-
-import abc
-import collections
-import itertools
-import os
-import re
-import shutil
-import subprocess
-import tempfile
-from warnings import warn
-
-import numpy
-import sympy
-
 import pysb.core
-import pysb.pathfinder as pf
 from pysb.generator.bng import BngGenerator, format_complexpattern
+import os
+import subprocess
+import re
+import itertools
+import sympy
+import sympy.parsing.sympy_parser as sympy_parser
+import numpy
+import tempfile
+import abc
+from warnings import warn
+import shutil
+import collections
+import pysb.pathfinder as pf
+import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
 
 try:
@@ -397,7 +396,6 @@ class BngFileInterface(BngBaseInterface):
             model_additional_species=model_additional_species,
             model_population_maps=model_population_maps
         )
-        self._time = 0
         self._init_command_queue()
 
     def _init_command_queue(self):
@@ -478,9 +476,7 @@ class BngFileInterface(BngBaseInterface):
                 capture_error = True
             if capture_error:
                 captured_error_lines.append(line)
-            if 'Program times' in line:
-                self._time += float(line.split(' ')[3])
-                # quit()
+
             self._logger.debug(line)
 
         # p_out is already consumed, so only get p_err
@@ -740,6 +736,13 @@ def generate_equations(model, cleanup=True, verbose=False, **kwargs):
 def _parse_netfile(model, lines):
     """ Parse species, rxns and groups from a BNGL net file """
     try:
+        while 'begin parameters' not in next(lines):
+            pass
+        while True:
+            line = next(lines)
+            if 'end parameters' in line: break
+            _parse_parameter(model, line)
+
         while 'begin species' not in next(lines):
             pass
         model.species = []
@@ -773,6 +776,25 @@ def _parse_netfile(model, lines):
 
     except StopIteration as e:
         pass
+
+
+def _parse_parameter(model, line):
+    _, pname, pval, _, ptype = line.strip().split()
+    par_names = model.components.keys()
+    if pname not in par_names:
+        # Need to parse the value even for constants, since BNG considers some
+        # expressions to be "Constant", e.g. "2^2"
+        parsed_expr = parse_bngl_expr(pval)
+        if ptype == 'Constant' and pname not in model._derived_parameters.keys():
+            p = pysb.core.Parameter(pname, parsed_expr, _export=False)
+            model._derived_parameters.add(p)
+        elif ptype == 'ConstantExpression' and \
+                pname not in model._derived_expressions.keys():
+            p = pysb.core.Expression(pname, parsed_expr, _export=False)
+            model._derived_expressions.add(p)
+        else:
+            raise ValueError('Unknown type {} for parameter {}'.format(
+                ptype, pname))
 
 
 def _parse_species(model, line):
@@ -812,7 +834,7 @@ def _parse_species(model, line):
                     site_name, condition = ss, None
                 site_conditions[site_name].append(condition)
 
-        site_conditions = {k: v[0] if len(v) == 1 else tuple(v)
+        site_conditions = {k: v[0] if len(v) == 1 else pysb.core.MultiState(*v)
                            for k, v in site_conditions.items()}
         monomer = model.monomers[monomer_name]
         monomer_compartment = model.compartments.get(monomer_compartment_name)
@@ -844,7 +866,8 @@ def _parse_reaction(model, line, reaction_cache):
     is_reverse = tuple(bool(i) for i in is_reverse)
     r_names = ['__s%d' % r for r in reactants]
     rate_param = [model.parameters.get(r) or model.expressions.get(r) or
-                  float(r) for r in rate]
+                  model._derived_parameters.get(r) or
+                  model._derived_expressions.get(r) or float(r) for r in rate]
     combined_rate = sympy.Mul(*[sympy.S(t) for t in r_names + rate_param])
     reaction = {
         'reactants': reactants,
@@ -892,6 +915,47 @@ def _parse_group(model, line):
             obs.coefficients.append(int(terms[0]))
             # -1 to change to 0-based indexing
             obs.species.append(int(terms[1]) - 1)
+
+
+def _convert_tokens(tokens, local_dict, global_dict):
+    for pos, tok in enumerate(tokens):
+        if tok == (tokenize.NAME, 'if'):
+            tokens[pos] = (tokenize.NAME, '__bngl_if')
+            local_dict['__bngl_if'] = sympy.Function('bngl_if')
+        elif tok == (tokenize.OP, '^'):
+            tokens[pos] = (tokenize.OP, '**')
+        elif tok == (tokenize.NAME, 'and'):
+            tokens[pos] = (tokenize.OP, '&')
+        elif tok == (tokenize.NAME, 'or'):
+            tokens[pos] = (tokenize.OP, '|')
+    return tokens
+
+
+def parse_bngl_expr(text, *args, **kwargs):
+    """Convert a BNGL math expression string to a sympy Expr."""
+
+    # Translate a few operators with simple text replacement.
+    text = text.replace('()', '')
+    text = text.replace('==', '=')
+    # Use sympy to parse the text into an Expr.
+    trans = (
+        sympy_parser.standard_transformations
+        + (sympy_parser.convert_equals_signs, _convert_tokens)
+    )
+    expr = sympy_parser.parse_expr(text, *args, transformations=trans, **kwargs)
+    # Transforming 'if' to Piecewise requires subexpression rearrangement, so we
+    # use sympy's replace functionality rather than attempt it using text
+    # replacements above.
+    expr = expr.replace(
+        sympy.Function('bngl_if'),
+        lambda cond, t, f: sympy.Piecewise((t, cond), (f, True))
+    )
+    # Check for unsupported constructs.
+    if expr.has('time'):
+        raise ValueError(
+            "Expressions referencing simulation time are not supported"
+        )
+    return expr
 
 
 class NoInitialConditionsError(RuntimeError):

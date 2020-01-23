@@ -191,11 +191,14 @@ class Component(object):
             mod_name = frame.f_globals.get('__name__', '__unnamed__')
             if mod_name in ['IPython.core.interactiveshell', '__main__']:
                 break
-            if mod_name not in ['pysb.core', 'pysb.macros'] and not \
+            if mod_name != 'pysb.core' and not \
                     mod_name.startswith('importlib.'):
                 self._modules.append(mod_name)
                 if self._function is None:
-                    self._function = frame.f_code.co_name
+                    if mod_name == 'pysb.macros':
+                        self._function = frame.f_back.f_code.co_name
+                    else:
+                        self._function = frame.f_code.co_name
             frame = frame.f_back
 
     def __getstate__(self):
@@ -517,6 +520,7 @@ class MonomerPattern(object):
         self.site_conditions = site_conditions
         self.compartment = compartment
         self._graph = None
+        self._tag = None
 
     def is_concrete(self):
         """
@@ -595,7 +599,9 @@ class MonomerPattern(object):
         # updated according to our args (as in Monomer.__call__).
         site_conditions = self.site_conditions.copy()
         site_conditions.update(extract_site_conditions(conditions, **kwargs))
-        return MonomerPattern(self.monomer, site_conditions, self.compartment)
+        mp = MonomerPattern(self.monomer, site_conditions, self.compartment)
+        mp._tag = self._tag
+        return mp
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
@@ -649,6 +655,18 @@ class MonomerPattern(object):
         else:
             return NotImplemented
 
+    def __matmul__(self, other):
+        if not isinstance(other, Tag):
+            return NotImplemented
+
+        if self._tag:
+            raise TagAlreadySpecifiedError()
+
+        # Need to upgrade to a ComplexPattern
+        cp_new = as_complex_pattern(self)
+        cp_new._tag = other
+        return cp_new
+
     def __repr__(self):
         value = '%s(' % self.monomer.name
         sites_unique = list(collections.OrderedDict.fromkeys(
@@ -661,6 +679,8 @@ class MonomerPattern(object):
         value += ')'
         if self.compartment is not None:
             value += ' ** ' + self.compartment.name
+        if self._tag:
+            value = '{} @ {}'.format(self._tag.name, value)
         return value
 
 
@@ -694,10 +714,16 @@ class ComplexPattern(object):
         if compartment and not isinstance(compartment, Compartment):
             raise Exception("compartment is not a Compartment object")
 
+        # Drop species cpt, if redundant
+        if compartment and len(monomer_patterns) == 1 and \
+                monomer_patterns[0].compartment == compartment:
+            compartment = None
+
         self.monomer_patterns = monomer_patterns
         self.compartment = compartment
         self.match_once = match_once
         self._graph = None
+        self._tag = None
 
     def is_concrete(self):
         """
@@ -924,7 +950,11 @@ class ComplexPattern(object):
         The new object will have references to the original compartment, and
         copies of the monomer_patterns.
         """
-        return ComplexPattern([mp() for mp in self.monomer_patterns], self.compartment, self.match_once)
+        cp = ComplexPattern([mp() for mp in self.monomer_patterns],
+                            self.compartment,
+                            self.match_once)
+        cp._tag = self._tag
+        return cp
 
     def __call__(self, conditions=None, **kwargs):
         """Build a new ComplexPattern with updated site conditions."""
@@ -988,6 +1018,8 @@ class ComplexPattern(object):
             return NotImplemented
 
     def __mod__(self, other):
+        if self._tag:
+            raise ValueError('Tag should be specified at the end of the complex')
         if isinstance(other, MonomerPattern):
             return ComplexPattern(self.monomer_patterns + [other], self.compartment, self.match_once)
         elif isinstance(other, ComplexPattern):
@@ -1031,12 +1063,33 @@ class ComplexPattern(object):
         else:
             return NotImplemented
 
+    def __matmul__(self, other):
+        if not isinstance(other, Tag):
+            return NotImplemented
+
+        if self._tag:
+            raise TagAlreadySpecifiedError()
+
+        cp_new = self.copy()
+        cp_new._tag = other
+        return cp_new
+
     def __repr__(self):
-        ret = ' % '.join([repr(p) for p in self.monomer_patterns])
-        if self.compartment is not None:
-            ret = '(%s) ** %s' % (ret, self.compartment.name)
+        # Monomer patterns need to be in parentheses if they have a tag,
+        # except in the first position, to preserve operator precedence
+        ret = ' % '.join(
+            [repr(p)
+             if idx == 0 or p._tag is None
+             else '({})'.format(repr(p))
+             for idx, p in enumerate(self.monomer_patterns)])
+        if self.compartment:
+            if len(self.monomer_patterns) > 1:
+                ret = '(%s)' % ret
+            ret += ' ** %s' % self.compartment.name
         if self.match_once:
             ret = 'MatchOnce(%s)' % ret
+        if self._tag:
+            ret = '{} @ {}'.format(ret, self._tag.name)
         return ret
 
 
@@ -1218,8 +1271,16 @@ class Parameter(Component, sympy.Symbol):
         return (self.name, self.value, False)
 
     def __init__(self, name, value=0.0, _export=True):
-        self.value = float(value)
+        self.value = value
         Component.__init__(self, name, _export)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, new_value):
+        self._value = float(new_value)
     
     def get_value(self):
         return self.value
@@ -1337,6 +1398,9 @@ class Rule(Component):
         validate_expr(rate_forward, "forward rate")
         if rule_expression.is_reversible:
             validate_expr(rate_reverse, "reverse rate")
+        elif rate_reverse:
+            raise ValueError('Reverse rate specified, but rule expression is '
+                             'not reversible. Use | instead of >>.')
         self.rule_expression = rule_expression
         self.reactant_pattern = rule_expression.reactant_pattern
         self.product_pattern = rule_expression.product_pattern
@@ -1357,6 +1421,44 @@ class Rule(Component):
                                      'concrete'.format(cp, name))
 
         Component.__init__(self, name, _export)
+
+        # Get tags from rule expression
+        tags = set()
+        for rxn_pat in (rule_expression.reactant_pattern,
+                        rule_expression.product_pattern):
+            if rxn_pat.complex_patterns:
+                for cp in rxn_pat.complex_patterns:
+                    if cp is not None:
+                        if cp._tag:
+                            tags.add(cp._tag)
+                        tags.update(mp._tag for mp in cp.monomer_patterns
+                                    if mp._tag is not None)
+
+        # Check that tags defined in rates are used in the expression
+        tags_rates = (self._check_rate_tags('forward', tags) +
+                      self._check_rate_tags('reverse', tags))
+
+        missing = tags.difference(set(tags_rates))
+        if missing:
+            names = [t.name for t in missing]
+            warnings.warn(
+                'Rule "{}": Tags {} defined in rule expression but not used in '
+                'rates'.format(self.name, ', '.join(names)), UserWarning)
+
+    def _check_rate_tags(self, direction, tags):
+        rate = self.rate_forward if direction == 'forward' else \
+            self.rate_reverse
+        if not isinstance(rate, Expression):
+            return []
+        tags_rate = rate.tags()
+        missing = set(tags_rate).difference(tags)
+        if missing:
+            names = [t.name for t in missing]
+            raise ValueError(
+                'Rule "{}": Tag(s) {} defined in {} rate but not in '
+                'expression'.format(self.name, ', '.join(names), direction))
+
+        return tags_rate
 
     def is_synth(self):
         """Return a bool indicating whether this is a synthesis rule."""
@@ -1485,6 +1587,13 @@ class Observable(Component, sympy.Symbol):
     def __str__(self):
         return repr(self)
 
+    def __call__(self, tag):
+        if not isinstance(tag, Tag):
+            raise ValueError('Observables are only callable with a Tag '
+                             'instance, for use within local Expressions')
+
+        return sympy.Function(self.name)(tag)
+
 
 class Expression(Component, sympy.Symbol):
 
@@ -1535,13 +1644,27 @@ class Expression(Component, sympy.Symbol):
                    for a in self.expr.atoms())
 
     def get_value(self):
-        return self.expr.evalf()
+        # Use parameter and expression values for evaluation
+        subs = {}
+        for a in self.expr.atoms():
+            if isinstance(a, Parameter):
+                subs[a] = a.value
+            elif isinstance(a, Expression) and a.is_constant_expression():
+                subs[a] = a.get_value()
+        return self.expr.xreplace(subs)
 
     # This is needed to make sympy's evalf machinery treat this class like a
     # Symbol.
     @property
     def func(self):
         return sympy.Symbol
+
+    @property
+    def is_local(self):
+        return len(self.expr.atoms(Tag)) > 0
+
+    def tags(self):
+        return sorted(self.expr.atoms(Tag), key=lambda tag: tag.name)
 
     def __repr__(self):
         ret = '%s(%s, %s)' % (self.__class__.__name__, repr(self.name),
@@ -1550,6 +1673,39 @@ class Expression(Component, sympy.Symbol):
 
     def __str__(self):
         return repr(self)
+
+    def __call__(self, tag):
+        if not isinstance(tag, Tag):
+            raise ValueError('Expressions are only callable with a Tag '
+                             'instance, for use within local Expressions')
+
+        return sympy.Function(self.name)(tag)
+
+
+class Tag(Component, sympy.Symbol):
+    """Tag for labelling MonomerPatterns and ComplexPatterns"""
+    def __new__(cls, name, _export=True):
+        return super(sympy.Symbol, cls).__new__(cls, name)
+
+    def __getnewargs__(self):
+        return self.name, False
+
+    def __init__(self, name, _export=True):
+        Component.__init__(self, name, _export)
+
+    def __matmul__(self, other):
+        if not isinstance(other, MonomerPattern):
+            return NotImplemented
+
+        if other._tag:
+            raise TagAlreadySpecifiedError()
+
+        new_mp = other()
+        new_mp._tag = self
+        return new_mp
+
+    def __repr__(self):
+        return "{}({})".format(self.__class__.__name__, repr(self.name))
 
 
 class Initial(object):
@@ -1659,7 +1815,7 @@ class Model(object):
     """
 
     _component_types = (Monomer, Compartment, Parameter, Rule, Observable,
-                        Expression)
+                        Expression, Tag)
 
     def __init__(self, name=None, base=None, _export=True):
         self.name = name
@@ -1671,6 +1827,7 @@ class Model(object):
         self.rules = ComponentSet()
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
+        self.tags = ComponentSet()
         self.initials = []
         self.annotations = []
         self._odes = OdeView(self)
@@ -1820,9 +1977,12 @@ class Model(object):
                             if e.is_constant_expression())
         return cset
 
-    def expressions_dynamic(self):
+    def expressions_dynamic(self, include_local=True):
         """Return a ComponentSet of non-constant expressions."""
-        return self.expressions - self.expressions_constant()
+        cset = self.expressions - self.expressions_constant()
+        if not include_local:
+            cset = ComponentSet(e for e in cset if not e.is_local)
+        return cset
 
     @property
     def odes(self):
@@ -1990,6 +2150,8 @@ class Model(object):
         self.reactions = []
         self.reactions_bidirectional = []
         self._stoichiometry_matrix = None
+        self._derived_parameters = ComponentSet()
+        self._derived_expressions = ComponentSet()
         for obs in self.observables:
             obs.species = []
             obs.coefficients = []
@@ -2053,11 +2215,15 @@ class UnknownSiteError(ValueError):
 class CompartmentAlreadySpecifiedError(ValueError):
     pass
 
+
+class TagAlreadySpecifiedError(ValueError):
+    pass
+
+
 class ModelNotDefinedError(RuntimeError):
     """SelfExporter method was called before a model was defined."""
     def __init__(self):
-        ValueError.__init__(
-            self,
+        super(RuntimeError, self).__init__(
             "A Model must be declared before declaring any model components"
         )
 
@@ -2362,6 +2528,10 @@ class RedundantSiteConditionsError(ValueError):
 
 
 class DanglingBondError(ValueError):
+    pass
+
+
+class ReusedBondError(ValueError):
     pass
 
 # Some light infrastructure for defining symbols that act like "keywords", i.e.

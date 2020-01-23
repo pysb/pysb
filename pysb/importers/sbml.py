@@ -38,7 +38,10 @@ def sbml_translator(input_file,
     Run the BioNetGen sbmlTranslator binary to convert SBML to BNGL
 
     This function runs the external program sbmlTranslator, included with
-    BioNetGen, which converts SBML files to BioNetGen language (BNGL).
+    BioNetGen, which converts SBML files to BioNetGen language (BNGL). If
+    PySB was installed using "conda", you can install sbmlTranslator using
+    "conda install -c alubbock atomizer". sbmlTranslator is bundled with
+    BioNetGen if BNG is installed by manual download and unzip.
 
     Generally, PySB users don't need to run this function directly; an SBML
     model can be imported to PySB in a single step with
@@ -84,11 +87,8 @@ def sbml_translator(input_file,
         BNGL output filename
     """
     logger = get_logger(__name__, log_level=verbose)
-    bng_path = os.path.realpath(pf.get_path('bng'))
-    sbmltrans_bin = os.path.join(
-        os.path.dirname(bng_path),
-        'sbmlTranslator' if bng_path.endswith('.bat') else 'bin/sbmlTranslator'
-    )
+    sbmltrans_bin = pf.get_path('atomizer')
+
     sbmltrans_args = [sbmltrans_bin, '-i', input_file]
     if output_file is None:
         output_file = os.path.splitext(input_file)[0] + '.bngl'
@@ -145,6 +145,11 @@ def model_from_sbml(filename, force=False, cleanup=True, **kwargs):
     Notes
     -----
 
+    Requires the sbmlTranslator program (also known at Atomizer). If
+    PySB was installed using "conda", you can install sbmlTranslator using
+    "conda install -c alubbock atomizer". It is bundled with BioNetGen if
+    BNG is installed by manual download and unzip.
+
     Read the `sbmlTranslator documentation
     <http://bionetgen.org/index.php/SBML2BNGL>`_ for further information on
     sbmlTranslator's limitations.
@@ -190,6 +195,11 @@ def model_from_biomodels(accession_no, force=False, cleanup=True,
 
     Notes
     -----
+
+    Requires the sbmlTranslator program (also known at Atomizer). If
+    PySB was installed using "conda", you can install sbmlTranslator using
+    "conda install -c alubbock atomizer". It is bundled with BioNetGen if
+    BNG is installed by manual download and unzip.
 
     Read the `sbmlTranslator documentation
     <http://bionetgen.org/index.php/SBML2BNGL>`_ for further information on

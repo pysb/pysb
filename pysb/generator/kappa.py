@@ -6,7 +6,7 @@ from sympy.core import S
 import collections
 import re
 import pysb.logging
-from pysb.export import CompartmentsNotSupported
+from pysb.export import CompartmentsNotSupported, LocalFunctionsNotSupported
 # Alias basestring under Python 3 for forwards compatibility
 try:
     basestring
@@ -17,13 +17,18 @@ except NameError:
 class KappaGenerator(object):
 
     # Dialect can be either 'complx' or 'kasim' (default)
-    def __init__(self, model, dialect='kasim', _warn_no_ic=True):
-        if model and model.compartments:
-            raise CompartmentsNotSupported()
+    def __init__(self, model, dialect='kasim', _warn_no_ic=True,
+                 _exclude_ic_param=False):
+        if model:
+            if model.compartments:
+                raise CompartmentsNotSupported()
+            if model.tags:
+                raise LocalFunctionsNotSupported()
         self.model = model
         self.__content = None
         self.dialect = dialect
         self._warn_no_ic = _warn_no_ic
+        self._exclude_ic_param = _exclude_ic_param
         self._renamed_states = collections.defaultdict(dict)
         self._log = pysb.logging.get_logger(__name__)
 
@@ -41,11 +46,13 @@ class KappaGenerator(object):
         if (self.dialect == 'kasim'):
             self.generate_molecule_types() 
             # Parameters, variables, and expressions are allowed in kasim
-            self.generate_parameters()
+            if not self._exclude_ic_param:
+                self.generate_parameters()
 
         self.generate_reaction_rules()
         self.generate_observables()
-        self.generate_species()
+        if not self._exclude_ic_param:
+            self.generate_species()
 
     def generate_parameters(self):
         for p in self.model.parameters:

@@ -70,6 +70,10 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
                    perturbation=None, seed=None, verbose=False):
     """Runs the given model using KaSim and returns the parsed results.
 
+    .. deprecated:: 1.10
+
+    Use :func:`pysb.simulator.KappaSimulator` instead
+
     Parameters
     ----------
     model : pysb.core.Model
@@ -129,6 +133,11 @@ def run_simulation(model, time=10000, points=200, cleanup=True,
     a networkx MultiGraph containing the flux map. For details on viewing
     the flux map graphically see :func:`run_static_analysis` (notes section).
     """
+    warnings.warn(
+        'run_simulation will be removed in a future version of PySB. '
+        'Use pysb.simulator.KappaSimulator instead.',
+        DeprecationWarning
+    )
 
     gen = KappaGenerator(model)
 

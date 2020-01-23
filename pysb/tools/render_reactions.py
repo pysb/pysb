@@ -5,6 +5,10 @@ Usage
 
 Usage: ``python -m pysb.tools.render_reactions mymodel.py > mymodel.dot``
 
+If your model uses species as expression rates, you can visualize
+these interactions by including the --include-rate-species option::
+    python -m pysb.tools.render_reactions --include-rate-species mymodel.py > mymodel.dot
+
 Renders the reactions produced by a model into the "dot" graph format which can
 be visualized with Graphviz.
 
@@ -63,7 +67,7 @@ except ImportError:
     pygraphviz = None
 
 
-def run(model):
+def run(model, include_rate_species=False):
     """
     Render the reactions produced by a model into the "dot" graph format.
 
@@ -71,6 +75,9 @@ def run(model):
     ----------
     model : pysb.core.Model
         The model to render.
+    include_rate_species : bool
+        If True, enable multigraph and add dashed edges from species used in
+         expression rates to the node representing the reaction.
 
     Returns
     -------
@@ -82,8 +89,12 @@ def run(model):
                           'function')
 
     pysb.bng.generate_equations(model)
+    # Enable multigraph when include_rate_species is True
+    strict = True
+    if include_rate_species:
+        strict = False
 
-    graph = pygraphviz.AGraph(directed=True, rankdir="LR")
+    graph = pygraphviz.AGraph(directed=True, rankdir="LR", strict=strict)
     ic_species = [ic.pattern for ic in model.initials]
     for i, cp in enumerate(model.species):
         species_node = 's%d' % i
@@ -113,6 +124,24 @@ def run(model):
         reactants = reactants - modifiers
         products = products - modifiers
         attr_reversible = {'dir': 'both', 'arrowtail': 'empty'} if reaction['reversible'] else {}
+
+        rule = model.rules.get(reaction['rule'][0])
+        # Add a dashed edge when reaction forward and/or reverse parameters are
+        # expressions that contain observables
+        if include_rate_species:
+            sps_forward = set()
+            if isinstance(rule.rate_forward, pysb.core.Expression):
+                sps_forward = sp_from_expression(rule.rate_forward)
+                for s in sps_forward:
+                    r_link(graph, s, i, **{'style': 'dashed'})
+
+            if isinstance(rule.rate_reverse, pysb.core.Expression):
+                sps_reverse = sp_from_expression(rule.rate_reverse)
+                # Don't add edges that were added with forward parameters
+                sps_reverse = sps_reverse - sps_forward
+                for s in sps_reverse:
+                    r_link(graph, s, i, **{'style': 'dashed'})
+
         for s in reactants:
             r_link(graph, s, i, **attr_reversible)
         for s in products:
@@ -120,6 +149,7 @@ def run(model):
         for s in modifiers:
             r_link(graph, s, i, arrowhead="odiamond")
     return graph.string()
+
 
 def r_link(graph, s, r, **attrs):
     nodes = ('s%d' % s, 'r%d' % r)
@@ -130,6 +160,14 @@ def r_link(graph, s, r, **attrs):
     graph.add_edge(*nodes, **attrs)
 
 
+def sp_from_expression(expression):
+    expr_sps = []
+    for a in expression.expr.atoms():
+        if isinstance(a, pysb.core.Observable):
+            sps = a.species
+            expr_sps += sps
+    return set(expr_sps)
+
 usage = __doc__
 usage = usage[1:]  # strip leading newline
 
@@ -138,7 +176,7 @@ if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print(usage, end=' ')
         exit()
-    model_filename = sys.argv[1]
+    model_filename = sys.argv[-1]
     if not os.path.exists(model_filename):
         raise Exception("File '%s' doesn't exist" % model_filename)
     if not re.search(r'\.py$', model_filename):
@@ -159,7 +197,10 @@ if __name__ == '__main__':
         model = model_module.__dict__['model']
     except KeyError:
         raise Exception("File '%s' isn't a model file" % model_filename)
-    print(run(model))
+    include_rate_species = False
+    if '--include-rate-species' in sys.argv:
+        include_rate_species = True
+    print(run(model, include_rate_species))
 
 
 

@@ -22,12 +22,12 @@ class Annotation(object):
 
     """
 
-    def __init__(self, subject, object_, predicate="is"):
+    def __init__(self, subject, object_, predicate="is", _export=True):
         self.subject = subject
         self.object = object_
         self.predicate = predicate
         # if SelfExporter is in use, add the annotation to the model
-        if SelfExporter.do_export:
+        if SelfExporter.do_export and _export:
             SelfExporter.default_model.add_annotation(self)
 
     def __repr__(self):

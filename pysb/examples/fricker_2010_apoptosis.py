@@ -47,8 +47,7 @@ Rule('R_L_Binding', L (b=None) + pR (b=None, rf=None) >> L (b=1) % pR (b=1, rf=N
 
 # FADD binds
 Parameter('kf29', 84.4211e-03) #84.4211e-03
-Parameter('kr29', 0)
-Rule('RL_FADD_Binding', pR (b=ANY, rf=None) + FADD (rf=None, fe=None) >> pR (b=ANY, rf=2) % FADD (rf=2, fe=None), kf29,kr29)
+Rule('RL_FADD_Binding', pR (b=ANY, rf=None) + FADD (rf=None, fe=None) >> pR (b=ANY, rf=2) % FADD (rf=2, fe=None), kf29)
 
 #C8 binds to L:R:FADD
 Parameter('kf30', 3.19838e-03) #3.19838e-03
