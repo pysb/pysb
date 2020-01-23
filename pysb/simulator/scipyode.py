@@ -21,6 +21,7 @@ import distutils
 import pysb.bng
 import sympy
 import re
+from functools import partial
 import numpy as np
 import warnings
 import os
@@ -518,25 +519,15 @@ class ScipyOdeSimulator(Simulator):
         else:
             self._logger.debug('Multi-processor (parallel) mode using {} '
                                'processes'.format(num_processors))
-        with SerialExecutor() if num_processors == 1 else \
-                ProcessPoolExecutor(max_workers=num_processors) as executor:
-            for n in range(n_sims):
-                results.append(executor.submit(
-                    _integrator_process,
-                    self._code_eqs,
-                    self._jac_eqs,
-                    num_species,
-                    num_odes,
-                    self.initials[n],
-                    self.tspan,
-                    self.param_values[n],
-                    self._init_kwargs.get('integrator', 'vode'),
-                    compiler=self._compiler,
-                    integrator_opts=self.opts,
-                    compiler_directives=self._compiler_directives
-                ))
-            trajectories = [r.result() for r in results]
 
+        with ProcessPoolExecutor(max_workers=num_processors) as executor:
+            sim_partial = partial(_integrator_process, code_eqs=self._code_eqs, jac_eqs=self._jac_eqs,
+                                  num_species=num_species, num_odes=num_odes, tspan=self.tspan,
+                                  integrator_name=self._init_kwargs.get('integrator', 'vode'),
+                                  compiler=self._compiler, integrator_opts=self.opts,
+                                  compiler_directives=self._compiler_directives)
+
+            trajectories = list(executor.map(sim_partial, *[self.initials, self.param_values]))
         tout = np.array([self.tspan] * n_sims)
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, tout, trajectories)
@@ -636,9 +627,8 @@ def _get_rhs(compiler, code_eqs, ydot=None, jac=None, compiler_directives=None):
     return rhs
 
 
-def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
-                        tspan, param_values, integrator_name, compiler,
-                        integrator_opts, compiler_directives):
+def _integrator_process(initials, param_values, code_eqs, jac_eqs, num_species, num_odes, tspan,
+                        integrator_name, compiler, integrator_opts, compiler_directives):
     """ Single integrator process, for parallel execution """
     if compiler == 'python':
         code_eqs = sympy.lambdify(*code_eqs)
@@ -689,17 +679,3 @@ def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
         trajectory[i:, :] = 'nan'
 
     return trajectory
-
-
-class SerialExecutor(Executor):
-    """ Execute tasks in serial (immediately on submission) """
-    def submit(self, fn, *args, **kwargs):
-        f = Future()
-        try:
-            result = fn(*args, **kwargs)
-        except BaseException as e:
-            f.set_exception(e)
-        else:
-            f.set_result(result)
-
-        return f
