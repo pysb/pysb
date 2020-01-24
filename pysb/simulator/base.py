@@ -34,6 +34,10 @@ try:
 except ImportError:
     h5py = None
 
+try:
+    from collections.abc import Mapping, Sequence
+except ImportError:
+    from collections import Mapping, Sequence
 
 class SimulatorException(Exception):
     pass
@@ -168,7 +172,7 @@ class Simulator(object):
                 return len(self.param_values)
 
     def _update_initials_dict(self, initials_dict, initials_source, subs=None):
-        if isinstance(initials_source, collections.Mapping):
+        if isinstance(initials_source, Mapping):
             # Can't just use .update() as we need to test
             # equality with .is_equivalent_to()
             for cp, value_obj in initials_source.items():
@@ -177,7 +181,7 @@ class Simulator(object):
                        for existing_cp in initials_dict):
                     continue
 
-                if isinstance(value_obj, (collections.Sequence, np.ndarray))\
+                if isinstance(value_obj, (Sequence, np.ndarray))\
                         and all(isinstance(v, numbers.Number) for v in value_obj):
                     value = value_obj
                 elif isinstance(value_obj, Expression):
@@ -277,17 +281,17 @@ class Simulator(object):
 
         # Check potential quick return options
         if self._run_initials is not None:
-            if not isinstance(self._run_initials, collections.Mapping) and \
+            if not isinstance(self._run_initials, Mapping) and \
                     self._initials is None:
                 return self._run_initials
-        elif not isinstance(self._initials, collections.Mapping) and \
+        elif not isinstance(self._initials, Mapping) and \
                 self._initials is not None:
             return self._initials
 
         # At this point (after dimensionality check), we can return
         # self._run_initials if it's not a dictionary and not None
         if self._run_initials is not None and not isinstance(
-                self._run_initials, collections.Mapping):
+                self._run_initials, Mapping):
             return self._run_initials
 
         n_sims_initials = self._check_run_initials_vs_base_initials_length()
@@ -331,7 +335,7 @@ class Simulator(object):
                                      'MonomerPattern or ComplexPattern' %
                                      repr(cplx_pat))
                 # if val is a number, convert it to a single-element array
-                if not isinstance(val, (collections.Sequence, np.ndarray)):
+                if not isinstance(val, (Sequence, np.ndarray)):
                     val = [val]
                     new_initials[cplx_pat] = np.array(val)
                 # otherwise, check whether simulator supports multiple
@@ -468,7 +472,7 @@ class Simulator(object):
                     raise IndexError("new_params dictionary has unknown "
                                      "parameter name (%s)" % key)
                 # if val is a number, convert it to a single-element array
-                if not isinstance(val, collections.Sequence):
+                if not isinstance(val, Sequence):
                     val = [val]
                     new_params[key] = np.array(val)
                 # Check all elements are the same length

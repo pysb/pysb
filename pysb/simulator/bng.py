@@ -7,7 +7,10 @@ from pysb.core import as_complex_pattern, Parameter, \
     InvalidComplexPatternException
 import collections
 import os
-
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 class BngSimulator(Simulator):
     """ Simulate a model using BioNetGen """
@@ -111,7 +114,7 @@ class BngSimulator(Simulator):
 
         if method == 'nf':
             if population_maps is not None and (not isinstance(
-                    population_maps, collections.Iterable) or
+                    population_maps, Iterable) or
                     any(not isinstance(pm, PopulationMap) for pm in
                         population_maps)):
                 raise ValueError('population_maps should be a list of '

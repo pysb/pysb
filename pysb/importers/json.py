@@ -15,6 +15,10 @@ except NameError:
     # Python 3 compatibility.
     basestring = str
 
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping
 
 class PySBJSONDecodeError(ValueError):
     pass
@@ -37,7 +41,7 @@ class PySBJSONDecoder(JSONDecoder):
         return self.b.model.components[name]
 
     def decode_state_value(self, sv):
-        if isinstance(sv, collections.Mapping) and '__object__' in sv:
+        if isinstance(sv, Mapping) and '__object__' in sv:
             if sv['__object__'] == '__multistate__':
                 return MultiState(*sv['sites'])
             if sv['__object__'] == 'ANY':
@@ -46,7 +50,7 @@ class PySBJSONDecoder(JSONDecoder):
                 return WILD
         try:
             if len(sv) == 2 and isinstance(sv[0], basestring) \
-                    and isinstance(sv[1], (int, collections.Mapping)):
+                    and isinstance(sv[1], (int, Mapping)):
                 return sv[0], self.decode_state_value(sv[1])
         except TypeError:
             pass

@@ -33,6 +33,10 @@ try:
 except NameError:
     basestring = str
 
+try:
+    from collections.abc import Sequence
+except ImportError:
+    from collections import Sequence
 
 def set_bng_path(dir):
     """ Deprecated. Use pysb.pathfinder.set_path() instead. """
@@ -120,7 +124,7 @@ class BngBaseInterface(object):
             return '"%s"' % param
         elif isinstance(param, bool):
             return 1 if param else 0
-        elif isinstance(param, (collections.Sequence, numpy.ndarray)):
+        elif isinstance(param, (Sequence, numpy.ndarray)):
             return list(param)
         return param
 

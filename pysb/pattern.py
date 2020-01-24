@@ -14,6 +14,10 @@ except NameError:
     # Under Python 3, do not pretend that bytes are a valid string
     basestring = str
 
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 class FilterPredicate(object):
     """
@@ -191,7 +195,7 @@ def get_half_bonds_in_pattern(pat):
             if isinstance(sc, int):
                 bonds_used.append(sc)
             elif not isinstance(sc, basestring) and \
-                    isinstance(sc, collections.Iterable):
+                    isinstance(sc, Iterable):
                 [bonds_used.append(b) for b in sc if isinstance(b, int)]
 
     if pat is None:
