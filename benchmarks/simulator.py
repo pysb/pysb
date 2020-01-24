@@ -48,7 +48,7 @@ class Earm10ODESuite(object):
         self.sim_cupsoda.run()
 
 
-class SSASchlogl(object):
+class SSASchloegl(object):
     def setup(self):
         self.nsims = 100
         self.timer = timeit.default_timer
