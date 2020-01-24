@@ -211,7 +211,6 @@ class BngSimulator(Simulator):
                                 skip_file_actions=True)
             else:
                 bngfile.execute()
-            self._time = bngfile._time
             if method != 'nf':
                 load_equations(self.model, bngfile.net_filename)
             list_of_yfull = \
