@@ -1,9 +1,12 @@
 from __future__ import print_function
-import random
+from pysb.simulator.base import SimulationResult
+from pysb.bng import generate_equations
+from pysb.simulator.cuda_ssa import SSABase
 import numpy as np
 import os
+import random
 import time
-import warnings
+
 try:
     import pyopencl as cl
     from pyopencl import array as ocl_array
@@ -12,10 +15,6 @@ except ImportError:
     cl = None
     device_type = None
     ocl_array = None
-
-from pysb.bng import generate_equations
-from pysb.simulator.base import SimulationResult
-from pysb.simulator.cuda_ssa import SSABase
 
 
 class OpenCLSSASimulator(SSABase):
@@ -71,9 +70,6 @@ class OpenCLSSASimulator(SSABase):
         Model passed to the constructor.
     tspan : vector-like
         Time values passed to the constructor.
-
-
-
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
@@ -99,7 +95,7 @@ class OpenCLSSASimulator(SSABase):
         if self._dtype == np.float32:
             self._code = self._code.replace('double', 'float')
             self._code = self._code.replace('USE_DP', 'USE_FLOAT')
-            warnings.warn("Should be cautious using single precision")
+            self._logger.warn("Should be cautious using single precision")
         if verbose == 2:
             self._code = self._code.replace('//#define VERBOSE',
                                             '#define VERBOSE')

@@ -1,4 +1,11 @@
 from __future__ import print_function
+from pysb.simulator.base import SimulationResult
+from pysb.simulator.ssa_base import SSABase
+import numpy as np
+import os
+import time
+import warnings
+from pysb.pathfinder import get_path
 try:
     import pycuda
     import pycuda.autoinit
@@ -11,21 +18,11 @@ try:
 except ImportError:
     pycuda = None
 
-import numpy as np
-import os
-import time
-import warnings
-from pysb.logging import setup_logger
-import logging
-from pysb.pathfinder import get_path
-from pysb.simulator.base import SimulationResult
-from pysb.simulator.ssa_base import SSABase
-
 
 class CudaSSASimulator(SSABase):
     """
     SSA simulator for NVIDIA gpus
-    
+
     Use `CUDA_VISIBLE_DEVICES` to set the device.
 
     Requires `PyCUDA`_, `CUDA`_, and a CUDA compatible NVIDIA gpu.
@@ -112,9 +109,6 @@ class CudaSSASimulator(SSABase):
         self._kernel = None
         self._param_tex = None
         self._ssa = None
-
-        if verbose:
-            setup_logger(logging.INFO)
         self._logger.info("Initialized CudaSSASimulator class")
 
     def _compile(self):
@@ -262,11 +256,10 @@ class CudaSSASimulator(SSABase):
         gpu_array[:len(values)] = values
         return gpu_array
 
-    @staticmethod
-    def get_blocks(n_simulations, threads_per_block):
+    def get_blocks(self, n_simulations, threads_per_block):
         max_tpb = 256
         if threads_per_block > max_tpb:
-            logging.warning("Limit of 256 threads per block due to curand."
+            self._logger.warning("Limit of 256 threads per block due to curand."
                             " Setting to 256.")
             threads_per_block = max_tpb
         if n_simulations < max_tpb:
