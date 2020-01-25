@@ -22,11 +22,12 @@ from pysb.simulator.base import SimulationResult
 from pysb.simulator.ssa_base import SSABase
 
 
-class CUDASimulator(SSABase):
+class CudaSSASimulator(SSABase):
     """
     CUDA simulator for NVIDIA gpus
 
-    Requires pycuda, cuda, and cuda compatible NVIDIA gpus.
+    Requires `PyCUDA`_, CUDA, and a CUDA compatible NVIDIA gpu.
+
 
     Parameters
     ----------
@@ -52,7 +53,7 @@ class CUDASimulator(SSABase):
         model.parameters.
     verbose : bool, optional (default: False)
         Verbose output.
-    precision : (np.float64, np.flaot32)
+    precision : (np.float64, np.float32)
         Precision for ssa simulation. Default is np.float64. float32 should
         be used with caution.
 
@@ -64,6 +65,12 @@ class CUDASimulator(SSABase):
         Model passed to the constructor.
     tspan : vector-like
         Time values passed to the constructor.
+
+    .. _PyCUDA :
+        https://documen.tician.de/pycuda/
+    .. _CUDA :
+        https://developer.nvidia.com/cuda-zone
+
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
@@ -72,7 +79,7 @@ class CUDASimulator(SSABase):
         if pycuda is None:
             raise ImportError('pycuda library required for {}'
                               ''.format(self.__class__.__name__))
-        super(CUDASimulator, self).__init__(model, verbose, **kwargs)
+        super(CudaSSASimulator, self).__init__(model, verbose, **kwargs)
         self._device = device.name()
         self.tspan = tspan
         self.verbose = verbose
@@ -83,7 +90,7 @@ class CUDASimulator(SSABase):
         self._code = template_code.format(**self._get_template_args())
 
         if precision not in (np.float64, np.float32):
-            raise TypeError("CUDASimulator can only use np.float64 or "
+            raise TypeError("CudaSSASimulator can only use np.float64 or "
                             "np.float32 precisions")
         self._dtype = precision
         if self._dtype == np.float32:
@@ -104,7 +111,7 @@ class CUDASimulator(SSABase):
 
         if verbose:
             setup_logger(logging.INFO)
-        self._logger.info("Initialized CUDASimulator class")
+        self._logger.info("Initialized CudaSSASimulator class")
 
     def _compile(self):
 
@@ -148,9 +155,9 @@ class CUDASimulator(SSABase):
         A :class:`SimulationResult` object
         """
 
-        super(CUDASimulator, self).run(tspan=tspan, initials=initials,
-                                       param_values=param_values,
-                                       number_sim=number_sim)
+        super(CudaSSASimulator, self).run(tspan=tspan, initials=initials,
+                                          param_values=param_values,
+                                          number_sim=number_sim)
 
         self._logger.info("Using device {}".format(device.name()))
 

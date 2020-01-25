@@ -18,11 +18,11 @@ from pysb.simulator.base import SimulationResult
 from pysb.simulator.cuda_ssa import SSABase
 
 
-class OpenCLSimulator(SSABase):
+class OpenCLSSASimulator(SSABase):
     """
     OpenCL simulator
 
-    Requires opencl and pyopencl.
+    Requires `OpenCL`_ and `PyPpenCL`_.
 
     Parameters
     ----------
@@ -48,7 +48,7 @@ class OpenCLSimulator(SSABase):
         model.parameters.
     verbose : bool, optional (default: False)
         Verbose output.
-    precision : (np.float64, np.flaot32)
+    precision : (np.float64, np.float32)
         Precision for ssa simulation. Default is np.float64. float32 should
         be used with caution.
 
@@ -60,6 +60,11 @@ class OpenCLSimulator(SSABase):
         Model passed to the constructor.
     tspan : vector-like
         Time values passed to the constructor.
+
+    .. _OpenCL :
+        https://www.khronos.org/opencl/
+    .. _PyOpenCL :
+        https://documen.tician.de/pyopencl/
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
@@ -69,7 +74,7 @@ class OpenCLSimulator(SSABase):
         if cl is None:
             raise ImportError('pyopencl library required for {}'
                               ''.format(self.__class__.__name__))
-        super(OpenCLSimulator, self).__init__(model, verbose, **kwargs)
+        super(OpenCLSSASimulator, self).__init__(model, verbose, **kwargs)
 
         generate_equations(self._model)
 
@@ -92,7 +97,7 @@ class OpenCLSimulator(SSABase):
         elif verbose > 3:
             self._code = self._code.replace('//#define VERBOSE',
                                             '#define VERBOSE_MAX')
-        self._logger.info("Initialized OpenCLSimulator class")
+        self._logger.info("Initialized OpenCLSSASimulator class")
 
     def _compile(self):
 
@@ -153,9 +158,9 @@ class OpenCLSimulator(SSABase):
         -------
         A :class:`SimulationResult` object
         """
-        super(OpenCLSimulator, self).run(tspan=tspan, initials=initials,
-                                         param_values=param_values,
-                                         number_sim=number_sim)
+        super(OpenCLSSASimulator, self).run(tspan=tspan, initials=initials,
+                                            param_values=param_values,
+                                            number_sim=number_sim)
         if tspan is None:
             if self.tspan is None:
                 raise Exception("Please provide tspan")
