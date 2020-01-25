@@ -1,14 +1,12 @@
-import collections
-import logging
-import os
-
-import numpy as np
-
+from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
 from pysb.bng import BngFileInterface, load_equations, generate_hybrid_model
+import numpy as np
+import logging
+from pysb.logging import EXTENDED_DEBUG
 from pysb.core import as_complex_pattern, Parameter, \
     InvalidComplexPatternException
-from pysb.logging import EXTENDED_DEBUG
-from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
+import collections
+import os
 
 
 class BngSimulator(Simulator):
