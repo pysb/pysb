@@ -82,7 +82,7 @@ def vary_x():
     kargs = {'duration': 8 / len(images)}
 
     imageio.mimsave(
-        'schlogl.gif',
+        'schloegl.gif',
         [imageio.imread(i) for i in images],
         **kargs
     )
