@@ -20,9 +20,20 @@ from pysb.simulator.cuda_ssa import SSABase
 
 class OpenCLSSASimulator(SSABase):
     """
-    OpenCL simulator
+    OpenCL SSA simulator
+
+    This simulator is capable of using either a GPU or multi-core CPU.
+    The simulator will detect and ask which device you would like to use.
+    Alteratively, you can set the device using with an environment variable
+     `PYOPENCL_CTX`
 
     Requires `OpenCL`_ and `PyPpenCL`_.
+
+    .. _OpenCL :
+        https://www.khronos.org/opencl/
+    .. _PyOpenCL :
+        https://documen.tician.de/pyopencl/
+
 
     Parameters
     ----------
@@ -61,10 +72,8 @@ class OpenCLSSASimulator(SSABase):
     tspan : vector-like
         Time values passed to the constructor.
 
-    .. _OpenCL :
-        https://www.khronos.org/opencl/
-    .. _PyOpenCL :
-        https://documen.tician.de/pyopencl/
+
+
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 

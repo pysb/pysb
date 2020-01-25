@@ -24,10 +24,16 @@ from pysb.simulator.ssa_base import SSABase
 
 class CudaSSASimulator(SSABase):
     """
-    CUDA simulator for NVIDIA gpus
+    SSA simulator for NVIDIA gpus
+    
+    Use `CUDA_VISIBLE_DEVICES` to set the device.
 
-    Requires `PyCUDA`_, CUDA, and a CUDA compatible NVIDIA gpu.
+    Requires `PyCUDA`_, `CUDA`_, and a CUDA compatible NVIDIA gpu.
 
+    .. _PyCUDA :
+        https://documen.tician.de/pycuda/
+    .. _CUDA :
+        https://developer.nvidia.com/cuda-zone
 
     Parameters
     ----------
@@ -66,10 +72,8 @@ class CudaSSASimulator(SSABase):
     tspan : vector-like
         Time values passed to the constructor.
 
-    .. _PyCUDA :
-        https://documen.tician.de/pycuda/
-    .. _CUDA :
-        https://developer.nvidia.com/cuda-zone
+
+
 
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
@@ -150,6 +154,7 @@ class CudaSSASimulator(SSABase):
             Number of simulations to perform
         threads_per_block: int
             Number of threads per block. Optimal value is generally 32
+
         Returns
         -------
         A :class:`SimulationResult` object
