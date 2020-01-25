@@ -2,7 +2,7 @@ import numpy as np
 from nose.plugins.attrib import attr
 from nose.tools import ok_
 from pysb.examples.schloegl import model
-from pysb.simulator import CUDASimulator, OpenCLSimulator
+from pysb.simulator import CudaSSASimulator, OpenCLSSASimulator
 
 
 @attr('gpu')
@@ -12,7 +12,7 @@ class TestGpu(object):
         self.tspan = np.linspace(0, 100, 101)
         self.model = model
         model.parameters['X_0'].value = 400
-        self.simulator = CUDASimulator(model)
+        self.simulator = CudaSSASimulator(model)
         self.n_sim = 10
 
     def test_run_by_nsim(self):
@@ -71,7 +71,7 @@ class TestOpencl(object):
         self.tspan = np.linspace(0, 100, 101)
         self.model = model
         model.parameters['X_0'].value = 400
-        self.simulator = OpenCLSimulator(model, device='gpu')
+        self.simulator = OpenCLSSASimulator(model, device='gpu')
         self.n_sim = 10
 
     def test_run_by_nsim(self):

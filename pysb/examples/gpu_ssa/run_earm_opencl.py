@@ -1,5 +1,5 @@
 """
-Example of using OpenCLSimulator for SSA simulations.
+Example of using OpenCLSSASimulator for SSA simulations.
 
 
 This example uses the earm_1_0 model.
@@ -11,13 +11,13 @@ be time out. For testing, one can change the tspan = np.linspace(0,5000,101).
 import matplotlib.pyplot as plt
 import numpy as np
 from pysb.examples.earm_1_0 import model
-from pysb.simulator import OpenCLSimulator, ScipyOdeSimulator
+from pysb.simulator import OpenCLSSASimulator, ScipyOdeSimulator
 
 if __name__ == "__main__":
     n_sim = 100
     tspan = np.linspace(0, 5000, 101)
     name = 'tBid_total'
-    sim = OpenCLSimulator(model, tspan=tspan, verbose=True)
+    sim = OpenCLSSASimulator(model, tspan=tspan, verbose=True)
     traj = sim.run(tspan=tspan, number_sim=n_sim)
 
     result = np.array(traj.observables)[name]

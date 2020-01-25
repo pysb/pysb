@@ -1,5 +1,5 @@
 """
-Example of using CUDASimulator for SSA simulations.
+Example of using CudaSSASimulator for SSA simulations.
 
 
 This example uses the earm_1_0 model.
@@ -11,14 +11,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from pysb.examples.earm_1_0 import model
-from pysb.simulator import CUDASimulator, ScipyOdeSimulator
+from pysb.simulator import CudaSSASimulator, ScipyOdeSimulator
 
 if __name__ == "__main__":
     n_sim = 100
     tspan = np.linspace(0, 5000, 101)
     name = 'tBid_total'
 
-    sim = CUDASimulator(model, tspan=tspan, verbose=True)
+    sim = CudaSSASimulator(model, tspan=tspan, verbose=True)
     traj = sim.run(tspan=tspan, number_sim=n_sim)
 
     result = np.array(traj.observables)[name]

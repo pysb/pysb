@@ -1,5 +1,5 @@
 """
-Example of using CUDASimulator for SSA simulations.
+Example of using CudaSSASimulator for SSA simulations.
 
 
 This example uses the schlogl model.
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pysb.examples.schloegl import model
 from pysb.integrate import odesolve
-from pysb.simulator.cuda_ssa import CUDASimulator
+from pysb.simulator.cuda_ssa import CudaSSASimulator
 
 
 def run(n_sim=100, x_0=100):
@@ -33,7 +33,7 @@ def run(n_sim=100, x_0=100):
     savename = 'schloegl_{}'.format(int(x_0))
 
     # create simulator and run simulations
-    traj = CUDASimulator(model).run(tspan, number_sim=n_sim)
+    traj = CudaSSASimulator(model).run(tspan, number_sim=n_sim)
     x = traj.dataframe[obs_name].unstack(0).values
 
     # create line traces
