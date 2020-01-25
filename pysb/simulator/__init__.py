@@ -1,7 +1,6 @@
 from .base import SimulatorException, SimulationResult
 from .scipyode import ScipyOdeSimulator
 from .cupsoda import CupSodaSimulator
-from .scipyode import ScipyOdeSimulator
 from .stochkit import StochKitSimulator
 from .bng import BngSimulator, PopulationMap
 from .kappa import KappaSimulator
