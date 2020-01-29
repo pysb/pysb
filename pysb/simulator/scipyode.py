@@ -513,21 +513,28 @@ class ScipyOdeSimulator(Simulator):
 
         num_species = len(self._model.species)
         num_odes = len(self._model.odes)
-        results = []
         if num_processors == 1:
             self._logger.debug('Single processor (serial) mode')
         else:
             self._logger.debug('Multi-processor (parallel) mode using {} '
                                'processes'.format(num_processors))
 
-        with ProcessPoolExecutor(max_workers=num_processors) as executor:
+        with SerialExecutor() if num_processors == 1 else \
+                ProcessPoolExecutor(max_workers=num_processors) as executor:
             sim_partial = partial(_integrator_process, code_eqs=self._code_eqs, jac_eqs=self._jac_eqs,
                                   num_species=num_species, num_odes=num_odes, tspan=self.tspan,
                                   integrator_name=self._init_kwargs.get('integrator', 'vode'),
                                   compiler=self._compiler, integrator_opts=self.opts,
                                   compiler_directives=self._compiler_directives)
 
-            trajectories = list(executor.map(sim_partial, *[self.initials, self.param_values]))
+            results = [executor.submit(sim_partial, *args)
+                       for args in zip(self.initials, self.param_values)]
+            try:
+                trajectories = [r.result() for r in results]
+            finally:
+                for r in results:
+                    r.cancel()
+
         tout = np.array([self.tspan] * n_sims)
         self._logger.info('All simulation(s) complete')
         return SimulationResult(self, tout, trajectories)
@@ -679,3 +686,17 @@ def _integrator_process(initials, param_values, code_eqs, jac_eqs, num_species, 
         trajectory[i:, :] = 'nan'
 
     return trajectory
+
+
+class SerialExecutor(Executor):
+    """ Execute tasks in serial (immediately on submission) """
+    def submit(self, fn, *args, **kwargs):
+        f = Future()
+        try:
+            result = fn(*args, **kwargs)
+        except BaseException as e:
+            f.set_exception(e)
+        else:
+            f.set_result(result)
+
+        return f
