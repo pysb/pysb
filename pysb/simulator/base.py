@@ -805,14 +805,15 @@ class SimulationResult(object):
                 len(tout[n]) * len(expr_names)).view(dtype=yexpr_dtype) for n
                           in range(self.nsims)]
         else:
-            self._yobs = [np.ndarray((len(self.tout[n]),),
-                                     dtype=yobs_dtype) for n in range(self.nsims)]
+            self._yobs = [np.ndarray((len(self.tout[n]),), dtype=yobs_dtype) if obs_names
+                          else np.ndarray((len(self.tout[n]), 0), dtype=yobs_dtype)
+                          for n in range(self.nsims)]
             self._yobs_view = [self._yobs[n].view(float).
-                               reshape(len(self._yobs[n]), -1) for n in range(
+                                   reshape(len(self._yobs[n]), -1) for n in range(
                 self.nsims)]
-            self._yexpr = [np.ndarray((len(self.tout[n]),),
-                                      dtype=yexpr_dtype) for n in range(
-                self.nsims)]
+            self._yexpr = [np.ndarray((len(self.tout[n]),), dtype=yexpr_dtype) if expr_names
+                           else np.ndarray((len(self.tout[n]), 0), dtype=yexpr_dtype)
+                           for n in range(self.nsims)]
             self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
                 self._yexpr[n]), -1) for n in range(self.nsims)]
 
