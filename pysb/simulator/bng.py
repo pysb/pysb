@@ -6,11 +6,8 @@ from pysb.logging import EXTENDED_DEBUG
 from pysb.core import as_complex_pattern, Parameter, \
     InvalidComplexPatternException
 import collections
+from collections.abc import Iterable
 import os
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
 
 class BngSimulator(Simulator):
     """ Simulate a model using BioNetGen """

@@ -14,6 +14,7 @@ import abc
 from warnings import warn
 import shutil
 import collections
+from collections.abc import Sequence
 import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
@@ -33,10 +34,6 @@ try:
 except NameError:
     basestring = str
 
-try:
-    from collections.abc import Sequence
-except ImportError:
-    from collections import Sequence
 
 def set_bng_path(dir):
     """ Deprecated. Use pysb.pathfinder.set_path() instead. """

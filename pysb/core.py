@@ -12,6 +12,7 @@ import sympy
 import numpy as np
 import scipy.sparse
 import networkx as nx
+from collections.abc import Iterable, Mapping, Sequence, Set
 
 try:
     reload
@@ -24,10 +25,6 @@ except NameError:
     basestring = str
     long = int
 
-try:
-    from collections.abc import Iterable, Mapping, Sequence, Set
-except ImportError:
-    from collections import Iterable, Mapping, Sequence, Set
 
 def MatchOnce(pattern):
     """Make a ComplexPattern match-once."""

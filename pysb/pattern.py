@@ -1,4 +1,5 @@
 import collections
+from collections.abc import Iterable
 from .core import ComplexPattern, MonomerPattern, Monomer, \
     ReactionPattern, ANY, as_complex_pattern, DanglingBondError, \
     ReusedBondError, Rule
@@ -14,10 +15,6 @@ except NameError:
     # Under Python 3, do not pretend that bytes are a valid string
     basestring = str
 
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
 
 class FilterPredicate(object):
     """

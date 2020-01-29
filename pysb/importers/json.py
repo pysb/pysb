@@ -6,6 +6,7 @@ from pysb.core import RuleExpression, ReactionPattern, ComplexPattern, \
 from pysb.annotation import Annotation
 import sympy
 import collections
+from collections.abc import Mapping
 import json
 import re
 from sympy.parsing.sympy_parser import parse_expr
@@ -15,10 +16,6 @@ except NameError:
     # Python 3 compatibility.
     basestring = str
 
-try:
-    from collections.abc import Mapping
-except ImportError:
-    from collections import Mapping
 
 class PySBJSONDecodeError(ValueError):
     pass

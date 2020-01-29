@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 import sympy
 import collections
+from collections.abc import Mapping, Sequence
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
                       Parameter, Expression, Model, ComponentSet
@@ -34,10 +35,6 @@ try:
 except ImportError:
     h5py = None
 
-try:
-    from collections.abc import Mapping, Sequence
-except ImportError:
-    from collections import Mapping, Sequence
 
 class SimulatorException(Exception):
     pass
