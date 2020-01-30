@@ -21,6 +21,7 @@ import distutils
 import pysb.bng
 import sympy
 import re
+from functools import partial
 import numpy as np
 import warnings
 import os
@@ -512,30 +513,27 @@ class ScipyOdeSimulator(Simulator):
 
         num_species = len(self._model.species)
         num_odes = len(self._model.odes)
-        results = []
         if num_processors == 1:
             self._logger.debug('Single processor (serial) mode')
         else:
             self._logger.debug('Multi-processor (parallel) mode using {} '
                                'processes'.format(num_processors))
+
         with SerialExecutor() if num_processors == 1 else \
                 ProcessPoolExecutor(max_workers=num_processors) as executor:
-            for n in range(n_sims):
-                results.append(executor.submit(
-                    _integrator_process,
-                    self._code_eqs,
-                    self._jac_eqs,
-                    num_species,
-                    num_odes,
-                    self.initials[n],
-                    self.tspan,
-                    self.param_values[n],
-                    self._init_kwargs.get('integrator', 'vode'),
-                    compiler=self._compiler,
-                    integrator_opts=self.opts,
-                    compiler_directives=self._compiler_directives
-                ))
-            trajectories = [r.result() for r in results]
+            sim_partial = partial(_integrator_process, code_eqs=self._code_eqs, jac_eqs=self._jac_eqs,
+                                  num_species=num_species, num_odes=num_odes, tspan=self.tspan,
+                                  integrator_name=self._init_kwargs.get('integrator', 'vode'),
+                                  compiler=self._compiler, integrator_opts=self.opts,
+                                  compiler_directives=self._compiler_directives)
+
+            results = [executor.submit(sim_partial, *args)
+                       for args in zip(self.initials, self.param_values)]
+            try:
+                trajectories = [r.result() for r in results]
+            finally:
+                for r in results:
+                    r.cancel()
 
         tout = np.array([self.tspan] * n_sims)
         self._logger.info('All simulation(s) complete')
@@ -636,9 +634,8 @@ def _get_rhs(compiler, code_eqs, ydot=None, jac=None, compiler_directives=None):
     return rhs
 
 
-def _integrator_process(code_eqs, jac_eqs, num_species, num_odes, initials,
-                        tspan, param_values, integrator_name, compiler,
-                        integrator_opts, compiler_directives):
+def _integrator_process(initials, param_values, code_eqs, jac_eqs, num_species, num_odes, tspan,
+                        integrator_name, compiler, integrator_opts, compiler_directives):
     """ Single integrator process, for parallel execution """
     if compiler == 'python':
         code_eqs = sympy.lambdify(*code_eqs)
