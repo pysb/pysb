@@ -154,9 +154,7 @@ class SelfExporter(object):
 
 
 class Symbol(sympy.Dummy):
-    def __new__(cls, name, value=0.0, _export=True, **kwargs):
-        kwargs.pop('value', None)
-        kwargs.pop('_export', None)
+    def __new__(cls, name, **kwargs):
         real = kwargs.pop('real', True)
         return super(Symbol, cls).__new__(cls, name, real=real, **kwargs)
 
