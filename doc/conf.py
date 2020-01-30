@@ -64,7 +64,7 @@ MOCK_MODULES = [ 'pandas', 'pygraphviz', 'sympy',  'sympy.core', 'sympy.parsing'
                  'concurrent', 'concurrent.futures' ]
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.MagicMock()
-sys.modules['sympy'].Symbol = type('Symbol', (object,), {})
+sys.modules['sympy'].Dummy = type('Dummy', (object,), {})
 
 
 # The version info for the project you're documenting, acts as replacement for
