@@ -154,8 +154,7 @@ class SelfExporter(object):
 
 
 class Symbol(sympy.Dummy):
-    def __new__(cls, name, **kwargs):
-        real = kwargs.pop('real', True)
+    def __new__(cls, name, real=True, **kwargs):
         return super(Symbol, cls).__new__(cls, name, real=real, **kwargs)
 
     def _lambdacode(self, printer, **kwargs):
@@ -1279,12 +1278,13 @@ class Parameter(Component, Symbol):
 
     Attributes
     ----------
-    Identical to Parameters (see above).
+    value (see Parameters above).
 
     """
 
     def __new__(cls, name, value=0.0, nonnegative=True, integer=False,
                 _export=True):
+        _check_value_consistency(value, integer, nonnegative)
         return super(Parameter, cls).__new__(cls, name, real=True,
                                              nonnegative=nonnegative,
                                              integer=integer)
@@ -1302,14 +1302,8 @@ class Parameter(Component, Symbol):
 
     @value.setter
     def value(self, new_value):
-        if self.is_integer:
-            if not float(new_value).is_integer():
-                raise ValueError('Cannot assign an non-integer value to a '
-                                 'parameter assumed to be an integer')
-        if self.is_nonnegative:
-            if float(new_value) < 0:
-                raise ValueError('Cannot assign a negative value to a '
-                                 'parameter assumed to be nonnegative')
+        _check_value_consistency(new_value, self.is_integer,
+                                 self.is_nonnegative)
 
         self._value = float(new_value)
     
@@ -1317,10 +1311,22 @@ class Parameter(Component, Symbol):
         return self.value
 
     def __repr__(self):
-        return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
+        return '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
     def __str__(self):
-        return  repr(self)
+        return repr(self)
+
+
+def _check_value_consistency(value, is_integer, is_nonnegative):
+    if is_integer:
+        if not float(value).is_integer():
+            raise ValueError('Cannot assign an non-integer value to a '
+                             'parameter assumed to be an integer')
+    if is_nonnegative:
+        if float(value) < 0:
+            raise ValueError('Cannot assign a negative value to a '
+                             'parameter assumed to be nonnegative')
+
 
 
 
