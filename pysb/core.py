@@ -11,6 +11,7 @@ import itertools
 import sympy
 import scipy.sparse
 import networkx as nx
+from collections.abc import Iterable, Mapping, Sequence, Set
 
 from importlib import reload
 
@@ -274,7 +275,7 @@ class Monomer(Component):
 
         # ensure sites is some kind of list (presumably of strings) but not a
         # string itself
-        if not isinstance(sites, collections.Iterable) or \
+        if not isinstance(sites, Iterable) or \
                isinstance(sites, str):
             raise ValueError("sites must be a list of strings")
 
@@ -2210,7 +2211,7 @@ class ModelNotDefinedError(RuntimeError):
         )
 
 
-class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
+class ComponentSet(Set, Mapping, Sequence):
     """
     An add-and-read-only container for storing model Components.
 
@@ -2418,7 +2419,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         # We require other to be a ComponentSet too so we know it will support
         # "in" efficiently.
         if not isinstance(other, ComponentSet):
-            return collections.Set.__and__(self, other)
+            return Set.__and__(self, other)
         return ComponentSet(value for value in self if value in other)
 
     def __rand__(self, other):
@@ -2442,7 +2443,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             del m[c.name]
 
 
-class OdeView(collections.Sequence):
+class OdeView(Sequence):
     """Compatibility shim for the Model.odes property."""
 
     # This is necessarily coupled pretty tightly with Model. Note that we
@@ -2468,7 +2469,7 @@ class OdeView(collections.Sequence):
         return len(self.model.species)
 
 
-class InitialConditionsView(collections.Sequence):
+class InitialConditionsView(Sequence):
     """Compatibility shim for the Model.initial_conditions property."""
 
     def __init__(self, model):

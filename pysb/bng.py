@@ -14,6 +14,7 @@ import abc
 from warnings import warn
 import shutil
 import collections
+from collections.abc import Sequence
 import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
@@ -107,7 +108,7 @@ class BngBaseInterface(object):
             return '"%s"' % param
         elif isinstance(param, bool):
             return 1 if param else 0
-        elif isinstance(param, (collections.Sequence, numpy.ndarray)):
+        elif isinstance(param, (Sequence, numpy.ndarray)):
             return list(param)
         return param
 

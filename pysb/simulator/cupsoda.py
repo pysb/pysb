@@ -14,6 +14,7 @@ import shutil
 from pysb.pathfinder import get_path
 import sympy
 import collections
+from collections.abc import Iterable
 try:
     import pandas as pd
 except ImportError:
@@ -167,7 +168,7 @@ class CupSodaSimulator(Simulator):
                                                param_values=param_values,
                                                verbose=verbose, **kwargs)
         self.gpu = kwargs.pop('gpu', (0, ))
-        if not isinstance(self.gpu, collections.Iterable):
+        if not isinstance(self.gpu, Iterable):
             self.gpu = [self.gpu]
         self._obs_species_only = kwargs.pop('obs_species_only', True)
         self._cleanup = kwargs.pop('cleanup', True)

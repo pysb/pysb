@@ -1,4 +1,5 @@
 import collections
+from collections.abc import Iterable
 from .core import ComplexPattern, MonomerPattern, Monomer, \
     ReactionPattern, ANY, as_complex_pattern, DanglingBondError, \
     ReusedBondError, Rule
@@ -186,7 +187,7 @@ def get_half_bonds_in_pattern(pat):
             if isinstance(sc, int):
                 bonds_used.append(sc)
             elif not isinstance(sc, str) and \
-                    isinstance(sc, collections.Iterable):
+                    isinstance(sc, Iterable):
                 [bonds_used.append(b) for b in sc if isinstance(b, int)]
 
     if pat is None:
