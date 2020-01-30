@@ -71,16 +71,15 @@ Simulation
 
 * How can I speed up my `ScipyOdeSimulator` simulation?
 
-    **Check the weave library is installed.** `weave` is a Python library
+    **Check the cython library is installed.** `cython` is a Python library
     which converts your system of ordinary differential equations (ODEs) to
     C code, which is faster to execute than pure Python code. You can check
-    if `weave` is installed by trying to import it at the Python prompt::
+    if `cython` is installed by trying to import it at the Python prompt::
 
-        import weave
+        import cython
 
-    If no `ImportError` appears, `weave` is available. Note that `weave` is
-    only available for Python 2. We are working on an alternative for Python
-    3 using `Cython <http://cython.org>`_.
+    If no `ImportError` appears, `cython` is available. Otherwise, you'll
+    need to install it using `pip` or `conda`.
 
     When running large numbers of simulations, consider using the
     `CupSodaSimulator` if you have an NVIDIA graphics card (GPU) available.

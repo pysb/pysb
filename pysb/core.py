@@ -12,6 +12,7 @@ import sympy
 import numpy as np
 import scipy.sparse
 import networkx as nx
+from collections.abc import Iterable, Mapping, Sequence, Set
 
 try:
     reload
@@ -153,6 +154,16 @@ class SelfExporter(object):
                              "name '%s'" % obj.name)
 
 
+class Symbol(sympy.Dummy):
+    def __new__(cls, name):
+        return super(Symbol, cls).__new__(cls, name)
+
+    def _lambdacode(self, printer, **kwargs):
+        """ custom printer method that ensures that the dummyid is not
+        appended when printing code """
+        return self.name
+
+
 class Component(object):
 
     """
@@ -274,7 +285,7 @@ class Monomer(Component):
 
         # ensure sites is some kind of list (presumably of strings) but not a
         # string itself
-        if not isinstance(sites, collections.Iterable) or \
+        if not isinstance(sites, Iterable) or \
                isinstance(sites, basestring):
             raise ValueError("sites must be a list of strings")
 
@@ -1243,7 +1254,7 @@ def build_rule_expression(reactant, product, is_reversible):
     return RuleExpression(reactant, product, is_reversible)
 
 
-class Parameter(Component, sympy.Symbol):
+class Parameter(Component, Symbol):
 
     """
     Model component representing a named constant floating point number.
@@ -1265,7 +1276,7 @@ class Parameter(Component, sympy.Symbol):
     """
 
     def __new__(cls, name, value=0.0, _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+        return super(Parameter, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return (self.name, self.value, False)
@@ -1284,12 +1295,6 @@ class Parameter(Component, sympy.Symbol):
     
     def get_value(self):
         return self.value
-    
-    # This is needed to make sympy's evalf machinery treat this class like a
-    # Symbol.
-    @property
-    def func(self):
-        return sympy.Symbol
 
     def __repr__(self):
         return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
@@ -1505,7 +1510,7 @@ def validate_const_expr(obj, description):
 
 
 
-class Observable(Component, sympy.Symbol):
+class Observable(Component, Symbol):
 
     """
     Model component representing a linear combination of species.
@@ -1545,7 +1550,7 @@ class Observable(Component, sympy.Symbol):
     """
 
     def __new__(cls, name, reaction_pattern, match='molecules', _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+        return super(Observable, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return (self.name, self.reaction_pattern, self.match, False)
@@ -1562,12 +1567,6 @@ class Observable(Component, sympy.Symbol):
         self.match = match
         self.species = []
         self.coefficients = []
-
-    # This is needed to make sympy's evalf machinery treat this class like a
-    # Symbol.
-    @property
-    def func(self):
-        return sympy.Symbol
 
     def expand_obs(self):
         """ Expand observables in terms of species and coefficients """
@@ -1595,7 +1594,7 @@ class Observable(Component, sympy.Symbol):
         return sympy.Function(self.name)(tag)
 
 
-class Expression(Component, sympy.Symbol):
+class Expression(Component, Symbol):
 
     """
     Model component representing a symbolic expression of other variables.
@@ -1613,7 +1612,7 @@ class Expression(Component, sympy.Symbol):
     """
 
     def __new__(cls, name, expr, _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+        return super(Expression, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return (self.name, self.expr, False)
@@ -1653,12 +1652,6 @@ class Expression(Component, sympy.Symbol):
                 subs[a] = a.get_value()
         return self.expr.xreplace(subs)
 
-    # This is needed to make sympy's evalf machinery treat this class like a
-    # Symbol.
-    @property
-    def func(self):
-        return sympy.Symbol
-
     @property
     def is_local(self):
         return len(self.expr.atoms(Tag)) > 0
@@ -1682,10 +1675,10 @@ class Expression(Component, sympy.Symbol):
         return sympy.Function(self.name)(tag)
 
 
-class Tag(Component, sympy.Symbol):
+class Tag(Component, Symbol):
     """Tag for labelling MonomerPatterns and ComplexPatterns"""
     def __new__(cls, name, _export=True):
-        return super(sympy.Symbol, cls).__new__(cls, name)
+        return super(Tag, cls).__new__(cls, name)
 
     def __getnewargs__(self):
         return self.name, False
@@ -2228,7 +2221,7 @@ class ModelNotDefinedError(RuntimeError):
         )
 
 
-class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
+class ComponentSet(Set, Mapping, Sequence):
     """
     An add-and-read-only container for storing model Components.
 
@@ -2436,7 +2429,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
         # We require other to be a ComponentSet too so we know it will support
         # "in" efficiently.
         if not isinstance(other, ComponentSet):
-            return collections.Set.__and__(self, other)
+            return Set.__and__(self, other)
         return ComponentSet(value for value in self if value in other)
 
     def __rand__(self, other):
@@ -2460,7 +2453,7 @@ class ComponentSet(collections.Set, collections.Mapping, collections.Sequence):
             del m[c.name]
 
 
-class OdeView(collections.Sequence):
+class OdeView(Sequence):
     """Compatibility shim for the Model.odes property."""
 
     # This is necessarily coupled pretty tightly with Model. Note that we
@@ -2486,7 +2479,7 @@ class OdeView(collections.Sequence):
         return len(self.model.species)
 
 
-class InitialConditionsView(collections.Sequence):
+class InitialConditionsView(Sequence):
     """Compatibility shim for the Model.initial_conditions property."""
 
     def __init__(self, model):

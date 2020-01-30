@@ -295,6 +295,9 @@ class BngPrinter(StrPrinter):
 
         return if_stmt
 
+    def _print_Dummy(self, expr):
+        return expr.name
+
     def _print_Pow(self, expr, rational=False):
         return super(BngPrinter, self)._print_Pow(expr, rational)\
             .replace('**', '^')
