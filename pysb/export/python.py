@@ -124,16 +124,21 @@ class PythonExporter(Exporter):
             import distutils.errors
             """))
         output.write(pad(r"""
-            _use_inline = False
-            # try to inline a C statement to see if inline is functional
+            _use_cython = False
+            # try to inline a C statement to see if Cython is functional
             try:
-                import weave
-                weave.inline('int i;', force=1)
-                _use_inline = True
+                import Cython
             except ImportError:
-                pass
-            except distutils.errors.CompileError:
-                pass
+                Cython = None
+            if Cython:
+                from Cython.Compiler.Errors import CompileError
+                try:
+                    Cython.inline('x = 1', force=True, quiet=True)
+                    _use_cython = True
+                except (CompileError,
+                        distutils.errors.CompileError,
+                        ValueError):
+                    pass
 
             Parameter = collections.namedtuple('Parameter', 'name value')
             Observable = collections.namedtuple('Observable', 'name species coefficients')
@@ -152,9 +157,6 @@ class PythonExporter(Exporter):
             def __init__(self):
                 self.y = None
                 self.yobs = None
-                self.integrator = scipy.integrate.ode(self.ode_rhs)
-                self.integrator.set_integrator('vode', method='bdf',
-                                               with_jacobian=True)
                 self.y0 = numpy.empty(%(num_species)d)
                 self.ydot = numpy.empty(%(num_species)d)
                 self.sim_param_values = numpy.empty(%(num_params)d)
@@ -181,20 +183,32 @@ class PythonExporter(Exporter):
             output.write("self.initials[%d] = Initial(%d, %d)\n" % ic_data)
         output.write("\n")
 
-        output.write("    if _use_inline:\n")
+        output.write(" " * 8)
+        if 'math.' in code_eqs:
+            code_eqs = 'import math\n' + code_eqs
+        output.write('code_eqs = \'\'\'\n%s\n\'\'\'\n' %
+                     code_eqs.replace(';', ''))
+
+        output.write(" " * 8)
+        output.write("if _use_cython:\n")
         output.write(pad(r"""
-            def ode_rhs(self, t, y, p):
+            def ode_rhs(t, y, p):
                 ydot = self.ydot
-                weave.inline(r'''%s''', ['ydot', 't', 'y', 'p'])
+                Cython.inline(code_eqs, quiet=True)
                 return ydot
-            """, 8) % ('\n' + pad(code_eqs, 16) + ' ' * 16))
-        output.write("    else:\n")
+            """, 12))
+        output.write("        else:\n")
         output.write(pad(r"""
-            def ode_rhs(self, t, y, p):
+            def ode_rhs(t, y, p):
                 ydot = self.ydot
-                %s
+                exec(code_eqs)
                 return ydot
-            """, 8) % pad('\n' + code_eqs, 12).replace(';','').strip())
+            """, 12))
+        output.write(" " * 8)
+        output.write('self.integrator = scipy.integrate.ode(ode_rhs)\n')
+        output.write(" " * 8)
+        output.write("self.integrator.set_integrator('vode', method='bdf', "
+                     "with_jacobian=True)\n")
 
         # note the simulate method is fixed, i.e. it doesn't require any templating
         output.write(pad(r"""

@@ -56,7 +56,7 @@ MOCK_MODULES = [ 'pandas', 'pygraphviz', 'sympy',  'sympy.core', 'sympy.parsing'
                  'sympy.printing', 'sympy.printing.mathml',
                  'sympy.printing.lambdarepr', 'numpy',
                  'scipy', 'scipy.integrate', 'scipy.constants', 'scipy.sparse',
-                 'h5py', 'theano', 'theano.tensor', 'dateutil',
+                 'h5py', 'dateutil',
                  'dateutil.parser', 'networkx', 'networkx.algorithms',
                  'networkx.algorithms.isomorphism',
                  'networkx.algorithms.isomorphism.vf2userfunc',
