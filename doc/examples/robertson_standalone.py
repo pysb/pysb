@@ -14,16 +14,21 @@ import itertools
 import distutils.errors
 
 
-_use_inline = False
-# try to inline a C statement to see if inline is functional
+_use_cython = False
+# try to inline a C statement to see if Cython is functional
 try:
-    import weave
-    weave.inline('int i;', force=1)
-    _use_inline = True
+    import Cython
 except ImportError:
-    pass
-except distutils.errors.CompileError:
-    pass
+    Cython = None
+if Cython:
+    from Cython.Compiler.Errors import CompileError
+    try:
+        Cython.inline('x = 1', force=True, quiet=True)
+        _use_cython = True
+    except (CompileError,
+            distutils.errors.CompileError,
+            ValueError):
+        pass
 
 Parameter = collections.namedtuple('Parameter', 'name value')
 Observable = collections.namedtuple('Observable', 'name species coefficients')
@@ -31,20 +36,16 @@ Initial = collections.namedtuple('Initial', 'param_index species_index')
 
 
 class Model(object):
-    
     def __init__(self):
         self.y = None
         self.yobs = None
-        self.integrator = scipy.integrate.ode(self.ode_rhs)
-        self.integrator.set_integrator('vode', method='bdf',
-                                       with_jacobian=True)
         self.y0 = numpy.empty(3)
         self.ydot = numpy.empty(3)
         self.sim_param_values = numpy.empty(6)
         self.parameters = [None] * 6
         self.observables = [None] * 3
         self.initials = [None] * 3
-    
+
         self.parameters[0] = Parameter('k1', 0.040000000000000001)
         self.parameters[1] = Parameter('k2', 30000000)
         self.parameters[2] = Parameter('k3', 10000)
@@ -60,27 +61,28 @@ class Model(object):
         self.initials[1] = Initial(4, 1)
         self.initials[2] = Initial(5, 2)
 
-    if _use_inline:
-        
-        def ode_rhs(self, t, y, p):
-            ydot = self.ydot
-            weave.inline(r'''
-                ydot[0] = y[1]*y[2]*p[2] + (y[0]*p[0])*(-1);
-                ydot[1] = y[0]*p[0] + (pow(y[1], 2)*p[1])*(-1) + (y[1]*y[2]*p[2])*(-1);
-                ydot[2] = pow(y[1], 2)*p[1];
-                ''', ['ydot', 't', 'y', 'p'])
-            return ydot
-        
-    else:
-        
-        def ode_rhs(self, t, y, p):
-            ydot = self.ydot
-            ydot[0] = y[1]*y[2]*p[2] + (y[0]*p[0])*(-1)
-            ydot[1] = y[0]*p[0] + (pow(y[1], 2)*p[1])*(-1) + (y[1]*y[2]*p[2])*(-1)
-            ydot[2] = pow(y[1], 2)*p[1]
-            return ydot
-        
-    
+        code_eqs = '''
+ydot[0] = (y[0]*p[0])*(-1.0) + (y[1]*y[2]*p[2])*1.0
+ydot[1] = (y[0]*p[0])*1.0 + (pow(y[1], 2)*p[1])*(-1.0) + (y[1]*y[2]*p[2])*(-1.0)
+ydot[2] = (pow(y[1], 2)*p[1])*1.0
+'''
+        if _use_cython:
+
+            def ode_rhs(t, y, p):
+                ydot = self.ydot
+                Cython.inline(code_eqs, quiet=True)
+                return ydot
+
+        else:
+
+            def ode_rhs(t, y, p):
+                ydot = self.ydot
+                exec(code_eqs)
+                return ydot
+
+        self.integrator = scipy.integrate.ode(ode_rhs)
+        self.integrator.set_integrator('vode', method='bdf', with_jacobian=True)
+
     def simulate(self, tspan, param_values=None, view=False):
         if param_values is not None:
             # accept vector of parameter values as an argument
