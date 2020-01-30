@@ -9,10 +9,8 @@ import weakref
 import copy
 import itertools
 import sympy
-import numpy as np
 import scipy.sparse
 import networkx as nx
-
 
 from importlib import reload
 

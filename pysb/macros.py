@@ -33,10 +33,8 @@ pattern, which can be harder for the caller to debug.
 """
 
 
-import inspect
 from pysb import *
-import pysb.core
-from pysb.core import ComponentSet, as_reaction_pattern, as_complex_pattern, MonomerPattern, ComplexPattern
+from pysb.core import ComponentSet, as_complex_pattern, MonomerPattern, ComplexPattern
 import numbers
 import functools
 import itertools

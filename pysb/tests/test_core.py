@@ -3,7 +3,6 @@ from pysb.core import *
 from functools import partial
 from nose.tools import assert_raises
 import operator
-import unittest
 
 
 @with_model

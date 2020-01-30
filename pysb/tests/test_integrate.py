@@ -1,5 +1,5 @@
 from pysb.testing import *
-from pysb.integrate import odesolve, Solver
+from pysb.integrate import Solver
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.bng import run_ssa

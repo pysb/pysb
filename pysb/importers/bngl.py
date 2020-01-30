@@ -5,7 +5,6 @@ from pysb.bng import BngFileInterface, parse_bngl_expr
 import xml.etree.ElementTree
 import re
 import sympy
-from sympy.parsing.sympy_parser import parse_expr
 import warnings
 import pysb.logging
 import collections
