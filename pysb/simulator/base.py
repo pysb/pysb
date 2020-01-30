@@ -5,7 +5,8 @@ import sympy
 import collections
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
-                      Parameter, Expression, Model, ComponentSet
+                      Parameter, Expression, Model, ComponentSet, \
+                      _check_value_consistency
 from pysb.logging import get_logger, EXTENDED_DEBUG
 import pickle
 from pysb.export.json import JsonExporter
@@ -37,6 +38,13 @@ except ImportError:
 
 class SimulatorException(Exception):
     pass
+
+
+def _check_parameter_value(parameter, value):
+    _check_value_consistency(
+        value, is_integer=parameter.is_integer,
+        is_nonnegative=parameter.is_nonnegative
+    )
 
 
 class Simulator(object):
@@ -475,6 +483,10 @@ class Simulator(object):
                 if len(val) != n_sims:
                     raise ValueError("all arrays in params dictionary "
                                      "must be equal length")
+
+                for value in val:
+                    _check_parameter_value(self._model.parameters[key], value)
+
         elif isinstance(new_params, np.ndarray):
             # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
@@ -484,6 +496,12 @@ class Simulator(object):
             if new_params.shape[1] != len(self._model.parameters):
                 raise ValueError("new_params must be the same length as "
                                  "model.parameters")
+
+            for isim in range(n_sims):
+                for param, value in zip(self._model.parameters,
+                                        new_params[isim, :]):
+                    _check_parameter_value(param, value)
+
         else:
             raise ValueError(
                 'Implicit conversion of data type "{}" is not '
@@ -495,6 +513,7 @@ class Simulator(object):
             raise ValueError(
                 self.__class__.__name__ +
                 " does not support multiple parameter values at this time.")
+
         return new_params
 
     def _reset_run_overrides(self):
