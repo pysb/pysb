@@ -29,7 +29,7 @@ def main():
                             'futures; python_version == "2.7"'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
-                         'pandas', 'theano>=1.0.4', 'h5py', 'mock', 'cython',
+                         'pandas', 'h5py', 'mock', 'cython',
                          'python-libsbml', 'libroadrunner'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],

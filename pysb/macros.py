@@ -953,8 +953,8 @@ def drug_binding(drug, d_site, substrate, s_site, t_action, klist):
          Monomer('__t'),
          Parameter('__k_t', 1.0),
          Observable('t', __t()),
-         Expression('kf_expr_drug_substrate', (t > 10)*kf_drug_substrate),
-         Expression('kr_expr_drug_substrate', (t > 10)*kr_drug_substrate),
+         Expression('kf_expr_drug_substrate', kf_drug_substrate*(t > 10)),
+         Expression('kr_expr_drug_substrate', kr_drug_substrate*(t > 10)),
          ])
 
     """
