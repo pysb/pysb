@@ -194,20 +194,6 @@ class TestScipyOdeCompilerTests(TestScipySimulatorBase):
         assert simres.species.shape[0] == self.args['tspan'].shape[0]
         assert np.allclose(self.python_res.dataframe, simres.dataframe)
 
-    def test_theano(self):
-        sim = ScipyOdeSimulator(compiler='theano', **self.args)
-        simres = sim.run()
-        assert simres.species.shape[0] == self.args['tspan'].shape[0]
-        assert np.allclose(self.python_res.dataframe, simres.dataframe)
-
-    @unittest.skipIf(sys.version_info.major >= 3, 'weave not available for '
-                                                  'Python 3')
-    def test_weave(self):
-        sim = ScipyOdeSimulator(compiler='weave', **self.args)
-        simres = sim.run()
-        assert simres.species.shape[0] == self.args['tspan'].shape[0]
-        assert np.allclose(self.python_res.dataframe, simres.dataframe)
-
 
 class TestScipySimulatorSequential(TestScipySimulatorBase):
     def test_sequential_initials(self):
