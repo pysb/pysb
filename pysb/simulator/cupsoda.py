@@ -15,6 +15,7 @@ import shutil
 from pysb.pathfinder import get_path
 import sympy
 import collections
+from collections.abc import Iterable
 try:
     import pandas as pd
 except ImportError:
@@ -23,10 +24,6 @@ try:
     import pycuda.driver as cuda
 except ImportError:
     cuda = None
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
 
 
 class CupSodaSimulator(Simulator):
