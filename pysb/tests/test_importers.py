@@ -19,7 +19,8 @@ REDUCED_PRECISION = {
     'motor': 1e-8,
     'fceri_ji': 1e-4,
     'test_paramname': 1e-4,
-    'tlmr': 1e-4
+    'tlmr': 1e-4,
+    'Repressilator': 1e-11,
 }
 
 logger = get_logger(__name__)
