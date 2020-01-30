@@ -16,10 +16,7 @@ from pysb.logging import get_logger
 REDUCED_PRECISION = {
     'CaOscillate_Func': 1e-4,
     'michment': 1e-8,
-    'motor': 1e-8,
-    'fceri_ji': 1e-4,
-    'test_paramname': 1e-4,
-    'tlmr': 1e-4
+    'motor': 1e-8
 }
 
 logger = get_logger(__name__)
