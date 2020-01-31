@@ -5,8 +5,7 @@ import sympy
 import collections
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
-                      Parameter, Expression, Model, ComponentSet, \
-                      _check_value_consistency
+                      Parameter, Expression, Model, ComponentSet
 from pysb.logging import get_logger, EXTENDED_DEBUG
 import pickle
 from pysb.export.json import JsonExporter
@@ -40,11 +39,12 @@ class SimulatorException(Exception):
     pass
 
 
-def _check_parameter_value(parameter, value):
-    _check_value_consistency(
-        value, is_integer=parameter.is_integer,
-        is_nonnegative=parameter.is_nonnegative
-    )
+class InconsistentParameterError(SimulatorException, ValueError):
+    def __init__(self, parameter_name, value, reason):
+        super(InconsistentParameterError, self).__init__(
+            f'Value {value} that was passed for parameter {parameter_name} '
+            f'was inconsistent with that parameters assumption: {reason}'
+        )
 
 
 class Simulator(object):
@@ -485,7 +485,13 @@ class Simulator(object):
                                      "must be equal length")
 
                 for value in val:
-                    _check_parameter_value(self._model.parameters[key], value)
+                    try:
+                        self._model.parameters[key].check_value(value)
+                    except ValueError as e:
+                        raise InconsistentParameterError(
+                            key, value, str(e)
+                        )
+
 
         elif isinstance(new_params, np.ndarray):
             # if new_params is a 1D array, convert to a 2D array of length 1
@@ -500,7 +506,13 @@ class Simulator(object):
             for isim in range(n_sims):
                 for param, value in zip(self._model.parameters,
                                         new_params[isim, :]):
-                    _check_parameter_value(param, value)
+                    try:
+                        param.check_value(value)
+                    except ValueError as e:
+                        raise InconsistentParameterError(
+                            param.name, value, e.message
+                        )
+
 
         else:
             raise ValueError(
