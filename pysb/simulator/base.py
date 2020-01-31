@@ -1252,12 +1252,12 @@ class SimulationResult(object):
 
             trajectories = None
             try:
-                trajectories = dset['trajectories']
+                trajectories = dset['trajectories'][:]
             except KeyError:
                 pass
 
             try:
-                initials = np.array(dset['initials'])
+                initials = dset['initials'][:]
             except KeyError:
                 initials = pickle.loads(dset['initials_dict'][()])
 
@@ -1274,7 +1274,7 @@ class SimulationResult(object):
                 simulator=None,
                 model=model,
                 initials=initials,
-                param_values=np.array(dset['param_values']),
+                param_values=dset['param_values'][:],
                 tout=np.array(dset['tout']),
                 trajectories=trajectories,
                 observables_and_expressions=obs_and_exprs,
