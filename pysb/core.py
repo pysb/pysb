@@ -1275,7 +1275,7 @@ class Parameter(Component, Symbol):
     integer : bool, optional
         Sets the assumption whether this parameter takes integer values,
         which affects simplifications of expressions that involve this
-        parameter. By default, parameters are assumed to take integer values.
+        parameter. By default, parameters are not assumed to take integer values.
 
     Attributes
     ----------
