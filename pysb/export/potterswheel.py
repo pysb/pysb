@@ -99,11 +99,11 @@ class PottersWheelExporter(Exporter):
             ic_values[self.model.get_species_index(ic.pattern)] = ic.value.value
 
         # list of "dynamic variables"
-        pw_x = ["m = pwAddX(m, 's%d', %e);" % (i, ic_values[i])
+        pw_x = ["m = pwAddX(m, 's%d', %.17g);" % (i, ic_values[i])
                 for i in range(len(self.model.odes))]
 
         # parameters
-        pw_k = ["m = pwAddK(m, '%s', %e);" % (p.name, p.value)
+        pw_k = ["m = pwAddK(m, '%s', %.17g);" % (p.name, p.value)
                 for p in self.model.parameters]
 
         # equations (one for each dynamic variable)
