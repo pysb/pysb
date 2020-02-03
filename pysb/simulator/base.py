@@ -493,7 +493,6 @@ class Simulator(object):
                             key, value, str(e)
                         )
 
-
         elif isinstance(new_params, np.ndarray):
             # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
@@ -511,7 +510,7 @@ class Simulator(object):
                         param.check_value(value)
                     except ValueError as e:
                         raise InconsistentParameterError(
-                            param.name, value, e.message
+                            param.name, value, str(e)
                         )
 
 
