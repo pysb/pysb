@@ -30,7 +30,8 @@ Option 1: Install PySB natively on your computer
 
    Anaconda has a simple graphical installer which can be downloaded from
    https://www.continuum.io/downloads - select your operating system
-   and download the 64 bit version. Both Python 2.7 and 3.6 are supported. The
+   and download the 64 bit version. From PySB 2.0, we only support
+   Python 3.x (see the :ref:`faq` for specific version support). The
    default installer options are usually appropriate.
 
 2. **Install PySB**
