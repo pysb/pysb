@@ -39,4 +39,5 @@ if __name__ == "__main__":
     plt.tight_layout()
     out_name = 'earm_ssa_example.png'
     plt.savefig(out_name)
+    print("Example figure saved as {}".format(out_name))
     plt.close()
