@@ -8,4 +8,4 @@ from .kappa import KappaSimulator
 
 __all__ = ['BngSimulator', 'CupSodaSimulator', 'ScipyOdeSimulator',
            'StochKitSimulator', 'KappaSimulator',
-           'SimulationResult', 'PopulationMap', 'InconsistentParameterError']
+           'SimulationResult', 'PopulationMap']
