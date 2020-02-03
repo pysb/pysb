@@ -62,6 +62,7 @@ def run(n_sim=100, x_0=100):
     out_name = '{}.png'.format(savename)
     plt.savefig(out_name)
     plt.close()
+    print("Saved {}".format(out_name))
     return out_name
 
 
@@ -86,6 +87,7 @@ def vary_x():
         [imageio.imread(i) for i in images],
         **kargs
     )
+    print("Saved schloegl.gif")
 
 
 if __name__ == '__main__':

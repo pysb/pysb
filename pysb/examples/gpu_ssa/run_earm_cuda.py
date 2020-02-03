@@ -37,5 +37,6 @@ if __name__ == "__main__":
 
     plt.legend(loc=0)
     plt.tight_layout()
-    plt.savefig('example_ssa_earm_cuda.png', dpi=200, bbox_inches='tight')
-    plt.show()
+    out_name = 'earm_ssa_example.png'
+    plt.savefig(out_name)
+    plt.close()
