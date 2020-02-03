@@ -1237,10 +1237,10 @@ class SimulationResult(object):
             obs_and_exprs = None
 
             if 'observables' in dset.keys():
-                obs_and_exprs = list(dset['observables'])
+                obs_and_exprs = list(dset['observables'][:])
 
             if 'expressions' in dset.keys():
-                exprs = dset['expressions']
+                exprs = dset['expressions'][:]
                 if obs_and_exprs is None:
                     obs_and_exprs = list(exprs)
                 else:
@@ -1275,7 +1275,7 @@ class SimulationResult(object):
                 model=model,
                 initials=initials,
                 param_values=dset['param_values'][:],
-                tout=np.array(dset['tout']),
+                tout=dset['tout'][:],
                 trajectories=trajectories,
                 observables_and_expressions=obs_and_exprs,
                 squeeze=dset.attrs['squeeze'],
