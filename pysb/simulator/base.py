@@ -40,6 +40,14 @@ class SimulatorException(Exception):
     pass
 
 
+class InconsistentParameterError(SimulatorException, ValueError):
+    def __init__(self, parameter_name, value, reason):
+        super(InconsistentParameterError, self).__init__(
+            f'Value {value} that was passed for parameter {parameter_name} '
+            f'was inconsistent with that parameters assumption: {reason}'
+        )
+
+
 class Simulator(object):
     """An abstract base class for numerical simulation of models.
 
@@ -476,6 +484,15 @@ class Simulator(object):
                 if len(val) != n_sims:
                     raise ValueError("all arrays in params dictionary "
                                      "must be equal length")
+
+                for value in val:
+                    try:
+                        self._model.parameters[key].check_value(value)
+                    except ValueError as e:
+                        raise InconsistentParameterError(
+                            key, value, str(e)
+                        )
+
         elif isinstance(new_params, np.ndarray):
             # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
@@ -485,6 +502,18 @@ class Simulator(object):
             if new_params.shape[1] != len(self._model.parameters):
                 raise ValueError("new_params must be the same length as "
                                  "model.parameters")
+
+            for isim in range(n_sims):
+                for param, value in zip(self._model.parameters,
+                                        new_params[isim, :]):
+                    try:
+                        param.check_value(value)
+                    except ValueError as e:
+                        raise InconsistentParameterError(
+                            param.name, value, str(e)
+                        )
+
+
         else:
             raise ValueError(
                 'Implicit conversion of data type "{}" is not '
@@ -496,6 +525,7 @@ class Simulator(object):
             raise ValueError(
                 self.__class__.__name__ +
                 " does not support multiple parameter values at this time.")
+
         return new_params
 
     def _reset_run_overrides(self):
