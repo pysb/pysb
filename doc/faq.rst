@@ -1,3 +1,5 @@
+.. _faq:
+
 ==========================
 Frequently Asked Questions
 ==========================
@@ -11,10 +13,11 @@ Overflow <https://www.stackoverflow.com>`_.
 General
 =======
 
-* Do you support Python 3?
+* What Python versions does PySB support?
 
-    **Yes**. The current release of PySB supports Python 3.6 and
-    Python 2.7. Other Python 3.x releases are not explicitly tested.
+    The current release of PySB supports Python 3.6, 3.7, and
+    3.8. Earlier versions, including Python 2.7, are not supported
+    from PySB 2.0 onwards.
 
     In PySB version 1.5 and earlier, the `<>` operator was used for
     reversible rules. `<>` is pending deprecation from PySB, and does not
