@@ -574,3 +574,42 @@ def test_reverse_rate_non_reversible_rule():
     Parameter('kf', 1)
     Parameter('kr', 2)
     Rule('r1', None >> A(), kf, kr)
+
+
+@with_model
+def test_parameter_assumptions():
+    Parameter('k1', 0.0)
+    assert k1.is_real
+    assert k1.is_nonnegative
+    assert not k1.is_integer
+    Parameter('k2', 0.0, nonnegative=False)
+    assert not k2.is_nonnegative
+    Parameter('k3', 0.0, integer=True)
+    assert k3.is_integer
+
+
+@raises(ValueError)
+@with_model
+def test_parameter_noninteger_integer_init():
+    Parameter('k3', 0.3, integer=True)
+
+
+@raises(ValueError)
+@with_model
+def test_parameter_noninteger_integer_setter():
+    Parameter('k3', 1.0, integer=True)
+    k3.value = 0.4
+
+
+@raises(ValueError)
+@with_model
+def test_parameter_negative_nonnegative_init():
+    Parameter('k3', -0.2, nonnegative=True)
+
+
+@raises(ValueError)
+@with_model
+def test_parameter_negative_nonnegative_setter():
+    Parameter('k3', 0.0, nonnegative=True)
+    k3.value = -0.2
+

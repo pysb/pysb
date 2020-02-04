@@ -1,4 +1,5 @@
-from .base import SimulatorException, SimulationResult
+from .base import SimulatorException, SimulationResult, \
+    InconsistentParameterError
 from .scipyode import ScipyOdeSimulator
 from .cupsoda import CupSodaSimulator
 from .stochkit import StochKitSimulator
