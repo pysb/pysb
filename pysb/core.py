@@ -1861,6 +1861,7 @@ class Model(object):
                 self.add_component(component)
                 component._do_export()
             self.initials = model_copy.initials
+            self.annotations = model_copy.annotations
 
     def __getstate__(self):
         state = self.__dict__.copy()
