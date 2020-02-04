@@ -3,7 +3,7 @@ import sys
 import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
-from pysb.simulator import ScipyOdeSimulator
+from pysb.simulator import ScipyOdeSimulator, InconsistentParameterError
 from pysb.examples import robertson, earm_1_0, tyson_oscillator
 import unittest
 import pandas as pd
@@ -311,6 +311,18 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
     def test_run_params_different_length_to_base(self):
         param_values = [[55, 65, 75, 0, 0, 1],
                         [90, 100, 110, 5, 6, 7]]
+        self.sim.param_values = param_values
+        self.sim.run(param_values=param_values[0])
+
+    @raises(InconsistentParameterError)
+    def test_run_params_inconsistent_parameter_list(self):
+        param_values = [55, 65, 75, 0, -3]
+        self.sim.param_values = param_values
+        self.sim.run(param_values=param_values[0])
+
+    @raises(InconsistentParameterError)
+    def test_run_params_inconsistent_parameter_dict(self):
+        param_values = {'A_init': [0, -4]}
         self.sim.param_values = param_values
         self.sim.run(param_values=param_values[0])
 
