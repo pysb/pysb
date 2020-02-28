@@ -145,8 +145,8 @@ class SelfExporter(object):
 
 
 class Symbol(sympy.Dummy):
-    def __new__(cls, name):
-        return super(Symbol, cls).__new__(cls, name)
+    def __new__(cls, name, real=True, **kwargs):
+        return super(Symbol, cls).__new__(cls, name, real=real, **kwargs)
 
     def _lambdacode(self, printer, **kwargs):
         """ custom printer method that ensures that the dummyid is not
@@ -1258,20 +1258,32 @@ class Parameter(Component, Symbol):
         The numerical value of the parameter. Defaults to 0.0 if not specified.
         The provided value is converted to a float before being stored, so any
         value that cannot be coerced to a float will trigger an exception.
+    nonnegative : bool, optional
+        Sets the assumption whether this parameter is nonnegative (>=0).
+        Affects simplifications of expressions that involve this parameter.
+        By default, parameters are assumed to be non-negative.
+    integer : bool, optional
+        Sets the assumption whether this parameter takes integer values,
+        which affects simplifications of expressions that involve this
+        parameter. By default, parameters are not assumed to take integer values.
 
     Attributes
     ----------
-    Identical to Parameters (see above).
+    value (see Parameters above).
 
     """
 
-    def __new__(cls, name, value=0.0, _export=True):
-        return super(Parameter, cls).__new__(cls, name)
+    def __new__(cls, name, value=0.0, nonnegative=True, integer=False,
+                _export=True):
+
+        return super(Parameter, cls).__new__(cls, name, real=True,
+                                             nonnegative=nonnegative,
+                                             integer=integer)
 
     def __getnewargs__(self):
         return (self.name, self.value, False)
 
-    def __init__(self, name, value=0.0, _export=True):
+    def __init__(self, name, value=0.0, _export=True, **kwargs):
         self.value = value
         Component.__init__(self, name, _export)
 
@@ -1281,17 +1293,27 @@ class Parameter(Component, Symbol):
 
     @value.setter
     def value(self, new_value):
+        self.check_value(new_value)
         self._value = float(new_value)
     
     def get_value(self):
         return self.value
 
+    def check_value(self, value):
+        if self.is_integer:
+            if not float(value).is_integer():
+                raise ValueError('Cannot assign an non-integer value to a '
+                                 'parameter assumed to be an integer')
+        if self.is_nonnegative:
+            if float(value) < 0:
+                raise ValueError('Cannot assign a negative value to a '
+                                 'parameter assumed to be nonnegative')
+
     def __repr__(self):
-        return  '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
+        return '%s(%s, %s)' % (self.__class__.__name__, repr(self.name), repr(self.value))
 
     def __str__(self):
-        return  repr(self)
-
+        return repr(self)
 
 
 class Compartment(Component):
