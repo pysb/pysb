@@ -77,7 +77,7 @@ class SSABase(Simulator):
                               rate)
 
             # replace x**2 with (x-1)*x
-            pattern = "(__s\d+)\*\*(\d+)"
+            pattern = "(_{2}s\d+)\*\*(\d+)"
             matches = re.findall(pattern, rate)
             for m in matches:
                 repl = m[0]
@@ -85,7 +85,7 @@ class SSABase(Simulator):
                     repl += "*(%s-%d)" % (m[0], i)
                 rate = re.sub(pattern, repl, rate)
             # replace species string with matrix index (`_si` with `y[i]`)
-            rate = re.sub(r'_*s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))),
+            rate = re.sub(r'_{2}s(\d+)', lambda m: 'y[%s]' % (int(m.group(1))),
                           rate)
             # replace param names with vector notation
             for q, prm in enumerate(params_names):
