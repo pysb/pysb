@@ -333,3 +333,4 @@ def test_parse_bngl_expression_and_or_equals():
 
 def test_bng_boolean_multiply_number():
     assert parse_bngl_expr('(2 > 1) * 4') == 4
+    assert parse_bngl_expr('4 * (2 > 1)') == 4

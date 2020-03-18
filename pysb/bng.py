@@ -18,7 +18,7 @@ from collections.abc import Sequence
 import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
-from sympy.logic.boolalg import BooleanTrue, BooleanFalse
+from sympy.logic.boolalg import BooleanTrue, BooleanFalse, BooleanAtom
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -944,13 +944,17 @@ def parse_bngl_expr(text, *args, **kwargs):
         + (sympy_parser.convert_equals_signs, _convert_tokens)
     )
     # BNG treats True and 1, False as 0 within expressions. Patch this...
-    orig_true, orig_false = BooleanTrue.__mul__, BooleanFalse.__mul__
     BooleanTrue.__mul__ = lambda self, other: 1 * other
     BooleanFalse.__mul__ = lambda self, other: 0 * other
+    BooleanTrue.__rmul__ = BooleanTrue.__mul__
+    BooleanFalse.__rmul__ = BooleanTrue.__mul__
     try:
         expr = sympy_parser.parse_expr(text, *args, transformations=trans, **kwargs)
     finally:
-        BooleanTrue.__mul__, BooleanFalse.__mul__ = orig_true, orig_false
+        BooleanTrue.__mul__ = BooleanAtom._noop
+        BooleanFalse.__mul__ = BooleanAtom._noop
+        BooleanTrue.__rmul__ = BooleanAtom._noop
+        BooleanFalse.__rmul__ = BooleanAtom._noop
     # Transforming 'if' to Piecewise requires subexpression rearrangement, so we
     # use sympy's replace functionality rather than attempt it using text
     # replacements above.
