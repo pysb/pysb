@@ -1682,8 +1682,12 @@ class Expression(Component, Symbol):
         return sorted(self.expr.atoms(Tag), key=lambda tag: tag.name)
 
     def __repr__(self):
+        if isinstance(self.expr, (Parameter, Expression)):
+            expr_repr = self.expr.name
+        else:
+            expr_repr = repr(self.expr)
         ret = '%s(%s, %s)' % (self.__class__.__name__, repr(self.name),
-                              repr(self.expr))
+                              expr_repr)
         return ret
 
     def __str__(self):
