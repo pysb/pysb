@@ -4,7 +4,7 @@ import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator import ScipyOdeSimulator, InconsistentParameterError
-from pysb.examples import robertson, earm_1_0, tyson_oscillator
+from pysb.examples import robertson, earm_1_0, tyson_oscillator, localfunc
 import unittest
 import pandas as pd
 
@@ -507,3 +507,8 @@ def test_multiprocessing_lambdify():
         model, tspan=tspan, compiler='python',
         use_analytic_jacobian=True
     ).run(param_values=[pars, pars], num_processors=2)
+
+
+def test_lambdify_localfunc():
+    model = localfunc.model
+    ScipyOdeSimulator(model, tspan=range(100), compiler='python').run()
