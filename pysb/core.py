@@ -649,6 +649,9 @@ class MonomerPattern(object):
     def __or__(self, other):
         return build_rule_expression(self, other, True)
 
+    def __ror__(self, other):
+        return build_rule_expression(other, self, True)
+
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
@@ -1056,6 +1059,9 @@ class ComplexPattern(object):
 
     def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ror__(self, other):
+        return build_rule_expression(other, self, True)
 
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
