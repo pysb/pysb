@@ -18,7 +18,7 @@ import logging
 import itertools
 import contextlib
 import importlib
-from concurrent.futures import ProcessPoolExecutor, Executor, Future
+from concurrent.futures import ProcessPoolExecutor, Executor, Future, TimeoutError
 
 
 class ScipyOdeSimulator(Simulator):
@@ -350,7 +350,7 @@ class ScipyOdeSimulator(Simulator):
         return eqns
 
     def run(self, tspan=None, initials=None, param_values=None,
-            num_processors=1):
+            num_processors=1, timeout=None):
         """
         Run a simulation and returns the result (trajectories)
 
@@ -370,6 +370,8 @@ class ScipyOdeSimulator(Simulator):
             (e.g. the number of CPU cores available) for parallel execution of
             simulations. This is only useful when simulating with more than one
             set of initial conditions and/or parameters.
+        timeout : int or float
+            Time in seconds to wait for the simulation to finish
 
         Returns
         -------
@@ -399,10 +401,15 @@ class ScipyOdeSimulator(Simulator):
 
             results = [executor.submit(sim_partial, *args)
                        for args in zip(self.initials, self.param_values)]
-            try:
-                trajectories = [r.result() for r in results]
-            finally:
-                for r in results:
+            trajectories = []
+            for r in results:
+                try:
+                    trajectories.append(r.result(timeout=timeout))
+                except TimeoutError as e:
+                    nan_array = np.empty((len(self.tspan), num_species))
+                    nan_array[:] = np.nan
+                    trajectories.append(nan_array)
+                finally:
                     r.cancel()
 
         tout = np.array([self.tspan] * n_sims)
