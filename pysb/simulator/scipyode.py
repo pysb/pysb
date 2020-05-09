@@ -402,10 +402,11 @@ class ScipyOdeSimulator(Simulator):
             results = [executor.submit(sim_partial, *args)
                        for args in zip(self.initials, self.param_values)]
             trajectories = []
-            for r in results:
+            for sim_idx, r in enumerate(results):
                 try:
                     trajectories.append(r.result(timeout=timeout))
-                except TimeoutError as e:
+                except TimeoutError:
+                    self._logger.warning('Simulation %d has timeout' % sim_idx)
                     nan_array = np.empty((len(self.tspan), num_species))
                     nan_array[:] = np.nan
                     trajectories.append(nan_array)

@@ -175,6 +175,14 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
     def test_result_dataframe(self):
         df = self.sim.run().dataframe
 
+    def test_simulation_timeout(self):
+        """Test simulation with timeout."""
+        t = np.linspace(0, 20000, 101)
+        # Run with or without inline
+        sim = ScipyOdeSimulator(earm_1_0.model, tspan=t)
+        simres = sim.run(timeout=0.1, num_processors=2).species
+        assert np.all(np.isnan(simres))
+
 
 class TestScipyOdeCompilerTests(TestScipySimulatorBase):
     """Test vode and analytic jacobian with different compiler backends"""
