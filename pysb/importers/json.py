@@ -4,6 +4,7 @@ from pysb.builder import Builder
 from pysb.core import RuleExpression, ReactionPattern, ComplexPattern, \
     MonomerPattern, MultiState, ANY, WILD, Parameter, Expression
 from pysb.annotation import Annotation
+from pysb.pattern import SpeciesPatternMatcher
 import sympy
 import collections
 from collections.abc import Mapping
@@ -233,6 +234,21 @@ class PySBJSONDecoder(JSONDecoder):
         for component_type, decoder in decoders.items():
             for component in res.get(component_type, []):
                 decoder(component)
+
+        if self.b.model.reactions:
+            # We have network, need to regenerate Observable species and coeffs
+            for obs in self.b.model.observables:
+                if obs.match in ('molecules', 'species'):
+                    obs_matches = SpeciesPatternMatcher(self.b.model).match(
+                        obs.reaction_pattern, index=True, counts=True)
+                    sp, vals = zip(*sorted(obs_matches.items()))
+                    obs.species = list(sp)
+                    if obs.match == 'molecules':
+                        obs.coefficients = list(vals)
+                    else:
+                        obs.coefficients = [1] * len(obs_matches.values())
+                else:
+                    raise ValueError(f'Unknown obs.match value: {obs.match}')
 
         return self.b.model
 
