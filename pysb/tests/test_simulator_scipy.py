@@ -3,8 +3,8 @@ import sys
 import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
-from pysb.simulator import ScipyOdeSimulator
-from pysb.examples import robertson, earm_1_0
+from pysb.simulator import ScipyOdeSimulator, InconsistentParameterError
+from pysb.examples import robertson, earm_1_0, tyson_oscillator, localfunc
 import unittest
 import pandas as pd
 
@@ -194,20 +194,6 @@ class TestScipyOdeCompilerTests(TestScipySimulatorBase):
         assert simres.species.shape[0] == self.args['tspan'].shape[0]
         assert np.allclose(self.python_res.dataframe, simres.dataframe)
 
-    def test_theano(self):
-        sim = ScipyOdeSimulator(compiler='theano', **self.args)
-        simres = sim.run()
-        assert simres.species.shape[0] == self.args['tspan'].shape[0]
-        assert np.allclose(self.python_res.dataframe, simres.dataframe)
-
-    @unittest.skipIf(sys.version_info.major >= 3, 'weave not available for '
-                                                  'Python 3')
-    def test_weave(self):
-        sim = ScipyOdeSimulator(compiler='weave', **self.args)
-        simres = sim.run()
-        assert simres.species.shape[0] == self.args['tspan'].shape[0]
-        assert np.allclose(self.python_res.dataframe, simres.dataframe)
-
 
 class TestScipySimulatorSequential(TestScipySimulatorBase):
     def test_sequential_initials(self):
@@ -325,6 +311,18 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
     def test_run_params_different_length_to_base(self):
         param_values = [[55, 65, 75, 0, 0, 1],
                         [90, 100, 110, 5, 6, 7]]
+        self.sim.param_values = param_values
+        self.sim.run(param_values=param_values[0])
+
+    @raises(InconsistentParameterError)
+    def test_run_params_inconsistent_parameter_list(self):
+        param_values = [55, 65, 75, 0, -3]
+        self.sim.param_values = param_values
+        self.sim.run(param_values=param_values[0])
+
+    @raises(InconsistentParameterError)
+    def test_run_params_inconsistent_parameter_dict(self):
+        param_values = {'A_init': [0, -4]}
         self.sim.param_values = param_values
         self.sim.run(param_values=param_values[0])
 
@@ -500,3 +498,17 @@ if sys.version_info[0] < 3:
         sim = ScipyOdeSimulator(rob_copy)
         simres = sim.run(tspan=t)
 
+
+def test_multiprocessing_lambdify():
+    model = tyson_oscillator.model
+    pars = [p.value for p in model.parameters]
+    tspan = np.linspace(0, 100, 100)
+    ScipyOdeSimulator(
+        model, tspan=tspan, compiler='python',
+        use_analytic_jacobian=True
+    ).run(param_values=[pars, pars], num_processors=2)
+
+
+def test_lambdify_localfunc():
+    model = localfunc.model
+    ScipyOdeSimulator(model, tspan=range(100), compiler='python').run()
