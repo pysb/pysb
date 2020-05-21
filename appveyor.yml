@@ -2,19 +2,14 @@ build: false
 
 environment:
   matrix:
-    - PYTHON_VERSION: 2.7
-      MINICONDA: C:\Miniconda-x64
     - PYTHON_VERSION: 3.6
       MINICONDA: C:\Miniconda36-x64
-
+    - PYTHON_VERSION: 3.7
+      MINICONDA: C:\Miniconda37-x64
 init:
   - "ECHO %PYTHON_VERSION% %MINICONDA%"
 
 install:
-  # https://stackoverflow.com/questions/13596407/errors-while-building-installing-c-module-for-python-2-7
-  - if "%PYTHON_VERSION%"=="2.7" (copy "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvars64.bat" "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvarsamd64.bat")
-  - if "%PYTHON_VERSION%"=="2.7" (copy "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvars64.bat" "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\amd64\vcvarsamd64.bat")
-
   # Issues have been encountered with installing numpy and scipy on
   # AppVeyor e.g.
   # http://tjelvarolsson.com/blog/how-to-continuously-test-your-python-code-on-windows-using-appveyor/
@@ -30,8 +25,7 @@ install:
 
   # Majority of dependencies can be installed with Anaconda
   - conda install -c conda-forge "numpy>=1.14" scipy matplotlib sympy
-    networkx nose h5py pandas theano mkl pydot mock cython
-  - if "%PYTHON_VERSION%"=="2.7" (conda install -c conda-forge weave)
+    networkx nose h5py pandas mkl pydot mock cython
 
   - conda install -c SBMLTeam python-libsbml
 

@@ -98,7 +98,8 @@ class PySBJSONEncoder(json.JSONEncoder):
     def encode_expression(cls, expr):
         return {
             'name': expr.name,
-            'expr': str(expr.expr)
+            'expr': expr.expr.name if isinstance(
+                expr.expr, (Parameter, Expression)) else str(expr.expr)
         }
 
     @classmethod

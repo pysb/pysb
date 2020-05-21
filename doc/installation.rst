@@ -30,7 +30,8 @@ Option 1: Install PySB natively on your computer
 
    Anaconda has a simple graphical installer which can be downloaded from
    https://www.continuum.io/downloads - select your operating system
-   and download the 64 bit version. Both Python 2.7 and 3.6 are supported. The
+   and download the 64 bit version. From PySB 2.0, we only support
+   Python 3.x (see the :ref:`faq` for specific version support). The
    default installer options are usually appropriate.
 
 2. **Install PySB**
@@ -71,18 +72,13 @@ Recommended additional software
 The following software is not required for the basic operation of PySB, but
 provides extra capabilities and features when installed.
 
-* `cython`_ or `weave`_
+* `cython`_
   Cython is a package for compiling Python code into C code on the fly. It
   is used by :class:`pysb.simulator.ScipyOdeSimulator` to greatly improve the
   speed of ODE integration. PySB will detect and use Cython automatically,
   if available. To install with Anaconda, type
   :command:`conda install cython`.
   With pip, type :command:`pip install cython`.
-
-  Weave performs the same job as Cython, and is slightly faster in some
-  circumstances. It is only available on Python 2. To install with Anaconda,
-  type :command:`conda install -c conda-forge weave`. With pip, type
-  :command:`pip install weave`.
 
 * `matplotlib`_
 
@@ -209,4 +205,3 @@ https://hub.docker.com/r/jupyter/scipy-notebook/
 .. _BioNetGen: http://www.bionetgen.org/
 .. _Perl: http://www.perl.org/
 .. _Cython: http://cython.org/
-.. _weave: https://pypi.python.org/pypi/weave

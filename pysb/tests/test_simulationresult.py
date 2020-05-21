@@ -11,6 +11,7 @@ import warnings
 from pysb.pattern import SpeciesPatternMatcher
 import collections
 import copy
+import io
 import pandas as pd
 
 
@@ -188,6 +189,18 @@ def test_save_load():
     _check_resultsets_equal(simres, simres_load)
     _check_resultsets_equal(nfres1, nfres1_load)
     _check_resultsets_equal(nfres2, nfres2_load)
+
+
+def test_save_load_observables_expressions():
+    buff = io.BytesIO()
+    tspan = np.linspace(0, 100, 100)
+    sim = ScipyOdeSimulator(tyson_oscillator.model, tspan).run()
+    sim.save(buff, include_obs_exprs=True)
+
+    sim2 = SimulationResult.load(buff)
+    assert len(sim2.observables) == len(tspan)
+    # Tyson oscillator doesn't have expressions
+    assert_raises(ValueError, lambda: sim2.expressions)
 
 
 def _check_resultsets_equal(res1, res2):
