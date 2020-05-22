@@ -4,7 +4,7 @@ from pysb.examples import robertson, bax_pore, bax_pore_sequential, \
 from pysb.bng import generate_equations
 from nose.tools import assert_raises
 from pysb import as_complex_pattern, as_reaction_pattern, ANY, WILD, \
-    Monomer
+    Monomer, Model, ComplexPattern, Compartment
 import collections
 
 
@@ -69,3 +69,76 @@ def test_all_species_generated():
     for model in [bax_pore, earm_1_3, bax_pore_sequential, kinase_cascade,
                   bngwiki_egfr_simple]:
         yield (check_all_species_generated, model.model)
+
+
+def test_match_exact_canonicalization():
+    Model()
+    volume = Compartment('volume', dimension=3)
+    surface = Compartment('surface', dimension=2, parent=volume)
+    A = Monomer('A', ['a'])
+    B = Monomer('B', ['a', 'b'], {'b': ['a', 'b']})
+    # sorting sites
+    assert match_complex_pattern(
+        as_complex_pattern(B(a=None, b='a') ** surface),
+        as_complex_pattern(B(b='a', a=None) ** surface),
+        exact=True
+    )
+    assert not match_complex_pattern(
+        as_complex_pattern(B(a=None, b='a') ** surface),
+        as_complex_pattern(B(b='b', a=None) ** surface),
+        exact=True
+    )
+    # canonicalization cpt + sorting mps + sorting sites
+    assert match_complex_pattern(
+        (A(a=1) ** volume % B(a=1, b='a')) ** surface,
+        B(b='a', a=2) ** surface % A(a=2) ** volume,
+        exact=True
+    )
+    # canonicalization cpt
+    assert match_complex_pattern(
+        (A(a=1) ** volume % B(a=1, b='a') ** surface) ** surface,
+        A(a=2) ** volume % B(a=2, b='a') ** surface,
+        exact=True
+    )
+    # canonicalization cpt
+    assert not match_complex_pattern(
+        (A(a=1) % B(a=1, b='a')) ** surface,
+        A(a=2) ** volume % B(a=2, b='a') ** surface,
+        exact=True
+    )
+    # canonicalization cpt
+    assert not match_complex_pattern(
+        (A(a=1) % B(a=1, b='a')) ** volume,
+        A(a=2) ** volume % B(a=2, b='a') ** surface,
+        exact=True
+    )
+    # canonicalization cpt
+    assert match_complex_pattern(
+        (A(a=1) % B(a=1, b='a')) ** surface,
+        A(a=2) ** surface % B(a=2, b='a') ** surface,
+        exact=True
+    )
+    # canonicalization cpt
+    assert match_complex_pattern(
+        (A(a=1) % B(a=1, b='a')) ** volume,
+        A(a=2) ** volume % B(a=2, b='a') ** volume,
+        exact=True
+    )
+
+    # canonicalization cpt + sorting mps + bond_and_state
+    assert match_complex_pattern(
+        ((B(a=None, b=('b', 3)) % A(a=1) ** volume) %
+         B(a=1, b=('a', 3))) ** surface,
+        B(b=('a', 5), a=2) ** surface % B(b=('b', 5), a=None) ** surface %
+        A(a=2) ** volume,
+        exact=True
+    )
+    # sorting mps + bond_and_state
+    assert match_complex_pattern(
+        (B(a=1, b=('a', 3)) ** volume % B(a=1, b=('a', 5)) ** volume %
+         B(a=2, b=('a', 3)) ** surface % B(a=2, b=('a', 5)) ** surface),
+        (B(a=2, b=('a', 5)) ** volume % B(a=2, b=('a', 3)) ** volume %
+         B(a=1, b=('a', 5)) ** surface % B(a=1, b=('a', 3)) ** surface),
+        exact=True
+    )
+

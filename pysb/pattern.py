@@ -305,7 +305,7 @@ def match_complex_pattern(pattern, candidate, exact=False, count=False):
         if not candidate.is_concrete():
             raise ValueError('Candidate must be concrete for '
                              'exact matching: {}'.format(candidate))
-        match = pattern.__repr__() == candidate.__repr__()
+        match = pattern.canonical_form() == candidate.canonical_form()
         return int(match) if count else match
 
     # Compare the monomer counts in the patterns so we can fail fast

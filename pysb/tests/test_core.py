@@ -612,4 +612,3 @@ def test_parameter_negative_nonnegative_init():
 def test_parameter_negative_nonnegative_setter():
     Parameter('k3', 0.0, nonnegative=True)
     k3.value = -0.2
-

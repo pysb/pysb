@@ -11,7 +11,6 @@ import itertools
 import sympy
 import scipy.sparse
 import networkx as nx
-from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence, Set
 
 try:
@@ -466,6 +465,71 @@ class MultiState(object):
             repr(s) for s in self))
 
 
+def site_condition_from_node(graph, monomer, site_node, bonds):
+    """
+    Convert MonomerPattern to networkx graph, caching the result
+
+    Parameters
+    ----------
+    graph: nx.Graph
+        Full graph potentially including the parent ComplexPattern
+    monomer: Monomer
+        Monomer for which this node defines a site_condition
+    site_node: str
+        Node which defines the site condition
+    bonds:
+        List that keeps track of identified bonds in the parent
+        ComplexPattern (if applicable)
+    """
+    states = []
+    site = graph.nodes[site_node]['id']
+    mp_id = graph.nodes[site_node]['mp_id']
+    for condition_node in graph.neighbors(site_node):
+        state_candidate = graph.nodes[condition_node]['id']
+        candiditate_mp_id = graph.nodes[condition_node]['mp_id']
+        if state_candidate == 'NoBond':
+            continue
+        elif isinstance(state_candidate, Monomer):
+            continue
+        # need to make sure that site is in same monomer pattern!
+        elif site in monomer.site_states and state_candidate in \
+                monomer.site_states[site] and mp_id == candiditate_mp_id:
+            states.append(state_candidate)
+        elif isinstance(state_candidate, AnyBondTester) and \
+                not isinstance(state_candidate, int):
+            states.append(ANY)
+        else:
+            if site_node in bonds:
+                # existing bond
+                states.append(bonds.index(site_node))
+            else:
+                # add new bond
+                states.append(len(bonds))
+                bonds.append(condition_node)
+
+    if len(states) == 0:
+        return None
+    elif len(states) == 1:
+        return states[0]
+    elif len(states) == 2 and any(not isinstance(state, int)
+                                  for state in states):
+        # sort as (state, bond)
+        if isinstance(states[1], int):
+            return tuple(states)
+        else:
+            return states[1], states[0]
+    else:
+        return sorted(states)
+
+
+NO_BOND = 'NoBond'
+
+
+class AnyBondTester(object):
+    def __eq__(self, other):
+        return not isinstance(other, Component) and other != NO_BOND
+
+
 class MonomerPattern(object):
 
     """
@@ -528,12 +592,7 @@ class MonomerPattern(object):
             raise ValueError("compartment is not a Compartment object")
 
         self.monomer = monomer
-        self.site_conditions = OrderedDict(
-            (k, tuple(sorted(v, key=str)))
-            if isinstance(v, MultiState)
-            else (k, v)
-            for k, v in sorted(site_conditions.items(), key=lambda x: x[0])
-        )
+        self.site_conditions = site_conditions
         self.compartment = compartment
         self._graph = None
         self._tag = None
@@ -595,6 +654,32 @@ class MonomerPattern(object):
             return False
 
         return True
+
+    @classmethod
+    def _from_graph(cls, graph, monomer_node, bonds):
+        """
+        Convert MonomerPattern to networkx graph, caching the result
+
+        Parameters
+        ----------
+        graph: nx.Graph
+            Full graph potentially including the parent ComplexPattern
+        monomer_node: str
+            The node corresponding to the Monomer that is to be reconstructed
+        bonds:
+            List that keeps track of identified bounds in the parent
+            ComplexPattern (if applicable)
+        """
+        monomer = graph.nodes[monomer_node]['id']
+        compartment = None
+        site_conditions = dict()
+        for site in graph.neighbors(monomer_node):
+            if isinstance(graph.nodes[site]['id'], Compartment):
+                compartment = graph.nodes[site]['id']
+            else:
+                site_conditions[graph.nodes[site]['id']] = \
+                    site_condition_from_node(graph, monomer, site, bonds)
+        return cls(monomer, site_conditions, compartment)
 
     def _as_graph(self):
         """
@@ -701,7 +786,6 @@ class MonomerPattern(object):
 
 
 class ComplexPattern(object):
-
     """
     A bound set of MonomerPatterns, i.e. a pattern to match a complex.
 
@@ -735,12 +819,12 @@ class ComplexPattern(object):
                 monomer_patterns[0].compartment == compartment:
             compartment = None
 
-        self.monomer_patterns = sorted(monomer_patterns,
-                                       key=lambda x: x.__repr__())
+        self.monomer_patterns = monomer_patterns
         self.compartment = compartment
         self.match_once = match_once
         self._graph = None
         self._tag = None
+        self._canonical_form = None
 
     def is_concrete(self):
         """
@@ -756,6 +840,76 @@ class ComplexPattern(object):
         compartment_ok = self.compartment is not None and \
             all(mp.is_site_concrete() for mp in self.monomer_patterns)
         return mp_concrete_ok or compartment_ok
+
+    def species_volume(self):
+        """
+        Computes the compartment of this ComplexPattern according to the cBNGL
+        definition. Only works if this is a species, i.e. the pattern is
+        concrete.
+        """
+        if not self.is_concrete():
+            raise ValueError('Pattern must be concrete to compute species '
+                             'volume.')
+
+        compartments = {
+            mp.compartment for mp in self.monomer_patterns
+        }
+        # if monomer patterns span multiple compartments, cBNGL defines
+        # the species compartment as the surface compartment
+        compartment = self.compartment
+        if compartment is None:
+            compartment = next((
+                comp for comp in compartments
+                if len(compartments) == 1
+                # if more than one, search for surface compartment
+                or (comp is not None and comp.dimension == 2)
+            ), next((
+                comp for comp in compartments
+                if comp is not None
+                # if no surface compartment pick the one that is not None
+            ), None))
+
+        return compartment
+
+    def canonical_form(self):
+        """
+        Computes the canonical representation of this pattern, only works if
+        the pattern is concrete.
+        """
+        if not self.is_concrete():
+            raise ValueError('Pattern must be concrete to compute canonical'
+                             'representation.')
+
+        if self._canonical_form is None:
+            mps = copy.deepcopy(self.monomer_patterns)
+            # string based sorting ignoring numeric characters, this prevents
+            # bond-indexing from affecting ordering
+            canonical_cp = ComplexPattern(sorted(
+                mps, key=lambda x: re.sub(r'[\d]+', r'0', str(x))
+            ), self.compartment, self.match_once)
+            # roundtrip through graph generation to canonicalize bond numbers
+            self._canonical_form = str(ComplexPattern._from_graph(
+                canonical_cp._as_graph()
+            ))
+
+        return self._canonical_form
+
+    @classmethod
+    def _from_graph(cls, graph):
+        bonds = list()
+        mps = []
+        compartment = None
+        for n, d in graph.nodes(data=True):
+            if isinstance(d['id'], Monomer):
+                mps.append(MonomerPattern._from_graph(graph, n, bonds))
+            if isinstance(d['id'], Compartment):
+                if compartment is None:
+                    compartment = d['id']
+                # only overwrite if surface compartment
+                elif d['id'].dimension == 2:
+                    compartment = d['id']
+
+        return cls(mps, compartment)
 
     def _as_graph(self):
         """
@@ -809,18 +963,12 @@ class ComplexPattern(object):
         if self._graph is not None:
             return self._graph
 
-        NO_BOND = 'NoBond'
-
         def autoinc():
             i = 0
             while True:
                 yield i
                 i += 1
         node_count = autoinc()
-
-        class AnyBondTester(object):
-            def __eq__(self, other):
-                return not isinstance(other, Component) and other != NO_BOND
 
         any_bond_tester = AnyBondTester()
 
@@ -832,91 +980,72 @@ class ComplexPattern(object):
             try:
                 return _cpt_nodes[cpt]
             except KeyError:
-                cpt_node_id = next(node_count)
+                cpt_node_id = f'compartment_{cpt.name}'
                 _cpt_nodes[cpt] = cpt_node_id
-                g.add_node(cpt_node_id, id=cpt)
+                g.add_node(cpt_node_id, id=cpt, mp_id=None)
                 return cpt_node_id
 
-        species_cpt_node_id = None
-        if self.compartment:
-            species_cpt_node_id = add_or_get_compartment_node(self.compartment)
-
-        def _handle_site_instance(state_or_bond):
-            mon_site_id = next(node_count)
-            g.add_node(mon_site_id, id=site)
-            g.add_edge(mon_node_id, mon_site_id)
-            state = None
-            bond_num = None
-            if state_or_bond is WILD:
-                return
-            elif isinstance(state_or_bond, basestring):
-                state = state_or_bond
-            elif is_state_bond_tuple(state_or_bond):
-                state = state_or_bond[0]
-                bond_num = state_or_bond[1]
-            elif isinstance(state_or_bond, (int, list)):
-                bond_num = state_or_bond
-            elif state_or_bond is not ANY and state_or_bond is not None:
-                raise ValueError('Unrecognized state: {}'.format(
-                    state_or_bond))
-
-            if state_or_bond is ANY or bond_num is ANY:
-                bond_num = any_bond_tester
-                any_bond_tester_id = next(node_count)
-                g.add_node(any_bond_tester_id, id=any_bond_tester)
-                g.add_edge(mon_site_id, any_bond_tester_id)
-
-            if state is not None:
-                mon_site_state_id = next(node_count)
-                g.add_node(mon_site_state_id, id=state)
-                g.add_edge(mon_site_id, mon_site_state_id)
-
-            if bond_num is None:
-                bond_edges[NO_BOND].append(mon_site_id)
-            elif isinstance(bond_num, int):
-                bond_edges[bond_num].append(mon_site_id)
-            elif isinstance(bond_num, list):
-                for bond in bond_num:
-                    bond_edges[bond].append(mon_site_id)
-
-        for mp in self.monomer_patterns:
-            mon_node_id = next(node_count)
-            g.add_node(mon_node_id, id=mp.monomer)
+        for imp, mp in enumerate(self.monomer_patterns):
+            mp_id = f'mp{imp}'
+            mon_node_id = f'{mp_id}_monomer'
+            unbound_sites = []
+            g.add_node(mon_node_id, id=mp.monomer, mp_id=mp_id)
             if mp.compartment or self.compartment:
                 cpt_node_id = add_or_get_compartment_node(mp.compartment or
                                                           self.compartment)
                 g.add_edge(mon_node_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
-                if isinstance(state_or_bond, MultiState):
-                    # Duplicate sites
-                    [_handle_site_instance(s) for s in state_or_bond]
-                else:
-                    _handle_site_instance(state_or_bond)
+                site_index = mp.monomer.sites.index(site)
+                mon_site_id = f'{mp_id}_s{site_index}'
+                g.add_node(mon_site_id, id=site, mp_id=mp_id)
+                g.add_edge(mon_node_id, mon_site_id)
+                state = None
+                bond_num = None
+                if state_or_bond is WILD:
+                    continue
+                elif isinstance(state_or_bond, basestring):
+                    state = state_or_bond
+                elif isinstance(state_or_bond, Sequence) \
+                        and len(state_or_bond) == 2:
+                    state = state_or_bond[0]
+                    bond_num = state_or_bond[1]
+                elif isinstance(state_or_bond, int):
+                    bond_num = state_or_bond
 
-        # Unbound edges
-        unbound_sites = bond_edges.pop(NO_BOND, None)
-        if unbound_sites is not None:
-            no_bond_id = next(node_count)
-            g.add_node(no_bond_id, id=NO_BOND)
-            for unbound_site in unbound_sites:
-                g.add_edge(unbound_site, no_bond_id)
+                if state_or_bond is ANY or bond_num is ANY:
+                    bond_num = any_bond_tester
+                    any_bond_tester_id = f'{mp_id}_s{site_index}b'
+                    g.add_node(any_bond_tester_id, id=any_bond_tester,
+                               mp_id=mp_id)
+                    g.add_edge(mon_site_id, any_bond_tester_id)
+
+                if state is not None:
+                    mon_site_state_id = f'{mp_id}_s{site_index}c'
+                    g.add_node(mon_site_state_id, id=state, mp_id=mp_id)
+                    g.add_edge(mon_site_id, mon_site_state_id)
+
+                if bond_num is None:
+                    unbound_sites.append(mon_site_id)
+                elif isinstance(bond_num, int):
+                    bond_edges[bond_num].append(mon_site_id)
+
+                # Unbound edges
+                if unbound_sites:
+                    no_bond_id = f'{mp_id}_unbound'
+                    g.add_node(no_bond_id, id=NO_BOND, mp_id=mp_id)
+                    for unbound_site in unbound_sites:
+                        g.add_edge(unbound_site, no_bond_id)
 
         # Add bond edges
         for site_nodes in bond_edges.values():
             if len(site_nodes) == 1:
                 # Treat dangling bond as WILD
                 any_bond_tester_id = next(node_count)
-                g.add_node(any_bond_tester_id, id=any_bond_tester)
+                g.add_node(any_bond_tester_id, id=any_bond_tester, mp_id=None)
                 g.add_edge(site_nodes[0], any_bond_tester_id)
             for n1, n2 in itertools.combinations(site_nodes, 2):
                 g.add_edge(n1, n2)
-
-        # Remove the species compartment if all monomer nodes have a
-        # compartment
-        if species_cpt_node_id is not None and \
-                        g.degree(species_cpt_node_id) == 0:
-            g.remove_node(species_cpt_node_id)
 
         self._graph = g
         return self._graph
