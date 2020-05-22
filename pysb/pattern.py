@@ -305,16 +305,16 @@ def match_complex_pattern(pattern, candidate, exact=False, count=False):
         if not candidate.is_concrete():
             raise ValueError('Candidate must be concrete for '
                              'exact matching: {}'.format(candidate))
-        match = pattern.canonical_form() == candidate.canonical_form()
-        return int(match) if count else match
 
+        if len(pattern.monomer_patterns) != len(candidate.monomer_patterns):
+            return False
     # Compare the monomer counts in the patterns so we can fail fast
     # without having to compare bonds using graph isomorphism checks, which
     # are more computationally expensive
-    mons_pat = collections.Counter([mp.monomer for mp in \
-            pattern.monomer_patterns])
-    mons_cand = collections.Counter([mp.monomer for mp in \
-            candidate.monomer_patterns])
+    mons_pat = collections.Counter([mp.monomer
+                                    for mp in pattern.monomer_patterns])
+    mons_cand = collections.Counter([mp.monomer
+                                     for mp in candidate.monomer_patterns])
 
     for mon, mon_count_cand in mons_cand.items():
         mon_count_pat = mons_pat.get(mon, 0)
@@ -323,9 +323,15 @@ def match_complex_pattern(pattern, candidate, exact=False, count=False):
         if mon_count_pat > mon_count_cand:
             return False
 
+    # For exact matching we can compare using the canonical form,
+    # which is faster than performing explicit checks
+    if exact:
+        return pattern.canonical_form() == candidate.canonical_form()
+
+
     # If we've got this far, we'll need to do a full pattern match
     # by searching for a graph isomorphism
-    return _match_graphs(pattern, candidate, count=count)
+    return _match_graphs(pattern, candidate, count)
 
 
 def match_reaction_pattern(pattern, candidate):
