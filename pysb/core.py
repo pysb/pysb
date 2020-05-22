@@ -884,7 +884,8 @@ class ComplexPattern(object):
             mps = copy.deepcopy(self.monomer_patterns)
             # string based sorting ignoring numeric characters, this prevents
             # bond-indexing from affecting ordering, note that we don't want
-            # to ignore numeric characters in
+            # to ignore numeric characters in Component names or non-bond
+            # states
             canonical_cp = ComplexPattern(sorted(
                 mps, key=lambda x: re.sub(
                     r'[\d]+\)', r'0)',  # state and bond
