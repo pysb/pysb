@@ -482,14 +482,13 @@ def site_condition_from_node(graph, monomer, site_node, bonds):
         List that keeps track of identified bonds in the parent
         ComplexPattern (if applicable)
     """
-    states = defaultdict(list)
+    states = list()
     site = graph.nodes[site_node]['id']
     mp_id = graph.nodes[site_node]['mp_id']
 
     for condition_node in graph.neighbors(site_node):
         state_candidate = graph.nodes[condition_node]['id']
         candiditate_mp_id = graph.nodes[condition_node]['mp_id']
-        state_id = graph.nodes[condition_node]['s_id']
         if state_candidate == 'NoBond':
             continue
         elif isinstance(state_candidate, Monomer):
@@ -497,28 +496,20 @@ def site_condition_from_node(graph, monomer, site_node, bonds):
         # need to make sure that site is in same monomer pattern!
         elif site in monomer.site_states and state_candidate in \
                 monomer.site_states[site] and mp_id == candiditate_mp_id:
-            states[state_id].append(state_candidate)
+            states.append(state_candidate)
         elif isinstance(state_candidate, AnyBondTester) and \
                 not isinstance(state_candidate, int):
-            states[state_id].append(ANY)
+            states.append(ANY)
         else:
             if site_node in bonds:
                 # existing bond
-                states[state_id].append(bonds.index(site_node))
+                states.append(bonds.index(site_node))
             else:
                 # add new bond
-                states[state_id].append(len(bonds))
+                states.append(len(bonds))
                 bonds.append(condition_node)
 
-    if len(states) == 0:
-        return None
-    elif len(states) == 1:
-        return normalize_state(next(iter(states.values())))
-    else:
-        return MultiState(*[
-            normalize_state(state)
-            for state in states.values()
-        ])
+    return normalize_state(states)
 
 
 def normalize_state(states):
@@ -533,6 +524,8 @@ def normalize_state(states):
             return tuple(states)
         else:
             return states[1], states[0]
+    elif len(states) == 2 and all(isinstance(state, int) for state in states):
+        return sorted(states)
     else:
         raise ValueError('Failed to reconstruct site condition from node')
 
@@ -686,15 +679,25 @@ class MonomerPattern(object):
         """
         monomer = graph.nodes[monomer_node]['id']
         compartment = None
+
         site_conditions = dict()
+        site_states = defaultdict(list)
         for site in graph.neighbors(monomer_node):
             if isinstance(graph.nodes[site]['id'], Compartment):
                 compartment = graph.nodes[site]['id']
-            elif graph.nodes[site]['s_id'] is None:
-                continue  # this is not a site, we can skip
             else:
-                site_conditions[graph.nodes[site]['id']] = \
+                site_states[graph.nodes[site]['id']].append(
                     site_condition_from_node(graph, monomer, site, bonds)
+                )
+
+        for site, states in site_states.items():
+            if len(states) == 0:
+                site_condition = None
+            elif len(states) == 1:
+                site_condition = states[0]
+            else:
+                site_condition = MultiState(*states)
+            site_conditions[site] = site_condition
 
 
         return cls(monomer, site_conditions, compartment)
@@ -969,12 +972,11 @@ class ComplexPattern(object):
         the ComplexPattern, index of site in the MonomerPattern, index of
         state for MultiState sites and whether its defines a condition or
         wildcard-bond) about the node. Moreover index of the MonomerPattern in
-        the ComplexPattern and index of state for MultiState sites
-        the MonomerPattern is, if applicable, encoded in data fields
-        `mp_id` and `s_id`. Neither the string references nor the two attributes
-        are used when checking graph isomorphism (instead, equality of the
-        `id` data field is checked). The two data fields `mp_id` and `s_id`
-        are required
+        the ComplexPattern, if applicable, encoded in data field `mp_id`.
+        Neither the string references nor the two attributes are used when
+        checking graph isomorphism (instead, equality of the `id` data field
+        is checked). The data field `mp_id` is required for the reconstruction
+        of a Monomer/ComplexPattern from a graph.
 
         The `WILD` keyword should match any bond except the special "no
         bond" node - as special private `WildTester` function is used for
@@ -1012,10 +1014,10 @@ class ComplexPattern(object):
                 g.add_node(cpt_node_id, id=cpt, mp_id=None)
                 return cpt_node_id
 
-        def _handle_site_instance(state_or_bond, site, mp_id, index=0):
+        def _handle_site_instance(state_or_bond, site, mp_id, state_index=0):
             site_index = mp.monomer.sites.index(site)
-            mon_site_id = f'{mp_id}_s{site_index}'
-            g.add_node(mon_site_id, id=site, mp_id=mp_id, s_id=index)
+            mon_site_id = f'{mp_id}_s{site_index}_{state_index}'
+            g.add_node(mon_site_id, id=site, mp_id=mp_id)
             g.add_edge(mon_node_id, mon_site_id)
             state = None
             bond_num = None
@@ -1031,15 +1033,14 @@ class ComplexPattern(object):
                 bond_num = state_or_bond
             if state_or_bond is ANY or bond_num is ANY:
                 bond_num = any_bond_tester
-                any_bond_tester_id = f'{mp_id}_s{site_index}b{index}'
+                any_bond_tester_id = f'{mp_id}_s{site_index}_{state_index}b'
                 g.add_node(any_bond_tester_id, id=any_bond_tester,
-                           mp_id=mp_id, s_id=index)
+                           mp_id=mp_id)
                 g.add_edge(mon_site_id, any_bond_tester_id)
 
             if state is not None:
-                mon_site_state_id = f'{mp_id}_s{site_index}c{index}'
-                g.add_node(mon_site_state_id, id=state, mp_id=mp_id,
-                           s_id=index)
+                mon_site_state_id = f'{mp_id}_s{site_index}_{state_index}c'
+                g.add_node(mon_site_state_id, id=state, mp_id=mp_id)
                 g.add_edge(mon_site_id, mon_site_state_id)
 
             if bond_num is None:
@@ -1050,7 +1051,7 @@ class ComplexPattern(object):
             # Unbound edges
             if unbound_sites:
                 no_bond_id = f'{mp_id}_unbound'
-                g.add_node(no_bond_id, id=NO_BOND, mp_id=mp_id, s_id=None)
+                g.add_node(no_bond_id, id=NO_BOND, mp_id=mp_id)
                 for unbound_site in unbound_sites:
                     g.add_edge(unbound_site, no_bond_id)
 
@@ -1058,7 +1059,7 @@ class ComplexPattern(object):
             mp_id = f'mp{imp}'
             mon_node_id = f'{mp_id}_monomer'
             unbound_sites = []
-            g.add_node(mon_node_id, id=mp.monomer, mp_id=mp_id, s_id=None)
+            g.add_node(mon_node_id, id=mp.monomer, mp_id=mp_id)
             if mp.compartment or self.compartment:
                 cpt_node_id = add_or_get_compartment_node(mp.compartment or
                                                           self.compartment)
@@ -1077,8 +1078,7 @@ class ComplexPattern(object):
             if len(site_nodes) == 1:
                 # Treat dangling bond as WILD
                 any_bond_tester_id = next(node_count)
-                g.add_node(any_bond_tester_id, id=any_bond_tester, mp_id=None,
-                           s_id=None)
+                g.add_node(any_bond_tester_id, id=any_bond_tester, mp_id=None)
                 g.add_edge(site_nodes[0], any_bond_tester_id)
             for n1, n2 in itertools.combinations(site_nodes, 2):
                 g.add_edge(n1, n2)
