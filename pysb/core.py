@@ -156,7 +156,7 @@ class SelfExporter(object):
 
 class Symbol(sympy.Dummy):
     def __new__(cls, name, real=True, **kwargs):
-        return super(Symbol, cls).__new__(cls, name, real=real, **kwargs)
+        return super(Symbol, cls).__new__(cls, real=real, **kwargs)
 
     def _lambdacode(self, printer, **kwargs):
         """ custom printer method that ensures that the dummyid is not
@@ -1286,7 +1286,7 @@ class Parameter(Component, Symbol):
     def __new__(cls, name, value=0.0, nonnegative=True, integer=False,
                 _export=True):
 
-        return super(Parameter, cls).__new__(cls, name, real=True,
+        return super(Parameter, cls).__new__(cls, real=True,
                                              nonnegative=nonnegative,
                                              integer=integer)
 
@@ -1572,7 +1572,7 @@ class Observable(Component, Symbol):
     """
 
     def __new__(cls, name, reaction_pattern, match='molecules', _export=True):
-        return super(Observable, cls).__new__(cls, name)
+        return super(Observable, cls).__new__(cls)
 
     def __getnewargs__(self):
         return (self.name, self.reaction_pattern, self.match, False)
@@ -1634,7 +1634,7 @@ class Expression(Component, Symbol):
     """
 
     def __new__(cls, name, expr, _export=True):
-        return super(Expression, cls).__new__(cls, name)
+        return super(Expression, cls).__new__(cls)
 
     def __getnewargs__(self):
         return (self.name, self.expr, False)
@@ -1704,7 +1704,7 @@ class Expression(Component, Symbol):
 class Tag(Component, Symbol):
     """Tag for labelling MonomerPatterns and ComplexPatterns"""
     def __new__(cls, name, _export=True):
-        return super(Tag, cls).__new__(cls, name)
+        return super(Tag, cls).__new__(cls)
 
     def __getnewargs__(self):
         return self.name, False
