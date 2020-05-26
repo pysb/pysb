@@ -443,7 +443,7 @@ class MultiState(object):
     >>> A(a=MultiState(1, 2))  # BNG: A(a!1,a!2)
     A(a=MultiState(1, 2))
     >>> B(b=MultiState('u', 'p'))  # BNG: A(A~u,A~p)
-    B(b=MultiState('u', 'p'))
+    B(b=MultiState('p', 'u'))
     >>> A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))  # BNG: A(a!1, a!2).B(b~u!1, b~2)
     A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))
     """
@@ -459,11 +459,11 @@ class MultiState(object):
         return len(self.sites)
 
     def __iter__(self):
-        return iter(self.sites)
+        return iter(sorted(self.sites, key=lambda x: str(x)))
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, ', '.join(
-            repr(s) for s in sorted(self, key=lambda x: str(x))))
+            repr(s) for s in self))
 
 
 def site_condition_from_node(graph, monomer, site_node, bonds):
@@ -698,7 +698,6 @@ class MonomerPattern(object):
             else:
                 site_condition = MultiState(*states)
             site_conditions[site] = site_condition
-
 
         return cls(monomer, site_conditions, compartment)
 

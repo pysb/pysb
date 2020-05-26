@@ -328,7 +328,6 @@ def match_complex_pattern(pattern, candidate, exact=False, count=False):
     if exact:
         return pattern.canonical_form() == candidate.canonical_form()
 
-
     # If we've got this far, we'll need to do a full pattern match
     # by searching for a graph isomorphism
     return _match_graphs(pattern, candidate, count)
