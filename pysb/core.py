@@ -443,7 +443,7 @@ class MultiState(object):
     >>> A(a=MultiState(1, 2))  # BNG: A(a!1,a!2)
     A(a=MultiState(1, 2))
     >>> B(b=MultiState('u', 'p'))  # BNG: A(A~u,A~p)
-    B(b=MultiState('p', 'u'))
+    B(b=MultiState('u', 'p'))
     >>> A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))  # BNG: A(a!1, a!2).B(b~u!1, b~2)
     A(a=MultiState(1, 2)) % B(b=MultiState(('u', 1), 2))
     """
