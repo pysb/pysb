@@ -459,7 +459,7 @@ class MultiState(object):
         return len(self.sites)
 
     def __iter__(self):
-        return iter(sorted(self.sites, key=lambda x: str(x)))
+        return iter(self.sites)
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, ', '.join(
@@ -696,7 +696,8 @@ class MonomerPattern(object):
             elif len(states) == 1:
                 site_condition = states[0]
             else:
-                site_condition = MultiState(*states)
+                site_condition = MultiState(*sorted(states,
+                                                    key=lambda v: str(v)))
             site_conditions[site] = site_condition
 
         return cls(monomer, site_conditions, compartment)
