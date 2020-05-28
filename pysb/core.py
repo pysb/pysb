@@ -934,7 +934,7 @@ class ComplexPattern(object):
 
         return cls(mps, compartment)
 
-    def _as_graph(self):
+    def _as_graph(self, mp_alignment=None, prefix='mp'):
         """
         Return the ComplexPattern represented as a networkx graph
 
@@ -988,9 +988,25 @@ class ComplexPattern(object):
 
         .. [Blinov2006] https://link.springer.com/chapter/10.1007%2F11905455_5
         .. [Faeder2009] https://www.csb.pitt.edu/Faculty/Faeder/Publications/Reprints/Faeder_2009.pdf
+
+        Parameters
+        ----------
+        mp_alignment: List[int]
+            List of indices used for indexing in the node identifiers.
+            Does not affect the structure of the graph.
+        prefix: str
+            prefix used when creating the node identifiers
         """
-        if self._graph is not None:
+        default_alignment = mp_alignment is None
+        if self._graph is not None and default_alignment:
             return self._graph
+
+        if default_alignment:
+            mp_alignment = range(len(self.monomer_patterns))
+
+        if len(mp_alignment) != len(self.monomer_patterns):
+            raise ValueError('Length of mp_alignment_indices does not match '
+                             'the number of complex patterns')
 
         def autoinc():
             i = 0
@@ -1055,8 +1071,8 @@ class ComplexPattern(object):
                 for unbound_site in unbound_sites:
                     g.add_edge(unbound_site, no_bond_id)
 
-        for imp, mp in enumerate(self.monomer_patterns):
-            mp_id = f'mp{imp}'
+        for imp, mp in zip(mp_alignment, self.monomer_patterns):
+            mp_id = f'{prefix}{imp}'
             mon_node_id = f'{mp_id}_monomer'
             unbound_sites = []
             g.add_node(mon_node_id, id=mp.monomer, mp_id=mp_id)
@@ -1083,8 +1099,10 @@ class ComplexPattern(object):
             for n1, n2 in itertools.combinations(site_nodes, 2):
                 g.add_edge(n1, n2)
 
-        self._graph = g
-        return self._graph
+        if default_alignment:
+            self._graph = g
+
+        return g
 
     def is_equivalent_to(self, other):
         """
@@ -1298,6 +1316,79 @@ class ReactionPattern(object):
         self.complex_patterns = complex_patterns
         from pysb.pattern import check_dangling_bonds
         check_dangling_bonds(self)
+        self._graph = None
+
+    def _as_graph(self, mp_alignments=None, prefix='mp'):
+        """
+        Creates a graph representation of the reaction pattern as
+        networkx.Graph. For a reaction pattern this is equal to the
+        composition of the graphs of the constituent ComplexPatterns. The
+        individual monomer patterns in complex patterns can be aligned by
+        passing an mp_alignment, which becomes relevant when later applying
+        precomputed graph-operations based on that alignment.
+
+        Parameters
+        ----------
+        mp_alignments: List[List[int]]
+            List of lists of indices for every ComplexPattern that defines
+            the indexing of the respective MonomerPatterns
+        prefix: str
+            Prefix used for the naming of nodes in the graph
+        """
+        default_alignment = mp_alignments is None
+        if self._graph is not None and default_alignment:
+            return self._graph
+
+        def autoinc():
+            i = 0
+            while True:
+                yield i
+                i += 1
+        mp_count = autoinc()
+
+        # generate default alignment
+        if default_alignment:
+            mp_alignments = [
+                [next(mp_count) for _ in cp.monomer_patterns]
+                for cp in self.complex_patterns
+            ]
+
+        if len(mp_alignments) != len(self.complex_patterns):
+            raise ValueError('Length of mp_alignment does not match'
+                             'the number of complex patterns')
+
+        if self.complex_patterns:
+            graph = nx.compose_all([
+                cp._as_graph(mp_alignment=mp_alignments[icp], prefix=prefix)
+                for icp, cp in enumerate(self.complex_patterns)
+            ])
+        else:
+            graph = nx.Graph()
+
+        if default_alignment:
+            self._graph = graph
+
+        return graph
+
+    @classmethod
+    def _from_graph(cls, graph):
+        # we can reconstruct the individual complex patterns by looking at
+        # the connected components while ignoring links through compartments
+        # (as connections do not constitute bonds. Note that this will fail
+        # for complex patterns that are not concrete since non-explicit
+        # edges such as A() % A() cannot be recovered.
+        compartments = {n for n, d in graph.nodes(data=True)
+                        if isinstance(d['id'], Compartment)}
+        components = nx.connected_components(
+            graph.subgraph([n for n in graph.nodes if n not in compartments])
+        )
+        # we need re-add compartments for proper reconstruction of complex
+        # patterns. extraneous compartments will be safely ignored as they
+        # wont be connected to any monomer
+        return cls([
+            ComplexPattern._from_graph(graph.subgraph(c | compartments))
+            for c in components
+        ])
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
