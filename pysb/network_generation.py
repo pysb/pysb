@@ -1,21 +1,26 @@
 import networkx as nx
 import numpy as np
+import sympy as sp
+
+import itertools
+import math
 
 from .core import ReactionPattern, Monomer, NO_BOND
+from .pattern import match_complex_pattern
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
-from collections import ChainMap
+from collections import ChainMap, Counter
 
 
 class ReactionGenerator:
-    def __init__(self, rule, reverse):
-        self.name = f'{rule.name}{"__reverse" if reverse else ""}'
-        self.rule = rule.name,
+    def __init__(self, rule, reverse, spm):
+        self.name = rule.name
         self.reverse = reverse,
         self.reactant_pattern = rule.product_pattern if reverse else \
             rule.reactant_pattern
         self.product_pattern = rule.reactant_pattern if reverse else \
             rule.product_pattern
+        self.rate = rule.rate_reverse if reverse else rule.rate_forward
 
         self.is_pure_synthesis_rule = \
             len(rule.reactant_pattern.complex_patterns) == 0
@@ -23,14 +28,61 @@ class ReactionGenerator:
         self.delete_molecules = rule.delete_molecules
 
         self.graph_diff = GraphDiff(self)
+        self.spm = spm
 
-    def generate_reaction(self, reactants):
-        reactant_mapping, mp_alignment_cp = \
-            self.compute_reactant_mapping(reactants)
+    def generate_reactions(self, reactant_idx, model):
+        # order reactants such that they match
+        matches = get_matching_patterns(
+            self.reactant_pattern, [model.species[ix]
+                                    for ix in reactant_idx]
+        )
+
+        # we only generate one reaction for every unique set of educts. the
+        # remaining symmetry is accounted for by the statfactor in the reaction
+        # rate
+        educt_matches = [
+            np.where(matches[irp, :])[0]
+            for irp in range(matches.shape[0])
+        ]
+        cp_indices = {
+            tuple(np.unique(indices)): indices
+            for indices in itertools.product(*educt_matches)
+            if len(np.unique(indices)) == len(reactant_idx)
+        }.values()
+
+        return [
+            rxn
+            for cp_index in cp_indices
+            for rxn in self._generate_reactions_mapped_cps(
+                tuple(reactant_idx[cp_idx] for cp_idx in cp_index), model
+            )
+        ]
+
+    def _generate_reactions_mapped_cps(self, reactant_indices, model):
+        reactants = [model.species[ix] for ix in reactant_indices]
+        reactant_mappings, mp_alignment_cp = \
+            self._compute_reactant_mapping(reactants)
 
         reactant_graph = ReactionPattern(reactants)._as_graph(
             mp_alignment_cp
         )
+
+        reactions = [
+            self._generate_reaction(reactant_indices, reactant_mapping,
+                                    reactant_graph, model)
+            for reactant_mapping in reactant_mappings
+        ]
+        # filter reactions with duplicate products, is there a smarter way?
+        return {
+            rxn['products']: rxn
+            for rxn in reactions
+        }.values()
+
+    def _generate_reaction(self, reactant_indices, reactant_mapping,
+                           reactant_graph, model):
+
+        sfactor = _compute_stat_factor(reactant_indices)
+        reactants = [model.species[ix] for ix in reactant_indices]
 
         product_graph = self.graph_diff.apply(
             reactant_mapping, reactant_graph, self.delete_molecules
@@ -38,14 +90,23 @@ class ReactionGenerator:
 
         products = ReactionPattern._from_graph(product_graph).complex_patterns
 
+        vfactor = _compute_volume_factor(reactants, products)
+
         reaction = {
             'rule': self.name,
+            'rate': self.rate * vfactor * sfactor * np.prod([
+                sp.Symbol(f'__s{ix}') for ix in reactant_indices
+            ]),
             'product_patterns': products,
             'reactant_patterns': reactants,
+            'reactants': reactant_indices,
+            'products': tuple(self.spm.match(product, index=True,
+                                             exact=True)[0]
+                              for product in products)
         }
         return reaction
 
-    def compute_reactant_mapping(self, reactants):
+    def _compute_reactant_mapping(self, reactants):
         node_matcher = categorical_node_match('id', default=None)
 
         def autoinc():
@@ -63,7 +124,7 @@ class ReactionGenerator:
             for cp in reactants
         ]
 
-        matches = [
+        gms = [
             GraphMatcher(
                 cp._as_graph(mp_alignment_cp[icp]),
                 rp._as_graph(self.graph_diff.mp_alignment_rp[icp],
@@ -75,14 +136,21 @@ class ReactionGenerator:
                              reactants))
         ]
 
-        for rpmatch in matches:
-            assert (rpmatch.subgraph_is_isomorphic())
+        # compute all isomorphisms for each reactant
+        matches = [
+            [mapping for mapping in gm.subgraph_isomorphisms_iter()]
+            for gm in gms
+        ]
 
-        # invert and merge mapping
-        return dict(ChainMap(*[
-            dict(zip(match.mapping.values(), match.mapping.keys()))
-            for match in matches
-        ])), mp_alignment_cp
+        # invert and merge mappings for the product of isomorphisms for all
+        # reactants
+        return [
+            dict(ChainMap(*[
+               dict((y, x) for x, y in mapping.items())
+               for mapping in mappings
+            ]))
+            for mappings in itertools.product(*matches)
+        ], mp_alignment_cp
 
 
 class GraphDiff:
@@ -239,3 +307,43 @@ def align_monomer_indices(reactantpattern, productpattern):
         pp_alignment[index[0]][index[1]] = -(new_count+1)
 
     return rp_alignment, pp_alignment
+
+def get_matching_patterns(reactant_pattern, species):
+    return np.asarray([
+            [
+                match_complex_pattern(cp, s)
+                if s is not None and cp is not None
+                else False
+                for s in species
+            ]
+            for cp in reactant_pattern.complex_patterns
+    ])
+
+
+def _compute_volume_factor(reactants, products):
+    compartment_educt = next((
+        educt.species_compartment()
+        for educt in reactants
+        if educt.species_compartment() is not None
+    ), None)
+
+    compartment_product = next((
+        product.species_compartment()
+        for product in products
+        if product.species_compartment() is not None
+    ), None)
+
+    volume_factor = 1
+    if compartment_educt is not compartment_product:
+        if compartment_educt is None:
+            volume_factor = 1 * compartment_product.size.value
+    return volume_factor
+
+
+def _compute_stat_factor(reactant_indices):
+    stat_factor = 1
+    for count in Counter(reactant_indices).values():
+        if count == 1:
+            continue  # avoid conversion to float to keep consistent with bng
+        stat_factor *= 1 / math.factorial(count)
+    return stat_factor

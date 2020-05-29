@@ -501,13 +501,15 @@ def site_condition_from_node(graph, monomer, site_node, bonds):
                 not isinstance(state_candidate, int):
             states.append(ANY)
         else:
+            # start indexing bonds at 1
             if site_node in bonds:
                 # existing bond
-                states.append(bonds.index(site_node))
+                states.append(bonds.index(site_node)+1)
             else:
                 # add new bond
-                states.append(len(bonds))
                 bonds.append(condition_node)
+                states.append(len(bonds))
+
 
     return normalize_state(states)
 
@@ -862,7 +864,7 @@ class ComplexPattern(object):
             all(mp.is_site_concrete() for mp in self.monomer_patterns)
         return mp_concrete_ok or compartment_ok
 
-    def species_volume(self):
+    def species_compartment(self):
         """
         Computes the compartment of this ComplexPattern according to the cBNGL
         definition. Only works if this is a species, i.e. the pattern is
@@ -891,31 +893,6 @@ class ComplexPattern(object):
             ), None))
 
         return compartment
-
-    def canonical_form(self):
-        """
-        Computes the canonical representation of this pattern, only works if
-        the pattern is concrete.
-        """
-        if not self.is_concrete():
-            raise ValueError('Pattern must be concrete to compute canonical'
-                             'representation.')
-
-        if self._canonical_form is None:
-            mps = copy.deepcopy(self.monomer_patterns)
-            # string based sorting ignoring numeric characters, this prevents
-            # bond-indexing from affecting ordering, note that we don't want
-            # to ignore numeric characters in Component names or non-bond
-            # states
-            canonical_cp = ComplexPattern(sorted(
-                mps, key=lambda x: re.sub(r'[^\w][\d]+[^\w]', r'=0', str(x))
-            ), self.compartment, self.match_once)
-            # roundtrip through graph generation to canonicalize bond numbers
-            self._canonical_form = str(ComplexPattern._from_graph(
-                canonical_cp._as_graph()
-            ))
-
-        return self._canonical_form
 
     @classmethod
     def _from_graph(cls, graph):

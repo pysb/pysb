@@ -1,8 +1,6 @@
-import numpy as np
-
 from pysb.network_generation import ReactionGenerator
 from pysb.bng import generate_equations
-from pysb.pattern import SpeciesPatternMatcher, match_complex_pattern
+from pysb.pattern import SpeciesPatternMatcher
 from collections import Counter
 
 from .test_importers import _bngl_location, model_from_bngl
@@ -39,61 +37,51 @@ def test_reaction_generation():
                      #'tlmr'
                      ):
         full_filename = _bngl_location(filename)
-        yield (compare_native_reactions_to_bng_reactions, full_filename)
+        yield (compare_pysb_reactions_to_bng_reactions, full_filename)
 
 
-def compare_native_reactions_to_bng_reactions(bng_file):
+def compare_pysb_reactions_to_bng_reactions(bng_file):
     m = model_from_bngl(bng_file)
     generate_equations(m)
     spm = SpeciesPatternMatcher(m)
     for rule in m.rules:
         reactions = [r for r in m.reactions if rule.name in r['rule']]
+
+        rg_forward = ReactionGenerator(rule, False, spm)
+        requires_reverse = any(True in r['reverse'] for r in reactions)
+        if requires_reverse:
+            rg_reverse = ReactionGenerator(rule, True, spm)
+
         # reactions with the same reactants can have multiple different
         # products depending on the matching between reactant_pattern and
         # the reactants, so we aggregate unique sets of reactants and
         # validate the respective reactions together
         for reactants in set(r['reactants'] for r in reactions):
-            validate_reaction([r for r in reactions
-                               if r['reactants'] == reactants], m, spm)
+            reactant_reactions = [r for r in reactions
+                                  if r['reactants'] == reactants
+                                  and len(r['rule']) == 1]
+            reactions_forward = [r for r in reactant_reactions
+                                 if not r['reverse'][0]]
+            validate_reaction(rg_forward, reactions_forward, m)
+            if requires_reverse:
+                reactions_reverse = [r for r in reactant_reactions
+                                     if r['reverse'][0]]
+                validate_reaction(rg_reverse, reactions_reverse, m)
 
 
-def get_matching_patterns(reactant_pattern, species):
-    matches = [
-            np.where([
-                match_complex_pattern(cp, s)
-                if s is not None and cp is not None
-                else False
-                for s in species
-            ])
-            for cp in reactant_pattern.complex_patterns
-    ]
-    return [
-            np.where([
-                match_complex_pattern(cp, s)
-                if s is not None and cp is not None
-                else False
-                for s in species
-            ])[0][0]
-            for cp in reactant_pattern.complex_patterns
-    ]
-
-
-def validate_reaction(reactions, m, spm):
-    if len(reactions[0]['rule']) > 1:
+def validate_reaction(rg, reactions_bng, m,):
+    if not reactions_bng:
         return
 
-    rg = ReactionGenerator(m.rules[reactions[0]['rule'][0]],
-                           reactions[0]['reverse'][0])
+    # we can pick index 0 as reactants should all be the same
+    reactions_pysb = rg.generate_reactions(reactions_bng[0]['reactants'], m)
 
-    # order reactants such that they match
-    cp_order = get_matching_patterns(
-        rg.reactant_pattern, [m.species[ix]
-                              for ix in reactions[0]['reactants']]
-    )
-
-    r = rg.generate_reaction([m.species[reactions[0]['reactants'][cp_idx]]
-                              for cp_idx in cp_order])
-
-    products = [spm.match(product, index=True, exact=True)[0]
-                for product in r['product_patterns']]
-    assert Counter(reactions[0]['products']) == Counter(products)
+    # reactions_pysb and reactions_bng are not equally ordered so we check
+    # that the same number of reactions is generated and that we find at
+    # least one match for every reaction
+    assert len(reactions_bng) == len(reactions_pysb)
+    for rxn_pysb in reactions_pysb:
+        assert any(
+            Counter(rxn_bng['products']) == Counter(rxn_pysb['products'])
+            for rxn_bng in reactions_bng
+        )

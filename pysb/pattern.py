@@ -264,9 +264,14 @@ def check_dangling_bonds(pattern):
                               '{}'.format(reused_bonds, pattern))
 
 
-def _match_graphs(pattern, candidate, count):
+def _match_graphs(pattern, candidate, count, exact):
     """ Compare two pattern graphs for isomorphism """
     node_matcher = categorical_node_match('id', default=None)
+    if exact:
+        match = nx.is_isomorphic(pattern._as_graph(),
+                                 candidate._as_graph(),
+                                 node_match=node_matcher)
+        return int(match) if count else match
     gm = GraphMatcher(
         candidate._as_graph(), pattern._as_graph(),
         node_match=node_matcher
@@ -323,14 +328,9 @@ def match_complex_pattern(pattern, candidate, exact=False, count=False):
         if mon_count_pat > mon_count_cand:
             return False
 
-    # For exact matching we can compare using the canonical form,
-    # which is faster than performing explicit checks
-    if exact:
-        return pattern.canonical_form() == candidate.canonical_form()
-
     # If we've got this far, we'll need to do a full pattern match
     # by searching for a graph isomorphism
-    return _match_graphs(pattern, candidate, count)
+    return _match_graphs(pattern, candidate, count, exact)
 
 
 def match_reaction_pattern(pattern, candidate):
