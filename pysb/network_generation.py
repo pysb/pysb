@@ -5,7 +5,7 @@ import sympy as sp
 import itertools
 import math
 
-from .core import ReactionPattern, Monomer, NO_BOND
+from .core import ReactionPattern, Monomer, NO_BOND, Compartment
 from .pattern import match_complex_pattern
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
@@ -27,7 +27,7 @@ class ReactionGenerator:
 
         self.delete_molecules = rule.delete_molecules
 
-        self.graph_diff = GraphDiff(self)
+        self.graph_diff = GraphDiff(self, rule.move_connected)
         self.spm = spm
 
     def generate_reactions(self, reactant_idx, model):
@@ -90,7 +90,11 @@ class ReactionGenerator:
 
         products = ReactionPattern._from_graph(product_graph).complex_patterns
 
-        vfactor = _compute_volume_factor(reactants, products)
+        self.fix_compartments(products, model)
+
+        vfactor = _compute_volume_factor(
+            *self.graph_diff.compartment_transport
+        )
 
         reaction = {
             'rule': self.name,
@@ -105,6 +109,43 @@ class ReactionGenerator:
                               for product in products)
         }
         return reaction
+
+    def fix_compartments(self, products,  model):
+        reactant_cpt, product_cpt = self.graph_diff.compartment_transport
+        if not are_unequal_compartments(reactant_cpt, product_cpt):
+            return
+
+        cpt_updates = {
+            reactant_cpt.name: product_cpt
+        }
+        if reactant_cpt.dimension == 2 and product_cpt.dimension == 2:
+            # when moving from surface compartment to surface compartment
+            # inside/outside are flipped
+            inside_cpt = next((
+                cpt for cpt in model.compartments
+                if are_equal_compartments(cpt.parent, product_cpt)
+            ), None)
+            outside_cpt = reactant_cpt.parent
+            if are_unequal_compartments(inside_cpt, outside_cpt):
+                cpt_updates[outside_cpt.name] = inside_cpt
+
+            inside_cpt = next((
+                cpt for cpt in model.compartments
+                if are_equal_compartments(cpt.parent, reactant_cpt)
+            ), None)
+            outside_cpt = product_cpt.parent
+            if are_unequal_compartments(inside_cpt, outside_cpt):
+                cpt_updates[inside_cpt.name] = outside_cpt
+
+        def update_cpt(pattern):
+            if pattern.compartment is not None:
+                pattern.compartment = cpt_updates.get(pattern.compartment.name,
+                                                      pattern.compartment)
+
+        for cp in products:
+            update_cpt(cp)
+            for mp in cp.monomer_patterns:
+                update_cpt(mp)
 
     def _compute_reactant_mapping(self, reactants):
         node_matcher = categorical_node_match('id', default=None)
@@ -154,39 +195,122 @@ class ReactionGenerator:
 
 
 class GraphDiff:
-    def __init__(self, reaction_generator):
+    def __init__(self, rg, move_connected):
         self.mp_alignment_rp, self.mp_alignment_pp = align_monomer_indices(
-            reaction_generator.reactant_pattern,
-            reaction_generator.product_pattern
+            rg.reactant_pattern,
+            rg.product_pattern
         )
-        rp_graph = reaction_generator.reactant_pattern._as_graph(
+        rp_graph = rg.reactant_pattern._as_graph(
             prefix='rp', mp_alignments=self.mp_alignment_rp
         )
-        pp_graph = reaction_generator.product_pattern._as_graph(
+        pp_graph = rg.product_pattern._as_graph(
             prefix='rp', mp_alignments=self.mp_alignment_pp
         )
+
+        # check whether there is a change in species (not molecule!)
+        # compartment
+        if not move_connected:
+            rp_scompartmentents = {
+                idx: cp.compartment
+                for cp, mp_alignment in zip(rg.reactant_pattern.complex_patterns,
+                                            self.mp_alignment_rp)
+                for idx, _ in zip(mp_alignment, cp.monomer_patterns)
+            }
+            pp_scompartments = {
+                idx: cp.compartment
+                for cp, mp_alignment in zip(rg.product_pattern.complex_patterns,
+                                            self.mp_alignment_pp)
+                for idx, _ in zip(mp_alignment, cp.monomer_patterns)
+            }
+            common_mps = set(rp_scompartmentents.keys()).intersection(
+                set(pp_scompartments.keys())
+            )
+            species_transport = next((
+                True
+                for mp in common_mps
+                if are_unequal_compartments(rp_scompartmentents[mp],
+                                            pp_scompartments[mp])
+            ), False)
+        else:
+            species_transport = True
 
         self.removed_nodes = tuple(
             n for n, d in rp_graph.nodes(data=True)
             if n not in pp_graph
             or n in pp_graph and pp_graph.nodes[n]['id'] != d['id']
         )
+
+        source_cpt_node, source_cpt = next((
+            (node, rp_graph.nodes[node]['id'])
+            for node in self.removed_nodes
+            if node.startswith('compartment')
+        ), (None, None))
+
+        # if we remove a compartment node this is indicates that this rule
+        # implements a transportation. For species transportation we are not
+        # allowed to remove the compartment node as this will irreparably
+        # remove connecting edges. Instead, we will change the id of the
+        # compartment node. For molecule transportations this is not
+        # necessary, and the source/target compartment are only stored for
+        # the computation of the volume factor in the reaction rate.
+        if source_cpt_node is not None:
+            # dont remove cpt node
+            if species_transport:
+                self.removed_nodes = tuple(
+                    node for node in self.removed_nodes
+                    if node != source_cpt_node
+                )
         rp_graph.remove_nodes_from(self.removed_nodes)
+
         self.added_nodes = tuple(
             (n, d) for n, d in pp_graph.nodes(data=True)
             if n not in rp_graph
         )
+        target_cpt_node, target_cpt = next((
+            (n, d['id'])
+            for n, d in self.added_nodes
+            if isinstance(d['id'], Compartment)
+        ), (None, None))
+        if target_cpt_node is not None:
+            # dont remove cpt node
+            if species_transport:
+                self.added_nodes = tuple(
+                    (n, d) for n, d in self.added_nodes
+                    if n != target_cpt_node
+                )
         rp_graph.add_nodes_from(self.added_nodes)
+
+        # nx.difference requires two graphs with the same nodes. for species
+        # transport rules we want to ignore all removed/added edges for
+        # compartment as we implement those changes independently
+        if species_transport:
+            pp_graph = pp_graph.subgraph(n
+                                         for n in pp_graph.nodes()
+                                         if n != target_cpt_node)
+
+            rp_graph = rp_graph.subgraph(n
+                                         for n in rp_graph.nodes()
+                                         if n != source_cpt_node)
+
         self.removed_edges = tuple(
             nx.difference(rp_graph, pp_graph).edges()
         )
         self.added_edges = tuple(
             nx.difference(pp_graph, rp_graph).edges()
         )
+
+        if source_cpt_node and target_cpt and species_transport:
+            self.changed_node_ids = {source_cpt_node: target_cpt}
+        else:
+            self.changed_node_ids = {}
+
         self._mapped_removed_edges = ()
         self._mapped_added_edges = ()
         self._mapped_removed_nodes = ()
         self._mapped_added_nodes = ()
+        self._mapped_changed_node_ids = {}
+
+        self.compartment_transport = (source_cpt, target_cpt)
 
     def _apply_mapping(self, mapping):
         mapped_mp_ids = {
@@ -224,6 +348,11 @@ class GraphDiff:
              dict(mp_id=mapped_mp_ids.get(d['mp_id'], d['mp_id']), id=d['id']))
             for n, d in self.added_nodes
         )
+        if self.changed_node_ids:
+            self._mapped_changed_node_ids = {
+                extended_mapping.get(node, node): id
+                for node, id in self.changed_node_ids.items()
+            }
 
     def apply(self, mapping, ingraph, delete_molecules):
         self._apply_mapping(mapping)
@@ -249,6 +378,9 @@ class GraphDiff:
         outgraph.add_nodes_from(self._mapped_added_nodes)
         outgraph.add_edges_from(self._mapped_added_edges)
         outgraph.remove_edges_from(self._mapped_removed_edges)
+        if self._mapped_changed_node_ids:
+            nx.set_node_attributes(outgraph,
+                                   self._mapped_changed_node_ids, 'id')
         # fix dangling bonds:
         if delete_molecules:
             for node in list(dangling_bonds):
@@ -308,6 +440,7 @@ def align_monomer_indices(reactantpattern, productpattern):
 
     return rp_alignment, pp_alignment
 
+
 def get_matching_patterns(reactant_pattern, species):
     return np.asarray([
             [
@@ -320,23 +453,11 @@ def get_matching_patterns(reactant_pattern, species):
     ])
 
 
-def _compute_volume_factor(reactants, products):
-    compartment_educt = next((
-        educt.species_compartment()
-        for educt in reactants
-        if educt.species_compartment() is not None
-    ), None)
-
-    compartment_product = next((
-        product.species_compartment()
-        for product in products
-        if product.species_compartment() is not None
-    ), None)
-
+def _compute_volume_factor(compartment_reactants, compartment_products):
     volume_factor = 1
-    if compartment_educt is not compartment_product:
-        if compartment_educt is None:
-            volume_factor = 1 * compartment_product.size.value
+    if compartment_reactants is not None and compartment_products is not None \
+            and compartment_products.name != compartment_reactants.name:
+        volume_factor = 1 * compartment_products.size.value
     return volume_factor
 
 
@@ -347,3 +468,19 @@ def _compute_stat_factor(reactant_indices):
             continue  # avoid conversion to float to keep consistent with bng
         stat_factor *= 1 / math.factorial(count)
     return stat_factor
+
+
+def are_equal_compartments(cpt1, cpt2):
+    if cpt1 is None:
+        return False
+    if cpt2 is None:
+        return False
+    return cpt1.name == cpt2.name
+
+
+def are_unequal_compartments(cpt1, cpt2):
+    if cpt1 is None:
+        return False
+    if cpt2 is None:
+        return False
+    return cpt1.name != cpt2.name

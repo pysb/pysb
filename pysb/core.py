@@ -698,8 +698,7 @@ class MonomerPattern(object):
             elif len(states) == 1:
                 site_condition = states[0]
             else:
-                site_condition = MultiState(*sorted(states,
-                                                    key=lambda v: str(v)))
+                site_condition = MultiState(states)
             site_conditions[site] = site_condition
 
         return cls(monomer, site_conditions, compartment)
@@ -905,8 +904,9 @@ class ComplexPattern(object):
             if isinstance(d['id'], Compartment):
                 if compartment is None:
                     compartment = d['id']
-                # only overwrite if surface compartment
-                elif d['id'].dimension == 2:
+                # only overwrite if surface compartment that is connected to
+                # any node
+                elif d['id'].dimension == 2 and graph.degree(n) > 0:
                     compartment = d['id']
 
         return cls(mps, compartment)
@@ -997,15 +997,14 @@ class ComplexPattern(object):
         bond_edges = collections.defaultdict(list)
         g = nx.Graph()
         _cpt_nodes = {}
-
         def add_or_get_compartment_node(cpt):
             try:
                 return _cpt_nodes[cpt]
             except KeyError:
-                cpt_node_id = f'compartment_{cpt.name}'
-                _cpt_nodes[cpt] = cpt_node_id
-                g.add_node(cpt_node_id, id=cpt, mp_id=None)
-                return cpt_node_id
+                cpt_node = f'compartment_{cpt.name}'
+                _cpt_nodes[cpt] = cpt_node
+                g.add_node(cpt_node, id=cpt, mp_id=None)
+                return cpt_node
 
         def _handle_site_instance(state_or_bond, site, mp_id, state_index=0):
             site_index = mp.monomer.sites.index(site)
@@ -1065,16 +1064,6 @@ class ComplexPattern(object):
                      for istate, state in enumerate(state_or_bond)]
                 else:
                     _handle_site_instance(state_or_bond, site, mp_id)
-
-        # Add bond edges
-        for site_nodes in bond_edges.values():
-            if len(site_nodes) == 1:
-                # Treat dangling bond as WILD
-                any_bond_tester_id = next(node_count)
-                g.add_node(any_bond_tester_id, id=any_bond_tester, mp_id=None)
-                g.add_edge(site_nodes[0], any_bond_tester_id)
-            for n1, n2 in itertools.combinations(site_nodes, 2):
-                g.add_edge(n1, n2)
 
         if default_alignment:
             self._graph = g
