@@ -32,10 +32,9 @@ class ReactionGenerator:
 
     def generate_reactions(self, reactant_idx, model):
         # order reactants such that they match
-        matches = get_matching_patterns(
-            self.reactant_pattern, [model.species[ix]
-                                    for ix in reactant_idx]
-        )
+        matches = get_matching_patterns(self.reactant_pattern,
+                                        [model.species[ix]
+                                         for ix in reactant_idx])
 
         # we only generate one reaction for every unique set of educts. the
         # remaining symmetry is accounted for by the statfactor in the reaction

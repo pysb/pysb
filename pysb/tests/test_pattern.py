@@ -197,7 +197,3 @@ def test_match_exact_canonicalization():
          % M4(a=MultiState(('a', 1), 'b'))) ** volume,
         exact=True,
     )
-
-
-
-
