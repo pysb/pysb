@@ -10,6 +10,7 @@ import collections
 from collections.abc import Mapping
 import json
 import re
+import warnings
 from sympy.parsing.sympy_parser import parse_expr
 try:
     basestring
@@ -106,11 +107,16 @@ class PySBJSONDecoder(JSONDecoder):
         return self.decode_expression(expr, derived=True)
 
     def decode_observable(self, obs):
-        self.b.observable(
+        o = self.b.observable(
             obs['name'],
             self.decode_reaction_pattern(obs['reaction_pattern']),
             obs['match']
         )
+        try:
+            o.coefficients = obs['coefficients']
+            o.species = obs['species']
+        except KeyError:
+            pass
 
     def decode_monomer_pattern(self, mp):
         mon = self._modelget(mp['monomer'])
@@ -235,8 +241,16 @@ class PySBJSONDecoder(JSONDecoder):
             for component in res.get(component_type, []):
                 decoder(component)
 
-        if self.b.model.reactions:
+        if self.b.model.reactions and self.b.model.observables \
+                and 'species' not in res['observables'][0]:
+
             # We have network, need to regenerate Observable species and coeffs
+            warnings.warn(
+                'This SimulationResult file is missing Observable species and '
+                'coefficients data. These will be generated now - we recommend '
+                'you re-save your SimulationResult file to avoid this warning.'
+            )
+
             for obs in self.b.model.observables:
                 if obs.match in ('molecules', 'species'):
                     obs_matches = SpeciesPatternMatcher(self.b.model).match(
