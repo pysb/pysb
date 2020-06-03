@@ -71,129 +71,13 @@ def test_all_species_generated():
         yield (check_all_species_generated, model.model)
 
 
-def test_match_exact_canonicalization():
+def test_patternmatching_compartments():
     Model()
-    volume = Compartment('volume', dimension=3)
-    surface = Compartment('surface', dimension=2, parent=volume)
-    # assignments aren't really necessary here, but prevent this code from
-    # looking like a christmas tree in IDEs
-    M1 = Monomer('M1', ['a'])
-    M2 = Monomer('M2', ['a', 'b'], {'b': ['a', 'b']})
-    M3 = Monomer('M3', ['a'])
-    M4 = Monomer('M4', ['a', 'a'], {'a': ['a', 'b']})
-    t1 = Tag('Tag1')
-    t2 = Tag('Tag2')
-    # sorting sites
-    assert match_complex_pattern(
-        as_complex_pattern(M2(a=None, b='a') ** surface),
-        as_complex_pattern(M2(b='a', a=None) ** surface),
-        exact=True
-    )
-    # canonicalization cpt + sorting mps + sorting sites
-    assert match_complex_pattern(
-        (M1(a=1) ** volume % M2(a=1, b='a')) ** surface,
-        M2(b='a', a=2) ** surface % M1(a=2) ** volume,
-        exact=True
-    )
-    # canonicalization cpt
-    assert match_complex_pattern(
-        (M1(a=1) ** volume % M2(a=1, b='a') ** surface) ** surface,
-        M1(a=2) ** volume % M2(a=2, b='a') ** surface,
-        exact=True
-    )
-    # canonicalization cpt
-    assert not match_complex_pattern(
-        (M1(a=1) % M2(a=1, b='a')) ** surface,
-        M1(a=2) ** volume % M2(a=2, b='a') ** surface,
-        exact=True
-    )
-    # canonicalization cpt
-    assert not match_complex_pattern(
-        (M1(a=1) % M2(a=1, b='a')) ** volume,
-        M1(a=2) ** volume % M2(a=2, b='a') ** surface,
-        exact=True
-    )
-    # canonicalization cpt
-    assert match_complex_pattern(
-        (M1(a=1) % M2(a=1, b='a')) ** surface,
-        M1(a=2) ** surface % M2(a=2, b='a') ** surface,
-        exact=True
-    )
-    # canonicalization cpt
-    assert match_complex_pattern(
-        (M1(a=1) % M2(a=1, b='a')) ** volume,
-        M1(a=2) ** volume % M2(a=2, b='a') ** volume,
-        exact=True
-    )
-
-    # canonicalization cpt + sorting mps + bond_and_state
-    assert match_complex_pattern(
-        ((M2(a=None, b=('b', 3)) % M1(a=1) ** volume) %
-         M2(a=1, b=('a', 3))) ** surface,
-        M2(b=('a', 5), a=2) ** surface % M2(b=('b', 5), a=None) ** surface %
-        M1(a=2) ** volume,
-        exact=True
-    )
-    # sorting mps + bond_and_state
-    assert match_complex_pattern(
-        (M2(a=1, b=('a', 3)) ** volume % M2(a=1, b=('a', 5)) ** volume %
-         M2(a=2, b=('a', 3)) ** surface % M2(a=2, b=('a', 5)) ** surface),
-        (M2(a=2, b=('a', 5)) ** volume % M2(a=2, b=('a', 3)) ** volume %
-         M2(a=1, b=('a', 5)) ** surface % M2(a=1, b=('a', 3)) ** surface),
-        exact=True
-    )
-    # sorting mps
-    assert match_complex_pattern(
-        (M1(a=1) % M3(a=1)) ** volume,
-        (M3(a=1) % M1(a=1)) ** volume,
-        exact=True
-    )
-    # tag
-    assert match_complex_pattern(
-        (M1(a=1) % M1(a=1)) ** volume @ t1,
-        (M1(a=1) % M1(a=1)) ** volume @ t1,
-        exact=True
-    )
-    # tag
-    assert match_complex_pattern(
-        (M1(a=1) % M1(a=1)) ** volume @ t1,
-        (M1(a=1) % M1(a=1)) ** volume @ t2,
-        exact=True
-    )
-    # count
-    assert match_complex_pattern(
-        (M1(a=1) % M1(a=1)) ** volume,
-        (M1(a=1) % M1(a=1)) ** volume,
-        exact=True, count=True
-    ) == 1
-    # multistate
-    assert match_complex_pattern(
-        (M4(a=MultiState(('a', 1), 'a'))
-         % M4(a=MultiState(('a', 1), 'a'))) ** volume,
-        (M4(a=MultiState(('a', 2), 'a'))
-         % M4(a=MultiState(('a', 2), 'a'))) ** volume,
-    )
-    # multistate
-    assert match_complex_pattern(
-        (M4(a=MultiState(('a', 1), 'a'))
-         % M4(a=MultiState('a', ('a', 1)))) ** volume,
-        (M4(a=MultiState('a', ('a', 2)))
-         % M4(a=MultiState(('a', 2), 'a'))) ** volume,
-        exact=True,
-    )
-    # multistate
-    assert match_complex_pattern(
-        (M4(a=MultiState(('a', 1), ('a', 2)))
-         % M4(a=MultiState(('a', 2), ('a', 1)))) ** volume,
-        (M4(a=MultiState(('a', 1), ('a', 2)))
-         % M4(a=MultiState(('a', 1), ('a', 2)))) ** volume,
-        exact=True,
-    )
-    # multistate
-    assert not match_complex_pattern(
-        (M4(a=MultiState(('a', 1), 'b'))
-         % M4(a=MultiState(('b', 1), 'a'))) ** volume,
-        (M4(a=MultiState(('a', 1), 'b'))
-         % M4(a=MultiState(('a', 1), 'b'))) ** volume,
-        exact=True,
-    )
+    A = Monomer('A')
+    c = Compartment('c')
+    d = Compartment('d')
+    assert match_complex_pattern(A() % A() ** c, A() ** c % A() ** c)
+    assert match_complex_pattern(A() ** c % A() ** c, A() ** c % A() ** c)
+    assert match_complex_pattern((A() % A()) ** c, A() ** c % A() ** c)
+    assert match_complex_pattern(A() % A() ** c, A() ** d % A() ** c)
+    assert not match_complex_pattern(A() % A() ** c, A() ** d % A() ** d)

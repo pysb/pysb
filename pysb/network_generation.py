@@ -31,7 +31,6 @@ class ReactionGenerator:
         self.spm = spm
 
     def generate_reactions(self, reactant_idx, model):
-        # order reactants such that they match
         matches = get_matching_patterns(self.reactant_pattern,
                                         [model.species[ix]
                                          for ix in reactant_idx])
@@ -73,24 +72,31 @@ class ReactionGenerator:
         ]
         # filter reactions with duplicate products, is there a smarter way?
         return {
-            rxn['products']: rxn
+            tuple(sorted(rxn['products'])): rxn
             for rxn in reactions
         }.values()
 
     def _generate_reaction(self, reactant_indices, reactant_mapping,
                            reactant_graph, model):
 
+        # accounts for symmetries in educts
         sfactor = _compute_stat_factor(reactant_indices)
+
         reactants = [model.species[ix] for ix in reactant_indices]
 
         product_graph = self.graph_diff.apply(
             reactant_mapping, reactant_graph, self.delete_molecules
         )
 
-        products = ReactionPattern._from_graph(product_graph).complex_patterns
+        products_pattern = ReactionPattern._from_graph(product_graph)
+        if products_pattern is not None:
+            products = products_pattern.complex_patterns
+        else:
+            products = [None]
 
         self.fix_compartments(products, model)
 
+        # accounts for molecule/species transport
         vfactor = _compute_volume_factor(
             *self.graph_diff.compartment_transport
         )
@@ -105,7 +111,8 @@ class ReactionGenerator:
             'reactants': reactant_indices,
             'products': tuple(self.spm.match(product, index=True,
                                              exact=True)[0]
-                              for product in products)
+                              for product in products
+                              if product is not None)
         }
         return reaction
 

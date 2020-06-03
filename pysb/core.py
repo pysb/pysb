@@ -696,16 +696,22 @@ class MonomerPattern(object):
         site_conditions = dict()
         site_states = defaultdict(list)
         for site in graph.neighbors(monomer_node):
-            if isinstance(graph.nodes[site]['id'], Compartment):
-                compartment = graph.nodes[site]['id']
-            elif isinstance(graph.nodes[site]['id'], str) and \
-                    graph.nodes[site]['id'] == 'NoBond':
-                continue
-            else:
-                site_states[graph.nodes[site]['id']].append(
-                    site_condition_from_node(graph, monomer, site, bonds,
-                                             bond_count)
-                )
+            if isinstance(graph.nodes[site]['id'], str):
+                if graph.nodes[site]['id'] == 'NoBond':
+                    continue
+
+                if graph.nodes[site]['id'] == 'cpt':
+                    compartment = next(
+                        graph.nodes[n]['id']
+                        for n in graph.neighbors(site)
+                        if isinstance(graph.nodes[n]['id'], Compartment)
+                    )
+                    continue
+
+            site_states[graph.nodes[site]['id']].append(
+                site_condition_from_node(graph, monomer, site, bonds,
+                                         bond_count)
+            )
 
         for site, states in site_states.items():
             if len(states) == 0:
@@ -713,7 +719,7 @@ class MonomerPattern(object):
             elif len(states) == 1:
                 site_condition = states[0]
             else:
-                site_condition = MultiState(states)
+                site_condition = MultiState(*states)
             site_conditions[site] = site_condition
 
         return cls(monomer, site_conditions, compartment)
@@ -1085,7 +1091,10 @@ class ComplexPattern(object):
             if mp.compartment or self.compartment:
                 cpt_node_id = add_or_get_compartment_node(mp.compartment or
                                                           self.compartment)
-                g.add_edge(mon_node_id, cpt_node_id)
+                cpt_id = f'{mp_id}_cpt'
+                g.add_node(cpt_id, id='cpt', mp_id=mp_id)
+                g.add_edge(mon_node_id, cpt_id)
+                g.add_edge(cpt_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
                 if isinstance(state_or_bond, MultiState):

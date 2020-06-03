@@ -5,36 +5,38 @@ from collections import Counter
 
 from .test_importers import _bngl_location, model_from_bngl
 
+import sympy as sp
+
 
 def test_reaction_generation():
-    for filename in (#'CaOscillate_Func',
-                     #'continue',
-                     #'deleteMolecules',
-                     #'egfr_net',
-                     #'empty_compartments_block',
-                     #'gene_expr',
-                     #'gene_expr_func',
-                     #'gene_expr_simple',
-                     #'isomerization',
-                     #'localfunc',
-                     #'michment',
+    for filename in ('CaOscillate_Func',
+                     'continue',
+                     'deleteMolecules',
+                     # 'egfr_net', currently takes exceedingly long
+                     'empty_compartments_block',
+                     'gene_expr',
+                     'gene_expr_func',
+                     'gene_expr_simple',
+                     'isomerization',
+                     'localfunc',
+                     'michment',
                      'Motivating_example_cBNGL',
-                     #'motor',
-                     #'simple_system',
-                     #'test_compartment_XML',
-                     #'test_setconc',
-                     #'test_synthesis_cBNGL_simple',
-                     #'test_synthesis_complex',
-                     #'test_synthesis_complex_0_cBNGL',
-                     #'test_synthesis_complex_source_cBNGL',
-                     #'test_synthesis_simple',
+                     'motor',
+                     'simple_system',
+                     'test_compartment_XML',
+                     'test_setconc',
+                     'test_synthesis_cBNGL_simple',
+                     'test_synthesis_complex',
+                     'test_synthesis_complex_0_cBNGL',
+                     'test_synthesis_complex_source_cBNGL',
+                     'test_synthesis_simple',
                      'toy-jim',
-                     #'univ_synth',
-                     #'visualize',
-                     #'Repressilator',
-                     'fceri_ji',
-                     #'test_paramname',
-                     #'tlmr'
+                     'univ_synth',
+                     'visualize',
+                     'Repressilator',
+                     # 'fceri_ji', currently takes exceedingly long
+                     'test_paramname',
+                     'tlmr'
                      ):
         full_filename = _bngl_location(filename)
         yield (compare_pysb_reactions_to_bng_reactions, full_filename)
@@ -73,7 +75,7 @@ def validate_reaction(rg, reactions_bng, m,):
     if not reactions_bng:
         return
 
-    # we can pick index 0 as reactants should all be the same
+    # we can pick index 0 as reactants are all the same
     reactions_pysb = rg.generate_reactions(reactions_bng[0]['reactants'], m)
 
     # reactions_pysb and reactions_bng are not equally ordered so we check
@@ -85,3 +87,6 @@ def validate_reaction(rg, reactions_bng, m,):
             Counter(rxn_bng['products']) == Counter(rxn_pysb['products'])
             for rxn_bng in reactions_bng
         )
+        assert sp.simplify(
+            reactions_bng[0]['rate'] - reactions_pysb[0]['rate']
+        ).is_zero
