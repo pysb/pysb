@@ -953,7 +953,7 @@ def parse_bngl_expr(text, *args, **kwargs):
         lambda cond, t, f: sympy.Piecewise((t, cond), (f, True))
     )
     # Check for unsupported constructs.
-    if expr.has('time'):
+    if expr.has(sympy.Symbol('time')):
         raise ValueError(
             "Expressions referencing simulation time are not supported"
         )
