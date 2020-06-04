@@ -541,6 +541,7 @@ def normalize_state(states):
     else:
         raise ValueError('Failed to reconstruct site condition from node')
 
+
 NO_BOND = 'NoBond'
 
 
@@ -1047,9 +1048,6 @@ class ComplexPattern(object):
         def _handle_site_instance(state_or_bond, site, mp_id, state_index=0):
             site_index = mp.monomer.sites.index(site)
             mon_site_id = f'{mp_id}_s{site_index}_{state_index}'
-            g.add_node(mon_site_id, id=site, mp_id=mp_id,
-                       state_index=state_index)
-            g.add_edge(mon_node, mon_site_id)
             state = None
             bond_num = None
             if state_or_bond is WILD:
@@ -1064,6 +1062,10 @@ class ComplexPattern(object):
             elif state_or_bond is not ANY and state_or_bond is not None:
                 raise ValueError('Unrecognized state: {}'.format(
                     state_or_bond))
+
+            g.add_node(mon_site_id, id=site, mp_id=mp_id,
+                       state_index=state_index)
+            g.add_edge(mon_node, mon_site_id)
 
             if state_or_bond is ANY or bond_num is ANY:
                 bond_num = any_bond_tester
