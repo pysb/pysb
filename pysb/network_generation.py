@@ -6,6 +6,9 @@ import itertools
 import math
 
 from .core import ReactionPattern, Monomer, NO_BOND, Compartment
+from .core import (
+    ReactionPattern, Monomer, NO_BOND, Compartment, Expression, Tag, autoinc
+)
 from .pattern import match_complex_pattern
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
@@ -13,7 +16,7 @@ from collections import ChainMap, Counter
 
 
 class ReactionGenerator:
-    def __init__(self, rule, reverse, spm):
+    def __init__(self, rule, reverse, spm, model):
         self.name = rule.name
         self.reverse = reverse,
         self.reactant_pattern = rule.product_pattern if reverse else \
@@ -27,8 +30,47 @@ class ReactionGenerator:
 
         self.delete_molecules = rule.delete_molecules
 
-        self.graph_diff = GraphDiff(self, rule.move_connected)
+        self.graph_diff = GraphDiffGenerator(self, rule.move_connected)
         self.spm = spm
+
+        self._needs_rate_localization = isinstance(self.rate, Expression) \
+            and isinstance(self.rate.expr.func,
+                           sp.function.UndefinedFunction) \
+            and any(isinstance(a, Tag) for a in self.rate.expr.atoms())
+
+        if self._needs_rate_localization:
+            rate = self.rate
+            tags = tuple(a for a in rate.expr.atoms() if isinstance(a, Tag))
+            self._tag_rp_ids = tuple(
+                next(
+                    icp for icp, cp in enumerate(
+                        self.reactant_pattern.complex_patterns
+                    )
+                    if cp._tag is not None and cp._tag.name == tag.name
+                )
+                for tag in tags
+            )
+            # creates a function that evaluates observable functions of tags
+            # according to the matching count of the respectively provided
+            # ComplexPattern
+            self._localfunc = sp.lambdify(
+                tags,
+                model.expressions[rate.expr.func.name].expr,
+                modules=[
+                    {par.name: par for par in model.parameters},
+                    {expr.name: expr for expr in model.expressions},
+                    {
+                        obs.name: lambda x: sum(match_complex_pattern(
+                            cp, x, count=True
+                        ) for cp in obs.reaction_pattern.complex_patterns)
+                        for obs in model.observables
+                    }
+                ]
+            )
+        else:
+            self._tags = tuple()
+            self._tag_rp_ids = tuple()
+            self._localfunc = None
 
     def generate_reactions(self, reactant_idx, model):
         matches = get_matching_patterns(self.reactant_pattern,
@@ -56,6 +98,13 @@ class ReactionGenerator:
             )
         ]
 
+    def is_species_transport(self):
+        for cpt in self.graph_diff.compartment_transport:
+            if cpt is None:
+                return False
+
+        return True
+
     def _generate_reactions_mapped_cps(self, reactant_indices, model):
         reactants = [model.species[ix] for ix in reactant_indices]
         reactant_mappings, mp_alignment_cp = \
@@ -65,28 +114,32 @@ class ReactionGenerator:
             mp_alignment_cp
         )
 
+        graph_diffs = set(
+            self.graph_diff.generate(mapping)
+            for mapping in reactant_mappings
+        )
+
         reactions = [
-            self._generate_reaction(reactant_indices, reactant_mapping,
+            self._generate_reaction(reactant_indices, graph_diff,
                                     reactant_graph, model)
-            for reactant_mapping in reactant_mappings
+            for graph_diff in graph_diffs
         ]
-        # filter reactions with duplicate products, is there a smarter way?
-        return {
-            tuple(sorted(rxn['products'])): rxn
-            for rxn in reactions
-        }.values()
+        # summarize reactions with duplicate products by adding rates
+        rxns = dict()
+        for rxn in reactions:
+            normalized_products = tuple(sorted(rxn['products']))
+            if normalized_products in rxns:
+                rxns[normalized_products]['rate'] += rxn['rate']
+            else:
+                rxns[normalized_products] = rxn
 
-    def _generate_reaction(self, reactant_indices, reactant_mapping,
+        return rxns.values()
+
+    def _generate_reaction(self, reactant_indices, graph_diff,
                            reactant_graph, model):
-
-        # accounts for symmetries in educts
-        sfactor = _compute_stat_factor(reactant_indices)
-
         reactants = [model.species[ix] for ix in reactant_indices]
 
-        product_graph = self.graph_diff.apply(
-            reactant_mapping, reactant_graph, self.delete_molecules
-        )
+        product_graph = graph_diff.apply(reactant_graph, self.delete_molecules)
 
         products_pattern = ReactionPattern._from_graph(product_graph)
         if products_pattern is not None:
@@ -97,22 +150,30 @@ class ReactionGenerator:
         self.fix_compartments(products, model)
 
         # accounts for molecule/species transport
-        vfactor = _compute_volume_factor(
-            *self.graph_diff.compartment_transport
-        )
+        vfactor = _compute_volume_factor(reactants, products)
+
+        rate = self._localize_rate(reactants)
+
+        product_indices = tuple(self.spm.match(product, index=True,
+                                               exact=True)[0]
+                                for product in products
+                                if product is not None)
+
+        # accounts for symmetries in educts
+        sfactor = _compute_stat_factor(reactant_indices)
 
         reaction = {
             'rule': self.name,
-            'rate': self.rate * vfactor * sfactor * np.prod([
+            'rate': rate * vfactor * sfactor * np.prod([
                 sp.Symbol(f'__s{ix}') for ix in reactant_indices
             ]),
+            'reactants': reactant_indices,
+            'products': product_indices,
+            'base_rate': rate,
+            'volume_factor': vfactor,
+            'stat_factor': sfactor,
             'product_patterns': products,
             'reactant_patterns': reactants,
-            'reactants': reactant_indices,
-            'products': tuple(self.spm.match(product, index=True,
-                                             exact=True)[0]
-                              for product in products
-                              if product is not None)
         }
         return reaction
 
@@ -156,12 +217,6 @@ class ReactionGenerator:
     def _compute_reactant_mapping(self, reactants):
         node_matcher = categorical_node_match('id', default=None)
 
-        def autoinc():
-            i = 0
-            while True:
-                yield i
-                i += 1
-
         # alignment of mps in cps of pattern allows merging of mappings through
         # ChainMap, also enables us to apply the graph diff to the graph of the
         # reactant pattern of all cps in pattern in the end
@@ -186,7 +241,9 @@ class ReactionGenerator:
         # compute all isomorphisms for each reactant
         matches = [
             [mapping for mapping in gm.subgraph_isomorphisms_iter()]
-            for gm in gms
+            if not cp.match_once and not self.is_species_transport()
+            else [next(gm.subgraph_isomorphisms_iter())]
+            for cp, gm in zip(self.reactant_pattern.complex_patterns, gms)
         ]
 
         # invert and merge mappings for the product of isomorphisms for all
@@ -199,8 +256,77 @@ class ReactionGenerator:
             for mappings in itertools.product(*matches)
         ], mp_alignment_cp
 
+    def _localize_rate(self, reactants):
+        rate = self.rate
+        if self._needs_rate_localization:
+            rate = self._localfunc(*[reactants[i] for i in self._tag_rp_ids])
+
+        return rate
+
 
 class GraphDiff:
+    def __init__(self, removed_nodes, added_nodes, added_edges,
+                 removed_edges, changed_node_ids):
+        self.removed_nodes = removed_nodes
+        self.added_nodes = added_nodes
+        self.added_edges = added_edges
+        self.removed_edges = removed_edges
+        self.changed_node_ids = changed_node_ids
+
+    def __hash__(self):
+        return hash((
+            # use frozenset such that ordering doesnt matter
+            frozenset((k, v) for k, v in self.changed_node_ids.items()),
+            # convert values to strings such that Components become hashable
+            frozenset((name, tuple((k, str(v)) for k, v in data.items()))
+                      for name, data in self.added_nodes),
+            frozenset(self.removed_nodes),
+            # edges must be ordered as they are undirected
+            *[frozenset(tuple(sorted(edge)) for edge in getattr(self, attr))
+              for attr in ['added_edges', 'removed_edges']]
+        ))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def apply(self, ingraph, delete_molecules):
+        outgraph = ingraph.copy()
+        dangling_bonds = []
+        if delete_molecules:
+            for node in self.removed_nodes:
+                if isinstance(outgraph.nodes[node]['id'], Monomer):
+                    neighborhood = nx.ego_graph(outgraph, node, 2)
+                    mp_id = outgraph.nodes[node]['mp_id']
+                    for n in neighborhood.nodes:
+                        if n in self.removed_nodes:
+                            continue  # skip removal here
+                        if outgraph.nodes[n]['mp_id'] == mp_id:
+                            outgraph.remove_node(n)  # remove nodes from
+                            # same monomer
+                        else:
+                            # dont fix dangling bonds here as we might mess
+                            # this up again when adding/removing nodes in
+                            # the next steps
+                            dangling_bonds.append(n)
+        outgraph.remove_nodes_from(self.removed_nodes)
+        outgraph.add_nodes_from(self.added_nodes)
+        outgraph.add_edges_from(self.added_edges)
+        outgraph.remove_edges_from(self.removed_edges)
+        if self.changed_node_ids:
+            nx.set_node_attributes(outgraph,
+                                   self.changed_node_ids, 'id')
+        # fix dangling bonds:
+        if delete_molecules:
+            for node in list(dangling_bonds):
+                mp_id = outgraph.nodes[node]['mp_id']
+                if f'{mp_id}_unbound' not in outgraph.nodes():
+                    outgraph.add_node(f'{mp_id}_unbound', id=NO_BOND,
+                                      mp_id=mp_id)
+                outgraph.add_edge(node, f'{mp_id}_unbound')
+        return outgraph
+
+
+class GraphDiffGenerator:
     def __init__(self, rg, move_connected):
         self.mp_alignment_rp, self.mp_alignment_pp = align_monomer_indices(
             rg.reactant_pattern,
@@ -310,101 +436,48 @@ class GraphDiff:
         else:
             self.changed_node_ids = {}
 
-        self._mapped_removed_edges = ()
-        self._mapped_added_edges = ()
-        self._mapped_removed_nodes = ()
-        self._mapped_added_nodes = ()
-        self._mapped_changed_node_ids = {}
-
         self.compartment_transport = (source_cpt, target_cpt)
 
-    def _apply_mapping(self, mapping):
+    def generate(self, mapping):
         mapped_mp_ids = {
             key.split('_')[0]: val.split('_')[0]
             for key, val in mapping.items()
             if key.split('_')[1] == 'monomer'
         }
-        extended_mapping = {
-            **mapping,
-            **{
-                f'{mp_id}_unbound': f'{mapped_mp_id}_unbound'
-                for mp_id, mapped_mp_id in mapping.items()
-            }
-        }
+
+        graph_diff = dict()
 
         for attr in ['removed_edges', 'added_edges']:
-            self.__setattr__(
-                f'_mapped_{attr}',
-                tuple(
-                    (extended_mapping.get(e[0], e[0]),
-                     extended_mapping.get(e[1], e[1]))
-                    for e in self.__getattribute__(attr)
-                )
+            graph_diff[attr] = tuple(
+                (mapping.get(e[0], e[0]),
+                 mapping.get(e[1], e[1]))
+                for e in self.__getattribute__(attr)
             )
 
-        self._mapped_removed_nodes = tuple(
-            extended_mapping[n]
+        graph_diff['removed_nodes'] = tuple(
+            mapping[n]
             for n in self.removed_nodes
         )
         # for newly synthesized monomers there exists no mapping in extended
         # mapping so we need to fall back to the reaction pattern mp_ids in
         # that case
-        self._mapped_added_nodes = tuple(
-            (extended_mapping.get(n, n),
+        graph_diff['added_nodes'] = tuple(
+            (mapping.get(n, n),
              dict(mp_id=mapped_mp_ids.get(d['mp_id'], d['mp_id']), id=d['id']))
             for n, d in self.added_nodes
         )
         if self.changed_node_ids:
-            self._mapped_changed_node_ids = {
-                extended_mapping.get(node, node): id
-                for node, id in self.changed_node_ids.items()
+            graph_diff['changed_node_ids'] = {
+                mapping.get(node, node): node_id
+                for node, node_id in self.changed_node_ids.items()
             }
+        else:
+            graph_diff['changed_node_ids'] = dict()
 
-    def apply(self, mapping, ingraph, delete_molecules):
-        self._apply_mapping(mapping)
-        outgraph = ingraph.copy()
-        dangling_bonds = []
-        if delete_molecules:
-            for node in self._mapped_removed_nodes:
-                if isinstance(outgraph.nodes[node]['id'], Monomer):
-                    neighborhood = nx.ego_graph(outgraph, node, 2)
-                    mp_id = outgraph.nodes[node]['mp_id']
-                    for n in neighborhood.nodes:
-                        if n in self._mapped_removed_nodes:
-                            continue  # skip removal here
-                        if outgraph.nodes[n]['mp_id'] == mp_id:
-                            outgraph.remove_node(n)  # remove nodes from
-                            # same monomer
-                        else:
-                            # dont fix dangling bonds here as we might mess
-                            # this up again when adding/removing nodes in
-                            # the next steps
-                            dangling_bonds.append(n)
-        outgraph.remove_nodes_from(self._mapped_removed_nodes)
-        outgraph.add_nodes_from(self._mapped_added_nodes)
-        outgraph.add_edges_from(self._mapped_added_edges)
-        outgraph.remove_edges_from(self._mapped_removed_edges)
-        if self._mapped_changed_node_ids:
-            nx.set_node_attributes(outgraph,
-                                   self._mapped_changed_node_ids, 'id')
-        # fix dangling bonds:
-        if delete_molecules:
-            for node in list(dangling_bonds):
-                mp_id = outgraph.nodes[node]['mp_id']
-                if f'{mp_id}_unbound' not in outgraph.nodes():
-                    outgraph.add_node(f'{mp_id}_unbound', id=NO_BOND,
-                                      mp_id=mp_id)
-                outgraph.add_edge(node, f'{mp_id}_unbound')
-        return outgraph
+        return GraphDiff(**graph_diff)
 
 
 def align_monomer_indices(reactantpattern, productpattern):
-    def autoinc():
-        i = 0
-        while True:
-            yield i
-            i += 1
-
     mp_count = autoinc()
     rp_alignment = [
         [next(mp_count) for _ in cp.monomer_patterns]
@@ -459,11 +532,30 @@ def get_matching_patterns(reactant_pattern, species):
     ])
 
 
-def _compute_volume_factor(compartment_reactants, compartment_products):
+def _compute_volume_factor(reactants, products):
+    # converts intrinsic rates to extrinsic rates, for reference see
+    # bionetgen/bng2/Perl2/Rxn.pm::get_intensive_to_extensive_units_conversion
     volume_factor = 1
-    if compartment_reactants is not None and compartment_products is not None \
-            and compartment_products.name != compartment_reactants.name:
-        volume_factor = 1 * compartment_products.size.value
+    rcpt = [r.species_compartment() for r in reactants
+            if r is not None]
+    rcpt = [cpt for cpt in rcpt if cpt is not None]
+    if rcpt:
+        surfaces = [cpt for cpt in rcpt if cpt.dimension == 2]
+        volumes = [cpt for cpt in rcpt if cpt.dimension == 3]
+        if surfaces:
+            surfaces.pop(0)
+        else:
+            volumes.pop(0)
+
+        for cpt in surfaces + volumes:
+            volume_factor /= cpt.size.value
+    else:
+        for cpt in [p.species_compartment() for p in products
+                    if p is not None]:
+            if cpt is not None:
+                volume_factor *= cpt.size.value
+                break
+
     return volume_factor
 
 
@@ -472,7 +564,7 @@ def _compute_stat_factor(reactant_indices):
     for count in Counter(reactant_indices).values():
         if count == 1:
             continue  # avoid conversion to float to keep consistent with bng
-        stat_factor *= 1 / math.factorial(count)
+        stat_factor /= math.factorial(count)
     return stat_factor
 
 

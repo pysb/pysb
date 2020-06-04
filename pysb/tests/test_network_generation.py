@@ -1,6 +1,7 @@
 from pysb.network_generation import ReactionGenerator
 from pysb.bng import generate_equations
 from pysb.pattern import SpeciesPatternMatcher
+from pysb.core import Expression, Observable
 from collections import Counter
 
 from .test_importers import _bngl_location, model_from_bngl
@@ -36,8 +37,7 @@ def test_reaction_generation():
                      'Repressilator',
                      # 'fceri_ji', currently takes exceedingly long
                      'test_paramname',
-                     'tlmr'
-                     ):
+                     'tlmr'):
         full_filename = _bngl_location(filename)
         yield (compare_pysb_reactions_to_bng_reactions, full_filename)
 
@@ -49,10 +49,10 @@ def compare_pysb_reactions_to_bng_reactions(bng_file):
     for rule in m.rules:
         reactions = [r for r in m.reactions if rule.name in r['rule']]
 
-        rg_forward = ReactionGenerator(rule, False, spm)
+        rg_forward = ReactionGenerator(rule, False, spm, m)
         requires_reverse = any(True in r['reverse'] for r in reactions)
         if requires_reverse:
-            rg_reverse = ReactionGenerator(rule, True, spm)
+            rg_reverse = ReactionGenerator(rule, True, spm, m)
 
         # reactions with the same reactants can have multiple different
         # products depending on the matching between reactant_pattern and
@@ -87,6 +87,21 @@ def validate_reaction(rg, reactions_bng, m,):
             Counter(rxn_bng['products']) == Counter(rxn_pysb['products'])
             for rxn_bng in reactions_bng
         )
-        assert sp.simplify(
-            reactions_bng[0]['rate'] - reactions_pysb[0]['rate']
-        ).is_zero
+
+        rate_bng = _expand_rate(reactions_bng[0]['rate'])
+        rate_pysb = _expand_rate(reactions_pysb[0]['rate'])
+        assert sp.simplify(rate_pysb - rate_bng).is_zero
+
+
+def _expand_rate(rate):
+    subs = []
+    for a in rate.atoms():
+        if isinstance(a, Expression):
+            subs.append((a, a.expand_expr(
+                expand_observables=True)))
+        elif isinstance(a, Observable):
+            subs.append((a, a.expand_obs()))
+    rate = rate.subs(subs)
+    rate = sp.powdenest(sp.logcombine(rate, force=True),
+                        force=True)
+    return rate

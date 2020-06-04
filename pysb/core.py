@@ -12,7 +12,7 @@ import sympy
 import scipy.sparse
 import networkx as nx
 from collections.abc import Iterable, Mapping, Sequence, Set
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 try:
     reload
@@ -403,7 +403,7 @@ def validate_site_value(state, monomer=None, site=None, _in_multistate=False):
             raise ValueError('Cannot nest MultiState within each other')
 
         if monomer and site:
-            site_counts = collections.Counter(monomer.sites)
+            site_counts = Counter(monomer.sites)
             if len(state) > site_counts[site]:
                 raise ValueError(
                     'MultiState for site "{}" on monomer "{}" has maximum '
@@ -638,7 +638,7 @@ class MonomerPattern(object):
 
         'Site-concrete' means all sites have specified conditions."""
         dup_sites = {k: v for k, v in
-                     collections.Counter(self.monomer.sites).items() if v > 1}
+                     Counter(self.monomer.sites).items() if v > 1}
         if len(self.site_conditions) != len(self.monomer.sites) and \
                 not dup_sites:
             return False
@@ -939,6 +939,10 @@ class ComplexPattern(object):
                 # any node
                 elif d['id'].dimension == 2 and graph.degree(n) > 0:
                     compartment = d['id']
+
+        if all(mp.compartment is not None for mp in mps):
+            compartment = None  # don't provide redundant compartment defintion
+
         if mps:
             return cls(mps, compartment)
         else:
@@ -1039,7 +1043,8 @@ class ComplexPattern(object):
         def _handle_site_instance(state_or_bond, site, mp_id, state_index=0):
             site_index = mp.monomer.sites.index(site)
             mon_site_id = f'{mp_id}_s{site_index}_{state_index}'
-            g.add_node(mon_site_id, id=site, mp_id=mp_id)
+            g.add_node(mon_site_id, id=site, mp_id=mp_id,
+                       state_index=state_index)
             g.add_edge(mon_node_id, mon_site_id)
             state = None
             bond_num = None
@@ -1061,10 +1066,6 @@ class ComplexPattern(object):
 
             if state_or_bond is ANY or bond_num is ANY:
                 bond_num = any_bond_tester
-                any_bond_tester_id = f'{mp_id}_s{site_index}_{state_index}b'
-                g.add_node(any_bond_tester_id, id=any_bond_tester,
-                           mp_id=mp_id)
-                g.add_edge(mon_site_id, any_bond_tester_id)
 
             if state is not None:
                 mon_site_state_id = f'{mp_id}_s{site_index}_{state_index}c'
@@ -1075,13 +1076,6 @@ class ComplexPattern(object):
                 unbound_sites.append(mon_site_id)
             elif isinstance(bond_num, int):
                 bond_edges[bond_num].append(mon_site_id)
-
-            # Unbound edges
-            if unbound_sites:
-                no_bond_id = f'{mp_id}_unbound'
-                g.add_node(no_bond_id, id=NO_BOND, mp_id=mp_id)
-                for unbound_site in unbound_sites:
-                    g.add_edge(unbound_site, no_bond_id)
 
         for imp, mp in zip(mp_alignment, self.monomer_patterns):
             mp_id = f'{prefix}{imp}'
@@ -1103,6 +1097,31 @@ class ComplexPattern(object):
                      for istate, state in enumerate(state_or_bond)]
                 else:
                     _handle_site_instance(state_or_bond, site, mp_id)
+
+                # always adding an unbound node implicitely matches ANY to
+                # cases where nothing is specified as both pattern graph and
+                # candidate graph will always contains both the node for the
+                # site and the unbound node. When a site is specified as
+                # ANY, there won't be any edge between the two nodes in the
+                # pattern graph and there thus must not be any edge between
+                # the two nodes in the candidate graph, i.e. there site must
+                # not be unbound. This implementation does not lead to
+                # multiple matches of ANY to sites that have multiple bonds
+                # as it explicitely checks for "not not bound" instead of
+                # "bound".
+                # Having individual unbound nodes for every mp prevents mps
+                # that arent bound to each other have connected graphs.
+                no_bond_id = f'{mp_id}_unbound'
+                g.add_node(no_bond_id, id=NO_BOND, mp_id=mp_id)
+                for unbound_site in unbound_sites:
+                    g.add_edge(unbound_site, no_bond_id)
+
+                # we explicitely always add this edge such that it is clear
+                # to which MonomerPattern this unbound node belongs,
+                # otherwise this may mess up the mapping between graphs
+                g.add_edge(mon_node_id, no_bond_id)
+
+
 
         # Add bond edges
         for site_nodes in bond_edges.values():
@@ -1178,8 +1197,7 @@ class ComplexPattern(object):
         kwargs = extract_site_conditions(conditions, **kwargs)
 
         # Ensure we don't have more than one of any Monomer in our patterns.
-        mon_counts = collections.Counter(mp.monomer.name for mp in
-                                         self.monomer_patterns)
+        mon_counts = Counter(mp.monomer.name for mp in self.monomer_patterns)
         dup_monomers = [mon for mon, count in mon_counts.items() if count > 1]
         if dup_monomers:
             raise DuplicateMonomerError("ComplexPattern has duplicate "
