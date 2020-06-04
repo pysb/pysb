@@ -429,10 +429,11 @@ class GraphDiff:
         if delete_molecules:
             for node in list(dangling_bonds):
                 mp_id = outgraph.nodes[node]['mp_id']
-                if f'{mp_id}_unbound' not in outgraph.nodes():
-                    outgraph.add_node(f'{mp_id}_unbound', id=NO_BOND,
+                unbound_node = f'{mp_id}_unbound'
+                if unbound_node not in outgraph.nodes():
+                    outgraph.add_node(unbound_node, id=NO_BOND,
                                       mp_id=mp_id)
-                outgraph.add_edge(node, f'{mp_id}_unbound')
+                outgraph.add_edge(node, unbound_node)
         return outgraph
 
 
@@ -464,6 +465,11 @@ class GraphDiffGenerator:
         otherwise tuple of `None`
     """
     def __init__(self, rg, move_connected):
+        # to compute the graph diff we cannot match reactant pattern and
+        # product pattern using isomorphism matching. Instead, we follow
+        # what bng does and implement a left to right matching based on
+        # monomer names of monomer patterns, taking into account tagged
+        # patterns
         self.mp_alignment_rp, self.mp_alignment_pp = align_monomer_indices(
             rg.reactant_pattern,
             rg.product_pattern
@@ -627,16 +633,16 @@ class GraphDiffGenerator:
         return GraphDiff(**graph_diff)
 
 
-def align_monomer_indices(reactantpattern, productpattern):
+def align_monomer_indices(rp, pp):
     """
     Align MonomerPatterns in reactant and product ReactionPattern. This
     implements left to right matching respecting tags.
 
     Parameters
     ----------
-    reactantpattern: ReactionPattern
+    rp: ReactionPattern
         ReactantPattern
-    productpattern: ReactionPattern
+    pp: ReactionPattern
         ProductPattern
 
     Return
@@ -647,27 +653,33 @@ def align_monomer_indices(reactantpattern, productpattern):
     mp_count = autoinc()
     rp_alignment = [
         [next(mp_count) for _ in cp.monomer_patterns]
-        for cp in reactantpattern.complex_patterns
+        for cp in rp.complex_patterns
     ]
 
-    rp_monos = [
-        mp.monomer.name
-        for cp in reactantpattern.complex_patterns
-        for mp in cp.monomer_patterns
-    ]
+    def tag_label(cp, mp):
+        label = ''
+        # use a reserved character here to avoid matches to actual monomer
+        # names
+        if cp._tag is not None:
+            label += '#cp' + cp._tag.name
+        if mp._tag is not None:
+            label += '#mp' + mp._tag.name
 
-    pp_monos = {
-        (icp, imp): mp.monomer.name
-        for icp, cp in enumerate(productpattern.complex_patterns)
+        return label
+
+    pp_monos, rp_monos = [{
+        (icp, imp):
+            mp.monomer.name + tag_label(cp, mp)
+        for icp, cp in enumerate(reaction_pattern.complex_patterns)
         for imp, mp in enumerate(cp.monomer_patterns)
-    }
+    } for reaction_pattern in [pp, rp]]
 
     pp_alignment = [
         [np.NaN] * len(cp.monomer_patterns)
-        for cp in productpattern.complex_patterns
+        for cp in pp.complex_patterns
     ]
 
-    for imono, rp_mono in enumerate(rp_monos):
+    for imono, ((_, _), rp_mono) in enumerate(rp_monos.items()):
         # find first MonomerPattern in productpattern with same monomer name
         index = next((
             (icp, imp) for (icp, imp), pp_mono in pp_monos.items()
