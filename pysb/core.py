@@ -1067,7 +1067,7 @@ class ComplexPattern(object):
 
             if state_or_bond is ANY or bond_num is ANY:
                 bond_num = any_bond_tester
-                any_bond_tester_node = f'{mp_id}_s{site_index}b'
+                any_bond_tester_node = f'{mp_id}_s{site_index}_{state_index}b'
                 g.add_node(any_bond_tester_node, id=any_bond_tester)
                 g.add_edge(mon_site_id, any_bond_tester_node)
 

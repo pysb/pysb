@@ -112,6 +112,7 @@ class ReactionGenerator:
         cp_indices = {
             tuple(np.unique(indices)): indices
             for indices in itertools.product(*educt_matches)
+            # don't reuse reactants multiple times
             if len(np.unique(indices)) == len(reactant_idx)
         }.values()
 
