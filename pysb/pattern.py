@@ -264,7 +264,7 @@ def check_dangling_bonds(pattern):
                               '{}'.format(reused_bonds, pattern))
 
 
-def _match_graphs(pattern, candidate, count, exact):
+def _match_graphs(pattern, candidate, exact, count):
     """ Compare two pattern graphs for isomorphism """
     node_matcher = categorical_node_match('id', default=None)
     if exact:
@@ -330,7 +330,7 @@ def match_complex_pattern(pattern, candidate, exact=False, count=False):
 
     # If we've got this far, we'll need to do a full pattern match
     # by searching for a graph isomorphism
-    return _match_graphs(pattern, candidate, count, exact)
+    return _match_graphs(pattern, candidate, exact=exact, count=count)
 
 
 def match_reaction_pattern(pattern, candidate):

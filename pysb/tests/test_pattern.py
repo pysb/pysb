@@ -4,7 +4,7 @@ from pysb.examples import robertson, bax_pore, bax_pore_sequential, \
 from pysb.bng import generate_equations
 from nose.tools import assert_raises
 from pysb import as_complex_pattern, as_reaction_pattern, ANY, WILD, \
-    Monomer, Model, Compartment, Tag, MultiState
+    Monomer, Model, Compartment
 import collections
 
 
