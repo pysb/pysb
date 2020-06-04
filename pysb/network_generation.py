@@ -429,12 +429,9 @@ class GraphDiff:
         # fix dangling bonds:
         if delete_molecules:
             for node in list(dangling_bonds):
-                mp_id = outgraph.nodes[node]['mp_id']
-                unbound_node = f'{mp_id}_unbound'
-                if unbound_node not in outgraph.nodes():
-                    outgraph.add_node(unbound_node, id=NO_BOND,
-                                      mp_id=mp_id)
-                outgraph.add_edge(node, unbound_node)
+                if NO_BOND not in outgraph.nodes():
+                    outgraph.add_node(NO_BOND, id=NO_BOND)
+                outgraph.add_edge(node, NO_BOND)
         return outgraph
 
 
@@ -599,7 +596,8 @@ class GraphDiffGenerator:
         mapped_mp_ids = {
             key.split('_')[0]: val.split('_')[0]
             for key, val in mapping.items()
-            if key.split('_')[1] == 'monomer'
+            if len(key.split('_')) > 1
+            and key.split('_')[1] == 'monomer'
         }
 
         graph_diff = dict()

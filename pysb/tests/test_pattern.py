@@ -87,7 +87,8 @@ def test_patternmatching_multibinding():
     Model()
     A = Monomer('A', sites=['a', 'b'], site_states={'b': ['x', 'y']})
     assert match_complex_pattern(
-        A(a=ANY, b='x'), A(a=1, b='y') % A(a=[1, 2], b='x') % A(a=2, b='y'),
+        as_complex_pattern(A(a=ANY, b='x')),
+        A(a=1, b='y') % A(a=[1, 2], b='x') % A(a=2, b='y'),
         count=True
     ) == 2
 

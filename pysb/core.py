@@ -1079,7 +1079,7 @@ class ComplexPattern(object):
                 g.add_edge(mon_site_id, mon_site_state_id)
 
             if bond_num is None:
-                unbound_sites.append(mon_site_id)
+                bond_edges[NO_BOND].append(mon_site_id)
             elif isinstance(bond_num, int):
                 bond_edges[bond_num].append(mon_site_id)
             elif isinstance(bond_num, list):
@@ -1089,7 +1089,6 @@ class ComplexPattern(object):
         for imp, mp in zip(mp_alignment, self.monomer_patterns):
             mp_id = f'{prefix}{imp}'
             mon_node = f'{mp_id}_monomer'
-            unbound_sites = []
             g.add_node(mon_node, id=mp.monomer, mp_id=mp_id)
             if mp.compartment or self.compartment:
                 cpt_node_id = add_or_get_compartment_node(mp.compartment or
@@ -1107,15 +1106,19 @@ class ComplexPattern(object):
                 else:
                     _handle_site_instance(state_or_bond, site, mp_id)
 
-            if unbound_sites is not None:
-                unboundno_node = f'{mp_id}_unbound'
-                g.add_node(unboundno_node, id=NO_BOND, mp_id=mp_id)
-                g.add_edge(mon_node, unboundno_node)
-                for unbound_site in unbound_sites:
-                    g.add_edge(unbound_site, unboundno_node)
+        unbound_sites = bond_edges.pop(NO_BOND, None)
+        if unbound_sites is not None:
+            g.add_node(NO_BOND, id=NO_BOND, mp_id=None)
+            for unbound_site in unbound_sites:
+                g.add_edge(unbound_site, NO_BOND)
 
         # Add bond edges
         for site_nodes in bond_edges.values():
+            if len(site_nodes) == 1:
+                # Treat dangling bond as WILD
+                any_bond_tester_id = 'wild'
+                g.add_node(any_bond_tester_id, id=any_bond_tester)
+                g.add_edge(site_nodes[0], any_bond_tester_id)
             for n1, n2 in itertools.combinations(site_nodes, 2):
                 g.add_edge(n1, n2)
 
@@ -1412,7 +1415,9 @@ class ReactionPattern(object):
         compartments = {n for n, d in graph.nodes(data=True)
                         if isinstance(d['id'], Compartment)}
         components = nx.connected_components(
-            graph.subgraph([n for n in graph.nodes if n not in compartments])
+            graph.subgraph([n for n in graph.nodes
+                            if n not in compartments
+                            and n is not NO_BOND])
         )
         # we need re-add compartments for proper reconstruction of complex
         # patterns. extraneous compartments will be safely ignored as they
