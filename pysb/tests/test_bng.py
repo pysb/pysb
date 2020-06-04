@@ -329,3 +329,8 @@ def test_parse_bngl_expression_and_or_equals():
     assert parse_bngl_expr('x and y') == sympy.And(x, y)
     assert parse_bngl_expr('x or y') == sympy.Or(x, y)
     assert parse_bngl_expr('x == y') == sympy.Eq(x, y)
+
+
+def test_bng_boolean_multiply_number():
+    assert parse_bngl_expr('(2 > 1) * 4') == 4
+    assert parse_bngl_expr('4 * (2 > 1)') == 4

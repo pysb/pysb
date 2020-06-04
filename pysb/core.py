@@ -782,6 +782,9 @@ class MonomerPattern(object):
     def __or__(self, other):
         return build_rule_expression(self, other, True)
 
+    def __ror__(self, other):
+        return build_rule_expression(other, self, True)
+
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
                       "version of PySB. Use '|' instead.",
@@ -1278,6 +1281,9 @@ class ComplexPattern(object):
 
     def __or__(self, other):
         return build_rule_expression(self, other, True)
+
+    def __ror__(self, other):
+        return build_rule_expression(other, self, True)
 
     def __ne__(self, other):
         warnings.warn("'<>' for reversible rules will be removed in a future "
@@ -2169,6 +2175,7 @@ class Model(object):
                 self.add_component(component)
                 component._do_export()
             self.initials = model_copy.initials
+            self.annotations = model_copy.annotations
 
     def __getstate__(self):
         state = self.__dict__.copy()
