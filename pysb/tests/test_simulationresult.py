@@ -218,7 +218,7 @@ def _check_resultsets_equal(res1, res2):
         for k, v in res1.initials.items():
             assert np.allclose(res1.initials[k], v)
 
-    assert np.allclose(res1._yobs_view, res1._yobs_view)
+    assert np.allclose(res1._yobs_view, res2._yobs_view)
     if res1._model.expressions_dynamic():
         assert np.allclose(res1._yexpr_view, res2._yexpr_view)
 
