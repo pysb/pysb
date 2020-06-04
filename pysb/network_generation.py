@@ -5,7 +5,6 @@ import sympy as sp
 import itertools
 import math
 
-from .core import ReactionPattern, Monomer, NO_BOND, Compartment
 from .core import (
     ReactionPattern, Monomer, NO_BOND, Compartment, Expression, Tag, autoinc
 )
