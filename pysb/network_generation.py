@@ -705,15 +705,16 @@ def get_matching_patterns(reactant_pattern, species):
 
     Parameters
     ----------
-    reactantpattern: ReactionPattern
-        ReactantPattern
-    productpattern: ReactionPattern
-        ProductPattern
+    reactant_pattern: ReactionPattern
+        ReactionPattern that defines the set of patterns against which to match
+    species: Sequence[ComplexPattern]
+        sequence of ComplexPatterns that will be checked for matches
 
     Return
     ------
     matches: np.ndarray
-        matrix of boolean values indicating whether there is a match
+        matrix of boolean values indicating whether there is a match,
+        shape is (#patterns, #species)
     """
     return np.asarray([
             [

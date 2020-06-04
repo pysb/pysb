@@ -870,7 +870,6 @@ class ComplexPattern(object):
         self.match_once = match_once
         self._graph = None
         self._tag = None
-        self._canonical_form = None
 
     def is_concrete(self):
         """
@@ -1050,15 +1049,14 @@ class ComplexPattern(object):
             mon_site_id = f'{mp_id}_s{site_index}_{state_index}'
             g.add_node(mon_site_id, id=site, mp_id=mp_id,
                        state_index=state_index)
-            g.add_edge(mon_node_id, mon_site_id)
+            g.add_edge(mon_node, mon_site_id)
             state = None
             bond_num = None
             if state_or_bond is WILD:
                 return
             elif isinstance(state_or_bond, basestring):
                 state = state_or_bond
-            elif isinstance(state_or_bond, Sequence) \
-                    and isinstance(state_or_bond[0], str):
+            elif is_state_bond_tuple(state_or_bond):
                 state = state_or_bond[0]
                 bond_num = state_or_bond[1]
             elif isinstance(state_or_bond, int):
@@ -1084,15 +1082,15 @@ class ComplexPattern(object):
 
         for imp, mp in zip(mp_alignment, self.monomer_patterns):
             mp_id = f'{prefix}{imp}'
-            mon_node_id = f'{mp_id}_monomer'
+            mon_node = f'{mp_id}_monomer'
             unbound_sites = []
-            g.add_node(mon_node_id, id=mp.monomer, mp_id=mp_id)
+            g.add_node(mon_node, id=mp.monomer, mp_id=mp_id)
             if mp.compartment or self.compartment:
                 cpt_node_id = add_or_get_compartment_node(mp.compartment or
                                                           self.compartment)
                 cpt_id = f'{mp_id}_cpt'
                 g.add_node(cpt_id, id='cpt', mp_id=mp_id)
-                g.add_edge(mon_node_id, cpt_id)
+                g.add_edge(mon_node, cpt_id)
                 g.add_edge(cpt_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
@@ -1103,27 +1101,12 @@ class ComplexPattern(object):
                 else:
                     _handle_site_instance(state_or_bond, site, mp_id)
 
-                # always adding an unbound node implicitely matches ANY to
-                # cases where nothing is specified as both pattern graph and
-                # candidate graph will always contains both the node for the
-                # site and the unbound node. When a site is specified as
-                # ANY, there won't be any edge between the two nodes in the
-                # pattern graph and there thus must not be any edge between
-                # the two nodes in the candidate graph, i.e. there site must
-                # not be unbound. This implementation does not lead to
-                # multiple matches of ANY to sites that have multiple bonds
-                # as it explicitely checks for "not not bound" instead of
-                # "bound".
-                # Having individual unbound nodes for every mp prevents mps
-                # that arent bound to each other have connected graphs.
-                no_bond_id = f'{mp_id}_unbound'
-                g.add_node(no_bond_id, id=NO_BOND, mp_id=mp_id)
+            if unbound_sites is not None:
+                unboundno_node = f'{mp_id}_unbound'
+                g.add_node(unboundno_node, id=NO_BOND, mp_id=mp_id)
+                g.add_edge(mon_node, unboundno_node)
                 for unbound_site in unbound_sites:
-                    g.add_edge(unbound_site, no_bond_id)
-
-                # we explicitely always add this edge such that it is clear
-                # to which MonomerPattern this unbound node belongs
-                g.add_edge(mon_node_id, no_bond_id)
+                    g.add_edge(unbound_site, unboundno_node)
 
         # Add bond edges
         for site_nodes in bond_edges.values():
