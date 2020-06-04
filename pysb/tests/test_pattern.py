@@ -89,7 +89,7 @@ def test_patternmatching_multibinding():
     assert match_complex_pattern(
         A(a=ANY, b='x'), A(a=1, b='y') % A(a=[1, 2], b='x') % A(a=2, b='y'),
         count=True
-    ) == 1
+    ) == 2
 
 
 def test_patternmatching_multistate():

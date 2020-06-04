@@ -1059,16 +1059,17 @@ class ComplexPattern(object):
             elif is_state_bond_tuple(state_or_bond):
                 state = state_or_bond[0]
                 bond_num = state_or_bond[1]
-            elif isinstance(state_or_bond, int):
+            elif isinstance(state_or_bond, (int, list)):
                 bond_num = state_or_bond
-            elif isinstance(state_or_bond, Sequence) \
-                    and all(isinstance(s, int) for s in state_or_bond):
-                for bond_num in state_or_bond:
-                    bond_edges[bond_num].append(mon_site_id)
-                return
+            elif state_or_bond is not ANY and state_or_bond is not None:
+                raise ValueError('Unrecognized state: {}'.format(
+                    state_or_bond))
 
             if state_or_bond is ANY or bond_num is ANY:
                 bond_num = any_bond_tester
+                any_bond_tester_node = f'{mp_id}_s{site_index}b'
+                g.add_node(any_bond_tester_node, id=any_bond_tester)
+                g.add_edge(mon_site_id, any_bond_tester_node)
 
             if state is not None:
                 mon_site_state_id = f'{mp_id}_s{site_index}_{state_index}c'
@@ -1079,6 +1080,9 @@ class ComplexPattern(object):
                 unbound_sites.append(mon_site_id)
             elif isinstance(bond_num, int):
                 bond_edges[bond_num].append(mon_site_id)
+            elif isinstance(bond_num, list):
+                for bond in bond_num:
+                    bond_edges[bond].append(mon_site_id)
 
         for imp, mp in zip(mp_alignment, self.monomer_patterns):
             mp_id = f'{prefix}{imp}'
