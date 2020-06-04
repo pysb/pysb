@@ -67,8 +67,7 @@ class BnglBuilder(Builder):
 
         # Quick security check on the expression
         if re.match(r'^[\w\s()/+\-._*^]*$', expression):
-            return parse_bngl_expr(expression, local_dict=self._model_env,
-                                   evaluate=False)
+            return parse_bngl_expr(expression, local_dict=self._model_env)
         else:
             self._warn_or_except('Security check on expression "%s" failed' %
                                  expression)
