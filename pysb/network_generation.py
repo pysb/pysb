@@ -756,6 +756,8 @@ def _compute_volume_factor(reactants, products):
 def _compute_stat_factor(reactant_indices):
     stat_factor = 1
     for count in Counter(reactant_indices).values():
+        if count == 1:
+            continue  # avoids conversion to float when bng doesn't
         stat_factor /= math.factorial(count)
     return stat_factor
 
