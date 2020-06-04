@@ -954,7 +954,8 @@ class ComplexPattern(object):
 
         ComplexPatterns can be represented as a graph. This is mainly useful
         for comparing if ComplexPatterns are equivalent (see
-        :func:`ComplexPattern.is_equivalent_to`).
+        :func:`ComplexPattern.is_equivalent_to`) and to compute the effect
+        of Rules on species (see :class:`ReactionGenerator`)
 
         It turns out this is non-trivial because 1) bond numbering is
         arbitrary and 2) ComplexPatterns can contain MonomerPatterns which
@@ -990,7 +991,8 @@ class ComplexPattern(object):
         Neither the string references nor the two attributes are used when
         checking graph isomorphism (instead, equality of the `id` data field
         is checked). The data field `mp_id` is required for the reconstruction
-        of a Monomer/ComplexPattern from a graph.
+        of a Monomer/ComplexPattern from a graph (see
+        :func:`ComplexPattern._as_graph`).
 
         The `WILD` keyword should match any bond except the special "no
         bond" node - as special private `WildTester` function is used for
@@ -1117,11 +1119,8 @@ class ComplexPattern(object):
                     g.add_edge(unbound_site, no_bond_id)
 
                 # we explicitely always add this edge such that it is clear
-                # to which MonomerPattern this unbound node belongs,
-                # otherwise this may mess up the mapping between graphs
+                # to which MonomerPattern this unbound node belongs
                 g.add_edge(mon_node_id, no_bond_id)
-
-
 
         # Add bond edges
         for site_nodes in bond_edges.values():
@@ -1401,6 +1400,15 @@ class ReactionPattern(object):
 
     @classmethod
     def _from_graph(cls, graph):
+        """
+        Convert networkx graph to ReactionPattern
+
+        Parameters
+        ----------
+        graph: nx.Graph
+            Full graph where each connected non-compartment componen
+            corresponds to an individual ComplexPattern
+        """
         # we can reconstruct the individual complex patterns by looking at
         # the connected components while ignoring links through compartments
         # (as connections do not constitute bonds. Note that this will fail

@@ -1,6 +1,5 @@
 from pysb.network_generation import ReactionGenerator
 from pysb.bng import generate_equations
-from pysb.pattern import SpeciesPatternMatcher
 from pysb.core import Expression, Observable
 from collections import Counter
 
@@ -45,14 +44,13 @@ def test_reaction_generation():
 def compare_pysb_reactions_to_bng_reactions(bng_file):
     m = model_from_bngl(bng_file)
     generate_equations(m)
-    spm = SpeciesPatternMatcher(m)
     for rule in m.rules:
         reactions = [r for r in m.reactions if rule.name in r['rule']]
 
-        rg_forward = ReactionGenerator(rule, False, spm, m)
+        rg_forward = ReactionGenerator(rule, False, m)
         requires_reverse = any(True in r['reverse'] for r in reactions)
         if requires_reverse:
-            rg_reverse = ReactionGenerator(rule, True, spm, m)
+            rg_reverse = ReactionGenerator(rule, True, m)
 
         # reactions with the same reactants can have multiple different
         # products depending on the matching between reactant_pattern and
@@ -71,7 +69,7 @@ def compare_pysb_reactions_to_bng_reactions(bng_file):
                 validate_reaction(rg_reverse, reactions_reverse, m)
 
 
-def validate_reaction(rg, reactions_bng, m,):
+def validate_reaction(rg, reactions_bng, m):
     if not reactions_bng:
         return
 

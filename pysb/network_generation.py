@@ -8,16 +8,29 @@ import math
 from .core import (
     ReactionPattern, Monomer, NO_BOND, Compartment, Expression, Tag, autoinc
 )
-from .pattern import match_complex_pattern
+from .pattern import match_complex_pattern, SpeciesPatternMatcher
 from networkx.algorithms.isomorphism.vf2userfunc import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 from collections import ChainMap, Counter
 
 
 class ReactionGenerator:
-    def __init__(self, rule, reverse, spm, model):
+    """
+    Provides methods to generate a reaction from a set of reactants based on
+    the :class:`Rule` it was initialized with.
+
+    Parameters
+    ----------
+    rule: pysb.Rule
+        Rule for which this instance should generate reactions
+    reverse: bool
+        Indicates whether forward or reverse reactions should be generated
+    model: pysb.Model
+        Model containing the rule
+    """
+    def __init__(self, rule, reverse, model):
         self.name = rule.name
-        self.reverse = reverse,
+        self.reverse = reverse
         self.reactant_pattern = rule.product_pattern if reverse else \
             rule.reactant_pattern
         self.product_pattern = rule.reactant_pattern if reverse else \
@@ -29,8 +42,10 @@ class ReactionGenerator:
 
         self.delete_molecules = rule.delete_molecules
 
+        self.spm = SpeciesPatternMatcher(model)
+
+        # precompute generic variables
         self.graph_diff = GraphDiffGenerator(self, rule.move_connected)
-        self.spm = spm
 
         self._needs_rate_localization = isinstance(self.rate, Expression) \
             and isinstance(self.rate.expr.func,
@@ -72,6 +87,17 @@ class ReactionGenerator:
             self._localfunc = None
 
     def generate_reactions(self, reactant_idx, model):
+        """
+        Generates reactions for a set of reactant indices. These indices may be
+        unordered and reactions will be computed for all possible matchings.
+
+        Parameters
+        ----------
+        reactant_idx: Sequence[int]
+            Species indices of the reactants
+        model:
+            Model containing the ordered species
+        """
         matches = get_matching_patterns(self.reactant_pattern,
                                         [model.species[ix]
                                          for ix in reactant_idx])
@@ -98,16 +124,27 @@ class ReactionGenerator:
         ]
 
     def is_species_transport(self):
-        for cpt in self.graph_diff.compartment_transport:
-            if cpt is None:
-                return False
+        """
+        Check whether this generator implements a species transport.
+        """
+        return are_unequal_compartments(*self.graph_diff.compartment_transport)
 
-        return True
+    def _generate_reactions_mapped_cps(self, reactant_idx, model):
+        """
+        Generates reactions for a sequence of reactant indices. These indices 
+        must be ordered and reactions will only be computed for the 
+        restricted matchings.
 
-    def _generate_reactions_mapped_cps(self, reactant_indices, model):
-        reactants = [model.species[ix] for ix in reactant_indices]
+        Parameters
+        ----------
+        reactant_idx: Sequence[int]
+            Species indices of the reactants
+        model:
+            Model containing the ordered species
+        """
+        reactants = [model.species[ix] for ix in reactant_idx]
         reactant_mappings, mp_alignment_cp = \
-            self._compute_reactant_mapping(reactants)
+            self._compute_reactant_mappings(reactants)
 
         reactant_graph = ReactionPattern(reactants)._as_graph(
             mp_alignment_cp
@@ -119,7 +156,7 @@ class ReactionGenerator:
         )
 
         reactions = [
-            self._generate_reaction(reactant_indices, graph_diff,
+            self._generate_reaction(reactant_idx, graph_diff,
                                     reactant_graph, model)
             for graph_diff in graph_diffs
         ]
@@ -134,9 +171,21 @@ class ReactionGenerator:
 
         return rxns.values()
 
-    def _generate_reaction(self, reactant_indices, graph_diff,
+    def _generate_reaction(self, reactant_idx, graph_diff,
                            reactant_graph, model):
-        reactants = [model.species[ix] for ix in reactant_indices]
+        """
+        Generates a single reaction for a sequence of reactant indices. These
+        indices must be ordered and reactions will only be computed for the
+        restricted matchings.
+
+        Parameters
+        ----------
+        reactant_idx: Sequence[int]
+            Species indices of the reactants
+        model:
+            Model containing the ordered species
+        """
+        reactants = [model.species[ix] for ix in reactant_idx]
 
         product_graph = graph_diff.apply(reactant_graph, self.delete_molecules)
 
@@ -146,7 +195,7 @@ class ReactionGenerator:
         else:
             products = [None]
 
-        self.fix_compartments(products, model)
+        self.update_compartments(products, model)
 
         # accounts for molecule/species transport
         vfactor = _compute_volume_factor(reactants, products)
@@ -159,14 +208,14 @@ class ReactionGenerator:
                                 if product is not None)
 
         # accounts for symmetries in educts
-        sfactor = _compute_stat_factor(reactant_indices)
+        sfactor = _compute_stat_factor(reactant_idx)
 
         reaction = {
             'rule': self.name,
             'rate': rate * vfactor * sfactor * np.prod([
-                sp.Symbol(f'__s{ix}') for ix in reactant_indices
+                sp.Symbol(f'__s{ix}') for ix in reactant_idx
             ]),
-            'reactants': reactant_indices,
+            'reactants': reactant_idx,
             'products': product_indices,
             'base_rate': rate,
             'volume_factor': vfactor,
@@ -176,10 +225,22 @@ class ReactionGenerator:
         }
         return reaction
 
-    def fix_compartments(self, products,  model):
-        reactant_cpt, product_cpt = self.graph_diff.compartment_transport
-        if not are_unequal_compartments(reactant_cpt, product_cpt):
+    def update_compartments(self, products, model):
+        """
+        Updates compartments to fix child/parent compartments for species
+        transports that are not accounted for by the graph difference.
+
+        Parameters
+        ----------
+        products: Sequence[pysb.ComplexPattern]
+            Product species
+        model:
+            Model containing compartment definitions
+        """
+        if not self.is_species_transport():
             return
+
+        reactant_cpt, product_cpt = self.graph_diff.compartment_transport
 
         cpt_updates = {
             reactant_cpt.name: product_cpt
@@ -213,7 +274,17 @@ class ReactionGenerator:
             for mp in cp.monomer_patterns:
                 update_cpt(mp)
 
-    def _compute_reactant_mapping(self, reactants):
+    def _compute_reactant_mappings(self, reactants):
+        """
+        Computes all mappings between reactants and reactant patterns
+        according to subgraph isomorphisms restricted to equal ordering of
+        ComplexPatterns in reactants and the reactant pattern.
+
+        Parameters
+        ----------
+        reactants: Sequence[pysb.ComplexPattern]
+            Reactant species
+        """
         node_matcher = categorical_node_match('id', default=None)
 
         # alignment of mps in cps of pattern allows merging of mappings through
@@ -256,6 +327,15 @@ class ReactionGenerator:
         ], mp_alignment_cp
 
     def _localize_rate(self, reactants):
+        """
+        Computes rates according to the tagged species. Only has an effect if
+        the rate is defined as local function.
+
+        Parameters
+        ----------
+        reactants: Sequence[pysb.ComplexPattern]
+            Reactant species
+        """
         rate = self.rate
         if self._needs_rate_localization:
             rate = self._localfunc(*[reactants[i] for i in self._tag_rp_ids])
@@ -264,6 +344,22 @@ class ReactionGenerator:
 
 
 class GraphDiff:
+    """
+    Encodes the specific action of a Rule on the graph of a species.
+
+    Parameters
+    ----------
+    removed_nodes: Tuple[str]
+        nodes to be removed
+    added_nodes: Tuple[str, Dict[str, Union[str,pysb.Component]]]
+        node to be added including attributes
+    added_edges: Tuple[Tuple[str,str]]
+        edges to be added
+    removed_edges: Tuple[Tuple[str,str]]
+        edges to be removed
+    changed_node_ids: Dict[str, Union[str,pysb.Component]]
+        nodes for which the id is to be changed
+    """
     def __init__(self, removed_nodes, added_nodes, added_edges,
                  removed_edges, changed_node_ids):
         self.removed_nodes = removed_nodes
@@ -275,8 +371,8 @@ class GraphDiff:
     def __hash__(self):
         return hash((
             # use frozenset such that ordering doesnt matter
-            frozenset((k, v) for k, v in self.changed_node_ids.items()),
             # convert values to strings such that Components become hashable
+            frozenset((k, str(v)) for k, v in self.changed_node_ids.items()),
             frozenset((name, tuple((k, str(v)) for k, v in data.items()))
                       for name, data in self.added_nodes),
             frozenset(self.removed_nodes),
@@ -289,6 +385,21 @@ class GraphDiff:
         return hash(self) == hash(other)
 
     def apply(self, ingraph, delete_molecules):
+        """
+        Apply the encoded graph difference to the graph of the species
+
+        Parameters
+        ----------
+        ingraph: nx.graph
+            graph of the species
+        delete_molecules: bool
+            indicates whether delete_molecules flag was set for the rule
+
+        Returns
+        -------
+        outgraph:
+            graph of the new species with the rule applied
+        """
         outgraph = ingraph.copy()
         dangling_bonds = []
         if delete_molecules:
@@ -326,6 +437,32 @@ class GraphDiff:
 
 
 class GraphDiffGenerator:
+    """
+    Encodes the generic action of a Rule on any graph of a species.
+
+    Parameters
+    ----------
+    rg: ReactionGenerator
+        ReactionGenerator corresponding to the rule that is to be encoded
+    move_connected:
+        indicates whether move_connected flag was set for this rule
+
+    Attributes
+    ----------
+    removed_nodes: Tuple[str]
+        nodes to be removed
+    added_nodes: Tuple[str, Dict[str, Union[str,pysb.Component]]]
+        node to be added including attributes
+    added_edges: Tuple[Tuple[str,str]]
+        edges to be added
+    removed_edges: Tuple[Tuple[str,str]]
+        edges to be removed
+    changed_node_ids: Dict[str, Union[str,pysb.Component]]
+        nodes for which the id are to be changed
+    compartment_transport: Tuple(Union[None,Compartment],...)
+        tuple of source and target compartent for species transport rules,
+        otherwise tuple of `None`
+    """
     def __init__(self, rg, move_connected):
         self.mp_alignment_rp, self.mp_alignment_pp = align_monomer_indices(
             rg.reactant_pattern,
@@ -438,6 +575,20 @@ class GraphDiffGenerator:
         self.compartment_transport = (source_cpt, target_cpt)
 
     def generate(self, mapping):
+        """
+        Compute the specific action on a given species according to the
+        provided mapping
+
+        Parameters
+        ----------
+        mapping: Dict[str,str]
+            maps nodes in the reactant pattern to nodes in the species
+
+        Return
+        ------
+        graph_diff: GraphDiff
+            GraphDiff encoding the specific action
+        """
         mapped_mp_ids = {
             key.split('_')[0]: val.split('_')[0]
             for key, val in mapping.items()
@@ -477,6 +628,22 @@ class GraphDiffGenerator:
 
 
 def align_monomer_indices(reactantpattern, productpattern):
+    """
+    Align MonomerPatterns in reactant and product ReactionPattern. This
+    implements left to right matching respecting tags.
+
+    Parameters
+    ----------
+    reactantpattern: ReactionPattern
+        ReactantPattern
+    productpattern: ReactionPattern
+        ProductPattern
+
+    Return
+    ------
+    rp_alignment, pp_alignment: Sequence[Sequence[int]]
+        Sequence of sequences encoding the order of MonomerPatterns
+    """
     mp_count = autoinc()
     rp_alignment = [
         [next(mp_count) for _ in cp.monomer_patterns]
@@ -512,7 +679,7 @@ def align_monomer_indices(reactantpattern, productpattern):
             pp_alignment[index[0]][index[1]] = imono
             del pp_monos[index]
 
-    # add alignment for all unmatched MonomerPatterns
+    # add alignment for all unmatched (synthesized) MonomerPatterns
     for new_count, index in enumerate(pp_monos.keys()):
         pp_alignment[index[0]][index[1]] = -(new_count+1)
 
@@ -520,6 +687,22 @@ def align_monomer_indices(reactantpattern, productpattern):
 
 
 def get_matching_patterns(reactant_pattern, species):
+    """
+    Computes a matrix of matches between the ComplexPatterns of a
+    ReactionPattern and the provided species
+
+    Parameters
+    ----------
+    reactantpattern: ReactionPattern
+        ReactantPattern
+    productpattern: ReactionPattern
+        ProductPattern
+
+    Return
+    ------
+    matches: np.ndarray
+        matrix of boolean values indicating whether there is a match
+    """
     return np.asarray([
             [
                 match_complex_pattern(cp, s)
@@ -561,13 +744,13 @@ def _compute_volume_factor(reactants, products):
 def _compute_stat_factor(reactant_indices):
     stat_factor = 1
     for count in Counter(reactant_indices).values():
-        if count == 1:
-            continue  # avoid conversion to float to keep consistent with bng
         stat_factor /= math.factorial(count)
     return stat_factor
 
 
 def are_equal_compartments(cpt1, cpt2):
+    """Checks whether two compartments are equal, with None leading to
+        inequality"""
     if cpt1 is None:
         return False
     if cpt2 is None:
@@ -576,6 +759,8 @@ def are_equal_compartments(cpt1, cpt2):
 
 
 def are_unequal_compartments(cpt1, cpt2):
+    """Checks whether two compartments are unequal, with None leading to
+        equality"""
     if cpt1 is None:
         return False
     if cpt2 is None:
