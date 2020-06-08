@@ -25,7 +25,7 @@ install:
 
   # Majority of dependencies can be installed with Anaconda
   - conda install -c conda-forge "numpy>=1.14" scipy matplotlib sympy
-    networkx nose h5py pandas mkl pydot mock cython
+    networkx nose h5py pandas mkl pydot mock cython tqdm
 
   - conda install -c SBMLTeam python-libsbml
 
