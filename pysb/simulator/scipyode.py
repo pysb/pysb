@@ -403,8 +403,12 @@ class ScipyOdeSimulator(Simulator):
             def update(*a):
                 pbar.update()
 
-            results = [executor.submit(sim_partial, *args).add_done_callback(update)
-                       for args in zip(self.initials, self.param_values)]
+            results = []
+            for args in zip(self.initials, self.param_values):
+                f = executor.submit(sim_partial, *args)
+                f.add_done_callback(update)
+                results.append(f)
+
             try:
                 trajectories = [r.result() for r in results]
             finally:
