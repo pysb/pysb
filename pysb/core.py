@@ -311,6 +311,14 @@ class Monomer(Component):
             raise ValueError("Invalid or non-string state values in "
                              "site_states for sites: " + str(invalid_sites))
 
+        # ensure that site_states are not emtpy
+        empty_sites = [site for site, states in site_states.items()
+                       if not states]
+
+        if empty_sites:
+            raise ValueError("No states specified in site_states for sites: "
+                             + str(empty_sites))
+
         self.sites = list(sites)
         self.site_states = site_states
         Component.__init__(self, name, _export)
@@ -1519,13 +1527,13 @@ class Rule(Component):
         return ret
 
 
-
 def validate_expr(obj, description):
     """Raises an exception if the argument is not an expression."""
     if not isinstance(obj, (Parameter, Expression)):
         description_upperfirst = description[0].upper() + description[1:]
         msg = "%s must be a Parameter or Expression" % description_upperfirst
         raise ExpressionError(msg)
+
 
 def validate_const_expr(obj, description):
     """Raises an exception if the argument is not a constant expression."""
@@ -1535,7 +1543,6 @@ def validate_const_expr(obj, description):
         msg = ("%s must be a Parameter or constant Expression" %
                description_upperfirst)
         raise ConstantExpressionError(msg)
-
 
 
 class Observable(Component, Symbol):
