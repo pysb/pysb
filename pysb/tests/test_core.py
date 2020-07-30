@@ -613,3 +613,10 @@ def test_parameter_negative_nonnegative_setter():
     Parameter('k3', 0.0, nonnegative=True)
     k3.value = -0.2
 
+
+@with_model
+def test_reversible_synthesis():
+    Monomer('A')
+    Parameter('k', 1)
+    Rule('r1', None | A(), k, k)
+    Rule('r2', None | as_complex_pattern(A()), k, k)

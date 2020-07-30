@@ -120,6 +120,12 @@ def check_convert(model, format):
                     # issues
                     check_model_against_component_list(
                         m, model.all_components())
+                # Check observable generation
+                for obs in model.observables:
+                    assert obs.coefficients == \
+                        m.observables[obs.name].coefficients
+                    assert obs.species == \
+                        m.observables[obs.name].species
         elif format == 'bngl':
             if model.name.endswith('tutorial_b') or \
                     model.name.endswith('tutorial_c'):
