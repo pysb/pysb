@@ -237,17 +237,25 @@ def format_site_condition(site, state):
     # multiple bonds
     elif isinstance(state, list) and all(isinstance(s, int) for s in state):
         state_code = ''.join('!%d' % s for s in state)
-    # state
+    #     # state
     elif isinstance(state, basestring):
         state_code = '~' + state
     # state AND single bond
     elif isinstance(state, tuple):
         # bond is wildcard (zero or more unspecified bonds)
         if state[1] == pysb.WILD:
-            state = (state[0], '?')
+            bondstr = '?'
         elif state[1] == pysb.ANY:
-            state = (state[0], '+')
-        state_code = '~%s!%s' % state
+            bondstr = '+'
+        elif isinstance(state[1], int):
+            bondstr = str(state[1])
+        elif isinstance(state, list) and \
+                all(isinstance(s, int) for s in state[1]):
+            bondstr = ''.join('!%d' % s for s in state[1])
+        else:
+            raise ValueError("BNG generator has encountered an unknown "
+                             "element in a rule pattern site condition.")
+        state_code = '~%s!' % state[0] + bondstr
     elif isinstance(state, MultiState):
         return ','.join(format_site_condition(site, s) for s in state)
     # one or more unspecified bonds

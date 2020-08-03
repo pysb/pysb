@@ -366,7 +366,11 @@ def _check_bond(bond):
         isinstance(bond, int)
         or bond is WILD
         or bond is ANY
-        or isinstance(bond, list) and all(isinstance(b, int) for b in bond)
+        or (
+            isinstance(bond, list)
+            and all(isinstance(b, int) for b in bond)
+            and len(set(bond)) == len(bond)
+        )
     )
 
 
@@ -1465,9 +1469,9 @@ class Compartment(Component):
             raise ValueError("parent must be a predefined Compartment or None")
         if parent is not None and parent.dimension == dimension:
             raise ValueError("Cannot put compartment of dimension {pdim} "
-                             "cannot be put inside a compartment of side "
-                             "{dim}".format(pdim=parent.dimension,
-                                            dim=dimension))
+                             "inside a compartment of size {dim}".format(
+                             pdim=parent.dimension,
+                             dim=dimension))
         if size is not None and not isinstance(size, Parameter):
             raise ValueError("size must be a parameter (or omitted)")
 
@@ -1578,8 +1582,6 @@ class Rule(Component):
                              'are not compatible.')
             # just reproducing bng error here
 
-        # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
-
         def get_monomer_counts(cps):
             return collections.Counter([
                 mp.monomer.name
@@ -1637,7 +1639,9 @@ class Rule(Component):
                 )
 
         # Check whether rule compartments are consistent
+        cpt_dims = set()
         for rp in [self.reactant_pattern, self.product_pattern]:
+
             cpts = [
                 cp.compartment if cp.compartment is not None
                 else cp.inferred_compartment()
@@ -1645,8 +1649,21 @@ class Rule(Component):
             ]
             cpt_names = {cpt.name for cpt in cpts if cpt is not None}
             if len(cpt_names) > 1:
-                ValueError('Molecules and patterns specifying reactants and '
-                           'products must have consistent compartments')
+                raise ValueError('Molecules and patterns specifying reactants '
+                                 'and products must have consistent '
+                                 'compartments')
+
+            # save dimensions here we know there should only be one non-None
+            # cpt in cpts
+            cpt_dim = next((cpt.dimension for cpt in cpts if cpt is not None),
+                           None)
+            if cpt_dim is not None:
+                cpt_dims.add(cpt_dim)
+
+        if len(cpt_dims) > 1:
+            raise ValueError('Reaction Rule attempts to transfer a species '
+                             'between compartments of non-equal '
+                             'SpatialDimensions.')
 
         Component.__init__(self, name, _export)
 
@@ -2257,8 +2274,8 @@ class Model(object):
                 ), None)
                 if outermost_comparment is not None:
                     raise ValueError(
-                        'model already has outermonst compartment {c} with '
-                        'parent None.'.format(c=outermost_comparment)
+                        'Model already has outermost compartment {c} with '
+                        'parent None.'.format(c=outermost_comparment.name)
                     )
 
             # Check whether compartment definition satisfies the following
@@ -2274,8 +2291,10 @@ class Model(object):
                 if volume_compartment is not None:
                     raise ValueError(
                         'Surface compartment {scomp} already contains a volume'
-                        ' comparment {vcomp}'.format(scomp=other.parent,
-                                                     vcomp=volume_compartment)
+                        ' comparment {vcomp}'.format(
+                            scomp=other.parent.name,
+                            vcomp=volume_compartment.name
+                        )
                     )
 
         for t, cset in zip(Model._component_types, self.all_component_sets()):

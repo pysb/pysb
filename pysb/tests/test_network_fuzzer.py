@@ -2,6 +2,7 @@ import string
 import random
 import numpy
 import sympy
+from collections import Counter
 
 
 from pysb import (
@@ -54,6 +55,7 @@ NUMBER_REACTANTS = 2
 # COMPLEX PATTERNS
 NUMBER_BONDS = 2
 MAX_BONDNUMBERS = 20
+PROB_EXPLICIT = 0.7
 
 # MONOMER PATTERNS
 NUMBER_PROTOMERS = 2
@@ -96,6 +98,8 @@ EXPR_WEIGHT_BINARY = 5
 PROB_PARAMETER = 0.9
 
 
+RESERVED_NAMES = ['ln']
+
 def poisson(lam):
     return numpy.random.poisson(lam, 1)[0]
 
@@ -106,7 +110,7 @@ def bernoulli(p):
 
 def random_name(model, l_name=LENGTH_NAMES):
     name = _random_name(l_name)
-    while name in model.components.keys():
+    while name in model.components.keys() + RESERVED_NAMES:
         name = _random_name(l_name)
     return name
 
@@ -136,20 +140,22 @@ def add_bond_to_random_site(mono, site_conditions, bond_n):
         condition = site_conditions[bond_site]
         if condition is None:
             site_conditions[bond_site] = bond_n
-        if isinstance(condition, str) or isinstance(condition, int):
+        elif isinstance(condition, str):
             site_conditions[bond_site] = (condition, bond_n)
-        elif isinstance(condition, tuple) and isinstance(condition[0], int):
-            site_conditions[bond_site] = (bond_n, *condition)
+        elif isinstance(condition, int):
+            site_conditions[bond_site] = [bond_n, condition]
+        elif isinstance(condition, list) and isinstance(condition[0], int):
+            site_conditions[bond_site] = [bond_n] + condition
         elif isinstance(condition, tuple) and isinstance(condition[0], str) \
                 and isinstance(condition[1], int):
-            site_conditions[bond_site] = (condition[0], (bond_n, condition[1]))
+            site_conditions[bond_site] = (condition[0], [bond_n, condition[1]])
         elif isinstance(condition, tuple) and isinstance(condition[0], str) \
-                and isinstance(condition[1], tuple):
-            site_conditions[bond_site] = (condition[0], (bond_n,
-                                                         *condition[1]))
+                and isinstance(condition[1], list):
+            site_conditions[bond_site] = (condition[0],
+                                          [bond_n] + condition[1])
         else:
-            RuntimeError('Encountered unsupported site conditions ' +
-                         str(site_conditions))
+            raise RuntimeError('Encountered unsupported site conditions ' +
+                               str(site_conditions))
     else:
         site_conditions[bond_site] = bond_n
 
@@ -210,7 +216,11 @@ def random_monomer_pattern(model, explicit):
 
 
 def random_complex_pattern(model, l_monos=NUMBER_PROTOMERS,
-                           p_match=PROB_MATCH_ONCE, explicit=False):
+                           p_match=PROB_MATCH_ONCE, p_expl=PROB_EXPLICIT,
+                           explicit=False):
+    if bernoulli(p_expl):
+        explicit = True
+
     n_monos = poisson(l_monos)
     if explicit:
         n_monos = max(n_monos, 1)
@@ -397,24 +407,36 @@ def test_initials():
 def test_rules():
     validate_random_generation(random_rule, 1e3)
 
-
 def generate_random_model(m):
+    error_dump = []
+
+    def process_error(msg):
+        if msg.startswith('Invalid state value for sites'):
+            error_dump.append('Invalid state value for sites')
+        if msg.startswith('No states specified in site_states for sites'):
+            error_dump.append('No states specified in site_states for sites')
+        if msg.startswith('Dangling bond(s)'):
+            error_dump.append('Dangling bond(s)')
+        if msg.startswith('Rule is synthesizing'):
+            error_dump.append('Synthesis is not concrete')
+
     while len(m.rules) < 5:
         try:
             random_rule(m)
-        except ValueError:
-            pass
+        except ValueError as err:
+            process_error(str(err))
 
     while len(m.initials) < 5:
         try:
             random_initial(m)
-        except ValueError:
-            pass
+        except ValueError as err:
+            process_error(str(err))
 
+    print(Counter(error_dump))
     pysb.bng.generate_equations(m, verbose=True)
 
 
 def test_models():
-    validate_random_generation(generate_random_model, 1e3)
+    validate_random_generation(generate_random_model, 10)
 
 
