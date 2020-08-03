@@ -33,16 +33,17 @@ BINARY_FUNS = [
 
 NUMBER_TRIALS = 1e4
 
-LENGTH_NAMES = 10
+LENGTH_NAMES = 3
 
 # COMPARTMENTS
 LENGTH_COMP_NAME = LENGTH_NAMES
 PROB_NEW_COMPARTMENT = 0.2
 PROB_COMPARTMENT_PARENT = 0.3
+PROB_COMPARTMENT_NONE = 0.4
 
 # PARAMETERS
 LENGTH_PAR_NAME = LENGTH_NAMES
-PROB_NEW_PARAMETER = 0.95
+PROB_NEW_PARAMETER = 0.1
 
 # SITE CONDITIONS
 NUMBER_CONDITIONS = 3
@@ -66,11 +67,11 @@ PROB_DELETE_MOL = 0.1
 
 # MONOMERS
 LENGTH_MONO_NAME = LENGTH_NAMES
-PROB_NEW_MONO = 0.2
+PROB_NEW_MONO = 0.05
 
 # OBSERVABLES
 LENGTH_OBS_NAME = LENGTH_NAMES
-PROB_NEW_OBS = 0.5
+PROB_NEW_OBS = 0.1
 PROB_MATCH_SPECIES = 0.5
 
 # MONOMER SITES
@@ -89,7 +90,7 @@ EXPR_WEIGHT_PAR = 10
 EXPR_WEIGHT_OBS = 10
 EXPR_WEIGHT_EXPR = 10
 EXPR_WEIGHT_UNARY = 30
-EXPR_WEIGHT_BINARY = 20
+EXPR_WEIGHT_BINARY = 5
 
 # RATE
 PROB_PARAMETER = 0.9
@@ -103,17 +104,24 @@ def bernoulli(p):
     return numpy.random.binomial(1, p)
 
 
-def random_name(l_name=LENGTH_NAMES):
+def random_name(model, l_name=LENGTH_NAMES):
+    name = _random_name(l_name)
+    while name in model.components.keys():
+        name = _random_name(l_name)
+    return name
+
+
+def _random_name(l_name):
     return ''.join(random.choices(ALLOWED_LETTERS, k=max(poisson(l_name), 1)))
 
 
-def random_name_list(l_names, l_name):
-    return [random_name(l_name) for _ in range(poisson(l_names))]
+def random_name_list(model, l_names, l_name):
+    return [random_name(model, l_name) for _ in range(poisson(l_names))]
 
 
-def random_site_states(sites, l_states, p_state):
+def random_site_states(model, sites, l_states, p_state):
     return {
-        site: random_name_list(l_states, l_name=LENGTH_STATE_NAME)
+        site: random_name_list(model, l_states, l_name=LENGTH_STATE_NAME)
         for site in sites
         if bernoulli(p_state)
     }
@@ -190,7 +198,7 @@ def random_parameter(model, p_new=PROB_NEW_PARAMETER):
     if not bernoulli(p_new) and model.parameters:
         return random.choice(model.parameters)
 
-    return Parameter(random_name())
+    return Parameter(random_name(model), 1.0)
 
 
 def random_monomer_pattern(model, explicit):
@@ -266,7 +274,7 @@ def random_rate(model, p_par=PROB_PARAMETER):
 def random_rule(model, p_reversible=PROB_REVERSIBLE,
                 p_move_connected=PROB_MOVE_CONNECTED,
                 p_delete_mol=PROB_DELETE_MOL):
-    name = random_name()
+    name = random_name(model)
 
     kwargs = {
         'rate_forward': random_rate(model),
@@ -285,12 +293,16 @@ def random_rule(model, p_reversible=PROB_REVERSIBLE,
 
 
 def random_compartment(model, p_new=PROB_NEW_COMPARTMENT,
+                       p_none=PROB_COMPARTMENT_NONE,
                        p_parent=PROB_COMPARTMENT_PARENT):
+
+    if bernoulli(p_none):
+        return None
 
     if not bernoulli(p_new) and model.compartments:
         return random.choice(model.compartments)
 
-    name = random_name()
+    name = random_name(model)
 
     if bernoulli(p_parent) and model.compartments:
         parent = random.choice(model.compartments)
@@ -307,9 +319,9 @@ def random_monomer(model, p_new=PROB_NEW_MONO, l_sites=NUMBER_SITES,
     if not bernoulli(p_new) and model.monomers:
         return random.choice(model.monomers)
 
-    name = random_name()
-    sites = random_name_list(l_sites, LENGTH_SITE_NAME)
-    site_states = random_site_states(sites, l_states, p_state)
+    name = random_name(model)
+    sites = random_name_list(model, l_sites, LENGTH_SITE_NAME)
+    site_states = random_site_states(model, sites, l_states, p_state)
 
     return Monomer(name, sites, site_states)
 
@@ -318,7 +330,7 @@ def random_observable(model, p_new=PROB_NEW_OBS, p_species=PROB_MATCH_SPECIES):
     if not bernoulli(p_new) and model.observables:
         return random.choice(model.observables)
 
-    name = random_name()
+    name = random_name(model)
     obs = random_reaction_pattern(model)
     if bernoulli(p_species):
         match = 'species'
@@ -330,7 +342,7 @@ def random_observable(model, p_new=PROB_NEW_OBS, p_species=PROB_MATCH_SPECIES):
 def random_expression(model, p_new=PROB_NEW_EXPR):
     if not bernoulli(p_new) and model.expressions:
         return random.choice(model.expressions)
-    name = random_name()
+    name = random_name(model)
     expr = random_symbolic(model)
     return Expression(name, expr)
 
@@ -353,8 +365,8 @@ def validate_random_generation(generation_fun, n_trials):
         except ValueError:
             pass
 
-    assert n_valid > 0
     pct_valid = n_valid / n_trials * 100
+    assert pct_valid > 50
     print(pct_valid + '% of generations did not fail')
 
 
@@ -387,11 +399,17 @@ def test_rules():
 
 
 def generate_random_model(m):
-    for _ in range(3):
-        random_rule(m)
+    while len(m.rules) < 5:
+        try:
+            random_rule(m)
+        except ValueError:
+            pass
 
-    for _ in range(3):
-        random_initial(m)
+    while len(m.initials) < 5:
+        try:
+            random_initial(m)
+        except ValueError:
+            pass
 
     pysb.bng.generate_equations(m, verbose=True)
 

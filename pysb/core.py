@@ -742,6 +742,7 @@ class ComplexPattern(object):
             compartment = None
 
         self.monomer_patterns = monomer_patterns
+        self._check_compartment_consistency(compartment)
         self.compartment = compartment
         self.match_once = match_once
         self._graph = None
@@ -761,6 +762,89 @@ class ComplexPattern(object):
         compartment_ok = self.compartment is not None and \
             all(mp.is_site_concrete() for mp in self.monomer_patterns)
         return mp_concrete_ok or compartment_ok
+
+    def inferred_compartment(self):
+        """
+        Inferred the compartment of this ComplexPattern according to the cBNGL
+        definition of the inferred species compartment. Works even if the
+        pattern is not concrete.
+        """
+
+        compartments = {
+            mp.compartment for mp in self.monomer_patterns
+        }
+        if len(compartments) == 1:
+            return next(iter(compartments))
+
+        # if monomer patterns span multiple compartments, cBNGL defines
+        # the species compartment as the surface compartment
+        surface_comp = next((
+            comp for comp in compartments
+            if comp is not None and comp.dimension == 2
+        ), None)
+
+        compartment = surface_comp if surface_comp else next((
+            comp for comp in compartments
+            if comp is not None
+            # if no surface compartment pick the one that is not None
+        ), None)
+
+        return compartment
+
+    def _check_compartment_consistency(self, pattern_compartment):
+        # dict will naturally filter out duplicate compartments
+        cpts = {
+            mp.compartment.name: mp.compartment
+            for mp in self.monomer_patterns
+            if mp.compartment is not None
+        }
+        # cant span more than 3 compartments
+        if len(cpts) > 3:
+            raise ValueError('Molecules cannot span more than 3 compartments, '
+                             'pattern has {n}.'.format(n=len(cpts)))
+
+        # cant span more than one surface compartment
+        cpt_dim_counts = collections.Counter([
+            cpt.dimension
+            for cpt in cpts.values()
+        ])
+        if cpt_dim_counts[2] > 1:
+            raise ValueError('Molecules cannot span more than 1 surface '
+                             'compartment, pattern has {n}'.format(
+                                 n=cpt_dim_counts[2]))
+
+        # cant span more than two volume compartments
+        if cpt_dim_counts[1] > 2:
+            raise ValueError('Molecules cannot span more than 2 volume '
+                             'compartment, pattern has {n}'.format(
+                                 n=cpt_dim_counts[1]))
+
+        surface_cpt = next((cpt for cpt in cpts.values()
+                            if cpt.dimension == 2), None)
+
+        volume_cpts = [cpt for cpt in cpts.values() if cpt.dimension == 3]
+
+        if surface_cpt is None and len(volume_cpts) > 1:
+            raise ValueError('Molecules not localized to surface compartments '
+                             'can only span a single volume compartment.')
+
+        for cpt in volume_cpts:
+            if not cpt.is_adjacent(surface_cpt):
+                raise ValueError('Molecules cannot be localized to volume '
+                                 'compartments that are not parent or child '
+                                 'of the molecules surface compartment.')
+
+        if pattern_compartment is not None:
+            if surface_cpt is not None and \
+                    pattern_compartment.name != surface_cpt.name:
+                raise ValueError('Pattern compartment and molecule surface '
+                                 'compartment are not consistent.')
+
+            for cpt in volume_cpts:
+                if not cpt.is_adjacent(pattern_compartment):
+                    raise ValueError('Molecules cannot be localized to volume '
+                                     'compartments that are not parent or '
+                                     'child of the pattern compartment.')
 
     def _as_graph(self):
         """
@@ -1377,11 +1461,16 @@ class Compartment(Component):
     """
 
     def __init__(self, name, parent=None, dimension=3, size=None, _export=True):
-        if parent != None and isinstance(parent, Compartment) == False:
-            raise Exception("parent must be a predefined Compartment or None")
-        #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
+        if parent is not None and isinstance(parent, Compartment) == False:
+            raise ValueError("parent must be a predefined Compartment or None")
+        if parent is not None and parent.dimension == dimension:
+            raise ValueError("Cannot put compartment of dimension {pdim} "
+                             "cannot be put inside a compartment of side "
+                             "{dim}".format(pdim=parent.dimension,
+                                            dim=dimension))
         if size is not None and not isinstance(size, Parameter):
-            raise Exception("size must be a parameter (or omitted)")
+            raise ValueError("size must be a parameter (or omitted)")
+
         self.parent = parent
         self.dimension = dimension
         self.size = size
@@ -1395,6 +1484,20 @@ class Compartment(Component):
             repr(self.dimension),
             'None' if self.size is None else self.size.name
         )
+
+    def is_adjacent(self, other):
+        if other is None:
+            return False
+
+        # self contains other
+        if other.parent is not None and other.parent.name == self.name:
+            return True
+
+        # other contains self
+        if self.parent is not None and self.parent.name == other.name:
+            return True
+
+        return False
 
 
 class Rule(Component):
@@ -1445,21 +1548,102 @@ class Rule(Component):
         self.rule_expression = rule_expression
         self.reactant_pattern = rule_expression.reactant_pattern
         self.product_pattern = rule_expression.product_pattern
+        if all(cp is None for cp in self.reactant_pattern.complex_patterns +
+               self.product_pattern.complex_patterns):
+            raise ValueError('Rule is not doing anything.')
         self.is_reversible = rule_expression.is_reversible
         self.rate_forward = rate_forward
         self.rate_reverse = rate_reverse
         self.delete_molecules = delete_molecules
         self.move_connected = move_connected
+
+        if any(
+            cp is not None and cp.match_once
+            for cp in self.reactant_pattern.complex_patterns +
+            self.product_pattern.complex_patterns
+        ):
+            raise ValueError('MatchOnce is not allowed in Rule reactants or '
+                             'products.')
+
+        if any(
+            cp.compartment is not None
+            and any(mp.compartment is not None
+                    and mp.compartment == cp.compartment
+                    for mp in cp.monomer_patterns)
+            for cp in self.reactant_pattern.complex_patterns +
+            self.product_pattern.complex_patterns
+            if cp is not None
+        ):
+            raise ValueError('Reaction Rule molecule and pattern compartments '
+                             'are not compatible.')
+            # just reproducing bng error here
+
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
-        # Check synthesis products are concrete
+        def get_monomer_counts(cps):
+            return collections.Counter([
+                mp.monomer.name
+                for cp in cps
+                if cp is not None
+                for mp in cp.monomer_patterns
+            ])
+
+        self._counts_products = get_monomer_counts(
+            self.product_pattern.complex_patterns
+        )
+        self._counts_reactants = get_monomer_counts(
+            self.reactant_pattern.complex_patterns
+        )
+
+        def check_sufficient_explicit_synthesized(counts_r, counts_p, rp):
+            for mono in counts_p.keys():
+                synthesized_count = counts_p[mono] - counts_r.get(mono, 0)
+                if synthesized_count <= 0:
+                    continue
+
+                concrete_count = sum(
+                    cp.is_concrete()
+                    for cp in rp.complex_patterns
+                    if cp is not None
+                    if mono in [mp.monomer.name for mp in cp.monomer_patterns]
+                )
+
+                if concrete_count < synthesized_count:
+                    raise ValueError('Rule is synthesizing '
+                                     '{synthesized_count} of '
+                                     '{mono} but only {concrete_count} '
+                                     'molecules containing {mono} were '
+                                     'concrete.'.format(
+                                        synthesized_count=synthesized_count,
+                                        concrete_count=concrete_count,
+                                        mono=mono
+                                     ))
+
+                return synthesized_count - concrete_count
+
+        # Check all synthesis products are concrete
         if self.is_synth():
-            rp = self.reactant_pattern if self.is_reversible else \
+            check_sufficient_explicit_synthesized(
+                self._counts_reactants,
+                self._counts_products,
                 self.product_pattern
-            for cp in rp.complex_patterns:
-                if not cp.is_concrete():
-                    raise ValueError('Product {} of synthesis rule {} is not '
-                                     'concrete'.format(cp, name))
+            )
+
+            if self.is_reversible:
+                check_sufficient_explicit_synthesized(
+                    self._counts_products,
+                    self._counts_reactants,
+                    self.reactant_pattern
+                )
+
+        # Check whether rule compartments are consistent
+        for rp in [self.reactant_pattern, self.product_pattern]:
+            if len(set(cp.inferred_compartment().name
+                       for cp in rp.complex_patterns
+                       if cp is not None
+                       and cp.inferred_compartment() is not None)) > 1:
+                ValueError('Molecules and patterns specifying reactants and '
+                           'products must have consistent compartments')
 
         Component.__init__(self, name, _export)
 
@@ -1502,16 +1686,24 @@ class Rule(Component):
         return tags_rate
 
     def is_synth(self):
-        """Return a bool indicating whether this is a synthesis rule."""
-        return len(self.reactant_pattern.complex_patterns) == 0 or \
-            (self.is_reversible and
-             len(self.product_pattern.complex_patterns) == 0)
+        return self._is_synth() or (self.is_reversible and self._is_deg())
 
     def is_deg(self):
+        return self._is_deg() or (self.is_reversible and self._is_synth())
+
+    def _is_synth(self):
+        """Return a bool indicating whether this is a synthesis rule."""
+        return any(
+            p_count > self._counts_reactants.get(monomer, 0)
+            for monomer, p_count in self._counts_products.items()
+        )
+
+    def _is_deg(self):
         """Return a bool indicating whether this is a degradation rule."""
-        return len(self.product_pattern.complex_patterns) == 0 or \
-            (self.is_reversible and
-             len(self.reactant_pattern.complex_patterns) == 0)
+        return any(
+            r_count > self._counts_products.get(monomer, 0)
+            for monomer, r_count in self._counts_reactants.items()
+        )
 
     def __repr__(self):
         ret = '%s(%s, %s, %s' % \
@@ -1778,6 +1970,14 @@ class Initial(object):
             raise InvalidInitialConditionError("Pattern not concrete")
         if pattern.match_once:
             raise InvalidInitialConditionError("MatchOnce not allowed here")
+        if pattern.compartment is not None and \
+                pattern.inferred_compartment() != pattern.compartment:
+            raise InvalidInitialConditionError(
+                "Explicit species compartment ({ecomp}) is not compatible "
+                "with inferred species compartment ({icomp}).".format(
+                    ecomp=pattern.compartment,
+                    icomp=pattern.inferred_compartment()
+                ))
         validate_const_expr(value, "initial condition value")
         self.pattern = pattern
         self.value = value
@@ -2042,6 +2242,37 @@ class Model(object):
         """Add a component to the model."""
         # We have a container for each type of component. This code determines
         # the right one based on the class of the object being added.
+
+        if isinstance(other, Compartment):
+            # Check whether compartment is redefining the outermost compartment
+            if other.parent is None:
+                outermost_comparment = next((
+                    c for c in self.compartments
+                    if c.parent is None
+                ), None)
+                if outermost_comparment is not None:
+                    raise ValueError(
+                        'model already has outermonst compartment {c} with '
+                        'parent None.'.format(c=outermost_comparment)
+                    )
+
+            # Check whether compartment definition satisfies the following
+            # cBNGL rule:
+            # 3. A surface compartment may contain only a single volume
+            # compartment.
+            if other.parent is not None and other.parent.dimension == 2:
+                volume_compartment = next((
+                    c for c in self.compartments
+                    if c.parent is not None
+                    and c.parent.name == other.parent.name
+                ), None)
+                if volume_compartment is not None:
+                    raise ValueError(
+                        'Surface compartment {scomp} already contains a volume'
+                        ' comparment {vcomp}'.format(scomp=other.parent,
+                                                     vcomp=volume_compartment)
+                    )
+
         for t, cset in zip(Model._component_types, self.all_component_sets()):
             if isinstance(other, t):
                 cset.add(other)
