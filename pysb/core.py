@@ -1638,10 +1638,13 @@ class Rule(Component):
 
         # Check whether rule compartments are consistent
         for rp in [self.reactant_pattern, self.product_pattern]:
-            if len(set(cp.inferred_compartment().name
-                       for cp in rp.complex_patterns
-                       if cp is not None
-                       and cp.inferred_compartment() is not None)) > 1:
+            cpts = [
+                cp.compartment if cp.compartment is not None
+                else cp.inferred_compartment()
+                for cp in rp.complex_patterns if cp is not None
+            ]
+            cpt_names = {cpt.name for cpt in cpts if cpt is not None}
+            if len(cpt_names) > 1:
                 ValueError('Molecules and patterns specifying reactants and '
                            'products must have consistent compartments')
 
@@ -1970,8 +1973,10 @@ class Initial(object):
             raise InvalidInitialConditionError("Pattern not concrete")
         if pattern.match_once:
             raise InvalidInitialConditionError("MatchOnce not allowed here")
-        if pattern.compartment is not None and \
-                pattern.inferred_compartment() != pattern.compartment:
+        if pattern.compartment is not None \
+                and pattern.inferred_compartment() is not None \
+                and pattern.inferred_compartment().name != \
+                pattern.compartment.name:
             raise InvalidInitialConditionError(
                 "Explicit species compartment ({ecomp}) is not compatible "
                 "with inferred species compartment ({icomp}).".format(
