@@ -237,7 +237,7 @@ def format_site_condition(site, state):
     # multiple bonds
     elif isinstance(state, list) and all(isinstance(s, int) for s in state):
         state_code = ''.join('!%d' % s for s in state)
-    #     # state
+    # state
     elif isinstance(state, basestring):
         state_code = '~' + state
     # state AND single bond

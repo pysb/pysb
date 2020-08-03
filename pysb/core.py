@@ -1469,9 +1469,9 @@ class Compartment(Component):
             raise ValueError("parent must be a predefined Compartment or None")
         if parent is not None and parent.dimension == dimension:
             raise ValueError("Cannot put compartment of dimension {pdim} "
-                             "inside a compartment of size {dim}".format(
-                             pdim=parent.dimension,
-                             dim=dimension))
+                             "inside a compartment of dimension {dim}".format(
+                                 pdim=parent.dimension,
+                                 dim=dimension))
         if size is not None and not isinstance(size, Parameter):
             raise ValueError("size must be a parameter (or omitted)")
 
@@ -1997,8 +1997,8 @@ class Initial(object):
             raise InvalidInitialConditionError(
                 "Explicit species compartment ({ecomp}) is not compatible "
                 "with inferred species compartment ({icomp}).".format(
-                    ecomp=pattern.compartment,
-                    icomp=pattern.inferred_compartment()
+                    ecomp=pattern.compartment.name,
+                    icomp=pattern.inferred_compartment().name
                 ))
         validate_const_expr(value, "initial condition value")
         self.pattern = pattern
