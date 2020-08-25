@@ -18,7 +18,8 @@ from collections.abc import Sequence
 import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
-from sympy.logic.boolalg import BooleanTrue, BooleanFalse, BooleanAtom
+import asyncio
+import sys
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -463,29 +464,55 @@ class BngFileInterface(BngBaseInterface):
         if not bng_exec_args[0].endswith('.bat'):
             bng_exec_args.insert(0, 'perl')
 
-        p = subprocess.Popen(bng_exec_args,
-                             cwd=self.base_directory,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+        async def _run_bng():
+            p = await asyncio.create_subprocess_exec(*bng_exec_args,
+                                                     cwd=self.base_directory,
+                                                     stdout=subprocess.PIPE,
+                                                     stderr=subprocess.PIPE)
 
-        # output lines as DEBUG, unless a warning or error is encountered
-        capture_error = False
-        captured_error_lines = []
-        for line in iter(p.stdout.readline, b''):
-            line = line[:-1].decode('utf-8')
-            if line.startswith('ERROR:'):
-                capture_error = True
-            if capture_error:
-                captured_error_lines.append(line)
+            def _process_line(l, errlines):
+                if l is None:
+                    return
 
-            self._logger.debug(line)
+                l = l.strip()
+                self._logger.debug(l)
+                if l.startswith('ERROR:') or errlines:
+                    errlines.append(l)
 
-        # p_out is already consumed, so only get p_err
-        (_, p_err) = p.communicate()
-        p_err = p_err.decode('utf-8')
-        if p.returncode or captured_error_lines:
-            raise BngInterfaceError('\n'.join(captured_error_lines) + "\n" +
-                                    p_err.rstrip())
+            captured_error_lines = []
+            # read line (sequence of bytes ending with b'\n') asynchronously
+            while True:
+                try:
+                    line = await asyncio.wait_for(p.stdout.readline(),
+                                                  timeout=5)
+                except asyncio.TimeoutError:
+                    pass
+                else:
+                    _process_line(line.decode('utf-8'), captured_error_lines)
+                finally:
+                    if p.returncode is not None:
+                        break
+
+            (p_out, p_err) = await p.communicate()
+            # There may be some remaining p_out in the buffer
+            if p_out:
+                p_out = p_out.decode('utf-8')
+                for line in p_out.splitlines():
+                    _process_line(line, captured_error_lines)
+
+            if p.returncode or captured_error_lines:
+                raise BngInterfaceError(
+                    '\n'.join(captured_error_lines) + "\n" +
+                    p_err.decode('utf-8').rstrip() if p_err else '')
+
+        if sys.platform == "win32":
+            # for subprocess' pipes on Windows
+            loop = asyncio.ProactorEventLoop()
+            asyncio.set_event_loop(loop)
+        else:
+            loop = asyncio.get_event_loop()
+
+        loop.run_until_complete(_run_bng())
 
     def action(self, action, **kwargs):
         """
