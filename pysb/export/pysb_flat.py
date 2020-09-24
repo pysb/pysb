@@ -68,7 +68,7 @@ class PysbFlatExporter(Exporter):
                      "Compartment, Rule, Observable, Initial, MatchOnce, "
                      "Annotation, MultiState, Tag, ANY, WILD\n")
         output.write("from sympy.functions import " + ', '.join(
-            str(fun) for fun in BNGL_FUNCTIONS.values
+            str(fun) for fun in BNGL_FUNCTIONS.values()
             if isinstance(fun, sympy.core.function.FunctionClass)
         ) + "\n")
         output.write("\n")
