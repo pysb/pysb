@@ -24,11 +24,14 @@ following line::
 """
 
 import pysb
+import sympy.core
 from pysb.export import Exporter
 try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO
+
+from ..importers.bngl import BNGL_FUNCTIONS
 
 class PysbFlatExporter(Exporter):
     """A class for generating PySB "flat" model source code from a model.
@@ -64,6 +67,10 @@ class PysbFlatExporter(Exporter):
         output.write("from pysb import Model, Monomer, Parameter, Expression, "
                      "Compartment, Rule, Observable, Initial, MatchOnce, "
                      "Annotation, MultiState, Tag, ANY, WILD\n")
+        output.write("from sympy.functions import " + ', '.join(
+            str(fun) for fun in BNGL_FUNCTIONS.values
+            if isinstance(fun, sympy.core.function.FunctionClass)
+        ) + "\n")
         output.write("\n")
         output.write("Model()\n")
         output.write("\n")
