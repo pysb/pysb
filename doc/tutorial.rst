@@ -318,15 +318,15 @@ operator indicates that there is a bond formed between two or more
 species. This is indicated by the matching integer (in this case *1*)
 in the bonding site of both species along with the *binding*
 operator. If a non-reversible rule is desired, then the *forward-only*
-operator can be relplaced for the *forward/backward* operator. 
+operator can be replaced for the *forward/backward* operator. 
 
 In order to actually change the state of the Bid protein we must now
-edit the monomer so that have an acutal state site as follows::
+edit the monomer so that have an actual state site as follows::
 
    Monomer('Bid', ['b', 'S'], {'S':['u', 't']})
 
 Having added the state site we can now further specify the state of
-the Bid protein whe it undergoes rule-based interactions and
+the Bid protein when it undergoes rule-based interactions and
 explicitly indicate the changes of the protein state.  
 
 With this state site added, we can now go ahead and write the rules
@@ -373,7 +373,7 @@ python prompts).::
        Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc),
        ])
 
-With this we are almost ready to run a simulation, all we need now is
+With this we are almost ready to run a simulation; all we need now is
 to specify the initial conditions of the system.
 
 Observables
@@ -388,7 +388,7 @@ when we will have many more species than we care to monitor or
 characterize throughout the time evolution of the :eq:`ODEs`. In
 addition, it will often happen that the desirable species are
 combinations or sums of many other species. For this reason the
-rules-based engines we currently employ implemented the *Observables*
+rules-based engines we currently employ implement the *Observables*
 call which automatically collects the necessary information and
 returns the desired species. In our case, we will monitor the amount
 of free *C8*, unbound *Bid*, and active *tBid*. To specify the
@@ -399,9 +399,9 @@ as follows::
    Observable('obsBid', Bid(b=None, S='u'))
    Observable('obstBid', Bid(b=None, S='t'))
 
-As shown,the observable can be a species. As we will show later the
+As shown, the observable can be a species. As we will show later the
 observable can also contain wild-cards and given the "don't care don't
-write" approach to rule-writing it can be a very powerful approach to
+write" approach to rule-writing, it can be a very powerful approach to
 observe activated complexes.  
 
 Initial conditions
@@ -504,7 +504,7 @@ the commands as shown below::
 We have now loaded the integration engine and the graph engine into
 the interpreter environment. You may get some feedback from the
 program as some functions can be compiled at runtime for speed,
-depending on your operating system.Next we need to tell the integrator
+depending on your operating system. Next we need to tell the integrator
 the time domain over which we wish to integrate the equations. For our
 case we will use :math:`20000s` of simulation time. To do this we
 generate an array using the *linspace* function from *PyLab*. Enter
@@ -577,7 +577,7 @@ interactively. Enter the commands as shown below::
    >>> pl.show()
 
 You should now have a figure in your screen showing the number of
-*Bid* molecules decreaing from the initial amount decreasing over
+*Bid* molecules from the initial amount decreasing over
 time, the number of *tBid* molecules increasing over time, and the
 number of free *C8* molecules decrease to about half. For help with
 the above commands and to see more commands related to *PyLab* check
@@ -607,10 +607,10 @@ using the programs available from the command line. The files are
 located in the :file:`.../pysb/tools` directory. The files to
 visualize reactions and species are :file:`render_reactions.py` and
 :file:`render_species.py`. These python scripts will generate ``.dot``
-graph files that can be visualized using several tool such as
+graph files that can be visualized using several tools such as
 `OmniGraffle`_ in :file:`OS X` or `GraphViz`_ in all major
 platforms. For this tutorial we will use the `GraphViz`_ renderer. For
-this example will visualize the :file:`mymodel.py` file that was
+this example we will visualize the :file:`mymodel.py` file that was
 created earlier. Issue the following command, replacing the comments
 inside square brackets``[]`` with the correct paths. We will first
 generate the ``.dot`` from the command line as follows::
@@ -627,7 +627,7 @@ your models.
 Higher-order rules
 ================== 
 
-For this section we will show the power working in a programming
+For this section we will show the power of working in a programming
 environment by creating a simple function called "catalyze". Catalysis
 happens quite often in models and it is one of the basic functions we
 have found useful in our model development. Rather than typing many
@@ -660,7 +660,7 @@ concepts into a programmatic format. Examine the function below::
 
 As shown it takes about ten lines to write the catalyze function
 (shorter variants are certainly possible with more advanced *Python*
-statements). The skeleton of every function in *Python* 
+statements). 
 
 As shown, *Monomers*, *Parameters*, *Species*, and pretty much
 anything related to rules-based modeling are instantiated as objects
@@ -741,8 +741,8 @@ With this technical work out of the way we can now actually start our
 mdoel building. We will declare two sets of rates, the ``bid_rates``
 that we will use for all the ``Bid`` interactions and the
 ``bcl2_rates`` which we will use for all the Bcl-2
-interactions. Thesevalues could be specified individually as desired
-as desired but it is common practice in models to use generic values
+interactions. These values could be specified individually as desired
+but it is common practice in models to use generic values
 for the reaction rate parameters of a model and determine these in
 detail through some sort of model calibration. We will use these
 values for now for illustrative purposes. 
@@ -789,7 +789,7 @@ is followed by the catalytic activation of Bax and Bak. ::
    catalyze_b(Bid(S='m'), Bax(S='i'), Bax(S='m'), bid_rates)
    catalyze_b(Bid(S='m'), Bak(S='i'), Bak(S='a'), bid_rates)
 
-As shown, we simply state the soecies that acts as an *enzyme* as the
+As shown, we simply state the species that acts as an *enzyme* as the
 first function argument, the species that acts as the *reactant* with
 the enzyme as the second argument (along with any state
 specifications) and finally the *product* species. The ``bid_rates``
@@ -800,7 +800,7 @@ You may have noticed a problem with the previous statements. The
 ``S='t'`` but the activation of ``Bax`` and ``Bak`` happens only when
 ``Bid`` is in state ``S='m'`` to imply that these events only happen
 at the membrane. In order to transport ``Bid`` from the ``'t'`` state
-to the ``'m'`` state we need a transporf function. We achieve this by
+to the ``'m'`` state we need a transport function. We achieve this by
 using the *equilibrate* macro in PySB between these states. In
 addition we use this same macro for the transport of the ``Bax``
 species and the ``BclxL`` species as shown below. ::
@@ -812,7 +812,7 @@ species and the ``BclxL`` species as shown below. ::
 
 According to published experimental data, the Bcl-2 family of
 inhibitors can inhibit the initiator ``Bid`` and the effector ``Bax``
-and ``Bak``. These family has complex interactions with all these
+and ``Bak``. This family has complex interactions with all these
 proteins. Given that we have three inhibitors, and three molecules to
 be inhibited, this indicates nine interactions that need to be
 specified. This would involve writing nine reversible reactions in a
@@ -821,7 +821,7 @@ were writing the ODEs. Given that we are simply stating that these
 species *bind* to inhibit interactions, we can take advantage of two
 things. In the first case we have already seen that there is a *bind*
 macro specified in PySB. We can further functionalize this into a
-higher level macro, naemly the *bind_table* macro, which takes a table
+higher level macro, namely the *bind_table* macro, which takes a table
 of interactions as an argument and generates the rules based on these
 simple interactions. We specify the bind table for the inhibitors (top
 row) and the inhibited molecules (left column) as follows. ::
