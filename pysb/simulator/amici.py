@@ -13,6 +13,7 @@ import importlib
 
 try:
     import amici
+    from amici.pysb_import import pysb2amici
 except:
     amici = None
 
@@ -95,12 +96,12 @@ class AmiciSimulator(Simulator):
                                    'to prevent data loss. To ignore this '
                                    'warning, pass `force_recompile=True`')
 
-            amici.pysb2amici(model,
-                             self.modeldir,
-                             verbose=False,
-                             observables=[],
-                             constant_parameters=[],
-                             compute_conservation_laws=True)
+            pysb2amici(model,
+                       self.modeldir,
+                       verbose=False,
+                       observables=[],
+                       constant_parameters=[],
+                       compute_conservation_laws=True)
             mode = 'compilation'
             help = 'file an issue at https://github.com/ICB-DCM/AMICI/issues.'
         else:
