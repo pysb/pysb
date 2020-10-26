@@ -141,7 +141,7 @@ class SbmlExporter(Exporter):
                 _check(c)
                 _check(c.setId(cpt.name))
                 _check(c.setSpatialDimensions(cpt.dimension))
-                _check(c.setSize(cpt.size.value))
+                _check(c.setSize(1 if cpt.size is None else cpt.size.value))
                 _check(c.setConstant(True))
         else:
             c = smodel.createCompartment()
