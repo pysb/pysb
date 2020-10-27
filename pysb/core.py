@@ -331,9 +331,9 @@ class Monomer(Component):
 
         Parameters
         ----------
-        conditions : dict, optional
+        conditions: dict, optional
             See MonomerPattern.site_conditions.
-        **kwargs : dict
+        **kwargs: Union[None, int, str, Tuple[str,int], MultiSite, List[int]]
             See MonomerPattern.site_conditions.
 
         """
