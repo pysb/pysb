@@ -119,7 +119,7 @@ class CudaSSASimulator(SSABase):
                 source_file.write(self._code)
         nvcc_bin = get_path('nvcc')
         self._logger.debug("Compiling CUDA code")
-        opts = ['-O3', '--use_fast_math']
+        opts = ['-O3',  '--use_fast_math']
         self._kernel = pycuda.compiler.SourceModule(
             self._code, nvcc=nvcc_bin, options=opts, no_extern_c=True,
         )
@@ -189,9 +189,9 @@ class CudaSSASimulator(SSABase):
             self._create_gpu_array(self.param_values, total_threads,
                                    self._dtype)
         )
-
+        species_dtype = np.int32
         species_matrix_gpu = gpuarray.to_gpu(
-            self._create_gpu_array(self.initials, total_threads, np.int32)
+            self._create_gpu_array(self.initials, total_threads, species_dtype)
         )
 
         # allocate and upload time to GPU
@@ -200,7 +200,7 @@ class CudaSSASimulator(SSABase):
         # allocate space on GPU for results
         result = driver.managed_zeros(
             shape=(total_threads, len(t_out), self._n_species),
-            dtype=np.int32, mem_flags=driver.mem_attach_flags.GLOBAL
+            dtype=species_dtype, mem_flags=driver.mem_attach_flags.GLOBAL
         )
         elasped_t = time.time() - timer_start
         self._logger.info("Completed transfer in: {:.4f}s".format(elasped_t))
@@ -210,9 +210,15 @@ class CudaSSASimulator(SSABase):
 
         timer_start = time.time()
         # perform simulation
-        self._ssa(species_matrix_gpu, result, time_points_gpu,
-                  np.int32(len(t_out)), param_array_gpu,
-                  block=(threads, 1, 1), grid=(blocks, 1))
+        self._ssa(
+            species_matrix_gpu,
+            result,
+            time_points_gpu,
+            np.int32(len(t_out)),
+            param_array_gpu,
+            block=(threads, 1, 1),
+            grid=(blocks, 1)
+        )
 
         # Wait for kernel completion before host access
         pycuda.autoinit.context.synchronize()

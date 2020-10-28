@@ -9,4 +9,4 @@ from .cuda_ssa import CudaSSASimulator
 
 __all__ = ['BngSimulator', 'CupSodaSimulator', 'ScipyOdeSimulator',
            'StochKitSimulator', 'SimulationResult', 'PopulationMap',
-           'KappaSimulator', 'CudaSSASimulator', 'OpenCLSSASimulator']
+           'KappaSimulator', 'OpenCLSSASimulator', 'CudaSSASimulator']

@@ -1,7 +1,7 @@
 from __future__ import print_function
 from pysb.simulator.base import SimulationResult
 from pysb.bng import generate_equations
-from pysb.simulator.cuda_ssa import SSABase
+from pysb.simulator.ssa_base import SSABase
 import numpy as np
 import os
 import random
@@ -92,6 +92,14 @@ class OpenCLSSASimulator(SSABase):
         template_code = _load_template()
         self._code = template_code.format(**self._get_template_args())
         self._dtype = precision
+        self._dtype_species = np.int32
+        _d = {np.uint32: "uint",
+              np.int32: 'int',
+              np.int16: 'ushort',
+              np.int64: 'long',
+              np.uint64: 'unsigned long'}
+        self._code = self._code.replace("spc_type",
+                                        _d[self._dtype_species])
         if self._dtype == np.float32:
             self._code = self._code.replace('double', 'float')
             self._code = self._code.replace('USE_DP', 'USE_FLOAT')
@@ -117,11 +125,11 @@ class OpenCLSSASimulator(SSABase):
         # get platform of device (only one platform can be used, so using
         # first device will work )
         platform = devices[0].get_info(cl.device_info.PLATFORM)
-
         # check if a cpu, if so, we will change the work group size in run
         cpu_devices = platform.get_devices(device_type.CPU)
         use_cpu = len([i for i in cpu_devices if i in devices])
-
+        self._device_name = devices[0].name
+        print(self._device_name)
         # have not used FPGA but assumption is that it will require more
         # work, so assume gpu for now
         if use_cpu:
@@ -136,8 +144,16 @@ class OpenCLSSASimulator(SSABase):
 
         self.program = cl.Program(self.context, self._code).build(
             options=[
+                # '-Ofast',
+                #'-cl-std=2.0',
+                # '-cl-uniform-work-group-size',
+                # '-cl-fast-relaxed-math',
+                # '-cl-single-precision-constant',
+                '-cl-denorms-are-zero',
                 '-cl-no-signed-zeros',
+                '-cl-finite-math-only',
                 '-cl-mad-enable',
+                '-I {}'.format(os.path.dirname(__file__))
             ]
         )
 
@@ -189,9 +205,9 @@ class OpenCLSSASimulator(SSABase):
             local_work_size = (1, 1)
         else:
             local_work_size = self._local_work_size
-
         blocks, threads = self.get_blocks(self.num_sim, local_work_size[0])
         total_threads = int(blocks * threads)
+        # total_threads = int(self.num_sim)
         # transfer the array of seeds to the device
         random_seeds_gpu = ocl_array.to_device(
             self.queue,
@@ -211,14 +227,14 @@ class OpenCLSSASimulator(SSABase):
         species_matrix_gpu = ocl_array.to_device(
             self.queue,
             self._create_gpu_array(self.initials, total_threads,
-                                   np.uint32).flatten(order='C')
+                                   self._dtype_species).flatten(order='C')
         )
 
         result_gpu = ocl_array.zeros(
             self.queue,
             order='C',
             shape=(total_threads * t_out.shape[0] * self._n_species,),
-            dtype=np.uint32
+            dtype=self._dtype_species
         )
 
         elasped_t = time.time() - timer_start
@@ -226,9 +242,11 @@ class OpenCLSSASimulator(SSABase):
         global_work_size = (total_threads, 1)
 
         self._logger.debug("Starting {} simulations with {} workers "
-                           "and {} steps".format(number_sim, global_work_size,
+                           "and {} steps".format(self.num_sim,
+                                                 global_work_size,
                                                  self._local_work_size))
         timer_start = time.time()
+
 
         # perform simulation
         complete_event = self.program.Gillespie_all_steps(
@@ -246,14 +264,14 @@ class OpenCLSSASimulator(SSABase):
         complete_event.wait()
         self._time = time.time() - timer_start
         self._logger.info("{} simulations "
-                          "in {:.4f}s".format(number_sim, self._time))
+                          "in {:.4f}s".format(self.num_sim, self._time))
 
         # retrieve and store results
         timer_start = time.time()
         res = result_gpu.get(self.queue, async_=True)
+
         self._logger.info("Retrieved trajectories in {:.4f}s"
                           "".format(time.time() - timer_start))
-
         res = res.reshape((total_threads, len(t_out), self._n_species))
         res = res[:self.num_sim]
         tout = np.array([tspan] * self.num_sim)

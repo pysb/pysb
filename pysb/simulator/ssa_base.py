@@ -68,6 +68,7 @@ class SSABase(Simulator):
             rate = sympy.fcode(rxn["rate"])
             rate = re.sub('d0', '', rate)
             rate = p.sub('', rate)
+
             # Create expression strings with observables
             # expand only expressions used in the rate eqn
             for e in {sym for sym in rxn["rate"].atoms()
@@ -96,6 +97,7 @@ class SSABase(Simulator):
             # If a parameter is a float and appears first, the result output
             # will lose precision. Casting to double ensures precision
             rate = '(double)' + rate
+
             output_string += rate + ";\n"
         return dict(n_species=self._n_species, n_params=self._parameter_number,
                     n_reactions=_reaction_number, propensities=output_string,
