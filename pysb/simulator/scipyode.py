@@ -19,6 +19,7 @@ import itertools
 import contextlib
 import importlib
 from concurrent.futures import ProcessPoolExecutor, Executor, Future
+from tqdm import tqdm
 
 
 class ScipyOdeSimulator(Simulator):
@@ -397,8 +398,17 @@ class ScipyOdeSimulator(Simulator):
                                   compiler=self._compiler, integrator_opts=self.opts,
                                   compiler_directives=self._compiler_directives)
 
-            results = [executor.submit(sim_partial, *args)
-                       for args in zip(self.initials, self.param_values)]
+            pbar = tqdm(total=len(self.param_values))
+
+            def update(*a):
+                pbar.update()
+
+            results = []
+            for args in zip(self.initials, self.param_values):
+                f = executor.submit(sim_partial, *args)
+                f.add_done_callback(update)
+                results.append(f)
+
             try:
                 trajectories = [r.result() for r in results]
             finally:
