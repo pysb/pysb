@@ -46,7 +46,7 @@ class BngGenerator(object):
         max_length = max(len(p.name) for p in
                          self.model.parameters | self.model.expressions)
         for p in self.model.parameters:
-            self.__content += (("  %-" + str(max_length) + "s   %e\n") %
+            self.__content += (("  %-" + str(max_length) + "s   %.17g\n") %
                                (p.name, p.value))
         for e in exprs:
             self.__content += (("  %-" + str(max_length) + "s   %s\n") %
@@ -294,6 +294,9 @@ class BngPrinter(StrPrinter):
             )
 
         return if_stmt
+
+    def _print_Dummy(self, expr):
+        return expr.name
 
     def _print_Pow(self, expr, rational=False):
         return super(BngPrinter, self)._print_Pow(expr, rational)\

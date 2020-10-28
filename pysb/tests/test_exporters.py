@@ -69,7 +69,7 @@ def check_convert(model, format):
     if exported_file is not None:
         if format == 'python':
             # linspace arguments picked to avoid VODE warning
-            exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n', {'_use_inline': False})
+            exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n', {'numpy': np})
         elif format == 'pysb_flat':
             exec(exported_file, {'__name__': model.name})
         elif format == 'sbml':
@@ -120,6 +120,12 @@ def check_convert(model, format):
                     # issues
                     check_model_against_component_list(
                         m, model.all_components())
+                # Check observable generation
+                for obs in model.observables:
+                    assert obs.coefficients == \
+                        m.observables[obs.name].coefficients
+                    assert obs.species == \
+                        m.observables[obs.name].species
         elif format == 'bngl':
             if model.name.endswith('tutorial_b') or \
                     model.name.endswith('tutorial_c'):

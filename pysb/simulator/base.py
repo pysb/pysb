@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 import sympy
 import collections
+from collections.abc import Mapping, Sequence
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
                       Parameter, Expression, Model, ComponentSet
@@ -37,6 +38,14 @@ except ImportError:
 
 class SimulatorException(Exception):
     pass
+
+
+class InconsistentParameterError(SimulatorException, ValueError):
+    def __init__(self, parameter_name, value, reason):
+        super(InconsistentParameterError, self).__init__(
+            f'Value {value} that was passed for parameter {parameter_name} '
+            f'was inconsistent with that parameters assumption: {reason}'
+        )
 
 
 class Simulator(object):
@@ -168,7 +177,7 @@ class Simulator(object):
                 return len(self.param_values)
 
     def _update_initials_dict(self, initials_dict, initials_source, subs=None):
-        if isinstance(initials_source, collections.Mapping):
+        if isinstance(initials_source, Mapping):
             # Can't just use .update() as we need to test
             # equality with .is_equivalent_to()
             for cp, value_obj in initials_source.items():
@@ -177,7 +186,7 @@ class Simulator(object):
                        for existing_cp in initials_dict):
                     continue
 
-                if isinstance(value_obj, (collections.Sequence, np.ndarray))\
+                if isinstance(value_obj, (Sequence, np.ndarray))\
                         and all(isinstance(v, numbers.Number) for v in value_obj):
                     value = value_obj
                 elif isinstance(value_obj, Expression):
@@ -277,17 +286,17 @@ class Simulator(object):
 
         # Check potential quick return options
         if self._run_initials is not None:
-            if not isinstance(self._run_initials, collections.Mapping) and \
+            if not isinstance(self._run_initials, Mapping) and \
                     self._initials is None:
                 return self._run_initials
-        elif not isinstance(self._initials, collections.Mapping) and \
+        elif not isinstance(self._initials, Mapping) and \
                 self._initials is not None:
             return self._initials
 
         # At this point (after dimensionality check), we can return
         # self._run_initials if it's not a dictionary and not None
         if self._run_initials is not None and not isinstance(
-                self._run_initials, collections.Mapping):
+                self._run_initials, Mapping):
             return self._run_initials
 
         n_sims_initials = self._check_run_initials_vs_base_initials_length()
@@ -331,7 +340,7 @@ class Simulator(object):
                                      'MonomerPattern or ComplexPattern' %
                                      repr(cplx_pat))
                 # if val is a number, convert it to a single-element array
-                if not isinstance(val, (collections.Sequence, np.ndarray)):
+                if not isinstance(val, (Sequence, np.ndarray)):
                     val = [val]
                     new_initials[cplx_pat] = np.array(val)
                 # otherwise, check whether simulator supports multiple
@@ -468,13 +477,22 @@ class Simulator(object):
                     raise IndexError("new_params dictionary has unknown "
                                      "parameter name (%s)" % key)
                 # if val is a number, convert it to a single-element array
-                if not isinstance(val, collections.Sequence):
+                if not isinstance(val, Sequence):
                     val = [val]
                     new_params[key] = np.array(val)
                 # Check all elements are the same length
                 if len(val) != n_sims:
                     raise ValueError("all arrays in params dictionary "
                                      "must be equal length")
+
+                for value in val:
+                    try:
+                        self._model.parameters[key].check_value(value)
+                    except ValueError as e:
+                        raise InconsistentParameterError(
+                            key, value, str(e)
+                        )
+
         elif isinstance(new_params, np.ndarray):
             # if new_params is a 1D array, convert to a 2D array of length 1
             if len(new_params.shape) == 1:
@@ -484,6 +502,18 @@ class Simulator(object):
             if new_params.shape[1] != len(self._model.parameters):
                 raise ValueError("new_params must be the same length as "
                                  "model.parameters")
+
+            for isim in range(n_sims):
+                for param, value in zip(self._model.parameters,
+                                        new_params[isim, :]):
+                    try:
+                        param.check_value(value)
+                    except ValueError as e:
+                        raise InconsistentParameterError(
+                            param.name, value, str(e)
+                        )
+
+
         else:
             raise ValueError(
                 'Implicit conversion of data type "{}" is not '
@@ -495,6 +525,7 @@ class Simulator(object):
             raise ValueError(
                 self.__class__.__name__ +
                 " does not support multiple parameter values at this time.")
+
         return new_params
 
     def _reset_run_overrides(self):
@@ -805,14 +836,15 @@ class SimulationResult(object):
                 len(tout[n]) * len(expr_names)).view(dtype=yexpr_dtype) for n
                           in range(self.nsims)]
         else:
-            self._yobs = [np.ndarray((len(self.tout[n]),),
-                                     dtype=yobs_dtype) for n in range(self.nsims)]
+            self._yobs = [np.ndarray((len(self.tout[n]),), dtype=yobs_dtype) if obs_names
+                          else np.ndarray((len(self.tout[n]), 0), dtype=yobs_dtype)
+                          for n in range(self.nsims)]
             self._yobs_view = [self._yobs[n].view(float).
-                               reshape(len(self._yobs[n]), -1) for n in range(
+                                   reshape(len(self._yobs[n]), -1) for n in range(
                 self.nsims)]
-            self._yexpr = [np.ndarray((len(self.tout[n]),),
-                                      dtype=yexpr_dtype) for n in range(
-                self.nsims)]
+            self._yexpr = [np.ndarray((len(self.tout[n]),), dtype=yexpr_dtype) if expr_names
+                           else np.ndarray((len(self.tout[n]), 0), dtype=yexpr_dtype)
+                           for n in range(self.nsims)]
             self._yexpr_view = [self._yexpr[n].view(float).reshape(len(
                 self._yexpr[n]), -1) for n in range(self.nsims)]
 
@@ -1235,10 +1267,10 @@ class SimulationResult(object):
             obs_and_exprs = None
 
             if 'observables' in dset.keys():
-                obs_and_exprs = list(dset['observables'])
+                obs_and_exprs = list(dset['observables'][:])
 
             if 'expressions' in dset.keys():
-                exprs = dset['expressions']
+                exprs = dset['expressions'][:]
                 if obs_and_exprs is None:
                     obs_and_exprs = list(exprs)
                 else:
@@ -1250,12 +1282,12 @@ class SimulationResult(object):
 
             trajectories = None
             try:
-                trajectories = dset['trajectories']
+                trajectories = dset['trajectories'][:]
             except KeyError:
                 pass
 
             try:
-                initials = np.array(dset['initials'])
+                initials = dset['initials'][:]
             except KeyError:
                 initials = pickle.loads(dset['initials_dict'][()])
 
@@ -1272,8 +1304,8 @@ class SimulationResult(object):
                 simulator=None,
                 model=model,
                 initials=initials,
-                param_values=np.array(dset['param_values']),
-                tout=np.array(dset['tout']),
+                param_values=dset['param_values'][:],
+                tout=dset['tout'][:],
                 trajectories=trajectories,
                 observables_and_expressions=obs_and_exprs,
                 squeeze=dset.attrs['squeeze'],

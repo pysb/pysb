@@ -4,10 +4,13 @@ from pysb.builder import Builder
 from pysb.core import RuleExpression, ReactionPattern, ComplexPattern, \
     MonomerPattern, MultiState, ANY, WILD, Parameter, Expression
 from pysb.annotation import Annotation
+from pysb.pattern import SpeciesPatternMatcher
 import sympy
 import collections
+from collections.abc import Mapping
 import json
 import re
+import warnings
 from sympy.parsing.sympy_parser import parse_expr
 try:
     basestring
@@ -37,7 +40,7 @@ class PySBJSONDecoder(JSONDecoder):
         return self.b.model.components[name]
 
     def decode_state_value(self, sv):
-        if isinstance(sv, collections.Mapping) and '__object__' in sv:
+        if isinstance(sv, Mapping) and '__object__' in sv:
             if sv['__object__'] == '__multistate__':
                 return MultiState(*sv['sites'])
             if sv['__object__'] == 'ANY':
@@ -46,7 +49,7 @@ class PySBJSONDecoder(JSONDecoder):
                 return WILD
         try:
             if len(sv) == 2 and isinstance(sv[0], basestring) \
-                    and isinstance(sv[1], (int, collections.Mapping)):
+                    and isinstance(sv[1], (int, Mapping)):
                 return sv[0], self.decode_state_value(sv[1])
         except TypeError:
             pass
@@ -104,11 +107,16 @@ class PySBJSONDecoder(JSONDecoder):
         return self.decode_expression(expr, derived=True)
 
     def decode_observable(self, obs):
-        self.b.observable(
+        o = self.b.observable(
             obs['name'],
             self.decode_reaction_pattern(obs['reaction_pattern']),
             obs['match']
         )
+        try:
+            o.coefficients = obs['coefficients']
+            o.species = obs['species']
+        except KeyError:
+            pass
 
     def decode_monomer_pattern(self, mp):
         mon = self._modelget(mp['monomer'])
@@ -232,6 +240,29 @@ class PySBJSONDecoder(JSONDecoder):
         for component_type, decoder in decoders.items():
             for component in res.get(component_type, []):
                 decoder(component)
+
+        if self.b.model.reactions and self.b.model.observables \
+                and 'species' not in res['observables'][0]:
+
+            # We have network, need to regenerate Observable species and coeffs
+            warnings.warn(
+                'This SimulationResult file is missing Observable species and '
+                'coefficients data. These will be generated now - we recommend '
+                'you re-save your SimulationResult file to avoid this warning.'
+            )
+
+            for obs in self.b.model.observables:
+                if obs.match in ('molecules', 'species'):
+                    obs_matches = SpeciesPatternMatcher(self.b.model).match(
+                        obs.reaction_pattern, index=True, counts=True)
+                    sp, vals = zip(*sorted(obs_matches.items()))
+                    obs.species = list(sp)
+                    if obs.match == 'molecules':
+                        obs.coefficients = list(vals)
+                    else:
+                        obs.coefficients = [1] * len(obs_matches.values())
+                else:
+                    raise ValueError(f'Unknown obs.match value: {obs.match}')
 
         return self.b.model
 

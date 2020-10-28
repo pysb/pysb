@@ -1,3 +1,5 @@
+.. _faq:
+
 ==========================
 Frequently Asked Questions
 ==========================
@@ -11,10 +13,11 @@ Overflow <https://www.stackoverflow.com>`_.
 General
 =======
 
-* Do you support Python 3?
+* What Python versions does PySB support?
 
-    **Yes**. The current release of PySB supports Python 3.6 and
-    Python 2.7. Other Python 3.x releases are not explicitly tested.
+    The current release of PySB supports Python 3.6, 3.7, and
+    3.8. Earlier versions, including Python 2.7, are not supported
+    from PySB 2.0 onwards.
 
     In PySB version 1.5 and earlier, the `<>` operator was used for
     reversible rules. `<>` is pending deprecation from PySB, and does not
@@ -71,16 +74,15 @@ Simulation
 
 * How can I speed up my `ScipyOdeSimulator` simulation?
 
-    **Check the weave library is installed.** `weave` is a Python library
+    **Check the cython library is installed.** `cython` is a Python library
     which converts your system of ordinary differential equations (ODEs) to
     C code, which is faster to execute than pure Python code. You can check
-    if `weave` is installed by trying to import it at the Python prompt::
+    if `cython` is installed by trying to import it at the Python prompt::
 
-        import weave
+        import cython
 
-    If no `ImportError` appears, `weave` is available. Note that `weave` is
-    only available for Python 2. We are working on an alternative for Python
-    3 using `Cython <http://cython.org>`_.
+    If no `ImportError` appears, `cython` is available. Otherwise, you'll
+    need to install it using `pip` or `conda`.
 
     When running large numbers of simulations, consider using the
     `CupSodaSimulator` if you have an NVIDIA graphics card (GPU) available.

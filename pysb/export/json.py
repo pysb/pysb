@@ -98,7 +98,8 @@ class PySBJSONEncoder(json.JSONEncoder):
     def encode_expression(cls, expr):
         return {
             'name': expr.name,
-            'expr': str(expr.expr)
+            'expr': expr.expr.name if isinstance(
+                expr.expr, (Parameter, Expression)) else str(expr.expr)
         }
 
     @classmethod
@@ -230,6 +231,13 @@ class PySBJSONWithNetworkEncoder(PySBJSONEncoder):
             if isinstance(rxn['rate'], (Parameter, Expression)) \
             else str(rxn['rate'])
         return rxn
+
+    @classmethod
+    def encode_observable(cls, obs):
+        o = super(PySBJSONWithNetworkEncoder, cls).encode_observable(obs)
+        o['species'] = obs.species
+        o['coefficients'] = obs.coefficients
+        return o
 
     @classmethod
     def encode_model(cls, model):
