@@ -193,6 +193,17 @@ def test_compartment_initial_error():
     Initial(A(s=None)**c2, A_0)
 
 @with_model
+def test_compartment():
+    # Ensure that compartment size can be specified by a parameter,
+    #  a constant expression, or be omitted.
+    Parameter('A', 1.0)
+    Parameter('B', 2.0)
+    Expression('E', A * B)
+    Compartment("C1")
+    Compartment("C2", C1, 2, A)
+    Compartment("C3", C1, 2, E)
+
+@with_model
 def test_monomer_pattern_add_to_none():
     """Ensure that MonomerPattern + None returns a ReactionPattern."""
     Monomer('A', ['s'])
@@ -530,6 +541,13 @@ def test_invalid_parameter():
 @with_model
 def test_invalid_compartment():
     assert_raises(Exception, Compartment, 'c1', 'invalid_parent')
+
+    # Invalid dynamic expression as compartment size
+    Monomer('A')
+    Observable('O', A)
+    Expression('E', O)
+    assert_raises(Exception, Compartment, 'c2', size=E)
+
     assert len(model.compartments) == 0
 
 
