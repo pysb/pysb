@@ -1402,9 +1402,9 @@ class Rule(Component):
     rule_expression : RuleExpression
         RuleExpression containing the essence of the rule (reactants, products,
         reversibility).
-    rate_forward : Parameter
+    rate_forward : Union[Parameter,Expression]
         Forward reaction rate constant.
-    rate_reverse : Parameter, optional
+    rate_reverse : Union[Parameter,Expression], optional
         Reverse reaction rate constant (only required for reversible rules).
     delete_molecules : bool, optional
         If True, deleting a Monomer from a species is allowed to fragment the

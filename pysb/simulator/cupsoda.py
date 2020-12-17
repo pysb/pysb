@@ -670,7 +670,7 @@ class CupSodaSimulator(Simulator):
     @staticmethod
     def _load_with_pandas(filename):
         data = pd.read_csv(filename, sep='\t', skiprows=None,
-                           header=None).as_matrix()
+                           header=None).to_numpy()
         return data
 
     @staticmethod
