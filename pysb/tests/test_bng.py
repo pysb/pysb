@@ -312,6 +312,14 @@ def test_bng_printer():
     assert _bng_print(sympy.Min(x, y)) == 'min(x, y)'
     assert _bng_print(sympy.Max(x, y)) == 'max(x, y)'
 
+    # Relational
+    assert _bng_print(sympy.Eq(x, y)) == 'x == y'
+    assert _bng_print(sympy.Ne(x, y)) == 'x != y'
+    assert _bng_print(x < y) == 'x < y'
+    assert _bng_print(x <= y) == 'x <= y'
+    assert _bng_print(x > y) == 'x > y'
+    assert _bng_print(x >= y) == 'x >= y'
+
 
 def test_parse_bngl_expression_if():
     x, y = sympy.symbols('x y')
