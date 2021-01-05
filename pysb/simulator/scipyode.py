@@ -1,10 +1,9 @@
 from pysb.simulator.base import Simulator, SimulationResult
-import scipy.integrate
-try:
-    import Cython
-except ImportError:
-    Cython = None
-from sympy.printing.lambdarepr import lambdarepr
+import scipy.integrate, scipy.sparse
+from sympy.utilities.autowrap import CythonCodeWrapper
+from sympy.utilities.codegen import (
+    C99CodeGen, Routine, InputArgument, InOutArgument, default_datatypes,
+)
 import distutils
 import pysb.bng
 import sympy
@@ -13,11 +12,13 @@ from functools import partial
 import numpy as np
 import warnings
 import os
+import inspect
 from pysb.logging import get_logger, EXTENDED_DEBUG
 import logging
-import itertools
 import contextlib
 import importlib
+import tempfile
+import shutil
 from concurrent.futures import ProcessPoolExecutor, Executor, Future
 
 
@@ -121,13 +122,6 @@ class ScipyOdeSimulator(Simulator):
         }
     }
 
-    default_cython_directives = {
-        'boundscheck': False,
-        'wraparound': False,
-        'nonecheck': False,
-        'initializedcheck': False
-    }
-
     def __init__(self, model, tspan=None, initials=None, param_values=None,
                  verbose=False, **kwargs):
 
@@ -137,10 +131,8 @@ class ScipyOdeSimulator(Simulator):
                                                 param_values=param_values,
                                                 verbose=verbose,
                                                 **kwargs)
-        # We'll need to know if we're using the Jacobian when we get to run()
-        self._use_analytic_jacobian = kwargs.pop('use_analytic_jacobian',
-                                                 False)
         self.cleanup = kwargs.pop('cleanup', True)
+        with_jacobian = kwargs.pop('use_analytic_jacobian', False)
         integrator = kwargs.pop('integrator', 'vode')
         compiler_mode = kwargs.pop('compiler', None)
         integrator_options = kwargs.pop('integrator_options', {})
@@ -151,13 +143,6 @@ class ScipyOdeSimulator(Simulator):
             ))
         # Generate the equations for the model
         pysb.bng.generate_equations(self._model, self.cleanup, self.verbose)
-
-        # ODE RHS -----------------------------------------------
-        self._eqn_subs = {e: e.expand_expr(expand_observables=True) for
-                          e in self._model.expressions}
-        self._eqn_subs.update({e: e.expand_expr(expand_observables=True) for
-                               e in self._model._derived_expressions})
-        ode_mat = sympy.Matrix(self.model.odes).subs(self._eqn_subs)
 
         if compiler_mode is None:
             self._compiler = self._autoselect_compiler()
@@ -174,90 +159,10 @@ class ScipyOdeSimulator(Simulator):
 
         self._compiler_directives = None
 
-        # Use lambdarepr (Python code) with Cython, otherwise use C code
-        eqn_repr = lambdarepr if self._compiler == 'cython' else sympy.ccode
-
-        if self._compiler == 'cython':
-            # Prepare the string representations of the RHS equations
-
-            code_eqs = '\n'.join(['ydot[%d] = %s;' %
-                                  (i, eqn_repr(o))
-                                  for i, o in enumerate(ode_mat)])
-            code_eqs = str(self._eqn_substitutions(code_eqs))
-
-            # Allocate ydot here, once.
-            ydot = np.zeros(len(self.model.species))
-
-            self._compiler_directives = kwargs.pop(
-                'cython_directives', self.default_cython_directives
-            )
-
-            if not Cython:
-                raise ImportError('Cython library is not installed')
-
-            rhs = _get_rhs(self._compiler,
-                           code_eqs,
-                           ydot=ydot,
-                           compiler_directives=self._compiler_directives
-                           )
-
-            with _set_cflags_no_warnings(self._logger):
-                rhs(0.0, self.initials[0], self.param_values[0])
-
-            self._code_eqs = code_eqs
-
-        elif self._compiler == 'python':
-            self._symbols = sympy.symbols(','.join('__s%d' % sp_id for sp_id in
-                                                   range(len(
-                                                       self.model.species)))
-                                          + ',') + tuple(model.parameters)
-
-            self._code_eqs = (self._symbols, sympy.flatten(ode_mat))
-        else:
+        builder_cls = _rhs_builders.get(self._compiler, None)
+        if builder_cls is None:
             raise ValueError('Unknown compiler_mode: %s' % self._compiler)
-
-        # JACOBIAN -----------------------------------------------
-        # We'll keep the code for putting together the matrix in Sympy
-        # in case we want to do manipulations of the matrix later (e.g., to
-        # put together the sensitivity matrix)
-        self._jac_eqs = None
-        if self._use_analytic_jacobian:
-            species_symbols = [sympy.Symbol('__s%d' % i)
-                               for i in range(len(self._model.species))]
-            jac_matrix = ode_mat.jacobian(species_symbols)
-
-            if self._compiler == 'cython':
-                # Prepare the stringified Jacobian equations.
-                jac_eqs_list = []
-                for i in range(jac_matrix.shape[0]):
-                    for j in range(jac_matrix.shape[1]):
-                        entry = jac_matrix[i, j]
-                        # Skip zero entries in the Jacobian
-                        if entry == 0:
-                            continue
-                        jac_eq_str = 'jac[%d, %d] = %s;' % (
-                            i, j, eqn_repr(entry))
-                        jac_eqs_list.append(jac_eq_str)
-                jac_eqs = str(self._eqn_substitutions('\n'.join(jac_eqs_list)))
-                if '# Not supported in Python' in jac_eqs:
-                    raise ValueError('Analytic Jacobian calculation failed')
-
-                # Allocate jac array here, once, and initialize to zeros.
-                jac = np.zeros(
-                    (len(self._model.odes), len(self._model.species)))
-
-                jac_fn = _get_rhs(
-                    self._compiler,
-                    jac_eqs,
-                    compiler_directives=self._compiler_directives,
-                    jac=jac
-                )
-
-                with _set_cflags_no_warnings(self._logger):
-                    jac_fn(0.0, self.initials[0], self.param_values[0])
-                self._jac_eqs = jac_eqs
-            else:
-                self._jac_eqs = (self._symbols, jac_matrix, "numpy")
+        self.rhs_builder = builder_cls(model, with_jacobian, cleanup=self.cleanup)
 
         # build integrator options list from our defaults and any kwargs
         # passed to this function
@@ -286,11 +191,13 @@ class ScipyOdeSimulator(Simulator):
     def _test_cython(cls):
         if not hasattr(cls, '_use_cython'):
             cls._use_cython = False
-            if Cython is None:
-                return
             try:
-                Cython.inline('x = 1', force=True, quiet=True)
+                import Cython
+                Cython.inline("x = 1", force=True, quiet=True)
+                del Cython
                 cls._use_cython = True
+            except ImportError:
+                pass
             except (Cython.Compiler.Errors.CompileError,
                     distutils.errors.DistutilsPlatformError,
                     ValueError) as e:
@@ -331,23 +238,6 @@ class ScipyOdeSimulator(Simulator):
 
         # Default to python/lambdify
         return 'python'
-
-    def _eqn_substitutions(self, eqns):
-        """String substitutions on the sympy C code for the ODE RHS and
-        Jacobian functions to use appropriate terms for variables and
-        parameters."""
-        # Substitute 'y[i]' for 'si'
-        eqns = re.sub(r'\b__s(\d+)\b',
-                      lambda m: 'y[%s]' % (int(m.group(1))),
-                      eqns)
-
-        # Substitute 'p[i]' for any named parameters
-        for i, p in enumerate(self._model.parameters):
-            eqns = re.sub(r'\b(%s)\b' % p.name, 'p[%d]' % i, eqns)
-        for i, p in enumerate(self._model._derived_parameters):
-            eqns = re.sub(r'\b(%s)\b' % p.name,
-                          'p[%d]' % (i + len(self._model.parameters)), eqns)
-        return eqns
 
     def run(self, tspan=None, initials=None, param_values=None,
             num_processors=1):
@@ -391,12 +281,13 @@ class ScipyOdeSimulator(Simulator):
 
         with SerialExecutor() if num_processors == 1 else \
                 ProcessPoolExecutor(max_workers=num_processors) as executor:
-            sim_partial = partial(_integrator_process, code_eqs=self._code_eqs, jac_eqs=self._jac_eqs,
-                                  num_species=num_species, num_odes=num_odes, tspan=self.tspan,
-                                  integrator_name=self._init_kwargs.get('integrator', 'vode'),
-                                  compiler=self._compiler, integrator_opts=self.opts,
-                                  compiler_directives=self._compiler_directives)
-
+            sim_partial = partial(
+                _integrator_process,
+                tspan=self.tspan,
+                integrator_name=self._init_kwargs.get('integrator', 'vode'),
+                integrator_opts=self.opts,
+                rhs_builder=self.rhs_builder,
+            )
             results = [executor.submit(sim_partial, *args)
                        for args in zip(self.initials, self.param_values)]
             try:
@@ -479,67 +370,42 @@ class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
     fatal = logging.LoggerAdapter.critical
 
 
-def _get_rhs(compiler, code_eqs, ydot=None, jac=None, compiler_directives=None):
-    if compiler == 'cython':
-        if 'math.' in code_eqs:
-            code_eqs = 'import math\n' + code_eqs
-
-        def rhs(t, y, p):
-            # note that the evaluated code sets ydot as a side effect
-            Cython.inline(code_eqs, quiet=True,
-                          cython_compiler_directives=compiler_directives)
-
-            return ydot if ydot is not None else jac
-    else:
-        def rhs(t, y, p):
-            return code_eqs(*itertools.chain(y, p))
-
-    return rhs
-
-
-def _integrator_process(initials, param_values, code_eqs, jac_eqs, num_species, num_odes, tspan,
-                        integrator_name, compiler, integrator_opts, compiler_directives):
+def _integrator_process(
+    initials, param_values, tspan, integrator_name, integrator_opts, rhs_builder
+):
     """ Single integrator process, for parallel execution """
-    if compiler == 'python':
-        code_eqs = sympy.lambdify(*code_eqs)
-        if jac_eqs:
-            jac_eqs = sympy.lambdify(*jac_eqs)
-
-    rhs = _get_rhs(compiler, code_eqs, ydot=np.zeros(num_species),
-                   compiler_directives=compiler_directives)
-
-    jac_fn = None
-    if jac_eqs:
-        jac_eqs = _get_rhs(compiler,
-                           jac_eqs,
-                           jac=np.zeros((num_odes, num_species)),
-                           compiler_directives=compiler_directives)
+    rhs_fn = rhs_builder.rhs_fn
+    jac_fn = rhs_builder.jacobian_fn
+    initials = np.array(initials, float)
+    p = np.array(param_values, float)
+    e = rhs_builder.calc_expressions_constant(param_values)
+    extra_args = (p, e)
 
     # LSODA
     if integrator_name == 'lsoda':
         return scipy.integrate.odeint(
-            rhs,
+            rhs_fn,
             initials,
             tspan,
-            args=(param_values, ),
+            args=extra_args,
             Dfun=jac_fn,
             tfirst=True,
             **integrator_opts
         )
 
     # All other integrators
-    integrator = scipy.integrate.ode(rhs, jac=jac_fn)
+    integrator = scipy.integrate.ode(rhs_fn, jac=jac_fn)
     with warnings.catch_warnings():
         warnings.filterwarnings('error', 'No integrator name match')
         integrator.set_integrator(integrator_name, **integrator_opts)
     integrator.set_initial_value(initials, tspan[0])
 
     # Set parameter vectors for RHS func and Jacobian
-    integrator.set_f_params(param_values)
-    if jac_eqs:
-        integrator.set_jac_params(param_values)
+    integrator.set_f_params(*extra_args)
+    if rhs_builder.with_jacobian:
+        integrator.set_jac_params(*extra_args)
 
-    trajectory = np.ndarray((len(tspan), num_species))
+    trajectory = np.ndarray((len(tspan), rhs_builder.num_species))
     trajectory[0] = initials
     i = 1
     while integrator.successful() and integrator.t < tspan[-1]:
@@ -549,6 +415,346 @@ def _integrator_process(initials, param_values, code_eqs, jac_eqs, num_species, 
         trajectory[i:, :] = 'nan'
 
     return trajectory
+
+
+class RhsBuilder:
+    """Provides the ODE right-hand side evaluation function, given a model.
+
+    Also provides the Jacobian of the RHS function (partial derivatives of
+    species concentrations with respect to all other species).
+
+    This is an abstract base class; concrete subclasses must implement the
+    get_rhs and _get_jacobian_impl methods. These methods shall return function
+    objects for evaluating the RHS and Jacobian, respectively, of the system of
+    ODEs.
+
+    All implementations of this class must be picklable so they can be sent
+    across to the ProcessPoolExecutor workers in separate processes. The
+    _get_rhs and _get_jacobian methods may return process-specific non-picklable
+    values such as closures or native functions.
+
+    Parameters
+    ----------
+    model : pysb.Model
+        Model to simulate.
+    with_jacobian : bool, optional (default: False)
+        Whether to construct the Jacobian evaluation function.
+    cleanup : bool, optional (default: True)
+        Whether to delete the work directory with generated code and compiled
+        output files upon destruction.
+
+    Attributes
+    ----------
+    with_jacobian : bool
+        Whether to construct the Jacobian evaluation function.
+    cleanup : bool
+        Whether to delete the work directory with generated code and compiled
+        output files upon destruction.
+    y : sympy.MatrixSymbol
+        Symbol "y" representing the amount of all model species.
+    p : sympy.MatrixSymbol
+        Symbol "p" representing all model parameters.
+    e : sympy.MatrixSymbol
+        Symbol "e" representing all model constant expressions.
+    o : sympy.MatrixSymbol
+        Symbol "o" representing all model observables.
+    kinetics : sympy.Matrix
+        Symbolic form of model reaction rates in terms of y, p, e, o, and time.
+    kinetics_jacobian_y : sympy.SparseMatrix
+        Symbolic form of partial derivatives of kinetics with respect to y
+        (Only set if with_jacobian is True)
+    kinetics_jacobian_o : sympy.SparseMatrix
+        Symbolic form of partial derivatives of kinetics with respect to o
+        (Only set if with_jacobian is True)
+    stoichiometry_matrix : scipy.sparse.csr_matrix
+        Copy of the model's stoichiometry matrix.
+    observables_matrix : scipy.sparse.csr_matrix
+        Encodes the linear combinations of species that define the model's
+        observables.
+    model_name : str
+        The name of the model.
+
+    """
+
+    def __init__(self, model, with_jacobian=False, cleanup=True):
+        self.with_jacobian = with_jacobian
+        self.cleanup = cleanup
+        expr_dynamic = model.expressions_dynamic(include_derived=True)
+        expr_constant = model.expressions_constant(include_derived=True)
+        self.y = sympy.MatrixSymbol('y', len(model.species), 1)
+        self.p = sympy.MatrixSymbol('p', len(model.parameters_all()), 1)
+        self.e = sympy.MatrixSymbol('e', len(expr_constant), 1)
+        self.o = sympy.MatrixSymbol('o', len(model.observables), 1)
+        species_subs = {
+            sympy.Symbol('__s%d' % i): self.y[i]
+            for i, _ in enumerate(model.species)
+        }
+        param_subs = dict(zip(model.parameters_all(), self.p))
+        obs_subs = dict(zip(model.observables, self.o))
+        expr_dynamic_subs = {
+            e: e.expand_expr()
+            for i, e in enumerate(expr_dynamic)
+        }
+        expr_constant_subs = dict(zip(expr_constant, self.e))
+        om_shape = (len(model.observables), len(model.species))
+        obs_matrix = scipy.sparse.lil_matrix(om_shape, dtype=np.int64)
+        for i, obs in enumerate(model.observables):
+            obs_matrix[i, obs.species] = obs.coefficients
+        self.kinetics = sympy.Matrix([
+            r['rate']
+            .xreplace(expr_constant_subs)
+            .xreplace(expr_dynamic_subs)
+            .xreplace(param_subs)
+            .xreplace(species_subs)
+            .xreplace(obs_subs)
+            for r in model.reactions
+        ])
+        if with_jacobian:
+            # The Jacobian can be quite large but it's extremely sparse. We can
+            # obtain a sparse representation by making a SparseMatrix copy of
+            # the kinetics vector and computing the Jacobian on that.
+            kinetics_sparse = sympy.SparseMatrix(self.kinetics)
+            self.kinetics_jacobian_y = kinetics_sparse.jacobian(self.y)
+            self.kinetics_jacobian_o = kinetics_sparse.jacobian(self.o)
+        self.observables_matrix = obs_matrix.tocsr()
+        self.stoichiometry_matrix = model.stoichiometry_matrix
+        self.model_name = model.name
+        self._expressions_constant = [
+            e.expand_expr().xreplace(param_subs) for e in expr_constant
+        ]
+        self._work_path = None
+        self._expressions_constant_fn = None
+        self._rhs_fn = None
+        self._jacobian_fn = None
+
+    def __del__(self):
+        if self._work_path is not None and self.cleanup:
+            shutil.rmtree(self._work_path, ignore_errors=True)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Clear cached function objects (will be regenerated on demand).
+        state["_expressions_constant_fn"] = None
+        state["_rhs_fn"] = None
+        state["_jacobian_fn"] = None
+        return state
+
+    @property
+    def work_path(self):
+        """Location for saving any temporary working files."""
+        if self._work_path is None:
+            # Only initialize this on demand since it will create a directory
+            # which requires cleanup on destruction.
+            self._work_path = tempfile.mkdtemp(suffix="_pysb_compile")
+        return self._work_path
+
+    @property
+    def num_species(self):
+        """Number of species in the model."""
+        return self.stoichiometry_matrix.shape[0]
+
+    @property
+    def num_reactions(self):
+        """Number of reactions in the model."""
+        return self.stoichiometry_matrix.shape[1]
+
+    @property
+    def num_observables(self):
+        """Number of observables in the model."""
+        return self.observables_matrix.shape[0]
+
+    @property
+    def rhs_fn(self):
+        """The RHS function rhs(time, y, params, const_exprs)."""
+        if self._rhs_fn is None:
+            self._rhs_fn = self._get_rhs()
+        return self._rhs_fn
+
+    @property
+    def jacobian_fn(self):
+        """The Jacobian function jac(time, y, params, const_exprs).
+
+        The value is None if with_jacobian is False."""
+        if self.with_jacobian and self._jacobian_fn is None:
+            self._jacobian_fn = self._get_jacobian()
+        return self._jacobian_fn
+
+    def calc_expressions_constant(self, p):
+        """Compute constant expressions vector e from parameters vector p."""
+        if self._expressions_constant_fn is None:
+            # This function is expected to be called rarely enough (once per
+            # simulation) that we'll just create it here with lambdify and not
+            # allow implementations to override it.
+            self._expressions_constant_fn = sympy.lambdify(
+                [self.p], self._expressions_constant
+            )
+        e = self._expressions_constant_fn(p[:, None])
+        return np.array(e, float)[:, None]
+
+    def _get_rhs(self):
+        """Return the RHS function rhs(time, y, params, const_exprs).
+
+        All subclasses must implement this method."""
+        raise NotImplementedError
+
+    def _get_jacobian(self):
+        """Return the Jacobian function jac(time, y, params, const_exprs).
+
+        Subclasses may implement this method for Jacobian support."""
+        raise NotImplementedError
+
+
+class PythonRhsBuilder(RhsBuilder):
+
+    def _get_rhs(self):
+        kinetics = sympy.lambdify(
+            [self.y, self.p, self.e, self.o], self.kinetics
+        )
+
+        def rhs(t, y, p, e):
+            o = (self.observables_matrix * y)[:, None]
+            v = kinetics(y[:, None], p[:, None], e, o)
+            ydot = self.stoichiometry_matrix * v[:, 0]
+            return ydot
+
+        return rhs
+
+    def _get_jacobian(self):
+        kinetics_jacobian_y = sympy.lambdify(
+            [self.y, self.p, self.e, self.o], self.kinetics_jacobian_y
+        )
+        kinetics_jacobian_o = sympy.lambdify(
+            [self.y, self.p, self.e, self.o], self.kinetics_jacobian_o
+        )
+
+        def jacobian(t, y, p, e):
+            o = (self.observables_matrix * y)[:, None]
+            dy = kinetics_jacobian_y(y[:, None], p[:, None], e, o)
+            do = kinetics_jacobian_o(y[:, None], p[:, None], e, o)
+            jv = dy + do * self.observables_matrix
+            jac = (self.stoichiometry_matrix * jv).todense()
+            return jac
+
+        return jacobian
+
+
+def _mat_sym_dims(symbol):
+    """Return codegen Argument dimensions for a MatrixSymbol."""
+    return ((0, symbol.shape[0] - 1), (0, symbol.shape[1] - 1))
+
+
+class CythonRhsBuilder(RhsBuilder):
+
+    def __init__(self, model, with_jacobian=False, cleanup=True):
+        super(CythonRhsBuilder, self).__init__(model, with_jacobian, cleanup)
+        routine_names = ["kinetics"]
+        if with_jacobian:
+            routine_names += ["kinetics_jacobian_y", "kinetics_jacobian_o"]
+        # We want more control over various details of code generation and
+        # wrapper module creation than sympy's autowrap provides, so we'll use
+        # the lower-level building blocks directly.
+        routines = {name: self._build_routine(name) for name in routine_names}
+        code_gen = C99CodeGen()
+        code_wrapper = CythonCodeWrapper(
+            code_gen,
+            filepath=self.work_path,
+            extra_compile_args=[
+                # The RHS evaluation is such a tiny part of overall integration
+                # time, even for huge models, that compiler optimization
+                # actually takes more time than it will ever yield back. Since
+                # Cython sets -O2 by default we need to override it.
+                "-O0",
+                # TODO: Enable this line once Cython 3.0 is released.
+                #"-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION",
+            ],
+        )
+        escaped_name = re.sub(
+            r"[^A-Za-z0-9]",
+            "_",
+            self.model_name.encode("unicode_escape").decode(),
+        )
+        base_name = "pysb_" + escaped_name + "_kinetics"
+        code_wrapper._filename = base_name
+        code_wrapper._module_basename = base_name + "_wrapper"
+        functions = {
+            name: code_wrapper.wrap_code(routine)
+            for name, routine in routines.items()
+        }
+        # Grab specs for the Cython-compiled modules for reloading later.
+        self.module_specs = {
+            name: inspect.getmodule(function).__spec__
+            for name, function in functions.items()
+        }
+
+    def _build_routine(self, name):
+        expr = getattr(self, name)
+        inout = sympy.MatrixSymbol("_inout", *expr.shape)
+        routine = Routine(
+            name,
+            [
+                InputArgument(self.y, dimensions=_mat_sym_dims(self.y)),
+                InputArgument(self.p, dimensions=_mat_sym_dims(self.p)),
+                InputArgument(self.e, dimensions=_mat_sym_dims(self.e)),
+                InputArgument(self.o, dimensions=_mat_sym_dims(self.o)),
+                # TODO: Does saving this allocation actually help?
+                InOutArgument(
+                    inout,
+                    inout,
+                    expr,
+                    datatype=default_datatypes["float"],
+                    dimensions=_mat_sym_dims(inout),
+                ),
+            ],
+            [],
+            [],
+            [],
+        )
+        return routine
+
+    def _load_function(self, name):
+        # Import one of our previously compiled Cython functions.
+        spec = self.module_specs[name]
+        # These two lines seem strangely redundant, but it's how specs work...
+        module = spec.loader.create_module(spec)
+        spec.loader.exec_module(module)
+        function = getattr(module, name + "_c")
+        return function
+
+    def _get_rhs(self):
+        v = np.zeros(self.kinetics.shape)
+        kinetics = self._load_function("kinetics")
+
+        def rhs(t, y, p, e):
+            o = (self.observables_matrix * y)[:, None]
+            # Note that this function sets v as a side effect.
+            kinetics(y[:, None], p[:, None], e, o, v)
+            ydot = self.stoichiometry_matrix * v[:, 0]
+            return ydot
+
+        return rhs
+
+    def _get_jacobian(self):
+        dy = np.zeros(self.kinetics_jacobian_y.shape)
+        do = np.zeros(self.kinetics_jacobian_o.shape)
+        kinetics_jacobian_y = self._load_function("kinetics_jacobian_y")
+        kinetics_jacobian_o = self._load_function("kinetics_jacobian_o")
+
+        def jacobian(t, y, p, e):
+            o = (self.observables_matrix * y)[:, None]
+            # Note that these functions set dy and do as a side effect.
+            kinetics_jacobian_y(y[:, None], p[:, None], e, o, dy)
+            kinetics_jacobian_o(y[:, None], p[:, None], e, o, do)
+            jv = dy + do * self.observables_matrix
+            jac = self.stoichiometry_matrix * jv
+            return jac
+
+        return jacobian
+
+
+_rhs_builders = {
+    "python": PythonRhsBuilder,
+    "cython": CythonRhsBuilder,
+}
 
 
 class SerialExecutor(Executor):
