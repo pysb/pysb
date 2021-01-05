@@ -8,6 +8,7 @@ import collections
 import weakref
 import copy
 import itertools
+import numbers
 import sympy
 import scipy.sparse
 import networkx as nx
@@ -1432,6 +1433,10 @@ class Rule(Component):
         co-transport anything connected to that Monomer by a path in the same
         compartment. If False (default), connected Monomers will remain where
         they were.
+    energy : bool, optional
+        If True, this rule is an energy rule (as in Energy BNG) and the two
+        parameters are interpreted as the 'phi' and deltaG parameters of the
+        Arrhenius equation (see Hogg 2013 for details).
     total_rate: bool, optional
         If True, the rate is considered to be macroscopic and is not
         multiplied by the number of reactant molecules during simulation.
@@ -1449,8 +1454,8 @@ class Rule(Component):
     """
 
     def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
-                 delete_molecules=False, move_connected=False,
-                 _export=True, total_rate=False):
+                 delete_molecules=False, move_connected=False, energy=False,
+                 total_rate=False, _export=True):
         if not isinstance(rule_expression, RuleExpression):
             raise Exception("rule_expression is not a RuleExpression object")
         validate_expr(rate_forward, "forward rate")
@@ -1467,6 +1472,7 @@ class Rule(Component):
         self.rate_reverse = rate_reverse
         self.delete_molecules = delete_molecules
         self.move_connected = move_connected
+        self.energy = energy
         self.total_rate = total_rate
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
@@ -1541,9 +1547,52 @@ class Rule(Component):
             ret += ', delete_molecules=True'
         if self.move_connected:
             ret += ', move_connected=True'
+        if self.energy:
+            ret += ', energy=True'
         ret += ')'
         return ret
 
+
+class EnergyPattern(Component):
+
+    """
+    Model component representing an energy pattern.
+
+    Parameters
+    ----------
+    pattern : ComplexPattern
+        ComplexPattern describing the species to which the given deltaG in
+        `energy` should be attributed.
+    energy : sympy.Expr
+        Expression containing model parameters that defines the deltaG to be
+        ascribed to the part of a species matched by `pattern`.
+
+    Attributes
+    ----------
+
+    Identical to Parameters (see above).
+
+    """
+
+    def __init__(self, name, pattern, energy, _export=True):
+        Component.__init__(self, name, _export)
+        if not isinstance(pattern, ComplexPattern):
+            raise Exception("pattern is not a ComplexPattern object")
+        if not isinstance(energy, sympy.Expr):
+            raise Exception("energy is not a sympy.Expr object")
+        self.pattern = pattern
+        self.energy = energy
+
+    def __repr__(self):
+        if isinstance(self.energy, Component):
+            energystr = self.energy.name
+        else:
+            energystr = repr(self.energy)
+
+
+        ret = '%s(%s, %s, %s)' % (self.__class__.__name__, repr(self.name),
+                                  repr(self.pattern), energystr)
+        return ret
 
 
 def validate_expr(obj, description):
@@ -1671,7 +1720,9 @@ class Expression(Component, Symbol):
         return self.name, self.expr, False
 
     def __init__(self, name, expr, _export=True):
-        if not isinstance(expr, sympy.Expr):
+        if isinstance(expr, numbers.Number):
+            expr = sympy.Number(expr)
+        elif not isinstance(expr, sympy.Expr):
             raise ValueError('An Expression can only be created from a '
                              'sympy.Expr object')
         self.expr = expr
@@ -1865,7 +1916,7 @@ class Model(object):
     """
 
     _component_types = (Monomer, Compartment, Parameter, Rule, Observable,
-                        Expression, Tag)
+                        Expression, EnergyPattern, Tag)
 
     def __init__(self, name=None, base=None, _export=True):
         self.name = name
@@ -1877,6 +1928,7 @@ class Model(object):
         self.rules = ComponentSet()
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
+        self.energypatterns = ComponentSet()
         self.tags = ComponentSet()
         self.initials = []
         self.annotations = []
