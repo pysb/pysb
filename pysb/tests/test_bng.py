@@ -312,6 +312,21 @@ def test_bng_printer():
     assert _bng_print(sympy.Min(x, y)) == 'min(x, y)'
     assert _bng_print(sympy.Max(x, y)) == 'max(x, y)'
 
+    # Relational
+    assert _bng_print(sympy.Eq(x, y)) == 'x == y'
+    assert _bng_print(sympy.Ne(x, y)) == 'x != y'
+    assert _bng_print(x < y) == 'x < y'
+    assert _bng_print(x <= y) == 'x <= y'
+    assert _bng_print(x > y) == 'x > y'
+    assert _bng_print(x >= y) == 'x >= y'
+
+
+def test_bng_printer_relational_unknown():
+    class NewRelational(sympy.core.relational.Relational):
+        rel_op = "??????????"  # A highly unlikely rel_op for a new subclass.
+    x = sympy.Symbol("x")
+    assert_raises(NotImplementedError, _bng_print, NewRelational(x, x))
+
 
 def test_parse_bngl_expression_if():
     x, y = sympy.symbols('x y')
