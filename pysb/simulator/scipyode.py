@@ -2,7 +2,7 @@ from pysb.simulator.base import Simulator, SimulationResult
 import scipy.integrate, scipy.sparse
 from sympy.utilities.autowrap import CythonCodeWrapper
 from sympy.utilities.codegen import (
-    C99CodeGen, Routine, InputArgument, InOutArgument, default_datatypes,
+    C99CodeGen, Routine, InputArgument, OutputArgument, default_datatypes
 )
 import distutils
 import pysb.bng
@@ -688,7 +688,7 @@ class CythonRhsBuilder(RhsBuilder):
 
     def _build_routine(self, name):
         expr = getattr(self, name)
-        inout = sympy.MatrixSymbol("_inout", *expr.shape)
+        out = sympy.MatrixSymbol("out", *expr.shape)
         routine = Routine(
             name,
             [
@@ -696,13 +696,12 @@ class CythonRhsBuilder(RhsBuilder):
                 InputArgument(self.p, dimensions=_mat_sym_dims(self.p)),
                 InputArgument(self.e, dimensions=_mat_sym_dims(self.e)),
                 InputArgument(self.o, dimensions=_mat_sym_dims(self.o)),
-                # TODO: Does saving this allocation actually help?
-                InOutArgument(
-                    inout,
-                    inout,
+                OutputArgument(
+                    out,
+                    out,
                     expr,
                     datatype=default_datatypes["float"],
-                    dimensions=_mat_sym_dims(inout),
+                    dimensions=_mat_sym_dims(out),
                 ),
             ],
             [],
@@ -720,30 +719,30 @@ class CythonRhsBuilder(RhsBuilder):
         function = getattr(module, name + "_c")
         return function
 
+    # The inner functions below are, admittedly, basically identical to those
+    # in PythonRhsBuilder. Initial implementations differed more but they
+    # converged over time. They have not been refactored out into a common
+    # implementation to allow for exploration of performance improvements.
+
     def _get_rhs(self):
-        v = np.zeros(self.kinetics.shape)
         kinetics = self._load_function("kinetics")
 
         def rhs(t, y, p, e):
             o = (self.observables_matrix * y)[:, None]
-            # Note that this function sets v as a side effect.
-            kinetics(y[:, None], p[:, None], e, o, v)
+            v = kinetics(y[:, None], p[:, None], e, o)
             ydot = self.stoichiometry_matrix * v[:, 0]
             return ydot
 
         return rhs
 
     def _get_jacobian(self):
-        dy = np.zeros(self.kinetics_jacobian_y.shape)
-        do = np.zeros(self.kinetics_jacobian_o.shape)
         kinetics_jacobian_y = self._load_function("kinetics_jacobian_y")
         kinetics_jacobian_o = self._load_function("kinetics_jacobian_o")
 
         def jacobian(t, y, p, e):
             o = (self.observables_matrix * y)[:, None]
-            # Note that these functions set dy and do as a side effect.
-            kinetics_jacobian_y(y[:, None], p[:, None], e, o, dy)
-            kinetics_jacobian_o(y[:, None], p[:, None], e, o, do)
+            dy = kinetics_jacobian_y(y[:, None], p[:, None], e, o)
+            do = kinetics_jacobian_o(y[:, None], p[:, None], e, o)
             jv = dy + do * self.observables_matrix
             jac = self.stoichiometry_matrix * jv
             return jac
