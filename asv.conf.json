@@ -31,6 +31,13 @@
     // variable.
     "environment_type": "conda",
 
+    // Specify conda env with extra optional dependencies that are required
+    // for our benchmark suite.
+    // This feature is not in v0.4.2, the latest version at this time.
+    // It requires installing from the master branch at
+    // https://github.com/airspeed-velocity/asv .
+    "conda_environment_file": "asv_conda_environment.yml",
+
     // timeout in seconds for installing any dependencies in environment
     // defaults to 10 min
     //"install_timeout": 600,
