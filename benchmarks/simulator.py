@@ -32,6 +32,8 @@ class Earm10ODESuite(object):
             **integrator_options_common
         )
 
+    timeout = 500
+
     def time_scipy_lsoda(self):
         self.sim_lsoda.run()
 
