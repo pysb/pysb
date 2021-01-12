@@ -424,7 +424,7 @@ class RhsBuilder:
     species concentrations with respect to all other species).
 
     This is an abstract base class; concrete subclasses must implement the
-    get_rhs and _get_jacobian_impl methods. These methods shall return function
+    _get_rhs and _get_jacobian methods. These methods shall return function
     objects for evaluating the RHS and Jacobian, respectively, of the system of
     ODEs.
 
@@ -467,7 +467,7 @@ class RhsBuilder:
         Symbolic form of partial derivatives of kinetics with respect to o
         (Only set if with_jacobian is True)
     stoichiometry_matrix : scipy.sparse.csr_matrix
-        Copy of the model's stoichiometry matrix.
+        The model's stoichiometry matrix.
     observables_matrix : scipy.sparse.csr_matrix
         Encodes the linear combinations of species that define the model's
         observables.
@@ -496,8 +496,9 @@ class RhsBuilder:
             for i, e in enumerate(expr_dynamic)
         }
         expr_constant_subs = dict(zip(expr_constant, self.e))
-        om_shape = (len(model.observables), len(model.species))
-        obs_matrix = scipy.sparse.lil_matrix(om_shape, dtype=np.int64)
+        obs_matrix = scipy.sparse.lil_matrix(
+            (len(model.observables), len(model.species)), dtype=np.int64
+        )
         for i, obs in enumerate(model.observables):
             obs_matrix[i, obs.species] = obs.coefficients
         self.kinetics = sympy.Matrix([
@@ -514,6 +515,11 @@ class RhsBuilder:
             # obtain a sparse representation by making a SparseMatrix copy of
             # the kinetics vector and computing the Jacobian on that.
             kinetics_sparse = sympy.SparseMatrix(self.kinetics)
+            # Rather than substitute all the observables linear-combination-of-
+            # species expressions into the kinetics and then compute the
+            # Jacobian, we can use the total derivative / chain rule to
+            # simplify things. The final jacobian of the kinetics must be
+            # computed as jac(y) + jac(o) * observables_matrix.
             self.kinetics_jacobian_y = kinetics_sparse.jacobian(self.y)
             self.kinetics_jacobian_o = kinetics_sparse.jacobian(self.o)
         self.observables_matrix = obs_matrix.tocsr()
@@ -631,6 +637,7 @@ class PythonRhsBuilder(RhsBuilder):
             o = (self.observables_matrix * y)[:, None]
             dy = kinetics_jacobian_y(y[:, None], p[:, None], e, o)
             do = kinetics_jacobian_o(y[:, None], p[:, None], e, o)
+            # Compute Jacobian of the kinetics vector by total derivative.
             jv = dy + do * self.observables_matrix
             jac = (self.stoichiometry_matrix * jv).todense()
             return jac
@@ -743,6 +750,7 @@ class CythonRhsBuilder(RhsBuilder):
             o = (self.observables_matrix * y)[:, None]
             dy = kinetics_jacobian_y(y[:, None], p[:, None], e, o)
             do = kinetics_jacobian_o(y[:, None], p[:, None], e, o)
+            # Compute Jacobian of the kinetics vector by total derivative.
             jv = dy + do * self.observables_matrix
             jac = self.stoichiometry_matrix * jv
             return jac
