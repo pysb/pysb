@@ -66,21 +66,16 @@ class EgfrExtendedRunSuite(object):
         model = egfr_extended.model
         model.reset_equations()
         generate_equations(model, max_iter=6)
-        simulator_options_common = {
+        common_options = {
             'model': model,
             'tspan': np.linspace(0, 10000, 1000),
             'integrator': 'vode',
             'cleanup': False,
         }
+        compilers = 'python', 'cython'
         return {
-            'python': ScipyOdeSimulator(
-                compiler='python',
-                **simulator_options_common,
-            ),
-            'cython': ScipyOdeSimulator(
-                compiler='cython',
-                **simulator_options_common,
-            )
+            c: ScipyOdeSimulator(compiler=c, **common_options)
+            for c in compilers
         }
 
     def time_run_python(self, sims):
