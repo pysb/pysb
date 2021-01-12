@@ -72,7 +72,6 @@ class EgfrExtendedRunSuite(object):
             'model': model,
             'tspan': np.linspace(0, 10000, 1000),
             'integrator': 'vode',
-            'cleanup': False,
         }
         compilers = 'python', 'cython'
         return {
