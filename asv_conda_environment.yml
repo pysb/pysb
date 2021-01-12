@@ -1,6 +1,0 @@
-name: asv_benchmark
-dependencies:
-  - python-dateutil=2.8.1
-  - cython=0.29.21
-  - alubbock::bionetgen=2.5.1
-  - alubbock::cupsoda=v1.1_986c895

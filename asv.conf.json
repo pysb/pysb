@@ -31,13 +31,6 @@
     // variable.
     "environment_type": "conda",
 
-    // Specify conda env with extra optional dependencies that are required
-    // for our benchmark suite.
-    // This feature is not in v0.4.2, the latest version at this time.
-    // It requires installing from the master branch at
-    // https://github.com/airspeed-velocity/asv .
-    "conda_environment_file": "asv_conda_environment.yml",
-
     // timeout in seconds for installing any dependencies in environment
     // defaults to 10 min
     //"install_timeout": 600,
@@ -47,7 +40,7 @@
 
     // The Pythons you'd like to test against.  If not provided, defaults
     // to the current version of Python used to run `asv`.
-    "pythons": ["3.6", "3.7", "3.8"],
+    "pythons": ["3.8", "3.9"],
 
     // The matrix of dependencies to test.  Each key is the name of a
     // package (in PyPI) and the values are version numbers.  An empty
@@ -59,11 +52,17 @@
     // pip (with all the conda available packages installed first,
     // followed by the pip installed packages).
     //
-    // "matrix": {
-    //     "numpy": ["1.6", "1.7"],
-    //     "six": ["", null],        // test with and without six installed
-    //     "pip+emcee": [""],   // emcee is only available for install with pip.
-    // },
+    "matrix": {
+        "req": {
+            "python-dateutil": "2.8.1",
+            "cython": "0.29.21",
+            "alubbock::bionetgen": "2.5.1",
+            "alubbock::cupsoda": "v1.1_986c895"
+        },
+        "env_nobuild": {
+            "OMP_NUM_THREADS": "1"
+        }
+    },
 
     // Combinations of libraries/python versions can be excluded/included
     // from the set to test. Each entry is a dictionary containing additional
