@@ -78,6 +78,8 @@ class EgfrExtendedRunSuite(object):
             for c in compilers
         }
 
+    setup_cache.timeout = 1000
+
     def time_run_python(self, sims):
         sims['python'].run()
 
