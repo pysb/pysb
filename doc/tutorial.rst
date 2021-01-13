@@ -29,7 +29,7 @@ sampled at intervals of 10 seconds::
     >>> t = [0, 10, 20, 30, 40, 50, 60]
     >>> solver = Solver(model, t)
     >>> solver.run()
-    >>> print(solver.y[:, 1])
+    >>> print(solver.y[:, 0])
     [   0.   30.   60.   90.  120.  150.  180.]
 
 Creating a model

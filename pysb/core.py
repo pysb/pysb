@@ -1345,9 +1345,10 @@ class Compartment(Component):
     dimension : integer, optional
         The number of spatial dimensions in the compartment, either 2 (i.e. a
         membrane) or 3 (a volume).
-    size : Parameter, optional
-        A parameter object whose value defines the volume or area of the
-        compartment. If not specified, the size will be fixed at 1.0.
+    size : Parameter or Expression, optional
+        A parameter or constant expression object whose value defines the
+        volume or area of the compartment. If not specified, the size will be
+        fixed at 1.0.
 
     Attributes
     ----------
@@ -1372,8 +1373,10 @@ class Compartment(Component):
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
         #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
-        if size is not None and not isinstance(size, Parameter):
-            raise Exception("size must be a parameter (or omitted)")
+        if size is not None and not isinstance(size, Parameter) and not \
+                (isinstance(size, Expression) and size.is_constant_expression()):
+            raise Exception("size must be a parameter or a constant expression"
+                            " (or omitted)")
         self.parent = parent
         self.dimension = dimension
         self.size = size
@@ -1399,9 +1402,9 @@ class Rule(Component):
     rule_expression : RuleExpression
         RuleExpression containing the essence of the rule (reactants, products,
         reversibility).
-    rate_forward : Parameter
+    rate_forward : Union[Parameter,Expression]
         Forward reaction rate constant.
-    rate_reverse : Parameter, optional
+    rate_reverse : Union[Parameter,Expression], optional
         Reverse reaction rate constant (only required for reversible rules).
     delete_molecules : bool, optional
         If True, deleting a Monomer from a species is allowed to fragment the
