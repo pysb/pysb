@@ -131,10 +131,10 @@ class ScipyOdeSimulator(Simulator):
                                                 param_values=param_values,
                                                 verbose=verbose,
                                                 **kwargs)
-        self.cleanup = kwargs.pop('cleanup', True)
+        cleanup = kwargs.pop('cleanup', True)
         with_jacobian = kwargs.pop('use_analytic_jacobian', False)
         integrator = kwargs.pop('integrator', 'vode')
-        compiler_mode = kwargs.pop('compiler', None)
+        compiler = kwargs.pop('compiler', None)
         integrator_options = kwargs.pop('integrator_options', {})
 
         if kwargs:
@@ -142,27 +142,13 @@ class ScipyOdeSimulator(Simulator):
                 ', '.join(kwargs.keys())
             ))
         # Generate the equations for the model
-        pysb.bng.generate_equations(self._model, self.cleanup, self.verbose)
+        pysb.bng.generate_equations(self._model, cleanup, self.verbose)
 
-        if compiler_mode is None:
-            self._compiler = self._autoselect_compiler()
-            if self._compiler == 'python':
-                self._logger.warning(
-                    "This system of ODEs will be evaluated in pure Python. "
-                    "This may be slow for large models. We recommend "
-                    "installing the 'cython' package for compiling the ODEs to "
-                    "C code. This warning can be suppressed by specifying "
-                    "compiler='python'.")
-            self._logger.debug('Equation mode set to "%s"' % self._compiler)
-        else:
-            self._compiler = compiler_mode
-
-        self._compiler_directives = None
-
-        builder_cls = _rhs_builders.get(self._compiler, None)
-        if builder_cls is None:
-            raise ValueError('Unknown compiler_mode: %s' % self._compiler)
-        self.rhs_builder = builder_cls(model, with_jacobian, cleanup=self.cleanup)
+        builder_cls = _select_rhs_builder(compiler, self._logger)
+        self._logger.debug("Using RhsBuilder: %s", builder_cls.__name__)
+        self.rhs_builder = builder_cls(
+            model, with_jacobian, cleanup=cleanup, _logger=self._logger
+        )
 
         # build integrator options list from our defaults and any kwargs
         # passed to this function
@@ -186,58 +172,6 @@ class ScipyOdeSimulator(Simulator):
     def _patch_distutils_logging(self):
         """Return distutils logging context manager based on our logger."""
         return _patch_distutils_logging(self._logger.logger)
-
-    @classmethod
-    def _test_cython(cls):
-        if not hasattr(cls, '_use_cython'):
-            cls._use_cython = False
-            try:
-                import Cython
-                Cython.inline("x = 1", force=True, quiet=True)
-                del Cython
-                cls._use_cython = True
-            except ImportError:
-                pass
-            except (Cython.Compiler.Errors.CompileError,
-                    distutils.errors.DistutilsPlatformError,
-                    ValueError) as e:
-                if not cls._check_compiler_error(e, 'cython'):
-                    raise
-
-    @staticmethod
-    def _check_compiler_error(e, compiler):
-        if isinstance(e, distutils.errors.DistutilsPlatformError) and \
-                str(e) != 'Unable to find vcvarsall.bat':
-            return False
-
-        if isinstance(e, ValueError) and e.args != ('Symbol table not found',):
-            return False
-
-        # Build platform-specific C compiler error message
-        message = 'Please check you have a functional C compiler'
-        if os.name == 'nt':
-            message += ', available from ' \
-                       'https://wiki.python.org/moin/WindowsCompilers'
-        else:
-            message += '.'
-
-        get_logger(__name__).warn(
-            '{} compiler appears non-functional. {}\n'
-            'Original error: {}'.format(compiler, message, repr(e)))
-
-        return True
-
-    @classmethod
-    def _autoselect_compiler(cls):
-        """ Auto-select equation backend """
-
-        # Try cython
-        cls._test_cython()
-        if cls._use_cython:
-            return 'cython'
-
-        # Default to python/lambdify
-        return 'python'
 
     def run(self, tspan=None, initials=None, param_values=None,
             num_processors=1):
@@ -426,7 +360,9 @@ class RhsBuilder:
     This is an abstract base class; concrete subclasses must implement the
     _get_rhs and _get_jacobian methods. These methods shall return function
     objects for evaluating the RHS and Jacobian, respectively, of the system of
-    ODEs.
+    ODEs. Subclasses may also implement the `check` classmethod which should
+    return a bool indicating whether it is usable in the current environment
+    (it could for example check that all dependencies are present and working).
 
     All implementations of this class must be picklable so they can be sent
     across to the ProcessPoolExecutor workers in separate processes. The
@@ -476,9 +412,10 @@ class RhsBuilder:
 
     """
 
-    def __init__(self, model, with_jacobian=False, cleanup=True):
+    def __init__(self, model, with_jacobian=False, cleanup=True, _logger=None):
         self.with_jacobian = with_jacobian
         self.cleanup = cleanup
+        self._logger = _logger
         expr_dynamic = model.expressions_dynamic(include_derived=True)
         expr_constant = model.expressions_constant(include_derived=True)
         self.y = sympy.MatrixSymbol('y', len(model.species), 1)
@@ -609,6 +546,22 @@ class RhsBuilder:
         Subclasses may implement this method for Jacobian support."""
         raise NotImplementedError
 
+    @classmethod
+    def check(cls):
+        """Raises an exception if this class is not usable.
+
+        The default implementation does nothing (always succeeds)."""
+        return True
+
+    @classmethod
+    def check_safe(cls):
+        """Returns a boolean indicating whether this class is usable."""
+        try:
+            cls.check()
+            return True
+        except Exception:
+            return False
+
 
 class PythonRhsBuilder(RhsBuilder):
 
@@ -652,8 +605,10 @@ def _mat_sym_dims(symbol):
 
 class CythonRhsBuilder(RhsBuilder):
 
-    def __init__(self, model, with_jacobian=False, cleanup=True):
-        super(CythonRhsBuilder, self).__init__(model, with_jacobian, cleanup)
+    def __init__(self, model, with_jacobian=False, cleanup=True, _logger=None):
+        super(CythonRhsBuilder, self).__init__(
+            model, with_jacobian, cleanup, _logger
+        )
         routine_names = ["kinetics"]
         if with_jacobian:
             routine_names += ["kinetics_jacobian_y", "kinetics_jacobian_o"]
@@ -662,18 +617,23 @@ class CythonRhsBuilder(RhsBuilder):
         # the lower-level building blocks directly.
         routines = {name: self._build_routine(name) for name in routine_names}
         code_gen = C99CodeGen()
+        extra_compile_args = [
+            # The RHS evaluation is such a tiny part of overall integration
+            # time, even for huge models, that compiler optimization actually
+            # takes more time than it will ever yield back. Since Cython sets
+            # -O2 by default we need to override it.
+            "-O0",
+        ]
+        # Opt in to the newer numpy C API which is only supported in Cython 3+.
+        import Cython
+        if not Cython.__version__.startswith("0."):
+            extra_compile_args.append(
+                "-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION"
+            )
         code_wrapper = CythonCodeWrapper(
             code_gen,
             filepath=self.work_path,
-            extra_compile_args=[
-                # The RHS evaluation is such a tiny part of overall integration
-                # time, even for huge models, that compiler optimization
-                # actually takes more time than it will ever yield back. Since
-                # Cython sets -O2 by default we need to override it.
-                "-O0",
-                # TODO: Enable this line once Cython 3.0 is released.
-                #"-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION",
-            ],
+            extra_compile_args=extra_compile_args,
         )
         escaped_name = re.sub(
             r"[^A-Za-z0-9]",
@@ -757,11 +717,80 @@ class CythonRhsBuilder(RhsBuilder):
 
         return jacobian
 
+    _check_ok = False
 
+    @classmethod
+    def check(cls):
+        # Quick return if previous check succeeded, otherwise re-run the checks
+        # so the exception is always raised if called repeatedly.
+        if cls._check_ok:
+            return
+        compiler_exc = None
+        try:
+            import Cython
+            Cython.inline("x = 1", force=True, quiet=True)
+            cls._check_ok = True
+            return
+        except ImportError:
+            raise RuntimeError(
+                "Please install the Cython package to use this compiler."
+            )
+        # Catch some common C compiler configuration problems so we can raise a
+        # chained exception with a more helpful message.
+        except (
+            Cython.Compiler.Errors.CompileError,
+            distutils.errors.CCompilerError,
+            distutils.errors.DistutilsPlatformError,
+        ) as e:
+            compiler_exc = e
+        except ValueError as e:
+            if e.args == ("Symbol table not found",):
+                # This is a common error building against numpy with mingw32.
+                compiler_exc = e
+            else:
+                raise
+        message = "Please check you have a functional C compiler"
+        if os.name == "nt":
+            message += ", available from " \
+                       "https://wiki.python.org/moin/WindowsCompilers"
+        else:
+            message += "."
+        # Reference chained exceptions for specifics on what went wrong.
+        message += "\nSee the above error messages for more details."
+        raise RuntimeError(message) from compiler_exc
+
+
+# Keep these sorted in priority order.
 _rhs_builders = {
-    "python": PythonRhsBuilder,
     "cython": CythonRhsBuilder,
+    "python": PythonRhsBuilder,
 }
+
+
+def _select_rhs_builder(compiler, logger):
+    if compiler is None:
+        # Probe for the first (best) working builder.
+        for cls in _rhs_builders.values():
+            if cls.check_safe():
+                break
+        else:
+            raise RuntimeError("No usable ODE compiler found.")
+        if cls is PythonRhsBuilder:
+            logger.warning(
+                "This system of ODEs will be evaluated in pure Python. "
+                "This may be slow for large models. We recommend "
+                "installing the 'cython' package for compiling the ODEs to "
+                "C code. This warning can be suppressed by specifying "
+                "compiler='python'."
+            )
+    else:
+        try:
+            cls = _rhs_builders[compiler]
+        except KeyError:
+            raise ValueError('Unknown ODE compiler name: %s' % compiler) \
+                from None
+        cls.check()
+    return cls
 
 
 class SerialExecutor(Executor):
