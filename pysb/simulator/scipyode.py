@@ -71,8 +71,7 @@ class ScipyOdeSimulator(Simulator):
           (tries cython, then python). Cython compiles the
           equation system into C code. Python is the slowest but most
           compatible.
-        * ``cleanup``: Boolean, `cleanup` argument used for
-          :func:`pysb.bng.generate_equations` call
+        * ``cleanup``: Boolean, whether to delete temporary files.
 
     Notes
     -----
@@ -358,7 +357,7 @@ class RhsBuilder:
     species concentrations with respect to all other species).
 
     This is an abstract base class; concrete subclasses must implement the
-    _get_rhs and _get_jacobian methods. These methods shall return function
+    `_get_rhs` and `_get_jacobian` methods. These methods shall return function
     objects for evaluating the RHS and Jacobian, respectively, of the system of
     ODEs. Subclasses may also implement the `check` classmethod which should
     return a bool indicating whether it is usable in the current environment
@@ -366,8 +365,8 @@ class RhsBuilder:
 
     All implementations of this class must be picklable so they can be sent
     across to the ProcessPoolExecutor workers in separate processes. The
-    _get_rhs and _get_jacobian methods may return process-specific non-picklable
-    values such as closures or native functions.
+    `_get_rhs` and `_get_jacobian` methods may return process-specific
+    non-picklable values.
 
     Parameters
     ----------
@@ -647,6 +646,8 @@ class CythonRhsBuilder(RhsBuilder):
             filepath=self.work_path,
             extra_compile_args=extra_compile_args,
         )
+        # Build a module-name-safe string that identifies the model as uniquely
+        # as possible to assist in debugging.
         escaped_name = re.sub(
             r"[^A-Za-z0-9]",
             "_",
