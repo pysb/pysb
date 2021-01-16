@@ -204,8 +204,6 @@ class ScipyOdeSimulator(Simulator):
                                            _run_kwargs=[])
         n_sims = len(self.param_values)
 
-        num_species = len(self._model.species)
-        num_odes = len(self._model.odes)
         if num_processors == 1:
             self._logger.debug('Single processor (serial) mode')
         else:
