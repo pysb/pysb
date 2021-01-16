@@ -419,30 +419,23 @@ class RhsBuilder:
         self.p = sympy.MatrixSymbol('p', len(model.parameters_all()), 1)
         self.e = sympy.MatrixSymbol('e', len(expr_constant), 1)
         self.o = sympy.MatrixSymbol('o', len(model.observables), 1)
-        species_subs = {
-            sympy.Symbol('__s%d' % i): self.y[i]
-            for i, _ in enumerate(model.species)
-        }
+        # Parameters symbols. We also need this independently of all_subs.
         param_subs = dict(zip(model.parameters_all(), self.p))
-        obs_subs = dict(zip(model.observables, self.o))
-        expr_dynamic_subs = {
-            e: e.expand_expr()
-            for i, e in enumerate(expr_dynamic)
-        }
-        expr_constant_subs = dict(zip(expr_constant, self.e))
-        obs_matrix = scipy.sparse.lil_matrix(
-            (len(model.observables), len(model.species)), dtype=np.int64
-        )
-        for i, obs in enumerate(model.observables):
-            obs_matrix[i, obs.species] = obs.coefficients
+        # All substitution rules we need to apply to the reaction expressions.
+        all_subs = param_subs.copy()
+        # Species symbols.
+        all_subs.update({
+            sympy.Symbol('__s%d' % i): self.y[i]
+            for i in range(len(model.species))
+        })
+        # Observables symbols.
+        all_subs.update(dict(zip(model.observables, self.o)))
+        # Constant expressions symbols.
+        all_subs.update(dict(zip(expr_constant, self.e)))
+        # Dynamic expressions (expanded).
+        all_subs.update({e: e.expand_expr() for e in expr_dynamic})
         self.kinetics = sympy.Matrix([
-            r['rate']
-            .xreplace(expr_constant_subs)
-            .xreplace(expr_dynamic_subs)
-            .xreplace(param_subs)
-            .xreplace(species_subs)
-            .xreplace(obs_subs)
-            for r in model.reactions
+            r['rate'].subs(all_subs) for r in model.reactions
         ])
         if with_jacobian:
             # The Jacobian can be quite large but it's extremely sparse. We can
@@ -457,6 +450,11 @@ class RhsBuilder:
             self._logger.debug("Computing Jacobian matrices")
             self.kinetics_jacobian_y = kinetics_sparse.jacobian(self.y)
             self.kinetics_jacobian_o = kinetics_sparse.jacobian(self.o)
+        obs_matrix = scipy.sparse.lil_matrix(
+            (len(model.observables), len(model.species)), dtype=np.int64
+        )
+        for i, obs in enumerate(model.observables):
+            obs_matrix[i, obs.species] = obs.coefficients
         self.observables_matrix = obs_matrix.tocsr()
         self.stoichiometry_matrix = model.stoichiometry_matrix
         self.model_name = model.name
