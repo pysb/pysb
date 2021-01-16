@@ -457,6 +457,7 @@ class RhsBuilder:
             # Jacobian, we can use the total derivative / chain rule to
             # simplify things. The final jacobian of the kinetics must be
             # computed as jac(y) + jac(o) * observables_matrix.
+            self._logger.debug("Computing Jacobian matrices")
             self.kinetics_jacobian_y = kinetics_sparse.jacobian(self.y)
             self.kinetics_jacobian_o = kinetics_sparse.jacobian(self.o)
         self.observables_matrix = obs_matrix.tocsr()
@@ -471,8 +472,15 @@ class RhsBuilder:
         self._jacobian_fn = None
 
     def __del__(self):
-        if self._work_path is not None and self.cleanup:
-            shutil.rmtree(self._work_path, ignore_errors=True)
+        if self._work_path:
+            if self.cleanup:
+                shutil.rmtree(self._work_path, ignore_errors=True)
+                self._logger.debug("Removed work dir: %s", self._work_path)
+            else:
+                self._logger.debug(
+                    "Leaving work dir in place (cleanup=False): %s",
+                    self._work_path
+                )
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -489,6 +497,7 @@ class RhsBuilder:
             # Only initialize this on demand since it will create a directory
             # which requires cleanup on destruction.
             self._work_path = tempfile.mkdtemp(suffix="_pysb_compile")
+            self._logger.debug("Created work dir: %s", self._work_path)
         return self._work_path
 
     @property
@@ -510,6 +519,7 @@ class RhsBuilder:
     def rhs_fn(self):
         """The RHS function rhs(time, y, params, const_exprs)."""
         if self._rhs_fn is None:
+            self._logger.debug("Constructing rhs function")
             self._rhs_fn = self._get_rhs()
         return self._rhs_fn
 
@@ -519,6 +529,7 @@ class RhsBuilder:
 
         The value is None if with_jacobian is False."""
         if self.with_jacobian and self._jacobian_fn is None:
+            self._logger.debug("Constructing jacobian function")
             self._jacobian_fn = self._get_jacobian()
         return self._jacobian_fn
 
@@ -528,6 +539,7 @@ class RhsBuilder:
             # This function is expected to be called rarely enough (once per
             # simulation) that we'll just create it here with lambdify and not
             # allow implementations to override it.
+            self._logger.debug("Constructing constant expressions function")
             self._expressions_constant_fn = sympy.lambdify(
                 [self.p], self._expressions_constant
             )
@@ -643,6 +655,7 @@ class CythonRhsBuilder(RhsBuilder):
         base_name = "pysb_" + escaped_name + "_kinetics"
         code_wrapper._filename = base_name
         code_wrapper._module_basename = base_name + "_wrapper"
+        self._logger.debug("Running code generation and Cython compilation")
         functions = {
             name: code_wrapper.wrap_code(routine)
             for name, routine in routines.items()
