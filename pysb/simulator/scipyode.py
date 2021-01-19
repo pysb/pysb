@@ -13,7 +13,7 @@ import numpy as np
 import warnings
 import os
 import inspect
-from pysb.logging import get_logger, EXTENDED_DEBUG
+from pysb.logging import get_logger, PySBModelLoggerAdapter, EXTENDED_DEBUG
 import logging
 import contextlib
 import importlib
@@ -483,7 +483,17 @@ class RhsBuilder:
         state["_expressions_constant_fn"] = None
         state["_rhs_fn"] = None
         state["_jacobian_fn"] = None
+        # Loggers are not picklable in Python 3.6.
+        state["_logger_extra"] = state["_logger"].extra
+        del state["_logger"]
         return state
+
+    def __setstate__(self, state):
+        state["_logger"] = PySBModelLoggerAdapter(
+            get_logger(self.__module__), state["_logger_extra"]
+        )
+        del state["_logger_extra"]
+        self.__dict__.update(state)
 
     @property
     def work_path(self):
