@@ -59,7 +59,7 @@ class SelfExporter(object):
     This class is for pysb internal use only. Do not construct any instances.
 
     """
-    
+
     do_export = True
     default_model = None
     target_globals = None   # the globals dict to which we'll export our symbols
@@ -1327,7 +1327,7 @@ class Parameter(Component, Symbol):
     def value(self, new_value):
         self.check_value(new_value)
         self._value = float(new_value)
-    
+
     def get_value(self):
         return self.value
 
@@ -1576,10 +1576,11 @@ class EnergyPattern(Component):
 
     def __init__(self, name, pattern, energy, _export=True):
         Component.__init__(self, name, _export)
-        if not isinstance(pattern, ComplexPattern):
-            raise Exception("pattern is not a ComplexPattern object")
-        if not isinstance(energy, sympy.Expr):
-            raise Exception("energy is not a sympy.Expr object")
+        try:
+            pattern = as_complex_pattern(pattern)
+        except InvalidComplexPatternException as e:
+            raise ValueError("pattern must be a ComplexPattern")
+        validate_expr(energy, "energy")
         self.pattern = pattern
         self.energy = energy
 
@@ -1714,9 +1715,7 @@ class Expression(Component, Symbol):
         return self.name, self.expr, False
 
     def __init__(self, name, expr, _export=True):
-        if isinstance(expr, numbers.Number):
-            expr = sympy.Number(expr)
-        elif not isinstance(expr, sympy.Expr):
+        if not isinstance(expr, sympy.Expr):
             raise ValueError('An Expression can only be created from a '
                              'sympy.Expr object')
         self.expr = expr
@@ -1888,7 +1887,7 @@ class Model(object):
         `initials`.
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
-        the initial conditions and successively applying the rules. Each 
+        the initial conditions and successively applying the rules. Each
         ComplexPattern is concrete.
     reactions : list of dict
         Structures describing each possible unidirectional reaction that can be

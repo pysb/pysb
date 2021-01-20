@@ -63,7 +63,7 @@ class BngGenerator(object):
             else:
                 size = c.size.name
             self.__content += ("  %s  %d  %s  %s\n") % (c.name, c.dimension, size, parent_name)
-        self.__content += "end compartments\n\n"        
+        self.__content += "end compartments\n\n"
 
     def generate_molecule_types(self):
         if not self.model.monomers:
