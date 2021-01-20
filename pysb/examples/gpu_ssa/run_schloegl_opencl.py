@@ -10,8 +10,7 @@ the model.
 import matplotlib.pyplot as plt
 import numpy as np
 from pysb.examples.schloegl import model
-from pysb.integrate import odesolve
-from pysb.simulator import OpenCLSSASimulator
+from pysb.simulator import OpenCLSSASimulator, ScipyOdeSimulator
 
 
 def run(n_sim=100, x_0=100):
@@ -29,11 +28,18 @@ def run(n_sim=100, x_0=100):
     obs_name = 'X_total'
     tspan = np.linspace(0, 100, 101)
     x_0 = int(x_0)
-    model.parameters['X_0'].value = x_0
-    savename = 'schloegl_{}'.format(int(x_0))
 
+    savename = 'schloegl_{}'.format(int(x_0))
+    model.parameters['X_0'].value = x_0
     # create simulator and run simulations
-    traj = OpenCLSSASimulator(model).run(tspan, number_sim=n_sim)
+    simulator = OpenCLSSASimulator(model, verbose=True)
+
+    traj = simulator.run(
+        tspan,
+        number_sim=n_sim
+    )
+
+
     x = traj.dataframe[obs_name].unstack(0).values
 
     # create line traces
@@ -46,8 +52,10 @@ def run(n_sim=100, x_0=100):
     plt.text(1, 745, 'X(0)={}'.format(x_0), fontsize=20)
 
     # adding ODE solution to plot
-    y = odesolve(model, tspan)
-    plt.plot(tspan, y[obs_name], 'g--', lw=3, label="ODE")
+
+    ode_simulator = ScipyOdeSimulator(model, tspan=tspan)
+    ode_traj = ode_simulator.run()
+    plt.plot(tspan, ode_traj.all[obs_name], 'g--', lw=3, label="ODE")
     plt.ylim(0, 800)
     plt.xlabel('Time')
     plt.ylabel('X molecules')
@@ -61,7 +69,8 @@ def run(n_sim=100, x_0=100):
     plt.tight_layout()
     out_name = '{}.png'.format(savename)
     plt.savefig(out_name)
-    plt.close()
+    # plt.close()
+    plt.show()
     print("Saved {}".format(out_name))
     return out_name
 
@@ -91,5 +100,5 @@ def vary_x():
 
 
 if __name__ == '__main__':
-    run(10, 100)
+    run(100, 400)
     # vary_x()

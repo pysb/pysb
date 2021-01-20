@@ -36,13 +36,6 @@ class SSABase(Simulator):
         """ converts pysb reactions to pycuda/pyopencl format """
         p = re.compile('\s')
         stoich_matrix = self._get_stoich(self.model)
-        all_reactions = []
-        for rxn_number, rxn in enumerate(stoich_matrix.T):
-            changes = []
-            for index, change in enumerate(rxn):
-                if change != 0:
-                    changes.append([index, change])
-            all_reactions.append(changes)
 
         params_names = [g.name for g in self._model.parameters]
         _reaction_number = len(self._model.reactions)

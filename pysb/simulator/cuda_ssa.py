@@ -4,8 +4,9 @@ from pysb.simulator.ssa_base import SSABase
 import numpy as np
 import os
 import time
-import warnings
 from pysb.pathfinder import get_path
+
+
 try:
     import pycuda
     import pycuda.autoinit
@@ -15,6 +16,7 @@ try:
     import pycuda.tools as tools
     import pycuda.driver as driver
     import pycuda.gpuarray as gpuarray
+    from mako.template import Template
 except ImportError:
     pycuda = None
 
@@ -69,9 +71,6 @@ class CudaSSASimulator(SSABase):
     tspan : vector-like
         Time values passed to the constructor.
 
-
-
-
     """
     _supports = {'multi_initials': True, 'multi_param_values': True}
 
@@ -86,26 +85,45 @@ class CudaSSASimulator(SSABase):
         self.verbose = verbose
         # private attribute
         self._step_0 = True
-
-        template_code = _load_template()
-        self._code = template_code.format(**self._get_template_args())
-
-        if precision not in (np.float64, np.float32):
-            raise TypeError("CudaSSASimulator can only use np.float64 or "
-                            "np.float32 precisions")
         self._dtype = precision
-        if self._dtype == np.float32:
-            self._code = self._code.replace('double', 'float')
-            self._code = self._code.replace('USE_DP', 'USE_FLOAT')
-            warnings.warn("Should be cautious using single precision")
-        if verbose == 2:
-            self._code = self._code.replace('//#define VERBOSE',
-                                            '#define VERBOSE')
-        elif verbose > 3:
-            self._code = self._code.replace('//#define VERBOSE',
-                                            '#define VERBOSE_MAX')
 
-        self._ssa_all = None
+        template_code = Template(
+            filename=os.path.join(os.path.dirname(__file__),
+                                  'templates', 'cuda_ssa.cu')
+        )
+        args = self._get_template_args()
+        # The use of single precision seems to work for most cases with little
+        # differences in trajectory distributions, however sometimes if there
+        # are really small time scale reactions, tau is below the level of
+        # decimal precision time doesn't progress. Using double for time
+        # seems to fix that for EARM 1.0, however, if there are reactions
+        # who propensities make a0 too large, i think the no change in
+        # time, perpetual running on gpu would occur. Keeping this warning
+        # for now. For all other models that I have simulated, single produces
+        # non-significantly different traces.
+        if self._dtype == np.float32:
+            args['prec'] = '#define USE_SINGLE_PRECISION'
+            self._logger.warn("Should be cautious using single precision.")
+        else:
+            args['prec'] = '#define USE_DOUBLE_PRECISION'
+        # So far, int 32 seems to handle all situations.
+        # For boolean simulations, can use short or possible char.
+        # Keeping option for reference now in hopes of being able to
+        # calculate precision factor prior to simulating.
+        _d = {np.uint32: "uint",
+              np.int32: 'int',
+              np.int16: 'ushort',
+              np.int64: 'long',
+              np.uint64: 'unsigned long'}
+        self._dtype_species = np.int32
+        args['spc_type'] = _d[self._dtype_species]
+        if verbose == 2:
+            args['verbose'] = '#define VERBOSE'
+        elif verbose > 3:
+            args['verbose'] = '#define VERBOSE_MAX'
+        else:
+            args['verbose'] = ''
+        self._code = template_code.render(**args)
         self._kernel = None
         self._param_tex = None
         self._ssa = None
@@ -265,8 +283,8 @@ class CudaSSASimulator(SSABase):
     def get_blocks(self, n_simulations, threads_per_block):
         max_tpb = 256
         if threads_per_block > max_tpb:
-            self._logger.warning("Limit of 256 threads per block due to curand."
-                            " Setting to 256.")
+            self._logger.warning("Limit of 256 threads per block from curand."
+                                 " Setting to 256.")
             threads_per_block = max_tpb
         if n_simulations < max_tpb:
             block_count = 1
@@ -276,11 +294,4 @@ class CudaSSASimulator(SSABase):
         else:
             block_count = int(n_simulations // threads_per_block + 1)
         return block_count, threads_per_block
-
-
-def _load_template():
-    _path = os.path.join(os.path.dirname(__file__), 'templates', 'ssa.cu')
-    with open(_path, 'r') as f:
-        gillespie_code = f.read()
-    return gillespie_code
 

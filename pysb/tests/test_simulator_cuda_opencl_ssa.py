@@ -71,7 +71,7 @@ class TestOpencl(object):
         self.tspan = np.linspace(0, 100, 101)
         self.model = model
         model.parameters['X_0'].value = 400
-        self.simulator = OpenCLSSASimulator(model, device='gpu')
+        self.simulator = OpenCLSSASimulator(model)
         self.n_sim = 10
 
     def test_run_by_nsim(self):

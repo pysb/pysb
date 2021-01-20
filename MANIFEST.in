@@ -6,3 +6,4 @@ prune doc/_build
 include versioneer.py
 include pysb/_version.py
 include pysb/simulator/templates/*
+include pysb/simulator/*.h

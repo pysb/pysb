@@ -13,6 +13,7 @@ import numpy as np
 from pysb.examples.earm_1_0 import model
 from pysb.simulator import CudaSSASimulator, ScipyOdeSimulator
 
+
 if __name__ == "__main__":
     n_sim = 100
     tspan = np.linspace(0, 5000, 101)

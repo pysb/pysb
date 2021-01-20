@@ -10,8 +10,7 @@ the model.
 import matplotlib.pyplot as plt
 import numpy as np
 from pysb.examples.schloegl import model
-from pysb.integrate import odesolve
-from pysb.simulator.cuda_ssa import CudaSSASimulator
+from pysb.simulator import CudaSSASimulator, ScipyOdeSimulator
 
 
 def run(n_sim=100, x_0=100):
@@ -46,8 +45,9 @@ def run(n_sim=100, x_0=100):
     plt.text(1, 745, 'X(0)={}'.format(x_0), fontsize=20)
 
     # adding ODE solution to plot
-    y = odesolve(model, tspan)
-    plt.plot(tspan, y[obs_name], 'g--', lw=3, label="ODE")
+    ode_simulator = ScipyOdeSimulator(model, tspan=tspan)
+    ode_traj = ode_simulator.run()
+    plt.plot(tspan, ode_traj.all[obs_name], 'g--', lw=3, label="ODE")
     plt.ylim(0, 800)
     plt.xlabel('Time')
     plt.ylabel('X molecules')
