@@ -10,12 +10,14 @@ from earm_1_0 import model
 
 
 # saturating level of ligand (corresponding to ~1000 ng/ml SuperKiller TRAIL)
-Lsat = 6E4; 
+Lsat = 6E4;
 
 # relationship of ligand concentration in the model (in # molecules/cell) to actual TRAIL concentration (in ng/ml)
 Lfactor = model.parameters['L_0'].value / 50;
 
 L_0_baseline = model.parameters['L_0'].value
+
+sim = ScipyOdeSimulator(model)
 
 
 def fig_4a():
@@ -31,17 +33,15 @@ def fig_4a():
 
     CVenv = 0.2
     # num steps was originally 40, but 15 is plenty smooth enough for screen display
-    Ls = floor(logspace(1,5,15)) 
+    Ls = floor(logspace(1,5,15))
 
     fs = empty_like(Ls)
     Ts = empty_like(Ls)
     Td = empty_like(Ls)
     print("Scanning over %d values of L_0" % len(Ls))
-    for i in range(len(Ls)):
-        model.parameters['L_0'].value = Ls[i]
-
-        print("  L_0 = %g" % Ls[i])
-        x = ScipyOdeSimulator(model).run(tspan=t).all
+    for i, L_0 in enumerate(Ls):
+        print("  L_0 = %g" % L_0)
+        x = sim.run(tspan=t, param_values={"L_0": L_0}).all
 
         fs[i] = (x['PARP_unbound'][0] - x['PARP_unbound'][-1]) / x['PARP_unbound'][0]
         dP = 60 * (x['PARP_unbound'][:-1] - x['PARP_unbound'][1:]) / (dt * x['PARP_unbound'][0])  # in minutes
@@ -68,7 +68,7 @@ def fig_4b():
     print("Simulating model for figure 4B...")
 
     t = linspace(0, 6*3600, 6*60+1)  # 6 hours
-    x = ScipyOdeSimulator(model).run(tspan=t).all
+    x = sim.run(tspan=t).all
 
     x_norm = c_[x['Bid_unbound'], x['PARP_unbound'], x['mSmac_unbound']]
     x_norm = 1 - x_norm / x_norm[0, :]  # gets away without max() since first values are largest

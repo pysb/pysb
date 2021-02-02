@@ -191,10 +191,10 @@ def get_logger(logger_name=BASE_LOGGER_NAME, model=None, log_level=None,
     if model is None:
         return logger
     else:
-        return PySBModelLoggerAdapter(logger, {'model': model})
+        return PySBModelLoggerAdapter(logger, {'model_name': model.name})
 
 
 class PySBModelLoggerAdapter(logging.LoggerAdapter):
     """ A logging adapter to prepend a model's name to log entries """
     def process(self, msg, kwargs):
-        return '[%s] %s' % (self.extra['model'].name, msg), kwargs
+        return '[%s] %s' % (self.extra['model_name'], msg), kwargs
