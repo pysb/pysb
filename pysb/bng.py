@@ -18,7 +18,7 @@ from collections.abc import Sequence
 import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
-from sympy.logic.boolalg import BooleanTrue, BooleanFalse, BooleanAtom
+from sympy.logic.boolalg import Boolean
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -578,7 +578,7 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
         Number of steps in the simulation.
     param_values : vector-like or dictionary, optional
             Values to use for every parameter in the model. Ordering is
-            determined by the order of model.parameters. 
+            determined by the order of model.parameters.
             If not specified, parameter values will be taken directly from
             model.parameters.
     output_dir : string, optional
@@ -708,7 +708,7 @@ def generate_equations(model, cleanup=True, verbose=False, **kwargs):
     * reactions
     * reactions_bidirectional
     * observables (just `coefficients` and `species` fields for each element)
-    
+
     Parameters
     ----------
     model : Model
@@ -934,8 +934,7 @@ def _convert_tokens(tokens, local_dict, global_dict):
 
 
 def _is_bool_expr(e):
-    return isinstance(e, sympy.boolalg.Boolean) and not \
-        isinstance(e, sympy.AtomicExpr)
+    return isinstance(e, Boolean) and not isinstance(e, sympy.AtomicExpr)
 
 
 def _fix_boolean_multiplication(*args):

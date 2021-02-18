@@ -1345,9 +1345,10 @@ class Compartment(Component):
     dimension : integer, optional
         The number of spatial dimensions in the compartment, either 2 (i.e. a
         membrane) or 3 (a volume).
-    size : Parameter, optional
-        A parameter object whose value defines the volume or area of the
-        compartment. If not specified, the size will be fixed at 1.0.
+    size : Parameter or Expression, optional
+        A parameter or constant expression object whose value defines the
+        volume or area of the compartment. If not specified, the size will be
+        fixed at 1.0.
 
     Attributes
     ----------
@@ -1372,8 +1373,10 @@ class Compartment(Component):
         if parent != None and isinstance(parent, Compartment) == False:
             raise Exception("parent must be a predefined Compartment or None")
         #FIXME: check for only ONE "None" parent? i.e. only one compartment can have a parent None?
-        if size is not None and not isinstance(size, Parameter):
-            raise Exception("size must be a parameter (or omitted)")
+        if size is not None and not isinstance(size, Parameter) and not \
+                (isinstance(size, Expression) and size.is_constant_expression()):
+            raise Exception("size must be a parameter or a constant expression"
+                            " (or omitted)")
         self.parent = parent
         self.dimension = dimension
         self.size = size
@@ -1399,9 +1402,9 @@ class Rule(Component):
     rule_expression : RuleExpression
         RuleExpression containing the essence of the rule (reactants, products,
         reversibility).
-    rate_forward : Parameter
+    rate_forward : Union[Parameter,Expression]
         Forward reaction rate constant.
-    rate_reverse : Parameter, optional
+    rate_reverse : Union[Parameter,Expression], optional
         Reverse reaction rate constant (only required for reversible rules).
     delete_molecules : bool, optional
         If True, deleting a Monomer from a species is allowed to fragment the
@@ -1961,6 +1964,10 @@ class Model(object):
     def components(self):
         return self.all_components()
 
+    def parameters_all(self):
+        """Return a ComponentSet of all parameters and derived parameters."""
+        return self.parameters | self._derived_parameters
+
     def parameters_rules(self):
         """Return a ComponentSet of the parameters used in rules."""
         # rate_reverse is None for irreversible rules, so we'll need to filter those out
@@ -1996,16 +2003,21 @@ class Model(object):
         cset_used = (self.parameters_rules() | self.parameters_initial_conditions() |
                      self.parameters_compartments() | self.parameters_expressions())
         return self.parameters - cset_used
-    
-    def expressions_constant(self):
+
+    def expressions_constant(self, include_derived=False):
         """Return a ComponentSet of constant expressions."""
-        cset = ComponentSet(e for e in self.expressions
-                            if e.is_constant_expression())
+        expressions = self.expressions
+        if include_derived:
+            expressions = expressions | self._derived_expressions
+        cset = ComponentSet(e for e in expressions if e.is_constant_expression())
         return cset
 
-    def expressions_dynamic(self, include_local=True):
+    def expressions_dynamic(self, include_local=True, include_derived=False):
         """Return a ComponentSet of non-constant expressions."""
-        cset = self.expressions - self.expressions_constant()
+        expressions = self.expressions
+        if include_derived:
+            expressions = expressions | self._derived_expressions
+        cset = expressions - self.expressions_constant(include_derived)
         if not include_local:
             cset = ComponentSet(e for e in cset if not e.is_local)
         return cset

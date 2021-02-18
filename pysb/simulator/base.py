@@ -190,7 +190,7 @@ class Simulator(object):
                         and all(isinstance(v, numbers.Number) for v in value_obj):
                     value = value_obj
                 elif isinstance(value_obj, Expression):
-                    value = [value_obj.expand_expr().evalf(subs=subs[sim]) for sim in range(len(subs))]
+                    value = [value_obj.expand_expr().xreplace(subs[sim]) for sim in range(len(subs))]
                 elif isinstance(value_obj, Parameter):
                     # Set parameter using param_values
                     pi = self._model.parameters.index(value_obj)
