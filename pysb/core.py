@@ -1584,14 +1584,8 @@ class EnergyPattern(Component):
         self.energy = energy
 
     def __repr__(self):
-        if isinstance(self.energy, Component):
-            energystr = self.energy.name
-        else:
-            energystr = repr(self.energy)
-
-
         ret = '%s(%s, %s, %s)' % (self.__class__.__name__, repr(self.name),
-                                  repr(self.pattern), energystr)
+                                  repr(self.pattern), self.energy.name)
         return ret
 
 

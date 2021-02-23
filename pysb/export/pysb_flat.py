@@ -23,6 +23,7 @@ following line::
 
 """
 
+import sympy
 from pysb.export import Exporter
 from io import StringIO
 
@@ -51,6 +52,11 @@ class PysbFlatExporter(Exporter):
             if cset:
                 output.write("\n")
 
+        sympy_functions = set(
+            str(f.func)
+            for e in self.model.expressions
+            for f in e.expr.find(sympy.Function)
+        )
         if self.docstring:
             output.write('"""')
             output.write(self.docstring)
@@ -59,7 +65,11 @@ class PysbFlatExporter(Exporter):
         output.write("\n")
         output.write("from pysb import Model, Monomer, Parameter, Expression, "
                      "Compartment, Rule, Observable, Initial, MatchOnce, "
-                     "Annotation, MultiState, Tag, ANY, WILD\n")
+                     "EnergyPattern, Annotation, MultiState, Tag, ANY, WILD\n")
+        if sympy_functions:
+            output.write(
+                "from sympy import " + ", ".join(sympy_functions) + "\n"
+            )
         output.write("\n")
         output.write("Model()\n")
         output.write("\n")
@@ -71,6 +81,7 @@ class PysbFlatExporter(Exporter):
         write_cset(self.model.tags)
         write_cset(self.model.expressions_dynamic())
         write_cset(self.model.rules)
+        write_cset(self.model.energypatterns)
         for ic in self.model.initials:
             output.write("%s\n" % ic)
         output.write("\n")
