@@ -2089,6 +2089,15 @@ class Model(object):
             cset = ComponentSet(e for e in cset if not e.is_local)
         return cset
 
+    def rules_energy(self):
+        """Return a ComponentSet of energy-based rules."""
+        return ComponentSet(r for r in self.rules if r.energy)
+
+    @property
+    def uses_energy(self):
+        """Return True if model uses energy features."""
+        return bool(self.energypatterns or self.rules_energy())
+
     @property
     def odes(self):
         """Return sympy Expressions for the time derivative of each species."""
