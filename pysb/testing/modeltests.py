@@ -1,4 +1,3 @@
-from __future__ import print_function
 import pysb
 import abc
 from pysb.core import SelfExporter

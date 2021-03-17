@@ -17,14 +17,8 @@ import dateutil.parser
 import copy
 from warnings import warn
 from pysb.pattern import SpeciesPatternMatcher
-from pysb.bng import generate_equations
 from contextlib import contextmanager
 import weakref
-try:
-    basestring
-except NameError:
-    # Python 3 compatibility.
-    basestring = str
 
 try:
     import pandas as pd
@@ -1207,7 +1201,7 @@ class SimulationResult(object):
             for attr_name, attr_val in self.custom_attrs.items():
                 # Pass HDF5-native values straight through, pickling others.
                 if (not (isinstance(attr_val,
-                                    (basestring, bytes, float, complex))
+                                    (str, bytes, float, complex))
                          or (isinstance(attr_val, numbers.Integral)
                              and int_min <= attr_val <= int_max))):
                     attr_val = enpickle(attr_val)

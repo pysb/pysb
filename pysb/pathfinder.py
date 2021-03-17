@@ -1,5 +1,4 @@
 import os
-import sys
 import sysconfig
 
 # Set to False to not utilize the system PATH environment variable

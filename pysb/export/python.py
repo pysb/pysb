@@ -72,10 +72,7 @@ import pysb.bng
 import sympy
 from pysb.export import Exporter, pad, ExpressionsNotSupported, \
     CompartmentsNotSupported
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import StringIO
 import re
 
 class PythonExporter(Exporter):

@@ -55,7 +55,6 @@ as a "modifier" (enzyme or catalyst).
 
 """
 
-from __future__ import print_function
 import pysb
 import pysb.bng
 import re

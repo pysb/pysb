@@ -6,12 +6,6 @@ import sympy
 from sympy.printing import StrPrinter
 from sympy.printing.precedence import precedence
 
-# Alias basestring under Python 3 for forwards compatibility
-try:
-    basestring
-except NameError:
-    basestring = str
-
 
 class BngGenerator(object):
     def __init__(self, model, additional_initials=None, population_maps=None):
@@ -239,7 +233,7 @@ def format_site_condition(site, state):
     elif isinstance(state, list) and all(isinstance(s, int) for s in state):
         state_code = ''.join('!%d' % s for s in state)
     # state
-    elif isinstance(state, basestring):
+    elif isinstance(state, str):
         state_code = '~' + state
     # state AND single bond
     elif isinstance(state, tuple):

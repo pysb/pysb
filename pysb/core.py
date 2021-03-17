@@ -9,21 +9,11 @@ import weakref
 import copy
 import itertools
 import sympy
-import numpy as np
 import scipy.sparse
 import networkx as nx
 from collections.abc import Iterable, Mapping, Sequence, Set
 
-try:
-    reload
-except NameError:
-    from imp import reload
-try:
-    basestring
-except NameError:
-    # Under Python 3, do not pretend that bytes are a valid string
-    basestring = str
-    long = int
+from importlib import reload
 
 
 def MatchOnce(pattern):
@@ -286,7 +276,7 @@ class Monomer(Component):
         # ensure sites is some kind of list (presumably of strings) but not a
         # string itself
         if not isinstance(sites, Iterable) or \
-               isinstance(sites, basestring):
+               isinstance(sites, str):
             raise ValueError("sites must be a list of strings")
 
         # ensure no duplicate sites and validate each site name
@@ -304,7 +294,7 @@ class Monomer(Component):
                              str(unknown_sites))
         # ensure site_states values are all strings
         invalid_sites = [site for (site, states) in site_states.items()
-                         if not all([isinstance(s, basestring)
+                         if not all([isinstance(s, str)
                                      and self._VARIABLE_NAME_REGEX.match(s)
                                      for s in states])]
         if invalid_sites:
@@ -367,7 +357,7 @@ def is_state_bond_tuple(state):
     return (
         isinstance(state, tuple)
         and len(state) == 2
-        and isinstance(state[0], basestring)
+        and isinstance(state[0], str)
         and _check_bond(state[1])
     )
 
@@ -380,7 +370,7 @@ def _check_state_bond_tuple(monomer, site, state):
 def validate_site_value(state, monomer=None, site=None, _in_multistate=False):
     if state is None:
         return True
-    elif isinstance(state, basestring):
+    elif isinstance(state, str):
         if monomer and site:
             if not _check_state(monomer, site, state):
                 return False
@@ -574,7 +564,7 @@ class MonomerPattern(object):
         return True
 
     def _site_instance_concrete(self, site_name, site_val):
-        if isinstance(site_val, basestring):
+        if isinstance(site_val, str):
             site_state = site_val
             site_bond = None
         elif isinstance(site_val, tuple):
@@ -846,7 +836,7 @@ class ComplexPattern(object):
             bond_num = None
             if state_or_bond is WILD:
                 return
-            elif isinstance(state_or_bond, basestring):
+            elif isinstance(state_or_bond, str):
                 state = state_or_bond
             elif is_state_bond_tuple(state_or_bond):
                 state = state_or_bond[0]
@@ -2319,7 +2309,7 @@ class ComponentSet(Set, Mapping, Sequence):
         # stringified integer Mapping keys (like "0") are forbidden, but since
         # all Component names must be valid Python identifiers, integers are
         # ruled out anyway.
-        if isinstance(key, (int, long, slice)):
+        if isinstance(key, (int, slice)):
             return self._elements[key]
         else:
             return self._map[key]
@@ -2337,7 +2327,7 @@ class ComponentSet(Set, Mapping, Sequence):
         return self.keys()
 
     def get(self, key, default=None):
-        if isinstance(key, (int, long)):
+        if isinstance(key, int):
             raise ValueError("get is undefined for integer arguments, use []"
                              "instead")
         try:
