@@ -1,15 +1,9 @@
-from __future__ import print_function as _
 from pysb import ComponentSet
 import pysb.core
 import inspect
 import numpy
 import io
 import networkx as nx
-try:
-    basestring
-except NameError:
-    basestring = str
-
 __all__ = ['alias_model_components', 'rules_using_parameter', 'read_dot']
 
 
@@ -189,13 +183,13 @@ def _from_pydot(P):
         s = []
         d = []
 
-        if isinstance(u, basestring):
+        if isinstance(u, str):
             s.append(u.strip('"'))
         else:
             for unodes in u['nodes']:
                 s.append(unodes.strip('"'))
 
-        if isinstance(v, basestring):
+        if isinstance(v, str):
             d.append(v.strip('"'))
         else:
             for vnodes in v['nodes']:

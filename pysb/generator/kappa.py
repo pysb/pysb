@@ -7,11 +7,6 @@ import collections
 import re
 import pysb.logging
 from pysb.export import CompartmentsNotSupported, LocalFunctionsNotSupported
-# Alias basestring under Python 3 for forwards compatibility
-try:
-    basestring
-except NameError:
-    basestring = str
 
 
 class KappaGenerator(object):
@@ -210,7 +205,7 @@ class KappaGenerator(object):
         elif isinstance(state, pysb.MultiState):
             raise KappaException("Kappa generator does not support MultiStates")
         # Site with state
-        elif isinstance(state, basestring):
+        elif isinstance(state, str):
             state_code = '{%s}[.]' % state
         # Site with state and a bond
         elif isinstance(state, tuple):

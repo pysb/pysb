@@ -19,20 +19,7 @@ import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
 from sympy.logic.boolalg import Boolean
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import StringIO
-try:
-    from future_builtins import zip
-except ImportError:
-    pass
-
-# Alias basestring under Python 3 for forwards compatibility
-try:
-    basestring
-except NameError:
-    basestring = str
+from io import StringIO
 
 
 def set_bng_path(dir):
@@ -117,7 +104,7 @@ class BngBaseInterface(object):
         param :
             An argument to a BNG action call
         """
-        if isinstance(param, basestring):
+        if isinstance(param, str):
             return '"%s"' % param
         elif isinstance(param, bool):
             return 1 if param else 0
@@ -444,7 +431,7 @@ class BngFileInterface(BngBaseInterface):
                 output += self.generator.get_content()
             if reload_netfile:
                 filename = reload_netfile if \
-                    isinstance(reload_netfile, basestring) \
+                    isinstance(reload_netfile, str) \
                     else self.net_filename
                 output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
                     % (filename, int(skip_file_actions))
@@ -535,7 +522,7 @@ class BngFileInterface(BngBaseInterface):
             Initial concentration
 
         """
-        if isinstance(cplx_pat, basestring):
+        if isinstance(cplx_pat, str):
             formatted_name = cplx_pat
         else:
             formatted_name = format_complexpattern(

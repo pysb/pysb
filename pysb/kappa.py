@@ -11,7 +11,6 @@ specified in one of three ways:
   runtime
 """
 
-from __future__ import print_function as _
 import pysb.pathfinder as pf
 from pysb.generator.kappa import KappaGenerator
 import os
@@ -24,11 +23,6 @@ import warnings
 from collections import namedtuple
 from pysb.util import read_dot
 import pysb.logging
-
-try:
-    from future_builtins import zip
-except ImportError:
-    pass
 
 logger = pysb.logging.get_logger(__name__)
 

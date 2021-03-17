@@ -168,10 +168,9 @@ def test_save_load():
         # Saving network free results requires include_obs_exprs=True,
         # otherwise a warning should be raised
         with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+            warnings.simplefilter("always", UserWarning)
             nfres1.save(tf.name, dataset_name='nfsim_no_obs', append=True)
             assert len(w) == 1
-            assert issubclass(w[-1].category, UserWarning)
 
         nfres1.save(tf.name, include_obs_exprs=True,
                     dataset_name='nfsim test', append=True)

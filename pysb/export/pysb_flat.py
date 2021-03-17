@@ -26,10 +26,7 @@ following line::
 import pysb
 import sympy.core
 from pysb.export import Exporter
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import StringIO
 
 from ..importers.bngl import BNGL_FUNCTIONS
 

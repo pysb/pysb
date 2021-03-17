@@ -104,10 +104,7 @@ import pysb
 import pysb.bng
 import sympy
 import re
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import StringIO
 from pysb.export import Exporter, ExpressionsNotSupported, \
     CompartmentsNotSupported
 
