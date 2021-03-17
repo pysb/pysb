@@ -1,4 +1,3 @@
-from __future__ import print_function as _
 from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
 import pysb
 import pysb.bng
@@ -670,7 +669,7 @@ class CupSodaSimulator(Simulator):
     @staticmethod
     def _load_with_pandas(filename):
         data = pd.read_csv(filename, sep='\t', skiprows=None,
-                           header=None).as_matrix()
+                           header=None).to_numpy()
         return data
 
     @staticmethod
