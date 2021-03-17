@@ -38,6 +38,7 @@ from pysb.core import ComponentSet, as_complex_pattern, MonomerPattern, ComplexP
 import numbers
 import functools
 import itertools
+from sympy import Piecewise
 
 __all__ = ['equilibrate',
            'bind', 'bind_table',
@@ -951,8 +952,8 @@ def drug_binding(drug, d_site, substrate, s_site, t_action, klist):
          Monomer('__t'),
          Parameter('__k_t', 1.0),
          Observable('t', __t()),
-         Expression('kf_expr_drug_substrate', kf_drug_substrate*(t > 10)),
-         Expression('kr_expr_drug_substrate', kr_drug_substrate*(t > 10)),
+         Expression('kf_expr_drug_substrate', Piecewise((kf_drug_substrate, t > 10), (0, True))),
+         Expression('kr_expr_drug_substrate', Piecewise((kr_drug_substrate, t > 10), (0, True))),
          ])
 
     """
@@ -990,9 +991,9 @@ def drug_binding(drug, d_site, substrate, s_site, t_action, klist):
         raise ValueError("klist must contain Parameters, Expressions, or numbers.")
 
     kf_expr = Expression('kf_expr_{0}_{1}'.format(drug_monomer_name,
-                                                  substrate_monomer_name), (time_obs > t_action) * k1)
+                                                  substrate_monomer_name), Piecewise((k1, time_obs > t_action), (0, True)))
     kr_expr = Expression('kr_expr_{0}_{1}'.format(drug_monomer_name,
-                                                  substrate_monomer_name), (time_obs > t_action) * k2)
+                                                  substrate_monomer_name), Piecewise((k2, time_obs > t_action), (0, True)))
     bind_kpars = [kf_expr, kr_expr]
 
     components_added_macro = components_time_obs

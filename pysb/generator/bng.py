@@ -4,6 +4,7 @@ import pysb
 from pysb.core import MultiState
 import sympy
 from sympy.printing import StrPrinter
+from sympy.printing.precedence import precedence
 
 
 class BngGenerator(object):
@@ -301,6 +302,18 @@ class BngPrinter(StrPrinter):
 
     def _print_Or(self, expr):
         return super(BngPrinter, self)._print_Or(expr).replace('|', '||')
+
+    def _print_Relational(self, expr):
+        if getattr(expr, "rel_op", None) not in {"==", "!=", "<", "<=", ">", ">="}:
+            raise NotImplementedError(
+                "Relational operator not supported: %s" % type(expr).__name__
+            )
+        # Adapted from StrPrinter._print_Relational.
+        return '%s %s %s' % (
+            self.parenthesize(expr.lhs, precedence(expr)),
+            expr.rel_op,
+            self.parenthesize(expr.rhs, precedence(expr)),
+        )
 
     def _print_log(self, expr):
         # BNG doesn't accept "log", only "ln".

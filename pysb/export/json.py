@@ -232,6 +232,13 @@ class PySBJSONWithNetworkEncoder(PySBJSONEncoder):
         return rxn
 
     @classmethod
+    def encode_observable(cls, obs):
+        o = super(PySBJSONWithNetworkEncoder, cls).encode_observable(obs)
+        o['species'] = obs.species
+        o['coefficients'] = obs.coefficients
+        return o
+
+    @classmethod
     def encode_model(cls, model):
         d = super(PySBJSONWithNetworkEncoder, cls).encode_model(model)
 

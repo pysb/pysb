@@ -4,6 +4,7 @@ import copy
 import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator import ScipyOdeSimulator, InconsistentParameterError
+from pysb.simulator.scipyode import CythonRhsBuilder
 from pysb.examples import robertson, earm_1_0, tyson_oscillator, localfunc
 import unittest
 import pandas as pd
@@ -417,13 +418,12 @@ def test_set_initial_to_zero():
 def test_robertson_integration():
     """Ensure robertson model simulates."""
     t = np.linspace(0, 100)
-    # Run with or without inline
-    sim = ScipyOdeSimulator(robertson.model)
-    simres = sim.run(tspan=t)
+    sim = ScipyOdeSimulator(robertson.model, tspan=t, compiler="python")
+    simres = sim.run()
     assert simres.species.shape[0] == t.shape[0]
-    if sim._compiler != 'python':
-        # Also run without inline
-        sim = ScipyOdeSimulator(robertson.model, tspan=t, compiler='python')
+    # Also run with cython compiler if available.
+    if CythonRhsBuilder.check_safe():
+        sim = ScipyOdeSimulator(robertson.model, tspan=t, compiler="cython")
         simres = sim.run()
         assert simres.species.shape[0] == t.shape[0]
 
@@ -431,12 +431,11 @@ def test_robertson_integration():
 def test_earm_integration():
     """Ensure earm_1_0 model simulates."""
     t = np.linspace(0, 1e3)
-    # Run with or without inline
-    sim = ScipyOdeSimulator(earm_1_0.model, tspan=t)
+    sim = ScipyOdeSimulator(earm_1_0.model, tspan=t, compiler="python")
     sim.run()
-    if sim._compiler != 'python':
-        # Also run without inline
-        ScipyOdeSimulator(earm_1_0.model, tspan=t, compiler='python').run()
+    # Also run with cython compiler if available.
+    if CythonRhsBuilder.check_safe():
+        ScipyOdeSimulator(earm_1_0.model, tspan=t, compiler="cython").run()
 
 
 @raises(ValueError)
