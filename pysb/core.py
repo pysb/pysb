@@ -17,7 +17,28 @@ from importlib import reload
 
 
 def MatchOnce(pattern):
-    """Make a ComplexPattern match-once."""
+    """
+    Make a ComplexPattern match-once.
+
+    ``MatchOnce`` adjusts reaction rate multiplicity by only counting a pattern
+    match once per species, even it if it matches within that species multiple
+    times.
+
+    For example, if one were to have molecules of ``A`` degrading with a
+    specified rate:
+
+    >>> Rule('A_deg', A() >> None, kdeg)                # doctest: +SKIP
+
+    In the situation where multiple molecules of ``A()`` where present in a
+    species (e.g. ``A(a=1) % A(a=1)``), the above ``A_deg`` rule would have
+    multiplicity equal to the number of occurences of ``A()`` in the degraded
+    species. Thus, ``A(a=1) % A(a=1)`` would degrade twice as fast
+    as ``A(a=None)`` under the above rule. If this behavior is not desired,
+    the multiplicity can be fixed at one using the ``MatchOnce`` keyword:
+
+    >>> Rule('A_deg', MatchOnce(A()) >> None, kdeg)     # doctest: +SKIP
+
+    """
     cp = as_complex_pattern(pattern).copy()
     cp.match_once = True
     return cp
