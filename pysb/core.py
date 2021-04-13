@@ -21,7 +21,7 @@ def MatchOnce(pattern):
     Make a ComplexPattern match-once.
 
     ``MatchOnce`` adjusts reaction rate multiplicity by only counting a pattern
-    match once per species, even it if it matches within that species multiple
+    match once per species, even if it matches within that species multiple
     times.
 
     For example, if one were to have molecules of ``A`` degrading with a
