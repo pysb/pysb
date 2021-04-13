@@ -29,7 +29,7 @@ def MatchOnce(pattern):
 
     >>> Rule('A_deg', A() >> None, kdeg)                # doctest: +SKIP
 
-    In the situation where multiple molecules of ``A()`` where present in a
+    In the situation where multiple molecules of ``A()`` were present in a
     species (e.g. ``A(a=1) % A(a=1)``), the above ``A_deg`` rule would have
     multiplicity equal to the number of occurences of ``A()`` in the degraded
     species. Thus, ``A(a=1) % A(a=1)`` would degrade twice as fast
