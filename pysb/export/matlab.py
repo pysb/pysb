@@ -195,7 +195,8 @@ class MatlabExporter(Exporter):
             raise CompartmentsNotSupported()
 
         output = StringIO()
-        pysb.bng.generate_equations(self.model)
+        if not self.model.odes:
+            pysb.bng.generate_equations(self.model)
 
         docstring = ''
         if self.docstring:

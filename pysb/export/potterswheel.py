@@ -90,7 +90,8 @@ class PottersWheelExporter(Exporter):
             raise CompartmentsNotSupported()
 
         output = StringIO()
-        pysb.bng.generate_equations(self.model)
+        if not self.model.odes:
+            pysb.bng.generate_equations(self.model)
 
         model_name = self.model.name.replace('.', '_')
 

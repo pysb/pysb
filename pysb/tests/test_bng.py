@@ -23,6 +23,19 @@ def test_generate_network():
     ok_(generate_network(model))
 
 
+@with_model
+def test_generate_network_max_agg():
+    Monomer('A', ['b1', 'b1'])
+    Parameter('k', 1)
+    Parameter('A_0', 1)
+    Initial(A(b1=MultiState(None, None)), A_0)
+    Rule('a_bind_a', A(b1=MultiState(None, WILD)) + A(b1=MultiState(None, WILD)) >>
+         A(b1=MultiState(1, WILD)) % A(b1=MultiState(1, WILD)), k)
+    generate_equations(model, **{"max_stoich": {"A": 2}})
+    largest_sp = max([len(sp.monomer_patterns) for sp in model.species])
+    ok_(largest_sp == 2)
+
+
 @unittest.skipIf(os.name == 'nt', 'BNG Console does not work on Windows')
 @with_model
 def test_simulate_network_console():

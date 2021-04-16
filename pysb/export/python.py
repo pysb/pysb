@@ -95,7 +95,8 @@ class PythonExporter(Exporter):
             raise CompartmentsNotSupported()
 
         output = StringIO()
-        pysb.bng.generate_equations(self.model)
+        if not self.model.odes:
+            pysb.bng.generate_equations(self.model)
 
         # Note: This has a lot of duplication from pysb.integrate.
         # Can that be helped?
