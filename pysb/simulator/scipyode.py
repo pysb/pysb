@@ -468,7 +468,7 @@ class RhsBuilder:
         self._jacobian_fn = None
 
     def __del__(self):
-        if self._work_path:
+        if getattr(self, "_work_path", None):
             if self.cleanup:
                 shutil.rmtree(self._work_path, ignore_errors=True)
                 self._logger.debug("Removed work dir: %s", self._work_path)
