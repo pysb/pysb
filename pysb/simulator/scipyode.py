@@ -433,9 +433,10 @@ class RhsBuilder:
         # Constant expressions symbols.
         all_subs.update(dict(zip(expr_constant, self.e)))
         # Dynamic expressions (expanded).
-        all_subs.update({e: e.expand_expr() for e in expr_dynamic})
+        dyn_subs = {e: e.expand_expr().xreplace(all_subs) for e in expr_dynamic}
+        all_subs.update(dyn_subs)
         self.kinetics = sympy.Matrix([
-            r['rate'].subs(all_subs) for r in model.reactions
+            r['rate'].xreplace(all_subs) for r in model.reactions
         ])
         if with_jacobian:
             # The Jacobian can be quite large but it's extremely sparse. We can
