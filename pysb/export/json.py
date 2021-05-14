@@ -158,7 +158,7 @@ class PySBJSONEncoder(json.JSONEncoder):
         return {
             'name': ep.name,
             'pattern': cls.encode_complex_pattern(ep.pattern),
-            'energy': cls.encode_expression(ep.energy),
+            'energy': ep.energy.name,
         }
 
     @classmethod
