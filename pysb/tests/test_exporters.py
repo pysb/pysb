@@ -53,11 +53,7 @@ def check_convert(model, format):
             exported_file = JsonExporter(model).export(include_netgen=True)
         else:
             exported_file = export.export(model, format)
-    except export.ExpressionsNotSupported:
-        pass
-    except export.CompartmentsNotSupported:
-        pass
-    except export.LocalFunctionsNotSupported:
+    except export.FeatureNotSupportedError:
         pass
     except Exception as e:
         # Some example models are deliberately incomplete, so here we

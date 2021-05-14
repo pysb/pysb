@@ -24,7 +24,8 @@ following line::
 """
 
 import sympy
-from pysb.export import Exporter
+from .. import Expression, Observable
+from . import Exporter, CustomSympyFunctionsNotSupported
 from io import StringIO
 
 class PysbFlatExporter(Exporter):
@@ -52,11 +53,27 @@ class PysbFlatExporter(Exporter):
             if cset:
                 output.write("\n")
 
-        sympy_functions = set(
-            str(f.func)
+        all_functions = [
+            (f, e)
             for e in self.model.expressions
             for f in e.expr.find(sympy.Function)
-        )
+        ]
+        possible_local_function_names = {
+            c.name for c in self.model.expressions | self.model.observables
+        }
+        sympy_functions = set()
+        for f, e in all_functions:
+            f_name = str(f.func)
+            if f_name in possible_local_function_names:
+                pass
+            elif hasattr(sympy, f_name):
+                # Top-level sympy function.
+                sympy_functions.add(f_name)
+            else:
+                # Custom function or something not in sympy's top level.
+                raise CustomSympyFunctionsNotSupported(
+                    "Function '%s' in Expression '%s'" % (f_name, e.name)
+                )
         if self.docstring:
             output.write('"""')
             output.write(self.docstring)
