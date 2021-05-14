@@ -121,9 +121,8 @@ class BngGenerator(object):
         for ep in self.model.energypatterns:
             label = ep.name + ':'
             pattern = format_complexpattern(ep.pattern)
-            energy = expression_to_muparser(ep.energy)
             self.__content += (("  %-" + str(max_length) + "s  %s    %s")
-                               % (label, pattern, energy))
+                               % (label, pattern, ep.energy.name))
             self.__content += "\n"
         self.__content += "end energy patterns\n\n"
 
