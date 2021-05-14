@@ -124,6 +124,9 @@ def check_convert(model, format):
                     model.name.endswith('tutorial_c'):
                 # Models have no rules
                 return
+            if model.uses_energy:
+                # BNG XML format doesn't support Arrhenius rate law yet.
+                return
             with tempfile.NamedTemporaryFile(suffix='.bngl',
                                              delete=False) as tf:
                 tf.write(exported_file.encode('utf8'))
