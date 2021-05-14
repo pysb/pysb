@@ -27,7 +27,6 @@ need to manually reopen it every time you rerun the tool.
 
 """
 
-from __future__ import print_function
 import pysb
 import pysb.bng
 import re

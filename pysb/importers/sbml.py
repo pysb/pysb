@@ -1,4 +1,3 @@
-from __future__ import print_function as _
 from pysb.importers.bngl import model_from_bngl
 import pysb.pathfinder as pf
 import subprocess
@@ -6,12 +5,7 @@ import os
 import tempfile
 import shutil
 import re
-try:
-    # Python 3
-    from urllib.request import urlretrieve
-except ImportError:
-    # Python 2
-    from urllib import urlretrieve
+from urllib.request import urlretrieve
 from pysb.logging import get_logger, EXTENDED_DEBUG
 
 BIOMODELS_REGEX = re.compile(r'(BIOMD|MODEL)[0-9]{10}')

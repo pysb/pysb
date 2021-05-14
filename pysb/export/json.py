@@ -5,7 +5,6 @@ For information on how to use the model exporters, see the documentation
 for :py:mod:`pysb.export`.
 """
 
-from __future__ import absolute_import
 from pysb.export import Exporter
 from pysb.bng import generate_equations
 import json

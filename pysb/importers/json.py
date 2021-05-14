@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 from json import JSONDecoder
 from pysb.builder import Builder
 from pysb.core import RuleExpression, ReactionPattern, ComplexPattern, \
@@ -12,11 +11,6 @@ import json
 import re
 import warnings
 from sympy.parsing.sympy_parser import parse_expr
-try:
-    basestring
-except NameError:
-    # Python 3 compatibility.
-    basestring = str
 
 
 class PySBJSONDecodeError(ValueError):
@@ -48,7 +42,7 @@ class PySBJSONDecoder(JSONDecoder):
             if sv['__object__'] == 'WILD':
                 return WILD
         try:
-            if len(sv) == 2 and isinstance(sv[0], basestring) \
+            if len(sv) == 2 and isinstance(sv[0], str) \
                     and isinstance(sv[1], (int, Mapping)):
                 return sv[0], self.decode_state_value(sv[1])
         except TypeError:
