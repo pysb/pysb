@@ -67,10 +67,7 @@ def check_convert(model, format):
             raise
 
     if exported_file is not None:
-        if format == 'python':
-            # linspace arguments picked to avoid VODE warning
-            exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n', {'numpy': np})
-        elif format == 'pysb_flat':
+        if format == 'pysb_flat':
             exec(exported_file, {'__name__': model.name})
         elif format == 'sbml':
             # Skip the simulation comparison if roadrunner not available
