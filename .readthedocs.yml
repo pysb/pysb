@@ -10,7 +10,7 @@ sphinx:
    configuration: doc/conf.py
    fail_on_warning: true
 
-format:
+formats:
    - html
    - pdf
 
