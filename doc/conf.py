@@ -29,7 +29,8 @@ needs_sphinx = '1.4'
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.coverage',
               'sphinx.ext.imgmath', 'sphinx.ext.ifconfig', 'numpydoc',
-              'sphinx.ext.viewcode', 'sphinx.ext.autosummary']
+              'sphinx.ext.viewcode', 'sphinx.ext.autosummary', 
+              'IPython.sphinxext.ipython_console_highlighting']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
