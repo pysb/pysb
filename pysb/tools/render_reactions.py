@@ -7,6 +7,7 @@ Usage: ``python -m pysb.tools.render_reactions mymodel.py > mymodel.dot``
 
 If your model uses species as expression rates, you can visualize
 these interactions by including the --include-rate-species option::
+
     python -m pysb.tools.render_reactions --include-rate-species mymodel.py > mymodel.dot
 
 Renders the reactions produced by a model into the "dot" graph format which can
