@@ -17,14 +17,8 @@ import dateutil.parser
 import copy
 from warnings import warn
 from pysb.pattern import SpeciesPatternMatcher
-from pysb.bng import generate_equations
 from contextlib import contextmanager
 import weakref
-try:
-    basestring
-except NameError:
-    # Python 3 compatibility.
-    basestring = str
 
 try:
     import pandas as pd
@@ -190,7 +184,7 @@ class Simulator(object):
                         and all(isinstance(v, numbers.Number) for v in value_obj):
                     value = value_obj
                 elif isinstance(value_obj, Expression):
-                    value = [value_obj.expand_expr().evalf(subs=subs[sim]) for sim in range(len(subs))]
+                    value = [value_obj.expand_expr().xreplace(subs[sim]) for sim in range(len(subs))]
                 elif isinstance(value_obj, Parameter):
                     # Set parameter using param_values
                     pi = self._model.parameters.index(value_obj)
@@ -1207,7 +1201,7 @@ class SimulationResult(object):
             for attr_name, attr_val in self.custom_attrs.items():
                 # Pass HDF5-native values straight through, pickling others.
                 if (not (isinstance(attr_val,
-                                    (basestring, bytes, float, complex))
+                                    (str, bytes, float, complex))
                          or (isinstance(attr_val, numbers.Integral)
                              and int_min <= attr_val <= int_max))):
                     attr_val = enpickle(attr_val)

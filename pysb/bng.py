@@ -18,21 +18,8 @@ from collections.abc import Sequence
 import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
-from sympy.logic.boolalg import BooleanTrue, BooleanFalse, BooleanAtom
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from io import StringIO
-try:
-    from future_builtins import zip
-except ImportError:
-    pass
-
-# Alias basestring under Python 3 for forwards compatibility
-try:
-    basestring
-except NameError:
-    basestring = str
+from sympy.logic.boolalg import Boolean
+from io import StringIO
 
 
 def set_bng_path(dir):
@@ -117,7 +104,7 @@ class BngBaseInterface(object):
         param :
             An argument to a BNG action call
         """
-        if isinstance(param, basestring):
+        if isinstance(param, str):
             return '"%s"' % param
         elif isinstance(param, bool):
             return 1 if param else 0
@@ -444,7 +431,7 @@ class BngFileInterface(BngBaseInterface):
                 output += self.generator.get_content()
             if reload_netfile:
                 filename = reload_netfile if \
-                    isinstance(reload_netfile, basestring) \
+                    isinstance(reload_netfile, str) \
                     else self.net_filename
                 output += '\n  readFile({file=>"%s",skip_actions=>%d})\n' \
                     % (filename, int(skip_file_actions))
@@ -535,7 +522,7 @@ class BngFileInterface(BngBaseInterface):
             Initial concentration
 
         """
-        if isinstance(cplx_pat, basestring):
+        if isinstance(cplx_pat, str):
             formatted_name = cplx_pat
         else:
             formatted_name = format_complexpattern(
@@ -578,7 +565,7 @@ def run_ssa(model, t_end=10, n_steps=100, param_values=None, output_dir=None,
         Number of steps in the simulation.
     param_values : vector-like or dictionary, optional
             Values to use for every parameter in the model. Ordering is
-            determined by the order of model.parameters. 
+            determined by the order of model.parameters.
             If not specified, parameter values will be taken directly from
             model.parameters.
     output_dir : string, optional
@@ -708,7 +695,7 @@ def generate_equations(model, cleanup=True, verbose=False, **kwargs):
     * reactions
     * reactions_bidirectional
     * observables (just `coefficients` and `species` fields for each element)
-    
+
     Parameters
     ----------
     model : Model
@@ -934,8 +921,7 @@ def _convert_tokens(tokens, local_dict, global_dict):
 
 
 def _is_bool_expr(e):
-    return isinstance(e, sympy.boolalg.Boolean) and not \
-        isinstance(e, sympy.AtomicExpr)
+    return isinstance(e, Boolean) and not isinstance(e, sympy.AtomicExpr)
 
 
 def _fix_boolean_multiplication(*args):

@@ -288,24 +288,27 @@ class StochKitExporter(Exporter):
             if rate is None:
                 # Custom propensity function needed
 
-                rxn_atoms = rxn["rate"].atoms()
+                if isinstance(rxn['rate'], Expression):
+                    rate = expr_strings[rxn['rate'].name]
+                else:
+                    rxn_atoms = rxn["rate"].atoms()
 
-                # replace terms like __s**2 with __s*(__s-1)
-                rate = str(rxn["rate"])
+                    # replace terms like __s**2 with __s*(__s-1)
+                    rate = str(rxn["rate"])
 
-                matches = pattern.findall(rate)
-                for m in matches:
-                    repl = m[0]
-                    for i in range(1, int(m[1])):
-                        repl += "*(%s-%d)" % (m[0], i)
-                    rate = re.sub(pattern, repl, rate, count=1)
+                    matches = pattern.findall(rate)
+                    for m in matches:
+                        repl = m[0]
+                        for i in range(1, int(m[1])):
+                            repl += "*(%s-%d)" % (m[0], i)
+                        rate = re.sub(pattern, repl, rate, count=1)
 
-                # expand only expressions used in the rate eqn
-                for e in {sym for sym in rxn_atoms
-                          if isinstance(sym, Expression)}:
-                    rate = re.sub(r'\b%s\b' % e.name,
-                                  expr_strings[e.name],
-                                  rate)
+                    # expand only expressions used in the rate eqn
+                    for e in {sym for sym in rxn_atoms
+                              if isinstance(sym, Expression)}:
+                        rate = re.sub(r'\b%s\b' % e.name,
+                                      expr_strings[e.name],
+                                      rate)
 
             reacs.append(self._reaction_to_element(rxn_name,
                                                    rxn_desc,
