@@ -101,6 +101,23 @@ _path_config = {
 _path_cache = {}
 
 
+def list_programs():
+    """
+    Return the list of available external programs as a dictionary
+
+    Returns
+    -------
+    A dictionary containing the internal program name (key) and the
+    human-readable name and environment variable (value) to adjust the path
+    for that program.
+
+    """
+    keep_keys = ('name', 'env_var')
+    return {prog_name: {
+        k: v for k, v in prog_data.items() if k in keep_keys
+    } for prog_name, prog_data in _path_config.items()}
+
+
 def get_path(prog_name):
     """
     Gets the currently active path to an external executable
@@ -111,8 +128,8 @@ def get_path(prog_name):
     Parameters
     ----------
     prog_name: str
-        The PySB internal program name for an executable. One of 'bng'
-        (BioNetGen), 'kasa' (Kappa's KaSa) or 'kasim' (Kappa's KaSim).
+        The PySB internal program name for an executable (run
+        :func:`list_programs` for a list).
 
     Returns
     -------
@@ -216,13 +233,16 @@ def get_path(prog_name):
 
 def set_path(prog_name, full_path):
     """
-    Sets the full path to an external executable
+    Sets the full path to an external executable at runtime
+
+    External program paths can also be adjusted by environment variable prior
+    to first use; run :func:`list_programs` for a list of programs.
 
     Parameters
     ----------
     prog_name: str
-        The internal program name for an executable. See :func:`get_path` for
-        valid values.
+        The internal program name for an executable. (see
+        :func:`list_programs`)
     full_path: str
         The full path to the external executable or its enclosing directory.
         If the path is a directory, it will be searched for the executable.
