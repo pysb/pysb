@@ -122,8 +122,7 @@ class SbmlExporter(Exporter):
         _check(smodel)
         _check(smodel.setName(self.model.name))
 
-        if not self.model.odes:
-            pysb.bng.generate_equations(self.model)
+        pysb.bng.generate_equations(self.model)
 
         # Docstring
         if self.docstring:

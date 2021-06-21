@@ -140,13 +140,11 @@ class BngBaseInterface(object):
             processed_pars = []
             for k, v in kwargs.items():
                 bng_param = BngConsole._bng_param(v)
-                if isinstance(bng_param, dict):
+                if isinstance(bng_param, collections.Mapping):
                     par_string = f'{k}' + '=>{' + ','.join(f"{k}=>{v}" for k, v in bng_param.items()) + '}'
-                    processed_pars.append(par_string)
-
                 else:
                     par_string = f'{k}=>{bng_param}'
-                    processed_pars.append(par_string)
+                processed_pars.append(par_string)
 
             action_args = ','.join(processed_pars)
         else:

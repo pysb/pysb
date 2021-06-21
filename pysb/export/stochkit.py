@@ -126,8 +126,7 @@ class StochKitExporter(Exporter):
         if self.model.compartments:
             raise CompartmentsNotSupported()
 
-        if not self.model.odes:
-            generate_equations(self.model)
+        generate_equations(self.model)
         document = etree.Element("Model")
 
         d = etree.Element('Description')

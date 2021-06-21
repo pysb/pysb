@@ -132,8 +132,7 @@ class MathematicaExporter(Exporter):
             raise CompartmentsNotSupported()
 
         output = StringIO()
-        if not self.model.odes:
-            pysb.bng.generate_equations(self.model)
+        pysb.bng.generate_equations(self.model)
 
         # Add docstring if there is one
         if self.docstring:

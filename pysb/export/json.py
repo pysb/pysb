@@ -243,8 +243,7 @@ class PySBJSONWithNetworkEncoder(PySBJSONEncoder):
         d = super(PySBJSONWithNetworkEncoder, cls).encode_model(model)
 
         # Ensure network generation has taken place
-        if not model.odes:
-            generate_equations(model)
+        generate_equations(model)
 
         additional_encoders = {
             '_derived_parameters': cls.encode_parameter,
