@@ -7,6 +7,7 @@ PySB Modules Reference
    core.rst
    integrate.rst
    simulator.rst
+   pathfinder.rst
    modeltests.rst
    bng.rst
    kappa.rst
