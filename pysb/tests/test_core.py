@@ -475,7 +475,7 @@ def test_tags():
 
     # Test tag with compartment
     Compartment('c')
-    assert repr((A().__matmul__(x)) ** c) == 'A() ** c @ x'
+    assert repr((A().__matmul__(x)) ** c) == 'as_complex_pattern(A()) ** c @ x'
     assert repr((A() ** c).__matmul__(x)) == 'A() ** c @ x'
 
 
