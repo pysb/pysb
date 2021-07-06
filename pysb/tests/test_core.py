@@ -331,6 +331,23 @@ def test_complex_pattern_equivalence_compartments():
 
 
 @with_model
+def test_complex_pattern_single_monomer_complex_compartment():
+    Monomer('A')
+    Compartment('C')
+    Parameter('A_0', 10)
+    cp_source = as_complex_pattern(A()) ** C
+
+    # Check executing the string representation of the above ComplexPattern
+    # leads to the correct application of compartment, i.e. compartment applies
+    # to complex, not to monomer
+    exec(f"Initial({str(cp_source)}, A_0)")
+
+    cp_in_model = model.initials[0].pattern
+    assert cp_in_model.compartment == C
+    assert cp_in_model.monomer_patterns[0].compartment is None
+
+
+@with_model
 def test_reaction_pattern_match_complex_pattern_ordering():
     """Ensure CP equivalence is insensitive to MP order."""
     Monomer('A', ['s1', 's2'])

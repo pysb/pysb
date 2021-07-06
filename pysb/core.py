@@ -1113,6 +1113,8 @@ class ComplexPattern(object):
         if self.compartment:
             if len(self.monomer_patterns) > 1:
                 ret = '(%s)' % ret
+            else:
+                ret = 'as_complex_pattern(%s)' % ret
             ret += ' ** %s' % self.compartment.name
         if self.match_once:
             ret = 'MatchOnce(%s)' % ret
