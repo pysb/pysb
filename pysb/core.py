@@ -2272,12 +2272,12 @@ class Model(object):
 
     def __repr__(self):
         return ("<%s '%s' (monomers: %d, rules: %d, parameters: %d, "
-                "expressions: %d, energypatterns: %d, compartments: %d) "
-                " at 0x%x>" %
+                "expressions: %d, compartments: %d, energypatterns: %d) "
+                "at 0x%x>" %
                 (self.__class__.__name__, self.name,
                  len(self.monomers), len(self.rules), len(self.parameters),
-                 len(self.expressions), len(self.energypatterns),
-                 len(self.compartments), id(self)))
+                 len(self.expressions), len(self.compartments),
+                 len(self.energypatterns), id(self)))
 
 
 

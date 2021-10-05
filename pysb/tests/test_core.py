@@ -5,6 +5,7 @@ from pysb.core import *
 from functools import partial
 from nose.tools import assert_raises
 import operator
+import re
 
 
 @with_model
@@ -154,6 +155,27 @@ def test_model_pickle():
     assert_equal(len(model.all_components()), 7)
     model2 = pickle.loads(pickle.dumps(model))
     check_model_against_component_list(model, model2.all_components())
+
+@with_model
+def test_model_repr():
+    monomers = [Monomer(f"A{i}") for i in range(1, 7)]
+    parameters = [Parameter(f"P{i}") for i in range(1, 5)]
+    rules = [
+        Rule(f"R{i}", m() >> None, parameters[0])
+        for i, m in enumerate(monomers[:5], 1)
+    ]
+    expressions = [
+        Expression(f"E{i}", p + 1)
+        for i, p in enumerate(parameters[:3], 1)
+    ]
+    Compartment("C1")
+    Compartment("C2", C1, 2)
+    EnergyPattern("G1", A1() % A2(), P1)
+    assert re.match(
+        r"<Model 'test_model_repr' \(monomers: 6, rules: 5, parameters: 4, "
+        r"expressions: 3, compartments: 2, energypatterns: 1\) at 0x[0-9a-f]+>",
+        repr(model)
+    )
 
 @with_model
 def test_monomer_as_reaction_pattern():
