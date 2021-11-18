@@ -24,14 +24,12 @@ install:
   - activate test-environment
 
   # Majority of dependencies can be installed with Anaconda
-  - conda install -c conda-forge "numpy>=1.14" scipy matplotlib
+  - conda install -c conda-forge "numpy>=1.14" scipy matplotlib sympy
     networkx nose h5py pandas mkl pydot mock cython
 
   - conda install -c SBMLTeam python-libsbml
 
   - conda install -c alubbock graphviz bionetgen atomizer kappa stochkit-lite
-
-  - pip install "sympy>=1.9"
 
   # Build PySB
   - python setup.py build --build-lib=build/lib
