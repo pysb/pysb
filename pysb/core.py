@@ -1303,18 +1303,18 @@ class Parameter(Component, Symbol):
 
     """
 
-    def __new__(cls, name, value=0.0, nonnegative=True, integer=False,
-                _export=True):
-
+    def __new__(cls, name, value=0.0, _export=True, nonnegative=True,
+                integer=False):
         return super(Parameter, cls).__new__(cls, name, real=True,
                                              nonnegative=nonnegative,
                                              integer=integer)
 
     def __getnewargs__(self):
-        return (self.name, self.value, self.assumptions0['nonnegative'],
-                self.assumptions0['integer'], False)
+        return (self.name, self.value, False, self.assumptions0['nonnegative'],
+                self.assumptions0['integer'])
 
-    def __init__(self, name, value=0.0, _export=True, **kwargs):
+    def __init__(self, name, value=0.0, _export=True, nonnegative=True,
+                 integer=False):
         self.value = value
         Component.__init__(self, name, _export)
 
