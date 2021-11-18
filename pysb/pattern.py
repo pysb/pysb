@@ -240,6 +240,9 @@ def check_dangling_bonds(pattern):
 
     Raises a DanglingBondError if a dangling bond is found
     """
+    if pattern is None:
+        return
+
     if isinstance(pattern, ReactionPattern):
         for cp in pattern.complex_patterns:
             check_dangling_bonds(cp)
