@@ -1307,8 +1307,13 @@ class Parameter(Component, Symbol):
                                              nonnegative=nonnegative,
                                              integer=integer)
 
+    def __getnewargs_ex__(self):
+        return ((self.name, self.value, self.assumptions0['nonnegative'],
+                self.assumptions0['integer'], False), {})
+
     def __getnewargs__(self):
-        return (self.name, self.value, False)
+        return (self.name, self.value, self.assumptions0['nonnegative'],
+                self.assumptions0['integer'], False)
 
     def __init__(self, name, value=0.0, _export=True, **kwargs):
         self.value = value

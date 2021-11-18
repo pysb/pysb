@@ -1,3 +1,5 @@
+import copy
+
 from pysb.testing import *
 from pysb.core import *
 from functools import partial
@@ -16,6 +18,11 @@ def test_component_names_valid():
         model.add_component(c)
         assert_equal(model.components[name], c)
         assert_equal(getattr(model.components, name), c)
+
+@with_model
+def test_deepcopy_parameter():
+    Parameter("a", 1)
+    copy.deepcopy(model)
 
 
 @with_model
