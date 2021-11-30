@@ -169,6 +169,9 @@ class Symbol(sympy.Dummy):
     def __new__(cls, name, real=True, **kwargs):
         return super(Symbol, cls).__new__(cls, name, real=real, **kwargs)
 
+    def __getnewargs_ex__(self):
+        return self.__getnewargs__(), {}
+
     def _lambdacode(self, printer, **kwargs):
         """ custom printer method that ensures that the dummyid is not
         appended when printing code """
@@ -1300,17 +1303,18 @@ class Parameter(Component, Symbol):
 
     """
 
-    def __new__(cls, name, value=0.0, nonnegative=True, integer=False,
-                _export=True):
-
+    def __new__(cls, name, value=0.0, _export=True, nonnegative=True,
+                integer=False):
         return super(Parameter, cls).__new__(cls, name, real=True,
                                              nonnegative=nonnegative,
                                              integer=integer)
 
     def __getnewargs__(self):
-        return (self.name, self.value, False)
+        return (self.name, self.value, False, self.assumptions0['nonnegative'],
+                self.assumptions0['integer'])
 
-    def __init__(self, name, value=0.0, _export=True, **kwargs):
+    def __init__(self, name, value=0.0, _export=True, nonnegative=True,
+                 integer=False):
         self.value = value
         Component.__init__(self, name, _export)
 
@@ -1551,7 +1555,6 @@ def validate_const_expr(obj, description):
         raise ConstantExpressionError(msg)
 
 
-
 class Observable(Component, Symbol):
 
     """
@@ -1595,7 +1598,7 @@ class Observable(Component, Symbol):
         return super(Observable, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.reaction_pattern, self.match, False)
+        return self.name, self.reaction_pattern, self.match, False
 
     def __init__(self, name, reaction_pattern, match='molecules', _export=True):
         try:
@@ -1657,7 +1660,7 @@ class Expression(Component, Symbol):
         return super(Expression, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.expr, False)
+        return self.name, self.expr, False
 
     def __init__(self, name, expr, _export=True):
         if not isinstance(expr, sympy.Expr):
