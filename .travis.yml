@@ -12,8 +12,9 @@ before_install:
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda install --yes -c conda-forge python="$PYVER"
-    numpy scipy matplotlib sympy nose h5py pexpect pandas networkx
+    numpy scipy matplotlib sympy nose pexpect pandas networkx
     pydot codecov mock cython
+- pip install h5py  # use pip due to travis/conda undefined symbol error
 - if [[ $PYVER != 3.8 ]]; then conda install --yes -c SBMLTeam python-libsbml; else pip install python-libsbml; fi
 # libroadrunner is not currently available for Python 3.8
 - if [[ $PYVER != 3.8 ]]; then pip install libroadrunner twine; else pip install twine; fi
@@ -26,4 +27,7 @@ install:
 before_script:
   python setup.py sdist && twine check dist/*
 script:
-  python -c "import h5py"
+  nosetests build/lib/pysb --with-coverage --cover-inclusive
+  --cover-package=build/lib/pysb -a '!gpu'
+after_success:
+  codecov
