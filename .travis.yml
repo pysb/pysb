@@ -26,7 +26,4 @@ install:
 before_script:
   python setup.py sdist && twine check dist/*
 script:
-  nosetests build/lib/pysb --with-coverage --cover-inclusive
-  --cover-package=build/lib/pysb -a '!gpu'
-after_success:
-  codecov
+  python -c "import h5py"
