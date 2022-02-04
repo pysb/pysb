@@ -1,6 +1,14 @@
 language: python
 sudo: required
-dist: trusty
+dist: bionic
+compiler: gcc
+addons:
+  apt:
+    packages:
+      - libatlas-base-dev
+      - swig3.0
+      - g++-5
+      - libc6-dbg
 env:
 - PYVER=3.6
 - PYVER=3.7
@@ -18,8 +26,13 @@ before_install:
 - if [[ $PYVER != 3.8 ]]; then conda install --yes -c SBMLTeam python-libsbml; else pip install python-libsbml; fi
 # libroadrunner is not currently available for Python 3.8
 - if [[ $PYVER != 3.8 ]]; then pip install libroadrunner twine; else pip install twine; fi
+# enable openmp parallelization in amici install
+- export AMICI_CXXFLAGS=-fopenmp; export AMICI_LDFLAGS=-fopenmp
+- pip install amici
 - mkdir -p ~/.config/matplotlib
 - echo "backend:Agg" > ~/.config/matplotlib/matplotlibrc
+# create swig alias for swig3.0
+- mkdir -p ~/bin/ && ln -s /usr/bin/swig3.0 ~/bin/swig && export PATH=~/bin/:$PATH;
 # Install BioNetGen, Kappa, StochKit and Atomizer
 - conda install --yes -c alubbock kappa stochkit bionetgen atomizer
 install:
