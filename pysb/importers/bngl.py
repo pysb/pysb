@@ -11,6 +11,34 @@ import collections
 import numbers
 import os
 
+from sympy.functions import (
+    exp, log, sqrt, Abs, sin, cos, tan, asin, acos, atan, sinh,
+    cosh, tanh, asinh, acosh, atanh
+)
+
+BNGL_FUNCTIONS = {
+    'exp': exp,
+    'log': log,
+    'log10': lambda x: log(x, 10),
+    'log2': lambda x: log(x, 2),
+    'sqrt': sqrt,
+    'abs': Abs,
+    'sin': sin,
+    'cos': cos,
+    'tan': tan,
+    'asin': asin,
+    'acos': acos,
+    'atan': atan,
+    'sinh': sinh,
+    'cosh': cosh,
+    'tanh': tanh,
+    'asinh': asinh,
+    'acosh': acosh,
+    'atanh': atanh,
+}
+
+
+
 
 def _ns(tag_string):
     """
@@ -42,7 +70,7 @@ class BnglBuilder(Builder):
 
         self.model.name = os.path.splitext(os.path.basename(filename))[0]
         self._force = force
-        self._model_env = {}
+        self._model_env = BNGL_FUNCTIONS
         self._renamed_states = collections.defaultdict(dict)
         self._renamed_observables = {}
         self._log = pysb.logging.get_logger(__name__)
