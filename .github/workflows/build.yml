@@ -1,3 +1,4 @@
+---
 name: build
 on: [push]
 
@@ -17,28 +18,31 @@ jobs:
         shell: bash -l {0}
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: conda-incubator/setup-miniconda@v2
-      with:
-        auto-update-conda: true
-        python-version: ${{ matrix.python-version }}
-        environment-file: .github/pysb-conda-env.yml
-        activate-environment: pysb
-    - name: Install StochKit (except on Windows)
-      if: matrix.os != 'windows-latest'
-      run: conda install -y -c alubbock stochkit
-    - name: Install StochKit Lite (Windows only)
-      if: matrix.os == 'windows-latest'
-      run: conda install -y -c alubbock -c conda-forge stochkit-lite
-    - name: Fix gfortran DLL linker error on Windows/Python 3.8
-      if: matrix.os == 'windows-latest' && matrix.python-version == '3.8'
-      run: pip install --upgrade --force-reinstall scipy
-    - name: Conda environment info
-      run: |
-        conda info
-        conda list
-    - name: Build PySB
-      run: python setup.py build --build-lib=build/lib
-    - name: Run nosetests
-      run: |
-       nosetests build/lib/pysb --with-coverage --cover-inclusive --cover-package=build/lib/pysb -a '!gpu'
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+          environment-file: .github/pysb-conda-env.yml
+          activate-environment: pysb
+      - name: Install StochKit (except on Windows)
+        if: matrix.os != 'windows-latest'
+        run: conda install -y -c alubbock stochkit
+      - name: Install StochKit Lite (Windows only)
+        if: matrix.os == 'windows-latest'
+        run: conda install -y -c alubbock -c conda-forge stochkit-lite
+      - name: Fix gfortran DLL linker error on Windows/Python 3.8
+        if: matrix.os == 'windows-latest' && matrix.python-version == '3.8'
+        run: pip install --upgrade --force-reinstall scipy
+      - name: Conda environment info
+        run: |
+          conda info
+          conda list
+      - name: Build PySB
+        run: python setup.py build --build-lib=build/lib
+      - name: Run nosetests
+        run: >
+          nosetests
+          build/lib/pysb
+          --with-coverage --cover-inclusive --cover-package=build/lib/pysb
+          -a '!gpu'
