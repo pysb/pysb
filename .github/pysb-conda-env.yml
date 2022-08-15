@@ -1,11 +1,11 @@
+---
 name: pysb
 channels:
- - alubbock
- - conda-forge
+  - conda-forge
 dependencies:
-  - bionetgen
-  - atomizer
-  - kappa
+  - alubbock::bionetgen
+  - alubbock::atomizer
+  - alubbock::kappa
   - numpy
   - scipy
   - sympy
@@ -17,11 +17,10 @@ dependencies:
   - pexpect
   - pandas
   - pydot
+  - coverage
   - coveralls
   - mock
   - pip
   - pip:
-    - libroadrunner
-    - python-libsbml
-    - coverage
-    - sympy
+      - libroadrunner
+      - python-libsbml
