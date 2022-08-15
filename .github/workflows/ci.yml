@@ -3,7 +3,8 @@ name: Continuous Integration
 on: [push, pull_request]
 
 jobs:
-  Tests & Coverage:
+  tests_coverage:
+    name: Tests & Coverage
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
