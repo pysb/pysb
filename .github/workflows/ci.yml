@@ -1,9 +1,9 @@
 ---
-name: build
-on: [push]
+name: Continuous Integration
+on: [push, pull_request]
 
 jobs:
-  build-linux:
+  Tests & Coverage:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
