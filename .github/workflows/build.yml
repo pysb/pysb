@@ -46,3 +46,4 @@ jobs:
           build/lib/pysb
           --with-coverage --cover-inclusive --cover-package=build/lib/pysb
           -a '!gpu'
+      - uses: codecov/codecov-action@v3
