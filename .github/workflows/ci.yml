@@ -49,6 +49,6 @@ jobs:
           --cover-xml-file
           -a '!gpu'
       - uses: codecov/codecov-action@v3
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
         with:
           verbose: true
+          flags: ${{ matrix.os }}, python-${{ matrix.python-version }}
