@@ -46,16 +46,9 @@ jobs:
           nosetests
           build/lib/pysb
           --with-coverage --cover-inclusive --cover-package=build/lib/pysb
+          --cover-xml-file
           -a '!gpu'
-      - name: coverage xml (testing)
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
-        run: coverage xml
       - uses: codecov/codecov-action@v3
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
         with:
           verbose: true
-      - uses: actions/upload-artifact@v3
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
-        with:
-          path: |
-            .
