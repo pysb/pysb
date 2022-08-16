@@ -46,9 +46,9 @@ jobs:
           nosetests
           build/lib/pysb
           --with-coverage --cover-inclusive --cover-package=build/lib/pysb
-          --cover-xml-file
+          --cover-xml
           -a '!gpu'
       - uses: codecov/codecov-action@v3
         with:
           verbose: true
-          flags: ${{ matrix.os }}, python-${{ matrix.python-version }}
+          flags: os-${{ matrix.os }},python-${{ matrix.python-version }}
