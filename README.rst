@@ -6,8 +6,8 @@ PySB
    :target: https://gitter.im/pysb/pysb?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
 .. image:: https://github.com/pysb/pysb/workflows/Continuous%20Integration/badge.svg
-    :alt: Continuous Integration
-    :target: https://github.com/pysb/pysb/actions
+   :alt: Continuous Integration
+   :target: https://github.com/pysb/pysb/actions
 
 Python Systems Biology modeling framework
 
