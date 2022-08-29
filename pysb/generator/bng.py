@@ -29,6 +29,7 @@ class BngGenerator(object):
         self.generate_observables()
         self.generate_functions()
         self.generate_species()
+        self.generate_energy_patterns()
         self.generate_reaction_rules()
         self.generate_population_maps()
         self.__content += "end model\n"
@@ -62,7 +63,7 @@ class BngGenerator(object):
             else:
                 size = c.size.name
             self.__content += ("  %s  %d  %s  %s\n") % (c.name, c.dimension, size, parent_name)
-        self.__content += "end compartments\n\n"        
+        self.__content += "end compartments\n\n"
 
     def generate_molecule_types(self):
         if not self.model.monomers:
@@ -92,10 +93,15 @@ class BngGenerator(object):
             arrow = '->'
             if r.is_reversible:
                 arrow = '<->'
+            if not r.energy:
+                kf = r.rate_forward.name
+            else:
+                kf = 'Arrhenius(%s, %s)' % (r.rate_forward.name,
+                                            r.rate_reverse.name)
             self.__content += ("  %-" + str(max_length) + "s  %s %s %s    %s") % \
-                (label, reactants_code, arrow, products_code, r.rate_forward.name)
+                (label, reactants_code, arrow, products_code, kf)
             self.__content += _tags_in_rate(r.rate_forward)
-            if r.is_reversible:
+            if r.is_reversible and not r.energy:
                 self.__content += ', %s' % r.rate_reverse.name
                 self.__content += _tags_in_rate(r.rate_reverse)
             if r.delete_molecules:
@@ -106,6 +112,19 @@ class BngGenerator(object):
                 self.__content += ' TotalRate'
             self.__content += "\n"
         self.__content += "end reaction rules\n\n"
+
+    def generate_energy_patterns(self):
+        if not self.model.energypatterns:
+            return
+        max_length = max(len(name) for name in self.model.energypatterns.keys())
+        self.__content += "begin energy patterns\n"
+        for ep in self.model.energypatterns:
+            label = ep.name + ':'
+            pattern = format_complexpattern(ep.pattern)
+            self.__content += (("  %-" + str(max_length) + "s  %s    %s")
+                               % (label, pattern, ep.energy.name))
+            self.__content += "\n"
+        self.__content += "end energy patterns\n\n"
 
     def generate_observables(self):
         if not self.model.observables:
