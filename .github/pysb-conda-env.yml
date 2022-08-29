@@ -1,0 +1,26 @@
+---
+name: pysb
+channels:
+  - conda-forge
+dependencies:
+  - alubbock::bionetgen
+  - alubbock::atomizer
+  - alubbock::kappa
+  - numpy
+  - scipy
+  - sympy
+  - cython
+  - matplotlib
+  - networkx
+  - nose
+  - h5py
+  - pexpect
+  - pandas
+  - pydot
+  - coverage
+  - coveralls
+  - mock
+  - pip
+  - pip:
+      - libroadrunner
+      - python-libsbml

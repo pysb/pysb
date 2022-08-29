@@ -6,7 +6,9 @@ from sympy.core import S
 import collections
 import re
 import pysb.logging
-from pysb.export import CompartmentsNotSupported, LocalFunctionsNotSupported
+from pysb.export import (
+    CompartmentsNotSupported, LocalFunctionsNotSupported, EnergyNotSupported
+)
 
 
 class KappaGenerator(object):
@@ -19,6 +21,8 @@ class KappaGenerator(object):
                 raise CompartmentsNotSupported()
             if model.tags:
                 raise LocalFunctionsNotSupported()
+            if model.uses_energy:
+                raise EnergyNotSupported()
         self.model = model
         self.__content = None
         self.dialect = dialect
@@ -39,7 +43,7 @@ class KappaGenerator(object):
         # Agent declarations appear to be required in kasim
         # but prohibited in complx
         if (self.dialect == 'kasim'):
-            self.generate_molecule_types() 
+            self.generate_molecule_types()
             # Parameters, variables, and expressions are allowed in kasim
             if not self._exclude_ic_param:
                 self.generate_parameters()
