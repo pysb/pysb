@@ -8,6 +8,7 @@ import collections
 import weakref
 import copy
 import itertools
+import numbers
 import sympy
 import scipy.sparse
 import networkx as nx
@@ -58,7 +59,7 @@ class SelfExporter(object):
     This class is for pysb internal use only. Do not construct any instances.
 
     """
-    
+
     do_export = True
     default_model = None
     target_globals = None   # the globals dict to which we'll export our symbols
@@ -1326,7 +1327,7 @@ class Parameter(Component, Symbol):
     def value(self, new_value):
         self.check_value(new_value)
         self._value = float(new_value)
-    
+
     def get_value(self):
         return self.value
 
@@ -1432,6 +1433,10 @@ class Rule(Component):
         co-transport anything connected to that Monomer by a path in the same
         compartment. If False (default), connected Monomers will remain where
         they were.
+    energy : bool, optional
+        If True, this rule is an energy rule (as in Energy BNG) and the two
+        parameters are interpreted as the 'phi' and deltaG parameters of the
+        Arrhenius equation (see Hogg 2013 for details).
     total_rate: bool, optional
         If True, the rate is considered to be macroscopic and is not
         multiplied by the number of reactant molecules during simulation.
@@ -1449,8 +1454,8 @@ class Rule(Component):
     """
 
     def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
-                 delete_molecules=False, move_connected=False,
-                 _export=True, total_rate=False):
+                 delete_molecules=False, move_connected=False, energy=False,
+                 total_rate=False, _export=True):
         if not isinstance(rule_expression, RuleExpression):
             raise Exception("rule_expression is not a RuleExpression object")
         validate_expr(rate_forward, "forward rate")
@@ -1467,6 +1472,7 @@ class Rule(Component):
         self.rate_reverse = rate_reverse
         self.delete_molecules = delete_molecules
         self.move_connected = move_connected
+        self.energy = energy
         self.total_rate = total_rate
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
@@ -1541,9 +1547,47 @@ class Rule(Component):
             ret += ', delete_molecules=True'
         if self.move_connected:
             ret += ', move_connected=True'
+        if self.energy:
+            ret += ', energy=True'
         ret += ')'
         return ret
 
+
+class EnergyPattern(Component):
+
+    """
+    Model component representing an energy pattern.
+
+    Parameters
+    ----------
+    pattern : ComplexPattern
+        ComplexPattern describing the species to which the given deltaG in
+        `energy` should be attributed.
+    energy : sympy.Expr
+        Expression containing model parameters that defines the deltaG to be
+        ascribed to the part of a species matched by `pattern`.
+
+    Attributes
+    ----------
+
+    Identical to Parameters (see above).
+
+    """
+
+    def __init__(self, name, pattern, energy, _export=True):
+        Component.__init__(self, name, _export)
+        try:
+            pattern = as_complex_pattern(pattern)
+        except InvalidComplexPatternException as e:
+            raise ValueError("pattern must be a ComplexPattern")
+        validate_expr(energy, "energy")
+        self.pattern = pattern
+        self.energy = energy
+
+    def __repr__(self):
+        ret = '%s(%s, %s, %s)' % (self.__class__.__name__, repr(self.name),
+                                  repr(self.pattern), self.energy.name)
+        return ret
 
 
 def validate_expr(obj, description):
@@ -1843,7 +1887,7 @@ class Model(object):
         `initials`.
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
-        the initial conditions and successively applying the rules. Each 
+        the initial conditions and successively applying the rules. Each
         ComplexPattern is concrete.
     reactions : list of dict
         Structures describing each possible unidirectional reaction that can be
@@ -1865,7 +1909,7 @@ class Model(object):
     """
 
     _component_types = (Monomer, Compartment, Parameter, Rule, Observable,
-                        Expression, Tag)
+                        Expression, EnergyPattern, Tag)
 
     def __init__(self, name=None, base=None, _export=True):
         self.name = name
@@ -1877,6 +1921,7 @@ class Model(object):
         self.rules = ComponentSet()
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
+        self.energypatterns = ComponentSet()
         self.tags = ComponentSet()
         self.initials = []
         self.annotations = []
@@ -2043,6 +2088,15 @@ class Model(object):
         if not include_local:
             cset = ComponentSet(e for e in cset if not e.is_local)
         return cset
+
+    def rules_energy(self):
+        """Return a ComponentSet of energy-based rules."""
+        return ComponentSet(r for r in self.rules if r.energy)
+
+    @property
+    def uses_energy(self):
+        """Return True if model uses energy features."""
+        return bool(self.energypatterns or self.rules_energy())
 
     @property
     def odes(self):
@@ -2218,10 +2272,12 @@ class Model(object):
 
     def __repr__(self):
         return ("<%s '%s' (monomers: %d, rules: %d, parameters: %d, "
-                "expressions: %d, compartments: %d) at 0x%x>" %
+                "expressions: %d, compartments: %d, energypatterns: %d) "
+                "at 0x%x>" %
                 (self.__class__.__name__, self.name,
                  len(self.monomers), len(self.rules), len(self.parameters),
-                 len(self.expressions), len(self.compartments), id(self)))
+                 len(self.expressions), len(self.compartments),
+                 len(self.energypatterns), id(self)))
 
 
 
