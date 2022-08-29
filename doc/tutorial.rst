@@ -334,7 +334,7 @@ that will account for the binding step and the unbinding step as
 follows::
 
    Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') | C8(b=1) % Bid(b=1, S='u'), kf, kr)
-   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) % Bid(b=None, S='t'), kc)
+   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc)
 
 As shown, the initial reactants, *C8* and *Bid* initially in the
 unbound state and, for Bid, in the 'u' state, undergo a complexation
