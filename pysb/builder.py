@@ -172,6 +172,12 @@ class Builder(object):
         self.model.add_component(e)
         return e
 
+    def energypattern(self, *args, **kwargs):
+        """Adds an energypattern to the Builder's model instance."""
+        p = EnergyPattern(*args, _export=False, **kwargs)
+        self.model.add_component(p)
+        return p
+
     def initial(self, *args, **kwargs):
         """Adds an initial condition to the Builder's model instance."""
         i = Initial(*args, _export=False, **kwargs)

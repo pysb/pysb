@@ -51,12 +51,16 @@ class PySBJSONEncoder(json.JSONEncoder):
     * References to other components are stored using the component name
     * Sympy expressions are encoded as strings using the default encoder
 
-    The protocol number (currently: 1) specifies semantic model compatibility,
-    and should be incremented if new features are added which affect how a model
-    is simulated or prevent a model being loaded by
-    :py:func:`pysb.importers.json.PySBJSONDecoder`.
+    The protocol number specifies semantic compatibility of the JSON output. It
+    should be incremented if new features are added which affect how a model is
+    simulated or prevent the new output from being loaded by
+    :py:func:`pysb.importers.json.PySBJSONDecoder`. See that code for
+    documentation on the different protocol versions. This encoder only
+    produces JSON using the highest protocol currently defined; If you need to
+    generate output for an older protocol, use an older version of PySB in
+    which the desired protocol number was still current.
     """
-    PROTOCOL = 1
+    PROTOCOL = 2
 
     @classmethod
     def encode_keyword(cls, keyword):
@@ -145,7 +149,16 @@ class PySBJSONEncoder(json.JSONEncoder):
             'rate_forward': r.rate_forward.name,
             'rate_reverse': r.rate_reverse.name if r.rate_reverse else None,
             'delete_molecules': r.delete_molecules,
-            'move_connected': r.move_connected
+            'move_connected': r.move_connected,
+            'energy': r.energy,
+        }
+
+    @classmethod
+    def encode_energypattern(cls, ep):
+        return {
+            'name': ep.name,
+            'pattern': cls.encode_complex_pattern(ep.pattern),
+            'energy': ep.energy.name,
         }
 
     @classmethod
@@ -191,6 +204,7 @@ class PySBJSONEncoder(json.JSONEncoder):
             'parameters': cls.encode_parameter,
             'expressions': cls.encode_expression,
             'rules': cls.encode_rule,
+            'energypatterns': cls.encode_energypattern,
             'observables': cls.encode_observable,
             'initials': cls.encode_initial,
             'annotations': cls.encode_annotation
