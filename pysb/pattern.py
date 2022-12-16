@@ -804,11 +804,7 @@ class RulePatternMatcher(object):
             for cache, rp in ((self._reactant_cache, rule.reactant_pattern),
                               (self._product_cache, rule.product_pattern)):
                 for cp in rp.complex_patterns:
-                    if cp.compartment:
-                        raise NotImplementedError
                     for mp in cp.monomer_patterns:
-                        if mp.compartment:
-                            raise NotImplementedError
                         cache[mp.monomer].add(rule.name)
 
     def match_reactants(self, pattern):
@@ -989,8 +985,6 @@ class ReactionPatternMatcher(object):
                     (self._product_cache, rxn['products'])):
                 for sp_id in species_ids:
                     sp = model.species[sp_id]
-                    if sp.compartment:
-                        raise NotImplementedError
                     cache[sp].add(r_id)
 
     def match_reactants(self, pattern):
@@ -1015,7 +1009,7 @@ class ReactionPatternMatcher(object):
         rxn_ids.sort()
 
         return [_Reaction(rxn_dict=self.model.reactions_bidirectional[rxn_id],
-                         model=self.model) for rxn_id in rxn_ids]
+                          model=self.model) for rxn_id in rxn_ids]
 
 
 class _Reaction(object):
