@@ -1,6 +1,6 @@
 from pysb.pattern import SpeciesPatternMatcher, match_complex_pattern
 from pysb.examples import robertson, bax_pore, bax_pore_sequential, \
-    earm_1_3, kinase_cascade, bngwiki_egfr_simple
+    earm_1_3, kinase_cascade, bngwiki_egfr_simple, move_connected
 from pysb.bng import generate_equations
 from nose.tools import assert_raises
 from pysb import as_complex_pattern, as_reaction_pattern, ANY, WILD, \
@@ -67,5 +67,5 @@ def check_all_species_generated(model):
 
 def test_all_species_generated():
     for model in [bax_pore, earm_1_3, bax_pore_sequential, kinase_cascade,
-                  bngwiki_egfr_simple]:
+                  bngwiki_egfr_simple, move_connected]:
         yield (check_all_species_generated, model.model)

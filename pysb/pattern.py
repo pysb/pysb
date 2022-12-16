@@ -489,11 +489,7 @@ class SpeciesPatternMatcher(object):
             self._add_species(idx, sp)
 
     def _add_species(self, idx, sp):
-        if sp.compartment:
-            raise NotImplementedError
         for mp in sp.monomer_patterns:
-            if mp.compartment:
-                raise NotImplementedError
             self._species_cache[mp.monomer].add(idx)
 
     def add_species(self, species, check_duplicate=True):
