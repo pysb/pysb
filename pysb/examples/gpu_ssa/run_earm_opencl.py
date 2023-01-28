@@ -3,7 +3,7 @@ Example of using OpenCLSSASimulator for SSA simulations.
 
 
 This example uses the earm_1_0 model.
-We recommend using a dedicated GPU without a display attached at there can
+We recommend using a dedicated GPU without a display attached as there can
 be time out. For testing, one can change the tspan = np.linspace(0,5000,101).
 
 """
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     plt.legend(loc=0)
     plt.tight_layout()
-    out_name = 'earm_ssa_example.png'
+    out_name = 'earm_ssa_example_opencl.png'
     plt.savefig(out_name)
     plt.close()
     print("Example figure saved as {}".format(out_name))

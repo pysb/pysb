@@ -49,7 +49,7 @@ class Earm10ODESuite(object):
 
 
 class SSASchloegl(object):
-    def setup(self):
+    def setup_cache(self):
         self.nsims = 100
         self.timer = timeit.default_timer
         self.model = schloegl.model

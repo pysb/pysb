@@ -1,4 +1,3 @@
-from __future__ import print_function
 from pysb.simulator.base import SimulationResult
 from pysb.simulator.ssa_base import SSABase
 import numpy as np
@@ -147,7 +146,7 @@ class CudaSSASimulator(SSABase):
         self._step_0 = False
 
     def run(self, tspan=None, param_values=None, initials=None, number_sim=0,
-            threads_per_block=None):
+            threads_per_block=None, random_seed=None):
         """
         Run a simulation and returns the result (trajectories)
 
@@ -166,7 +165,9 @@ class CudaSSASimulator(SSABase):
             Number of simulations to perform
         threads_per_block: int
             Number of threads per block. Optimal value is generally 32
-
+        random_seed: int
+            Seed used for generate random numbers that will then be seeds on
+            the device (seed of seeds).
         Returns
         -------
         A :class:`SimulationResult` object
@@ -211,6 +212,17 @@ class CudaSSASimulator(SSABase):
         species_matrix_gpu = gpuarray.to_gpu(
             self._create_gpu_array(self.initials, total_threads, species_dtype)
         )
+        # generate rng state based on given seed plus device number
+        rng = np.random.default_rng(random_seed)
+        random_seeds_gpu = gpuarray.to_gpu(
+            self._create_gpu_array(
+                rng.integers(
+                    0, 2 ** 32, total_threads, np.uint32
+                )[:, np.newaxis],
+                total_threads,
+                np.uint32
+            )
+        )
 
         # allocate and upload time to GPU
         time_points_gpu = gpuarray.to_gpu(np.array(t_out, dtype=self._dtype))
@@ -234,6 +246,7 @@ class CudaSSASimulator(SSABase):
             time_points_gpu,
             np.int32(len(t_out)),
             param_array_gpu,
+            random_seeds_gpu,
             block=(threads, 1, 1),
             grid=(blocks, 1)
         )
@@ -279,19 +292,3 @@ class CudaSSASimulator(SSABase):
         # The rest of the array will be zeros to fill up GPU.
         gpu_array[:len(values)] = values
         return gpu_array
-
-    def get_blocks(self, n_simulations, threads_per_block):
-        max_tpb = 256
-        if threads_per_block > max_tpb:
-            self._logger.warning("Limit of 256 threads per block from curand."
-                                 " Setting to 256.")
-            threads_per_block = max_tpb
-        if n_simulations < max_tpb:
-            block_count = 1
-            threads_per_block = max_tpb
-        elif n_simulations % threads_per_block == 0:
-            block_count = int(n_simulations // threads_per_block)
-        else:
-            block_count = int(n_simulations // threads_per_block + 1)
-        return block_count, threads_per_block
-

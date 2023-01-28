@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import logging
 import re
 
@@ -35,8 +33,7 @@ class SSABase(Simulator):
     def _get_template_args(self):
         """ converts pysb reactions to pycuda/pyopencl format """
         p = re.compile('\s')
-        stoich_matrix = self._get_stoich(self.model)
-
+        stoich_matrix = self.model.stoichiometry_matrix.toarray()
         params_names = [g.name for g in self._model.parameters]
         _reaction_number = len(self._model.reactions)
 
@@ -128,24 +125,27 @@ class SSABase(Simulator):
                                  _run_kwargs=locals())
 
     @staticmethod
-    def _get_stoich(model):
-        """
-        Left hand side
-        """
-        left_side = np.zeros((len(model.reactions), len(model.species)),
-                             dtype=np.int32)
-        right_side = left_side.copy()
+    def get_blocks(n_simulations, threads_per_block):
+        # Choosing the number of blocks and threads per block depends on the
+        # hardware warpsize (32 for NVIDIA, 64 for AMD), and number of
+        # simulations.
+        # CUDA CURAND limits it to 256, so that's the hard limit we set.
+        # We want to number of blocks to be a multiple of the
+        # threads_per_block, so we saturate the GPU equally.
+        # If the number of simulations isn't a multiple of it,
+        # we just make the number of blocks slightly bigger, then fill
+        # the rest of the space with zeros, which instantly finishes.
 
-        for i in range(len(model.reactions)):
-            for j in range(len(model.species)):
-                stoich = 0
-                for k in model.reactions[i]['reactants']:
-                    if j == k:
-                        stoich += 1
-                left_side[i, j] = stoich
-                stoich = 0
-                for k in model.reactions[i]['products']:
-                    if j == k:
-                        stoich += 1
-                right_side[i, j] = stoich
-        return (right_side + left_side * -1).T
+        max_tpb = 256
+        if threads_per_block > max_tpb:
+            # Limit of 256 threads per block from curand
+            threads_per_block = max_tpb
+
+        if n_simulations < max_tpb:
+            block_count = 1
+            threads_per_block = max_tpb
+        elif n_simulations % threads_per_block == 0:
+            block_count = int(n_simulations // threads_per_block)
+        else:
+            block_count = int(n_simulations // threads_per_block + 1)
+        return block_count, threads_per_block

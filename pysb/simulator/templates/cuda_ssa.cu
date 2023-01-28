@@ -74,12 +74,15 @@ __global__ void Gillespie_all_steps(
                  SPECIES_DTYPE* result,
                  const PREC* time,
                  const int NRESULTS,
-                 const PREC* param_values
+                 const PREC* param_values,
+                 const unsigned int* SEED
                  ){
 
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    unsigned int local_seed = SEED[tid];
     curandStateMRG32k3a_t  randState;
-    curand_init(clock64(), tid, 0, &randState);
+    curand_init(local_seed, tid, 0, &randState);
 //    curand_init(0, 0, 0, &randState);
 
 

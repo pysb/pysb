@@ -64,8 +64,8 @@ MOCK_MODULES = [ 'pandas', 'pygraphviz', 'sympy',  'sympy.core', 'sympy.parsing'
                  'networkx.algorithms.isomorphism',
                  'networkx.algorithms.isomorphism.vf2userfunc',
                  'nose', 'nose.tools', 'matplotlib', 'matplotlib.pyplot',
-                 'concurrent', 'concurrent.futures','pycuda.driver', 'pycuda',
-                  'pyopencl']
+                 'concurrent', 'concurrent.futures', 'pycuda.driver',
+                 'pycuda', 'pyopencl']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.MagicMock()
 sys.modules['sympy'].Dummy = type('Dummy', (object,), {})
