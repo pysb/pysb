@@ -29,7 +29,7 @@ Option 1: Install PySB natively on your computer
    this step and use your existing Python installation.
 
    Anaconda has a simple graphical installer which can be downloaded from
-   https://www.continuum.io/downloads - select your operating system
+   https://www.anaconda.com/products/individual - select your operating system
    and download the 64 bit version. From PySB 2.0, we only support
    Python 3.x (see the :ref:`faq` for specific version support). The
    default installer options are usually appropriate.
@@ -189,7 +189,7 @@ setting a password and more). Documentation from the Jupyter project is
 available at
 https://hub.docker.com/r/jupyter/scipy-notebook/
 
-.. _Anaconda: https://www.continuum.io/downloads
+.. _Anaconda: https://www.anaconda.com/products/individual
 .. _Docker: http://www.docker.org/
 .. _Kappa: http://www.kappalanguage.org/
 .. _Git: http://git-scm.com/

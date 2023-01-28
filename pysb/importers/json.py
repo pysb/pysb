@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 from json import JSONDecoder
 from pysb.builder import Builder
 from pysb.core import RuleExpression, ReactionPattern, ComplexPattern, \
@@ -12,11 +11,6 @@ import json
 import re
 import warnings
 from sympy.parsing.sympy_parser import parse_expr
-try:
-    basestring
-except NameError:
-    # Python 3 compatibility.
-    basestring = str
 
 
 class PySBJSONDecodeError(ValueError):
@@ -29,7 +23,7 @@ class PySBJSONDecoder(JSONDecoder):
 
     See :py:mod:`pysb.export.json` for implementation details.
     """
-    MAX_SUPPORTED_PROTOCOL = 1
+    MAX_SUPPORTED_PROTOCOL = 2
 
     def _modelget(self, name):
         if name is None:
@@ -48,7 +42,7 @@ class PySBJSONDecoder(JSONDecoder):
             if sv['__object__'] == 'WILD':
                 return WILD
         try:
-            if len(sv) == 2 and isinstance(sv[0], basestring) \
+            if len(sv) == 2 and isinstance(sv[0], str) \
                     and isinstance(sv[1], (int, Mapping)):
                 return sv[0], self.decode_state_value(sv[1])
         except TypeError:
@@ -160,7 +154,15 @@ class PySBJSONDecoder(JSONDecoder):
             self._modelget(r['rate_forward']),
             self._modelget(r['rate_reverse']),
             r['delete_molecules'],
-            r['move_connected']
+            r['move_connected'],
+            r['energy'] if self.protocol >= 2 else False,
+        )
+
+    def decode_energypattern(self, p):
+        self.b.energypattern(
+            p['name'],
+            self.decode_complex_pattern(p['pattern']),
+            self._modelget(p['energy']),
         )
 
     def decode_tag(self, tag):
@@ -217,6 +219,7 @@ class PySBJSONDecoder(JSONDecoder):
                 )
             )
 
+        self.protocol = res['protocol']
         self.b = Builder()
         self.b.model.name = res['name']
 
@@ -236,6 +239,8 @@ class PySBJSONDecoder(JSONDecoder):
             ('reactions_bidirectional', self.decode_reaction),
             ('species', self.decode_species)
         ))
+        if self.protocol >= 2:
+            decoders['energypatterns'] = self.decode_energypattern
 
         for component_type, decoder in decoders.items():
             for component in res.get(component_type, []):

@@ -3,7 +3,6 @@
 # Bug-fixes and changes by Carlos Lopez 2012
 #
 
-from __future__ import print_function
 import numpy
 from numpy import asarray, tan, exp, ones, squeeze, sign, \
      all, log, sqrt, pi, shape, array, minimum, where

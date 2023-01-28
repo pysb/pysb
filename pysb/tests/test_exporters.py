@@ -53,11 +53,7 @@ def check_convert(model, format):
             exported_file = JsonExporter(model).export(include_netgen=True)
         else:
             exported_file = export.export(model, format)
-    except export.ExpressionsNotSupported:
-        pass
-    except export.CompartmentsNotSupported:
-        pass
-    except export.LocalFunctionsNotSupported:
+    except export.FeatureNotSupportedError:
         pass
     except Exception as e:
         # Some example models are deliberately incomplete, so here we
@@ -67,10 +63,7 @@ def check_convert(model, format):
             raise
 
     if exported_file is not None:
-        if format == 'python':
-            # linspace arguments picked to avoid VODE warning
-            exec(exported_file + 'Model().simulate(tspan=numpy.linspace(0,1,501))\n', {'numpy': np})
-        elif format == 'pysb_flat':
+        if format == 'pysb_flat':
             exec(exported_file, {'__name__': model.name})
         elif format == 'sbml':
             # Skip the simulation comparison if roadrunner not available
@@ -130,6 +123,9 @@ def check_convert(model, format):
             if model.name.endswith('tutorial_b') or \
                     model.name.endswith('tutorial_c'):
                 # Models have no rules
+                return
+            if model.uses_energy:
+                # BNG XML format doesn't support Arrhenius rate law yet.
                 return
             with tempfile.NamedTemporaryFile(suffix='.bngl',
                                              delete=False) as tf:

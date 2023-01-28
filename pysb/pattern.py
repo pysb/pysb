@@ -9,11 +9,6 @@ from networkx.algorithms.isomorphism import categorical_node_match
 import numpy as np
 from abc import ABCMeta, abstractmethod
 import re
-try:
-    basestring
-except NameError:
-    # Under Python 3, do not pretend that bytes are a valid string
-    basestring = str
 
 
 class FilterPredicate(object):
@@ -191,7 +186,7 @@ def get_half_bonds_in_pattern(pat):
         for sc in mp.site_conditions.values():
             if isinstance(sc, int):
                 bonds_used.append(sc)
-            elif not isinstance(sc, basestring) and \
+            elif not isinstance(sc, str) and \
                     isinstance(sc, Iterable):
                 [bonds_used.append(b) for b in sc if isinstance(b, int)]
 

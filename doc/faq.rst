@@ -38,7 +38,7 @@ Rule and Reaction Rate Laws
 
          Parameter('A_multiplier', 2.0)
          Observable('A_total', A())
-         Expression('kf_A`, A_total * A_multiplier)
+         Expression('kf_A', A_total * A_multiplier)
          Rule('bindA', A(b=None) + A(b=None) >> A(b=1) % A(b=1), kf_A)
 
     Like Parameters, note that Expressions are multiplied by

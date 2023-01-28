@@ -334,7 +334,7 @@ that will account for the binding step and the unbinding step as
 follows::
 
    Rule('C8_Bid_bind', C8(b=None) + Bid(b=None, S='u') | C8(b=1) % Bid(b=1, S='u'), kf, kr)
-   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) % Bid(b=None, S='t'), kc)
+   Rule('tBid_from_C8Bid', C8(b=1) % Bid(b=1, S='u') >> C8(b=None) + Bid(b=None, S='t'), kc)
 
 As shown, the initial reactants, *C8* and *Bid* initially in the
 unbound state and, for Bid, in the 'u' state, undergo a complexation
@@ -380,12 +380,12 @@ Observables
 -----------
 
 In our model we have two initial species (*C8* and *Bid*) and one
-output species (*tBid*). As shown in the :eq:`ODEs` derived from the
+output species (*tBid*). As can be seen in the ODEs derived from the
 reactions above, there are four mathematical species needed to
 describe the evolution of the system (i.e. *C8*, *Bid*, *tBid*, and
 *C8:Bid*). Although this system is rather small, there are situations
 when we will have many more species than we care to monitor or
-characterize throughout the time evolution of the :eq:`ODEs`. In
+characterize throughout the time evolution of the ODEs. In
 addition, it will often happen that the desirable species are
 combinations or sums of many other species. For this reason the
 rules-based engines we currently employ implement the *Observables*

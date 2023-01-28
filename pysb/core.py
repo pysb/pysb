@@ -8,26 +8,38 @@ import collections
 import weakref
 import copy
 import itertools
+import numbers
 import sympy
-import numpy as np
 import scipy.sparse
 import networkx as nx
 from collections.abc import Iterable, Mapping, Sequence, Set
 
-try:
-    reload
-except NameError:
-    from imp import reload
-try:
-    basestring
-except NameError:
-    # Under Python 3, do not pretend that bytes are a valid string
-    basestring = str
-    long = int
+from importlib import reload
 
 
 def MatchOnce(pattern):
-    """Make a ComplexPattern match-once."""
+    """
+    Make a ComplexPattern match-once.
+
+    ``MatchOnce`` adjusts reaction rate multiplicity by only counting a pattern
+    match once per species, even if it matches within that species multiple
+    times.
+
+    For example, if one were to have molecules of ``A`` degrading with a
+    specified rate:
+
+    >>> Rule('A_deg', A() >> None, kdeg)                # doctest: +SKIP
+
+    In the situation where multiple molecules of ``A()`` were present in a
+    species (e.g. ``A(a=1) % A(a=1)``), the above ``A_deg`` rule would have
+    multiplicity equal to the number of occurences of ``A()`` in the degraded
+    species. Thus, ``A(a=1) % A(a=1)`` would degrade twice as fast
+    as ``A(a=None)`` under the above rule. If this behavior is not desired,
+    the multiplicity can be fixed at one using the ``MatchOnce`` keyword:
+
+    >>> Rule('A_deg', MatchOnce(A()) >> None, kdeg)     # doctest: +SKIP
+
+    """
     cp = as_complex_pattern(pattern).copy()
     cp.match_once = True
     return cp
@@ -47,7 +59,7 @@ class SelfExporter(object):
     This class is for pysb internal use only. Do not construct any instances.
 
     """
-    
+
     do_export = True
     default_model = None
     target_globals = None   # the globals dict to which we'll export our symbols
@@ -157,6 +169,9 @@ class SelfExporter(object):
 class Symbol(sympy.Dummy):
     def __new__(cls, name, real=True, **kwargs):
         return super(Symbol, cls).__new__(cls, name, real=real, **kwargs)
+
+    def __getnewargs_ex__(self):
+        return self.__getnewargs__(), {}
 
     def _lambdacode(self, printer, **kwargs):
         """ custom printer method that ensures that the dummyid is not
@@ -286,7 +301,7 @@ class Monomer(Component):
         # ensure sites is some kind of list (presumably of strings) but not a
         # string itself
         if not isinstance(sites, Iterable) or \
-               isinstance(sites, basestring):
+               isinstance(sites, str):
             raise ValueError("sites must be a list of strings")
 
         # ensure no duplicate sites and validate each site name
@@ -304,7 +319,7 @@ class Monomer(Component):
                              str(unknown_sites))
         # ensure site_states values are all strings
         invalid_sites = [site for (site, states) in site_states.items()
-                         if not all([isinstance(s, basestring)
+                         if not all([isinstance(s, str)
                                      and self._VARIABLE_NAME_REGEX.match(s)
                                      for s in states])]
         if invalid_sites:
@@ -367,7 +382,7 @@ def is_state_bond_tuple(state):
     return (
         isinstance(state, tuple)
         and len(state) == 2
-        and isinstance(state[0], basestring)
+        and isinstance(state[0], str)
         and _check_bond(state[1])
     )
 
@@ -380,7 +395,7 @@ def _check_state_bond_tuple(monomer, site, state):
 def validate_site_value(state, monomer=None, site=None, _in_multistate=False):
     if state is None:
         return True
-    elif isinstance(state, basestring):
+    elif isinstance(state, str):
         if monomer and site:
             if not _check_state(monomer, site, state):
                 return False
@@ -574,7 +589,7 @@ class MonomerPattern(object):
         return True
 
     def _site_instance_concrete(self, site_name, site_val):
-        if isinstance(site_val, basestring):
+        if isinstance(site_val, str):
             site_state = site_val
             site_bond = None
         elif isinstance(site_val, tuple):
@@ -846,7 +861,7 @@ class ComplexPattern(object):
             bond_num = None
             if state_or_bond is WILD:
                 return
-            elif isinstance(state_or_bond, basestring):
+            elif isinstance(state_or_bond, str):
                 state = state_or_bond
             elif is_state_bond_tuple(state_or_bond):
                 state = state_or_bond[0]
@@ -1102,6 +1117,8 @@ class ComplexPattern(object):
         if self.compartment:
             if len(self.monomer_patterns) > 1:
                 ret = '(%s)' % ret
+            else:
+                ret = 'as_complex_pattern(%s)' % ret
             ret += ' ** %s' % self.compartment.name
         if self.match_once:
             ret = 'MatchOnce(%s)' % ret
@@ -1289,17 +1306,18 @@ class Parameter(Component, Symbol):
 
     """
 
-    def __new__(cls, name, value=0.0, nonnegative=True, integer=False,
-                _export=True):
-
+    def __new__(cls, name, value=0.0, _export=True, nonnegative=True,
+                integer=False):
         return super(Parameter, cls).__new__(cls, name, real=True,
                                              nonnegative=nonnegative,
                                              integer=integer)
 
     def __getnewargs__(self):
-        return (self.name, self.value, False)
+        return (self.name, self.value, False, self.assumptions0['nonnegative'],
+                self.assumptions0['integer'])
 
-    def __init__(self, name, value=0.0, _export=True, **kwargs):
+    def __init__(self, name, value=0.0, _export=True, nonnegative=True,
+                 integer=False):
         self.value = value
         Component.__init__(self, name, _export)
 
@@ -1311,7 +1329,7 @@ class Parameter(Component, Symbol):
     def value(self, new_value):
         self.check_value(new_value)
         self._value = float(new_value)
-    
+
     def get_value(self):
         return self.value
 
@@ -1417,6 +1435,17 @@ class Rule(Component):
         co-transport anything connected to that Monomer by a path in the same
         compartment. If False (default), connected Monomers will remain where
         they were.
+    energy : bool, optional
+        If True, this rule is an energy rule (as in Energy BNG) and the two
+        parameters are interpreted as the 'phi' and deltaG parameters of the
+        Arrhenius equation (see Hogg 2013 for details).
+    total_rate: bool, optional
+        If True, the rate is considered to be macroscopic and is not
+        multiplied by the number of reactant molecules during simulation.
+        If False (default), the rate is multiplied by number of reactant
+        molecules.
+        Keyword is used by BioNetGen only for simulations using NFsim.
+        Keyword is ignored by generate_network command of BioNetGen.
 
     Attributes
     ----------
@@ -1427,8 +1456,8 @@ class Rule(Component):
     """
 
     def __init__(self, name, rule_expression, rate_forward, rate_reverse=None,
-                 delete_molecules=False, move_connected=False,
-                 _export=True):
+                 delete_molecules=False, move_connected=False, energy=False,
+                 total_rate=False, _export=True):
         if not isinstance(rule_expression, RuleExpression):
             raise Exception("rule_expression is not a RuleExpression object")
         validate_expr(rate_forward, "forward rate")
@@ -1445,6 +1474,8 @@ class Rule(Component):
         self.rate_reverse = rate_reverse
         self.delete_molecules = delete_molecules
         self.move_connected = move_connected
+        self.energy = energy
+        self.total_rate = total_rate
         # TODO: ensure all numbered sites are referenced exactly twice within each of reactants and products
 
         # Check synthesis products are concrete
@@ -1518,9 +1549,47 @@ class Rule(Component):
             ret += ', delete_molecules=True'
         if self.move_connected:
             ret += ', move_connected=True'
+        if self.energy:
+            ret += ', energy=True'
         ret += ')'
         return ret
 
+
+class EnergyPattern(Component):
+
+    """
+    Model component representing an energy pattern.
+
+    Parameters
+    ----------
+    pattern : ComplexPattern
+        ComplexPattern describing the species to which the given deltaG in
+        `energy` should be attributed.
+    energy : sympy.Expr
+        Expression containing model parameters that defines the deltaG to be
+        ascribed to the part of a species matched by `pattern`.
+
+    Attributes
+    ----------
+
+    Identical to Parameters (see above).
+
+    """
+
+    def __init__(self, name, pattern, energy, _export=True):
+        Component.__init__(self, name, _export)
+        try:
+            pattern = as_complex_pattern(pattern)
+        except InvalidComplexPatternException as e:
+            raise ValueError("pattern must be a ComplexPattern")
+        validate_expr(energy, "energy")
+        self.pattern = pattern
+        self.energy = energy
+
+    def __repr__(self):
+        ret = '%s(%s, %s, %s)' % (self.__class__.__name__, repr(self.name),
+                                  repr(self.pattern), self.energy.name)
+        return ret
 
 
 def validate_expr(obj, description):
@@ -1538,7 +1607,6 @@ def validate_const_expr(obj, description):
         msg = ("%s must be a Parameter or constant Expression" %
                description_upperfirst)
         raise ConstantExpressionError(msg)
-
 
 
 class Observable(Component, Symbol):
@@ -1584,7 +1652,7 @@ class Observable(Component, Symbol):
         return super(Observable, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.reaction_pattern, self.match, False)
+        return self.name, self.reaction_pattern, self.match, False
 
     def __init__(self, name, reaction_pattern, match='molecules', _export=True):
         try:
@@ -1646,7 +1714,7 @@ class Expression(Component, Symbol):
         return super(Expression, cls).__new__(cls, name)
 
     def __getnewargs__(self):
-        return (self.name, self.expr, False)
+        return self.name, self.expr, False
 
     def __init__(self, name, expr, _export=True):
         if not isinstance(expr, sympy.Expr):
@@ -1821,7 +1889,7 @@ class Model(object):
         `initials`.
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
-        the initial conditions and successively applying the rules. Each 
+        the initial conditions and successively applying the rules. Each
         ComplexPattern is concrete.
     reactions : list of dict
         Structures describing each possible unidirectional reaction that can be
@@ -1843,7 +1911,7 @@ class Model(object):
     """
 
     _component_types = (Monomer, Compartment, Parameter, Rule, Observable,
-                        Expression, Tag)
+                        Expression, EnergyPattern, Tag)
 
     def __init__(self, name=None, base=None, _export=True):
         self.name = name
@@ -1855,6 +1923,7 @@ class Model(object):
         self.rules = ComponentSet()
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
+        self.energypatterns = ComponentSet()
         self.tags = ComponentSet()
         self.initials = []
         self.annotations = []
@@ -1964,6 +2033,10 @@ class Model(object):
     def components(self):
         return self.all_components()
 
+    def parameters_all(self):
+        """Return a ComponentSet of all parameters and derived parameters."""
+        return self.parameters | self._derived_parameters
+
     def parameters_rules(self):
         """Return a ComponentSet of the parameters used in rules."""
         # rate_reverse is None for irreversible rules, so we'll need to filter those out
@@ -1999,19 +2072,33 @@ class Model(object):
         cset_used = (self.parameters_rules() | self.parameters_initial_conditions() |
                      self.parameters_compartments() | self.parameters_expressions())
         return self.parameters - cset_used
-    
-    def expressions_constant(self):
+
+    def expressions_constant(self, include_derived=False):
         """Return a ComponentSet of constant expressions."""
-        cset = ComponentSet(e for e in self.expressions
-                            if e.is_constant_expression())
+        expressions = self.expressions
+        if include_derived:
+            expressions = expressions | self._derived_expressions
+        cset = ComponentSet(e for e in expressions if e.is_constant_expression())
         return cset
 
-    def expressions_dynamic(self, include_local=True):
+    def expressions_dynamic(self, include_local=True, include_derived=False):
         """Return a ComponentSet of non-constant expressions."""
-        cset = self.expressions - self.expressions_constant()
+        expressions = self.expressions
+        if include_derived:
+            expressions = expressions | self._derived_expressions
+        cset = expressions - self.expressions_constant(include_derived)
         if not include_local:
             cset = ComponentSet(e for e in cset if not e.is_local)
         return cset
+
+    def rules_energy(self):
+        """Return a ComponentSet of energy-based rules."""
+        return ComponentSet(r for r in self.rules if r.energy)
+
+    @property
+    def uses_energy(self):
+        """Return True if model uses energy features."""
+        return bool(self.energypatterns or self.rules_energy())
 
     @property
     def odes(self):
@@ -2187,10 +2274,12 @@ class Model(object):
 
     def __repr__(self):
         return ("<%s '%s' (monomers: %d, rules: %d, parameters: %d, "
-                "expressions: %d, compartments: %d) at 0x%x>" %
+                "expressions: %d, compartments: %d, energypatterns: %d) "
+                "at 0x%x>" %
                 (self.__class__.__name__, self.name,
                  len(self.monomers), len(self.rules), len(self.parameters),
-                 len(self.expressions), len(self.compartments), id(self)))
+                 len(self.expressions), len(self.compartments),
+                 len(self.energypatterns), id(self)))
 
 
 
@@ -2310,7 +2399,7 @@ class ComponentSet(Set, Mapping, Sequence):
         # stringified integer Mapping keys (like "0") are forbidden, but since
         # all Component names must be valid Python identifiers, integers are
         # ruled out anyway.
-        if isinstance(key, (int, long, slice)):
+        if isinstance(key, (int, slice)):
             return self._elements[key]
         else:
             return self._map[key]
@@ -2328,7 +2417,7 @@ class ComponentSet(Set, Mapping, Sequence):
         return self.keys()
 
     def get(self, key, default=None):
-        if isinstance(key, (int, long)):
+        if isinstance(key, int):
             raise ValueError("get is undefined for integer arguments, use []"
                              "instead")
         try:

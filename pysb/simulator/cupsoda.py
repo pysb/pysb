@@ -1,4 +1,3 @@
-from __future__ import print_function as _
 from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
 import pysb
 import pysb.bng

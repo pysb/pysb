@@ -29,7 +29,8 @@ needs_sphinx = '1.4'
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.coverage',
               'sphinx.ext.imgmath', 'sphinx.ext.ifconfig', 'numpydoc',
-              'sphinx.ext.viewcode', 'sphinx.ext.autosummary']
+              'sphinx.ext.viewcode', 'sphinx.ext.autosummary',
+              'IPython.sphinxext.ipython_console_highlighting']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -51,19 +52,20 @@ copyright = u'2012, C. F. Lopez, J. L. Muhlich, J. A. Bachman'
 # -- Mock out some problematic modules-------------------------------------
 
 # Note that for sub-modules, all parent modules must be listed explicitly.
-MOCK_MODULES = ['pandas', 'pygraphviz', 'sympy',  'sympy.core',
-                'sympy.parsing', 'sympy.parsing.sympy_parser',
-                'sympy.printing', 'sympy.printing.mathml',
-                'sympy.printing.lambdarepr', 'numpy',
-                'scipy', 'scipy.integrate', 'scipy.constants', 'scipy.sparse',
-                'h5py', 'theano', 'theano.tensor', 'dateutil',
-                'dateutil.parser', 'networkx', 'networkx.algorithms',
-                'networkx.algorithms.isomorphism',
-                'networkx.algorithms.isomorphism.vf2userfunc',
-                'nose', 'nose.tools', 'matplotlib', 'matplotlib.pyplot',
-                'concurrent', 'concurrent.futures', 'pycuda.driver', 'pycuda',
-                'pyopencl']
-
+MOCK_MODULES = [ 'pandas', 'pygraphviz', 'sympy',  'sympy.core', 'sympy.parsing',
+                 'sympy.parsing.sympy_parser',
+                 'sympy.printing', 'sympy.printing.mathml',
+                 'sympy.printing.lambdarepr', 'sympy.printing.precedence',
+                 'sympy.logic', 'sympy.logic.boolalg', 'sympy.utilities',
+                 'sympy.utilities.autowrap', 'sympy.utilities.codegen', 'numpy',
+                 'scipy', 'scipy.integrate', 'scipy.constants', 'scipy.sparse',
+                 'h5py', 'dateutil',
+                 'dateutil.parser', 'networkx', 'networkx.algorithms',
+                 'networkx.algorithms.isomorphism',
+                 'networkx.algorithms.isomorphism.vf2userfunc',
+                 'nose', 'nose.tools', 'matplotlib', 'matplotlib.pyplot',
+                 'concurrent', 'concurrent.futures','pycuda.driver', 'pycuda',
+                  'pyopencl']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.MagicMock()
 sys.modules['sympy'].Dummy = type('Dummy', (object,), {})

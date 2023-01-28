@@ -3,7 +3,7 @@ import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator.bng import BngSimulator, PopulationMap
 from pysb.bng import generate_equations
-from pysb.examples import robertson, expression_observables, earm_1_0
+from pysb.examples import robertson, expression_observables
 
 _BNG_SEED = 123
 
