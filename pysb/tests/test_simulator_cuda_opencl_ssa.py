@@ -70,7 +70,7 @@ class TestOpencl(object):
     def setUp(self):
         self.tspan = np.linspace(0, 100, 101)
         self.model = model
-        model.parameters['X_0'].value = 400
+        model.parameters['X_0'].value = 200
         self.simulator = OpenCLSSASimulator(model)
         self.n_sim = 10
 
