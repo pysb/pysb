@@ -27,9 +27,9 @@ class OpenCLSSASimulator(SSABase):
     This simulator is capable of using either a GPU or multi-core CPU.
     The simulator will detect and ask which device you would like to use.
     Alteratively, you can set the device using with an environment variable
-     `PYOPENCL_CTX`
+    `PYOPENCL_CTX`
 
-    Requires `OpenCL`_ and `PyPpenCL`_.
+    Requires `OpenCL`_ and `PyOpenCL`_.
 
     .. _OpenCL :
         https://www.khronos.org/opencl/
