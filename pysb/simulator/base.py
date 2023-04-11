@@ -748,7 +748,7 @@ class SimulationResult(object):
             self.run_kwargs = {}
 
         self.squeeze = squeeze
-        self.tout = np.asarray(tout)
+        self.tout = tout
         self._yfull = None
         self.n_sims_per_parameter_set = simulations_per_param_set
         self.pysb_version = PYSB_VERSION
