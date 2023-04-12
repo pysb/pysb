@@ -45,6 +45,7 @@ def main():
             'Topic :: Scientific/Engineering :: Chemistry',
             'Topic :: Scientific/Engineering :: Mathematics',
             ],
+          include_package_data=True
           )
 
 
