@@ -307,7 +307,7 @@ the rule::
 
 The *rule name* can be any string and should be enclosed in single (')
 or double (") quotation marks. The species are *instances* of the
-mononmers in a specific state. In this case we are requiring that *C8*
+monomers in a specific state. In this case we are requiring that *C8*
 and *Bid* are both unbound, as we would not want any binding to occur
 with species that are previously bound. The *complexation* or
 *addition* operator tells the program that the two species are being
