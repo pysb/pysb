@@ -96,6 +96,19 @@ _path_config = {
             'nt': ('c:/Program Files/StochKit',)
         },
         'conda_install_cmd': 'conda install -c alubbock stochkit'
+    },
+    'nvcc': {
+        'name': 'NVIDIA CUDA compiler',
+        'executable': {
+            'posix': 'nvcc',
+            'nt': 'nvcc.exe'
+        },
+        'env_var': 'CUDAPATH',
+        'search_paths': {
+            'posix': ('/usr/local/cuda/bin', '/usr/bin', '/opt/cuda/bin'),
+            'nt': (
+            r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.0\bin',)
+        }
     }
 }
 _path_cache = {}
