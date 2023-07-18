@@ -1,6 +1,6 @@
 # Requirements just for building the docs (used by readthedocs, but also
 # helpful for building docs locally).
-sphinx>=1.4
+sphinx>=6,<7
 numpydoc>=0.6
 mock>=1.0
 setuptools>=20.0
