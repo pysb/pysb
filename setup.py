@@ -26,8 +26,8 @@ def main():
           scripts=['scripts/pysb_export'],
           # We should really specify some minimum versions here.
           python_requires='>=3.6',
-          install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6', 'networkx',
-                            'futures; python_version == "2.7"'],
+          install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6,<1.12',
+                            'networkx'],
           setup_requires=['nose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'h5py', 'mock', 'cython',

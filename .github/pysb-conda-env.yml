@@ -8,7 +8,7 @@ dependencies:
   - alubbock::kappa
   - numpy
   - scipy
-  - sympy
+  - sympy<1.12
   - cython
   - matplotlib
   - networkx
