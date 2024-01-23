@@ -12,7 +12,6 @@ dependencies:
   - cython
   - matplotlib
   - networkx
-  - nose
   - h5py
   - pexpect
   - pandas
@@ -24,3 +23,4 @@ dependencies:
   - pip:
       - libroadrunner
       - python-libsbml
+      - pynose

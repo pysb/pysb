@@ -28,7 +28,7 @@ def main():
           python_requires='>=3.6',
           install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6,<1.12',
                             'networkx'],
-          setup_requires=['nose'],
+          setup_requires=['pynose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'h5py', 'mock', 'cython',
                          'python-libsbml', 'libroadrunner'],
