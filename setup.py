@@ -22,7 +22,7 @@ def main():
           url='http://pysb.org/',
           packages=['pysb', 'pysb.generator', 'pysb.importers', 'pysb.tools',
                     'pysb.examples', 'pysb.export', 'pysb.simulator',
-                    'pysb.testing', 'pysb.tests'],
+                    'pysb.simulator.templates', 'pysb.testing', 'pysb.tests'],
           scripts=['scripts/pysb_export'],
           # We should really specify some minimum versions here.
           python_requires='>=3.6',
