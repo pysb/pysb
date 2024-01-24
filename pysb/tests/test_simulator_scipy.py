@@ -8,7 +8,6 @@ from pysb.simulator.scipyode import CythonRhsBuilder
 from pysb.examples import robertson, earm_1_0, tyson_oscillator, localfunc
 import unittest
 import pandas as pd
-import pytest
 
 
 class TestScipySimulatorBase(object):
@@ -58,7 +57,7 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run()
         assert simres._nsims == 1
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_invalid_init_kwarg(self):
         ScipyOdeSimulator(self.model, tspan=self.time, spam='eggs')
 
@@ -123,11 +122,11 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run(initials=initials_df)
         assert np.allclose(simres.observables['AB_complex'][0], 100)
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_y0_as_pandas_series(self):
         self.sim.run(initials=pd.Series())
 
-    @pytest.mark.raises(exception=TypeError)
+    @raises(TypeError)
     def test_y0_non_numeric_value(self):
         """Test y0 with non-numeric value."""
         self.sim.run(initials={self.mon('A')(a=None): 'eggs'})
@@ -142,7 +141,7 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         simres = self.sim.run(param_values=pd.DataFrame({'kbindAB': [0]}))
         assert np.allclose(simres.observables['AB_complex'], 0)
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_param_values_as_pandas_series(self):
         self.sim.run(param_values=pd.Series())
 
@@ -164,12 +163,12 @@ class TestScipySimulatorSingle(TestScipySimulatorBase):
         # param_values should reset to originals after the run
         assert np.allclose(self.sim.param_values, orig_param_values)
 
-    @pytest.mark.raises(exception=IndexError)
+    @raises(IndexError)
     def test_param_values_invalid_dictionary_key(self):
         """Test param_values with invalid parameter name."""
         self.sim.run(param_values={'spam': 150})
 
-    @pytest.mark.raises(exception=(ValueError, TypeError))
+    @raises(ValueError, TypeError)
     def test_param_values_non_numeric_value(self):
         """Test param_values with non-numeric value."""
         self.sim.run(param_values={'ksynthA': 'eggs'})
@@ -303,26 +302,26 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
         assert np.allclose(simres.initials, initials)
         assert np.allclose(simres.param_values, param_values)
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_run_initials_different_length_to_base(self):
         initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
         self.sim.initials = initials
         self.sim.run(initials=initials[0])
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_run_params_different_length_to_base(self):
         param_values = [[55, 65, 75, 0, 0, 1],
                         [90, 100, 110, 5, 6, 7]]
         self.sim.param_values = param_values
         self.sim.run(param_values=param_values[0])
 
-    @pytest.mark.raises(exception=InconsistentParameterError)
+    @raises(InconsistentParameterError)
     def test_run_params_inconsistent_parameter_list(self):
         param_values = [55, 65, 75, 0, -3]
         self.sim.param_values = param_values
         self.sim.run(param_values=param_values[0])
 
-    @pytest.mark.raises(exception=InconsistentParameterError)
+    @raises(InconsistentParameterError)
     def test_run_params_inconsistent_parameter_dict(self):
         param_values = {'A_init': [0, -4]}
         self.sim.param_values = param_values
@@ -348,7 +347,7 @@ class TestScipySimulatorMultiple(TestScipySimulatorBase):
         assert np.allclose(simres.dataframe.loc[(slice(None), 0.0), 'B_free'],
                            [250, 350])
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_initials_and_param_values_differing_lengths(self):
         initials = [[10, 20, 30, 40], [50, 60, 70, 80]]
         param_values = [[55, 65, 75, 0, 0],
@@ -439,12 +438,12 @@ def test_earm_integration():
         ScipyOdeSimulator(earm_1_0.model, tspan=t, compiler="cython").run()
 
 
-@pytest.mark.raises(exception=ValueError)
+@raises(ValueError)
 def test_simulation_no_tspan():
     ScipyOdeSimulator(robertson.model).run()
 
 
-@pytest.mark.raises(exception=UserWarning)
+@raises(UserWarning)
 def test_nonexistent_integrator():
     """Ensure nonexistent integrator raises."""
     ScipyOdeSimulator(robertson.model, tspan=np.linspace(0, 1, 2),
@@ -463,7 +462,7 @@ def test_unicode_obsname_ascii():
 
 
 if sys.version_info[0] < 3:
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_unicode_obsname_nonascii():
         """Ensure non-ascii unicode observable names error in python 2."""
         t = np.linspace(0, 100)
@@ -487,7 +486,7 @@ def test_unicode_exprname_ascii():
 
 
 if sys.version_info[0] < 3:
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_unicode_exprname_nonascii():
         """Ensure non-ascii unicode expression names error in python 2."""
         t = np.linspace(0, 100)

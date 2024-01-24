@@ -1,3 +1,4 @@
+from nose.tools import *
 from pysb.core import Model, SelfExporter
 import pickle
 
@@ -19,7 +20,7 @@ def with_model(func):
             # clean up the globals
             SelfExporter.cleanup()
             SelfExporter.do_export = selfexporter_state
-    return inner
+    return make_decorator(func)(inner)
 
 def serialize_component_list(model, filename):
     """Serialize (pickle) the components of the given model to a file. This can

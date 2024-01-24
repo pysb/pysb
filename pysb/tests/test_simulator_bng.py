@@ -4,7 +4,6 @@ from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.simulator.bng import BngSimulator, PopulationMap
 from pysb.bng import generate_equations
 from pysb.examples import robertson, expression_observables
-import pytest
 
 _BNG_SEED = 123
 
@@ -138,7 +137,7 @@ class TestNfSim(object):
         assert np.allclose(x.dataframe.loc[0, 0.0], [101.0, 5.0, 6.0])
         assert np.allclose(x.dataframe.loc[1, 0.0], [201.0, 11.0, 12.0])
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_nfsim_different_initials_lengths(self):
         A = self.model.monomers['A']
         B = self.model.monomers['B']
@@ -147,7 +146,7 @@ class TestNfSim(object):
                            initials={B(): [150, 250, 350]})
         sim.run(initials={A(): [275, 375]})
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_nfsim_different_initials_params_lengths(self):
         A = self.model.monomers['A']
 

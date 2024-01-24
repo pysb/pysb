@@ -4,8 +4,8 @@ import numpy as np
 from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
 from pysb.bng import run_ssa
 from pysb.simulator.base import SimulatorException
+
 from pysb.examples import robertson, earm_1_0
-import pytest
 
 
 class TestSolver(object):
@@ -72,12 +72,12 @@ class TestSolver(object):
         # kbindAB=0 should ensure no AB_complex is produced.
         assert np.allclose(self.solver.yobs["AB_complex"], 0)
 
-    @pytest.mark.raises(exception=IndexError)
+    @raises(IndexError)
     def test_param_values_invalid_dictionary_key(self):
         """Test param_values with invalid parameter name."""
         self.solver.run(param_values={'spam': 150})
 
-    @pytest.mark.raises(exception=(ValueError, TypeError, SimulatorException))
+    @raises(ValueError, TypeError, SimulatorException)
     def test_param_values_non_numeric_value(self):
         """Test param_values with non-numeric value."""
         self.solver.run(param_values={'ksynthA': 'eggs'})
@@ -154,7 +154,7 @@ def test_run_ssa():
     run_ssa(robertson.model, t_end=20000, n_steps=100, verbose=False)
 
 
-@pytest.mark.raises(exception=UserWarning)
+@raises(UserWarning)
 def test_nonexistent_integrator():
     """Ensure nonexistent integrator raises."""
     Solver(robertson.model, np.linspace(0, 1, 2), integrator='does_not_exist')

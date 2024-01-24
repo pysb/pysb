@@ -1,10 +1,11 @@
 import numpy as np
-import pytest
+from nose.plugins.attrib import attr
+from nose.tools import ok_
 from pysb.examples.schloegl import model
 from pysb.simulator import CudaSSASimulator, OpenCLSSASimulator
 
 
-@pytest.mark.run_on(["gpu"])
+@attr('gpu')
 class TestGpu(object):
 
     def setUp(self):
@@ -37,7 +38,7 @@ class TestGpu(object):
         for ic in self.model.initial_conditions:
             initials[ic[0]] = [ic[1].value] * n_sim
         self.simulator.run(self.tspan, initials=initials)
-        assert self.simulator.initials.shape[0] == n_sim
+        ok_(self.simulator.initials.shape[0] == n_sim)
 
     def test_run_by_multi_params_df(self):
 
@@ -46,7 +47,7 @@ class TestGpu(object):
         for ic in self.model.parameters:
             params[ic.name] = [ic.value] * n_sim
         self.simulator.run(self.tspan, param_values=params)
-        assert self.simulator.param_values.shape[0] == n_sim
+        ok_(self.simulator.param_values.shape[0] == n_sim)
 
     def test_run_by_params_set_n_sim(self):
         param_values = np.array(
@@ -63,7 +64,7 @@ class TestGpu(object):
         self.simulator.run(self.tspan, initials=initials, number_sim=10)
 
 
-@pytest.mark.run_on(["gpu"])
+@attr('gpu')
 class TestOpencl(object):
 
     def setUp(self):

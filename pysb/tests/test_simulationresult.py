@@ -1,5 +1,3 @@
-import pytest
-
 from pysb.simulator import ScipyOdeSimulator, BngSimulator
 from pysb.simulator.base import SimulationResult
 from pysb.examples import tyson_oscillator, robertson, \
@@ -8,6 +6,7 @@ from pysb.examples import tyson_oscillator, robertson, \
 from pysb.bng import generate_equations
 import numpy as np
 import tempfile
+from nose.tools import assert_raises, raises
 import warnings
 from pysb.pattern import SpeciesPatternMatcher
 import collections
@@ -85,11 +84,11 @@ class TestSimulationResultEarm13(object):
         self.sim = ScipyOdeSimulator(self.model, tspan=self.tspan)
         self.simres = self.sim.run()
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_dynamic_observable_nonpattern(self):
         self.simres.observable('cSmac')
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_match_nonexistent_pattern(self):
         m = self.model.monomers
         self.simres.observable(m.cSmac() % m.Bid())
@@ -139,31 +138,27 @@ def test_save_load():
         simres.save(tf.name, append=True)
 
         # Trying to overwrite an existing dataset gives a ValueError
-        with pytest.raises(ValueError):
-            simres.save(tf.name, append=True)
+        assert_raises(ValueError, simres.save, tf.name, append=True)
 
         # Trying to write to an existing file without append gives an IOError
-        with pytest.raises(IOError):
-            simres.save(tf.name)
+        assert_raises(IOError, simres.save, tf.name)
 
         # Trying to write a SimulationResult to the same group with a
         # different model name results in a ValueError
-        with pytest.raises(ValueError):
-            simres_rob.save(tf.name,
-                            dataset_name='robertson', group_name=model.name,
-                            append=True)
+        assert_raises(ValueError, simres_rob.save, tf.name,
+                      dataset_name='robertson', group_name=model.name,
+                      append=True)
 
         simres_rob.save(tf.name, append=True)
 
         # Trying to load from a file with more than one group without
         # specifying group_name should raise a ValueError
-        with pytest.raises(ValueError):
-            SimulationResult.load(tf.name)
+        assert_raises(ValueError, SimulationResult.load, tf.name)
 
         # Trying to load from a group with more than one dataset without
         # specifying a dataset_name should raise a ValueError
-        with pytest.raises(ValueError):
-            SimulationResult.load(tf.name, group_name=model.name)
+        assert_raises(ValueError, SimulationResult.load, tf.name,
+                      group_name=model.name)
 
         # Load should succeed when specifying group_name and dataset_name
         simres_load = SimulationResult.load(tf.name, group_name=model.name,
@@ -204,8 +199,7 @@ def test_save_load_observables_expressions():
     sim2 = SimulationResult.load(buff)
     assert len(sim2.observables) == len(tspan)
     # Tyson oscillator doesn't have expressions
-    with pytest.raises(ValueError):
-        sim2.expressions()
+    assert_raises(ValueError, lambda: sim2.expressions)
 
 
 def _check_resultsets_equal(res1, res2):

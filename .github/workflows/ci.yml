@@ -37,9 +37,13 @@ jobs:
           conda list
       - name: Build PySB
         run: python setup.py build --build-lib=build/lib
-      - name: Run pytest with coverage
+      - name: Run nosetests
         run: >
-          coverage run -m pytest build/lib/pysb
+          nosetests
+          build/lib/pysb
+          --with-coverage --cover-inclusive --cover-package=build/lib/pysb
+          --cover-xml
+          -a '!gpu'
       - uses: codecov/codecov-action@v3
         with:
           verbose: true

@@ -28,9 +28,10 @@ def main():
           python_requires='>=3.6',
           install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6,<1.12',
                             'networkx'],
+          setup_requires=['pynose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'h5py', 'mock', 'cython',
-                         'python-libsbml', 'libroadrunner', 'pytest', 'pytest-raises'],
+                         'python-libsbml', 'libroadrunner'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[

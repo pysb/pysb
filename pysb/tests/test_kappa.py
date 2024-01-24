@@ -1,5 +1,3 @@
-import pytest
-
 from pysb.testing import *
 from pysb import *
 from pysb.kappa import *
@@ -26,10 +24,10 @@ def test_kappa_simulation_results():
     Observable('AB', A(b=1) % B(b=1))
     npts = 200
     kres = run_simulation(model, time=100, points=npts, seed=_KAPPA_SEED)
-    assert len(kres['time']) == npts + 1
-    assert len(kres['AB']) == npts + 1
-    assert kres['time'][0] == 0
-    assert sorted(kres['time'])[-1] == 100
+    ok_(len(kres['time']) == npts + 1)
+    ok_(len(kres['AB']) == npts + 1)
+    ok_(kres['time'][0] == 0)
+    ok_(sorted(kres['time'])[-1] == 100)
 
 
 @with_model
@@ -85,12 +83,12 @@ def test_flux_map():
     res = run_simulation(model, time=10, points=100, flux_map=True,
                          cleanup=True, seed=_KAPPA_SEED, verbose=False)
     simdata = res.timecourse
-    assert len(simdata['time']) == 101
-    assert len(simdata['ABC']) == 101
-    assert simdata['time'][0] == 0
-    assert sorted(simdata['time'])[-1] == 10
+    ok_(len(simdata['time']) == 101)
+    ok_(len(simdata['ABC']) == 101)
+    ok_(simdata['time'][0] == 0)
+    ok_(sorted(simdata['time'])[-1] == 10)
     fluxmap = res.flux_map
-    assert isinstance(fluxmap, nx.MultiGraph)
+    ok_(isinstance(fluxmap, nx.MultiGraph))
 
 
 @with_model
@@ -105,7 +103,7 @@ def test_kappa_wild():
     run_simulation(model, time=0, seed=_KAPPA_SEED)
 
 
-@pytest.mark.raises(exception=ValueError)
+@raises(ValueError)
 @with_model
 def test_run_static_analysis_valueerror():
     Monomer('A', ['b'])
@@ -113,7 +111,7 @@ def test_run_static_analysis_valueerror():
     Rule('A_binds_B', A(b=None) + B(b=None) >> A(b=1) % B(b=1),
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
-    run_static_analysis(model, contact_map=False, influence_map=False)
+    res = run_static_analysis(model, contact_map=False, influence_map=False)
 
 
 
@@ -126,8 +124,8 @@ def test_run_static_analysis_cmap():
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
     res = run_static_analysis(model, contact_map=True, influence_map=False)
-    assert isinstance(res.contact_map, nx.MultiGraph)
-    assert res.influence_map is None
+    ok_(isinstance(res.contact_map, nx.MultiGraph))
+    ok_(res.influence_map is None)
 
 
 @with_model
@@ -146,8 +144,8 @@ def test_run_static_analysis_imap():
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
     res = run_static_analysis(model, contact_map=False, influence_map=True)
-    assert isinstance(res.influence_map, nx.MultiGraph)
-    assert res.contact_map is None
+    ok_(isinstance(res.influence_map, nx.MultiGraph))
+    ok_(res.contact_map is None)
 
 
 @with_model
@@ -166,8 +164,8 @@ def test_run_static_analysis_both():
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
     res = run_static_analysis(model, contact_map=True, influence_map=True)
-    assert isinstance(res.influence_map, nx.MultiGraph)
-    assert isinstance(res.contact_map, nx.MultiGraph)
+    ok_(isinstance(res.influence_map, nx.MultiGraph))
+    ok_(isinstance(res.contact_map, nx.MultiGraph))
 
 
 @with_model
@@ -178,7 +176,7 @@ def test_contact_map():
          Parameter('k_A_binds_B', 1))
     Observable('AB', A(b=1) % B(b=1))
     res = contact_map(model, cleanup=True)
-    assert isinstance(res, nx.MultiGraph)
+    ok_(isinstance(res, nx.MultiGraph))
 
 
 @with_model
@@ -196,7 +194,7 @@ def test_influence_map_kasa():
          B(active='y') + C(active='n') >> B(active='y') + C(active='y'),
          Parameter('k_B_activates_C', 1))
     res = influence_map(model, cleanup=True)
-    assert isinstance(res, nx.MultiGraph)
+    ok_(isinstance(res, nx.MultiGraph))
 
 
 @with_model
@@ -233,10 +231,9 @@ def test_kappa_error():
 
     # Can't model this as a PySB rule, since it would generate a
     # DanglingBondError. Directly inject kappa code for rule instead.
-    with pytest.raises(KasimInterfaceError):
-        run_simulation(model, time=10,
-                       perturbation="'A_binds_B' A(b),B(b) -> A(b!1),B(b) @ "
-                                    "'k_A_binds_B'")
+    assert_raises(KasimInterfaceError, run_simulation, model, time=10,
+                  perturbation="'A_binds_B' A(b),B(b) -> A(b!1),B(b) @ "
+                               "'k_A_binds_B'")
 
 
 @with_model

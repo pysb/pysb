@@ -1,11 +1,13 @@
 import warnings
 import numpy as np
+from nose.plugins.attrib import attr
 from pysb.examples.tyson_oscillator import model
 from pysb.simulator.cupsoda import CupSodaSimulator, run_cupsoda
-import pytest
+from nose.tools import raises
+import os
 
 
-@pytest.mark.run_on(["gpu"])
+@attr('gpu')
 class TestCupSODASimulatorSingle(object):
     def setUp(self):
         self.n_sims = 50
@@ -66,11 +68,11 @@ class TestCupSODASimulatorSingle(object):
         res = sim.run()
         assert res.nsims == self.n_sims
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_set_nblocks_str(self):
         self.solver.n_blocks = 'fail'
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_set_nblocks_0(self):
         self.solver.n_blocks = 0
 
@@ -97,11 +99,11 @@ class TestCupSODASimulatorSingle(object):
     def test_run_cupsoda_instance(self):
         run_cupsoda(model, tspan=self.tspan)
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_invalid_init_kwarg(self):
         CupSodaSimulator(model, tspan=self.tspan, spam='eggs')
 
-    @pytest.mark.raises(exception=ValueError)
+    @raises(ValueError)
     def test_invalid_integrator_option(self):
         CupSodaSimulator(model, tspan=self.tspan,
                          integrator_options={'spam': 'eggs'})
