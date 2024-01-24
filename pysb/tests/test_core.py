@@ -1,9 +1,6 @@
-import copy
-
 from pysb.testing import *
 from pysb.core import *
-from functools import partial
-from nose.tools import assert_raises
+import pytest
 import operator
 import re
 
@@ -12,13 +9,13 @@ import re
 def test_component_names_valid():
     for name in 'a', 'B', 'AbC', 'dEf', '_', '_7', '__a01b__999x_x___':
         c = Monomer(name, _export=False)
-        eq_(c.name, name)
+        assert c.name == name
         # Before the component is added, we should not be able to find it
         assert not hasattr(model.components, name)
         # Add the element to a model and try to access it as attribute and item
         model.add_component(c)
-        assert_equal(model.components[name], c)
-        assert_equal(getattr(model.components, name), c)
+        assert model.components[name] == c
+        assert getattr(model.components, name) == c
 
 @with_model
 def test_deepcopy_parameter():
@@ -33,13 +30,14 @@ def test_component_name_existing_attribute():
         model.add_component(c)
         # When using an existing attribute name like_map, we should get able to
         # get it as an item, but not as an attribute
-        assert_equal(model.components[name], c)
-        assert_not_equal(getattr(model.components, name), c)
+        assert model.components[name] == c
+        assert getattr(model.components, name) != c
 
 
 def test_component_names_invalid():
     for name in 'a!', '!B', 'A!bC~`\\', '_!', '_!7', '__a01b  999x_x___!':
-        assert_raises(InvalidComponentNameError, Component, name, _export=False)
+        with pytest.raises(InvalidComponentNameError):
+            Component(name, _export=False)
 
 @with_model
 def test_function_introspection():
@@ -71,21 +69,25 @@ def test_monomer():
     sites = ['x', 'y', 'z']
     states = {'y': ['foo', 'bar', 'baz'], 'x': ['e']}
     m = Monomer('A', sites, states, _export=False)
-    assert_equal(m.sites, sites)
-    assert_equal(m.site_states, states)
-    assert_equal(type(m()), MonomerPattern)
+    assert m.sites == sites
+    assert m.site_states == states
+    assert type(m()) == MonomerPattern
 
-    assert_raises(ValueError, Monomer, 'A', 'x', _export=False)
-    assert_raises(Exception, Monomer, 'A', 'x', 'x', _export=False)
-    assert_raises(Exception, Monomer, 'A', ['x'], {'y': ['a']}, _export=False)
-    assert_raises(Exception, Monomer, 'A', ['x'], {'x': [1]}, _export=False)
+    with pytest.raises(ValueError):
+        Monomer('A', 'x', _export=False)
+    with pytest.raises(Exception):
+        Monomer('A', 'x', 'x', _export=False)
+    with pytest.raises(Exception):
+        Monomer('A', ['x'], {'y': ['a']}, _export=False)
+    with pytest.raises(Exception):
+        Monomer('A', ['x'], {'x': [1]}, _export=False)
 
 @with_model
 def test_monomer_model():
     Monomer('A')
-    ok_(A in model.monomers)
-    ok_(A in model.all_components())
-    ok_(A not in model.all_components() - model.monomers)
+    assert A in model.monomers
+    assert A in model.all_components()
+    assert A not in model.all_components() - model.monomers
 
 
 @with_model
@@ -120,9 +122,11 @@ def test_monomer_rename_non_self_exported_model():
 def test_invalid_state():
     Monomer('A', ['a', 'b'], {'a': ['a1', 'a2'], 'b': ['b1']})
     # Specify invalid state in Monomer.__call__
-    assert_raises(ValueError, A, a='spam')
+    with pytest.raises(ValueError):
+        A(a='spam')
     # Specify invalid state in MonomerPattern.__call__
-    assert_raises(ValueError, A(a='a1'), b='spam')
+    with pytest.raises(ValueError):
+        A(a='a1')(b='spam')
 
 
 @with_model
@@ -130,12 +134,14 @@ def test_initial():
     Monomer('A', ['s'])
     Parameter('A_0')
     Initial(A(s=None), A_0)
-    assert_raises_iice = partial(assert_raises, InvalidInitialConditionError,
-                                 Initial)
-    assert_raises_iice('not a complexpattern', A_0)
-    assert_raises_iice(A(), A_0)
-    assert_raises_iice(A(s=None), A_0)
-    assert_raises_iice(MatchOnce(A(s=None)), A_0)
+    for obj, args in (
+        ('not a complexpattern', A_0),
+        (A(), A_0),
+        (A(s=None), A_0),
+        (MatchOnce(A(s=None)), A_0),
+    ):
+        with pytest.raises(InvalidInitialConditionError):
+            Initial(*args)
 
 @with_model
 def test_model_pickle():
@@ -152,7 +158,7 @@ def test_model_pickle():
         model.add_component(comp)
     model.add_component(c)
     Initial(A() ** c, k)
-    assert_equal(len(model.all_components()), 7)
+    assert len(model.all_components()) == 7
     model2 = pickle.loads(pickle.dumps(model))
     check_model_against_component_list(model, model2.all_components())
 
@@ -235,15 +241,13 @@ def test_compartment():
 def test_monomer_pattern_add_to_none():
     """Ensure that MonomerPattern + None returns a ReactionPattern."""
     Monomer('A', ['s'])
-    ok_(isinstance(A() + None, ReactionPattern),
-        'A() + None did not return a ReactionPattern.')
+    assert isinstance(A() + None, ReactionPattern), 'A() + None did not return a ReactionPattern.'
 
 @with_model
 def test_complex_pattern_add_to_none():
     """Ensure that ComplexPattern + None returns a ReactionPattern."""
     Monomer('A', ['s'])
-    ok_(isinstance(A(s=1) % A(s=1) + None, ReactionPattern),
-        'A(s=1) % A(s=1) + None did not return a ReactionPattern.')
+    assert isinstance(A(s=1) % A(s=1) + None, ReactionPattern), 'A(s=1) % A(s=1) + None did not return a ReactionPattern.'
 
 @with_model
 def test_reaction_pattern_add_to_none():
@@ -251,8 +255,7 @@ def test_reaction_pattern_add_to_none():
     Monomer('A', ['s'])
     cp = A(s=1) % A(s=1)
     rp = cp + cp
-    ok_(isinstance(rp + None, ReactionPattern),
-        'ReactionPattern + None did not return a ReactionPattern.')
+    assert isinstance(rp + None, ReactionPattern), 'ReactionPattern + None did not return a ReactionPattern.'
 
 @with_model
 def test_complex_pattern_call():
@@ -261,11 +264,12 @@ def test_complex_pattern_call():
     Monomer('B', ['y', 'z'], {'z': ('g', 'h')})
     cp = A(w=1, x='e') % B(y=1, z='g')
     r = {'x': 'f', 'z': 'h'} # refinement for complexpattern
-    ok_(cp(**r))
-    ok_(cp(**r).monomer_patterns[0].site_conditions['x'] == r['x'])
-    ok_(cp(r))
-    ok_(cp(r).monomer_patterns[0].site_conditions['x'] == r['x'])
-    assert_raises(RedundantSiteConditionsError, cp, {'x': 'f'}, z='h')
+    assert cp(**r)
+    assert cp(**r).monomer_patterns[0].site_conditions['x'] == r['x']
+    assert cp(r)
+    assert cp(r).monomer_patterns[0].site_conditions['x'] == r['x']
+    with pytest.raises(RedundantSiteConditionsError):
+        cp({'x': 'f'}, z='h')
 
 @with_model
 def test_monomer_unicode():
@@ -420,17 +424,20 @@ def test_concreteness():
 def test_dangling_bond():
     Monomer('A', ['a'])
     Parameter('kf', 1.0)
-    assert_raises(DanglingBondError, as_reaction_pattern, A(a=1) % A(a=None))
+    with pytest.raises(DanglingBondError):
+        as_reaction_pattern(A(a=1) % A(a=None))
 
 
 @with_model
 def test_invalid_site_name():
-    assert_raises(ValueError, Monomer, 'A', ['1'])
+    with pytest.raises(ValueError):
+        Monomer('A', ['1'])
 
 
 @with_model
 def test_invalid_state_value():
-    assert_raises(ValueError, Monomer, 'A', ['a'], {'a': ['1', 'a']})
+    with pytest.raises(ValueError):
+        Monomer('A', ['a'], {'a': ['1', 'a']})
 
 
 @with_model
@@ -440,7 +447,8 @@ def test_valid_state_values():
 
 @with_model
 def test_expression_type():
-    assert_raises(ValueError, Expression, 'A', 1)
+    with pytest.raises(ValueError):
+        Expression('A', 1)
 
 
 @with_model
@@ -459,8 +467,10 @@ def test_synth_requires_concrete():
 
     # These synthesis products are not concrete (site "s" not specified),
     # so they should raise a ValueError
-    assert_raises(ValueError, Rule, 'r1', None >> A(), kA)
-    assert_raises(ValueError, Rule, 'r2', A() | None, kA, kA)
+    with pytest.raises(ValueError):
+        Rule('r1', None >> A(), kA)
+    with pytest.raises(ValueError):
+        Rule('r2', A() | None, kA, kA)
 
 
 @with_model
@@ -487,7 +497,8 @@ def test_tags():
 
     # Trying to extend a tagged complex should fail - the tag should always
     # be specified last
-    assert_raises(ValueError, operator.mod, (A(b=1) % A(b=1)).__matmul__(x),
+    with pytest.raises(ValueError):
+        operator.mod((A(b=1) % A(b=1)).__matmul__(x),
                   A(b=1))
 
     Observable('o1', A(b=None))
@@ -497,7 +508,8 @@ def test_tags():
     Expression('e_tag', o1(x) ** 2)
 
     # Test tag defined in rate but not in rule expression
-    assert_raises(ValueError, Rule, 'r1', None >> A(b=None), e_tag)
+    with pytest.raises(ValueError):
+        Rule('r1', None >> A(b=None), e_tag)
 
     # Test tag defined in rule expression but not in rate
     Rule('r2', None >> A(b=None).__matmul__(x), e_no_tag)
@@ -539,17 +551,20 @@ def test_duplicate_sites():
     assert B(b=MultiState('u', ('u', 1))).is_concrete()
 
     # Syntax errors (should use MultiState)
-    assert_raises(ValueError, B, b=('u', 'p'))
-    assert_raises(ValueError, B, b=['u', 'p'])
+    with pytest.raises(ValueError):
+        B(b=('u', 'p'))
+    with pytest.raises(ValueError):
+        B(b=['u', 'p'])
 
     # Syntax error (can't nest MultiState)
-    assert_raises(ValueError, MultiState, MultiState(1, 2), 'p')
+    with pytest.raises(ValueError):
+        MultiState(MultiState(1, 2), 'p')
 
     # Duplicate sites with multi-bond
     A(a=MultiState([1, 2], [1, 2]))
 
 
-@raises(ValueError)
+@pytest.mark.raises(exception=ValueError)
 def test_duplicate_site_single_site():
     MultiState('a')
 
@@ -557,41 +572,48 @@ def test_duplicate_site_single_site():
 @with_model
 def test_invalid_rule():
     Monomer('A')
-    assert_raises(ExpressionError, Rule, 'r1', None >> A(), 1.0)
+    with pytest.raises(ExpressionError):
+        Rule('r1', None >> A(), 1.0)
     assert len(model.rules) == 0
 
     Parameter('kf', 1.0)
-    assert_raises(Exception, Rule, 'r1', 'invalid_rule_expr', kf)
+    with pytest.raises(Exception):
+        Rule('r1', 'invalid_rule_expr', kf)
     assert len(model.rules) == 0
 
 
 @with_model
 def test_invalid_expression():
-    assert_raises(ValueError, Expression, 'e1', 'invalid_expr')
+    with pytest.raises(ValueError):
+        Expression('e1', 'invalid_expr')
     assert len(model.expressions) == 0
 
 
 @with_model
 def test_invalid_monomer_name():
-    assert_raises(ValueError, Monomer, 'a', 123)
+    with pytest.raises(ValueError):
+        Monomer('a', 123)
     assert len(model.monomers) == 0
 
 
 @with_model
 def test_invalid_parameter():
-    assert_raises(ValueError, Parameter, 'a', 'invalid_value')
+    with pytest.raises(ValueError):
+        Parameter('a', 'invalid_value')
     assert len(model.parameters) == 0
 
 
 @with_model
 def test_invalid_compartment():
-    assert_raises(Exception, Compartment, 'c1', 'invalid_parent')
+    with pytest.raises(Exception):
+        Compartment('c1', 'invalid_parent')
 
     # Invalid dynamic expression as compartment size
     Monomer('A')
     Observable('O', A)
     Expression('E', O)
-    assert_raises(Exception, Compartment, 'c2', size=E)
+    with pytest.raises(Exception):
+        Compartment('c2', size=E)
 
     assert len(model.compartments) == 0
 
@@ -618,10 +640,11 @@ def test_update_initial_condition():
 
 
 def test_model_not_defined():
-    assert_raises(ModelNotDefinedError, Monomer, 'A')
+    with pytest.raises(ModelNotDefinedError):
+        Monomer('A')
 
 
-@raises(ReusedBondError)
+@pytest.mark.raises(exception=ReusedBondError)
 @with_model
 def test_bind_multiple():
     Monomer('A', ['a'])
@@ -630,7 +653,7 @@ def test_bind_multiple():
     as_reaction_pattern(A(a=1) % B(b=1) % B(b=1))
 
 
-@raises(ValueError)
+@pytest.mark.raises(exception=ValueError)
 @with_model
 def test_reverse_rate_non_reversible_rule():
     Monomer('A')
@@ -651,26 +674,26 @@ def test_parameter_assumptions():
     assert k3.is_integer
 
 
-@raises(ValueError)
+@pytest.mark.raises(exception=ValueError)
 @with_model
 def test_parameter_noninteger_integer_init():
     Parameter('k3', 0.3, integer=True)
 
 
-@raises(ValueError)
+@pytest.mark.raises(exception=ValueError)
 @with_model
 def test_parameter_noninteger_integer_setter():
     Parameter('k3', 1.0, integer=True)
     k3.value = 0.4
 
 
-@raises(ValueError)
+@pytest.mark.raises(exception=ValueError)
 @with_model
 def test_parameter_negative_nonnegative_init():
     Parameter('k3', -0.2, nonnegative=True)
 
 
-@raises(ValueError)
+@pytest.mark.raises(exception=ValueError)
 @with_model
 def test_parameter_negative_nonnegative_setter():
     Parameter('k3', 0.0, nonnegative=True)

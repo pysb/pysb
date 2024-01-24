@@ -2,10 +2,10 @@ from pysb.pattern import SpeciesPatternMatcher, match_complex_pattern
 from pysb.examples import robertson, bax_pore, bax_pore_sequential, \
     earm_1_3, kinase_cascade, bngwiki_egfr_simple
 from pysb.bng import generate_equations
-from nose.tools import assert_raises
 from pysb import as_complex_pattern, as_reaction_pattern, ANY, WILD, \
     Monomer
 import collections
+import pytest
 
 
 def test_species_pattern_matcher():
@@ -14,7 +14,8 @@ def test_species_pattern_matcher():
     # Check that SpeciesPatternMatcher raises exception if model has no species
     model = robertson.model
     model.reset_equations()
-    assert_raises(Exception, SpeciesPatternMatcher, model)
+    with pytest.raises(Exception):
+        SpeciesPatternMatcher(model)
 
     model = bax_pore.model
     generate_equations(model)

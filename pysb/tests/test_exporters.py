@@ -14,11 +14,11 @@ import pandas as pd
 import tempfile
 import os
 import sys
+import pytest
 try:
     import roadrunner
 except ImportError:
     roadrunner = None
-from nose.plugins.skip import SkipTest
 from pysb.importers.json import model_from_json
 from pysb.testing import check_model_against_component_list
 
@@ -68,7 +68,7 @@ def check_convert(model, format):
         elif format == 'sbml':
             # Skip the simulation comparison if roadrunner not available
             if roadrunner is None:
-                raise SkipTest("SBML Simulation test skipped (requires roadrunner)")
+                pytest.skip("SBML Simulation test skipped (requires roadrunner)")
 
             roadrunner.Logger.setLevel(roadrunner.Logger.LOG_ERROR)
 

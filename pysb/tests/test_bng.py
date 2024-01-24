@@ -1,10 +1,12 @@
+import pytest
+
 from pysb.testing import *
 from pysb import *
 from pysb.core import as_complex_pattern
 from pysb.bng import *
 import os
+import re
 import unittest
-from nose.tools import assert_raises_regexp
 from pysb.generator.bng import BngPrinter
 import sympy
 import math
@@ -13,14 +15,15 @@ import math
 @with_model
 def test_generate_network():
     Monomer('A')
-    assert_raises((NoInitialConditionsError, NoRulesError),
-                  generate_network, model)
+    with pytest.raises((NoInitialConditionsError, NoRulesError)):
+        generate_network(model)
     Parameter('A_0', 1)
     Initial(A(), A_0)
-    assert_raises(NoRulesError, generate_network, model)
+    with pytest.raises(NoRulesError):
+        generate_network(model)
     Parameter('k', 1)
     Rule('degrade', A() >> None, k)
-    ok_(generate_network(model))
+    assert generate_network(model)
 
 
 @unittest.skipIf(os.name == 'nt', 'BNG Console does not work on Windows')
@@ -49,13 +52,13 @@ def test_sequential_simulations():
         bng.action('simulate', method='ssa', t_end=20000, n_steps=100)
         bng.execute()
         yfull1 = bng.read_simulation_results()
-        ok_(yfull1.size == 101)
+        assert yfull1.size == 101
 
         # Run another simulation by reloading the existing network file
         bng.action('simulate', method='ssa', t_end=10000, n_steps=50)
         bng.execute(reload_netfile=True)
         yfull2 = bng.read_simulation_results()
-        ok_(yfull2.size == 51)
+        assert yfull2.size == 51
 
 
 @with_model
@@ -69,8 +72,8 @@ def test_compartment_species_equivalence():
     Initial(R(y=None) ** C, p)
     generate_equations(model)
     for i, ic in enumerate(model.initials):
-        ok_(ic.pattern.is_equivalent_to(model.species[i]))
-    ok_(model.species[2].is_equivalent_to(Q(x=1) ** C % R(y=1) ** C))
+        assert ic.pattern.is_equivalent_to(model.species[i])
+    assert model.species[2].is_equivalent_to(Q(x=1) ** C % R(y=1) ** C)
 
 
 @with_model
@@ -83,10 +86,10 @@ def test_bidirectional_rules_collapse():
     Rule('Rule2', A() | B(), k1, Parameter('k2', 1))
     Rule('Rule3', B() >> A(), Parameter('k4', 5))
     generate_equations(model)
-    ok_(len(model.reactions) == 4)
-    ok_(len(model.reactions_bidirectional) == 1)
-    ok_(len(model.reactions_bidirectional[0]['rule']) == 3)
-    ok_(model.reactions_bidirectional[0]['reversible'])
+    assert len(model.reactions) == 4
+    assert len(model.reactions_bidirectional) == 1
+    assert len(model.reactions_bidirectional[0]['rule']) == 3
+    assert model.reactions_bidirectional[0]['reversible']
 
 
 @with_model
@@ -98,10 +101,10 @@ def test_bidirectional_rules():
     Rule('Rule2', B() >> A(), Parameter('k3', 10))
     Rule('Rule3', B() >> A(), Parameter('k4', 5))
     generate_equations(model)
-    ok_(len(model.reactions) == 4)
-    ok_(len(model.reactions_bidirectional) == 1)
-    ok_(len(model.reactions_bidirectional[0]['rule']) == 3)
-    ok_(model.reactions_bidirectional[0]['reversible'])
+    assert len(model.reactions) == 4
+    assert len(model.reactions_bidirectional) == 1
+    assert len(model.reactions_bidirectional[0]['rule']) == 3
+    assert model.reactions_bidirectional[0]['reversible']
     #TODO Check that 'rate' has 4 terms
 
 
@@ -193,7 +196,7 @@ def test_nfsim_total_rate():
 
     # check that generate network does not fail when total rate is set to be true
     # generate_network just ignores this setting
-    ok_(generate_network(model))
+    assert generate_network(model)
 
     with BngFileInterface(model) as bng:
         bng.action('simulate', method='nf', t_end=1000, n_steps=100)
@@ -249,12 +252,9 @@ def test_bng_error():
     Parameter('kf', 1)
     # The following rule does not specify A's site on the RHS, so should generate a BNG error
     Rule('r1', A(a='s1') >> A(), kf)
-    assert_raises_regexp(
-        BngInterfaceError,
-        'Molecule created in reaction rule: Component\(s\) a missing from molecule A\(\)',
-        generate_equations,
-        model
-    )
+    with pytest.raises(BngInterfaceError) as err:
+        generate_equations(err)
+    assert re.match(r'Molecule created in reaction rule: Component(s) a missing from molecule A\(\)', err)
 
 
 @with_model
@@ -400,7 +400,8 @@ def test_bng_printer_relational_unknown():
     class NewRelational(sympy.core.relational.Relational):
         rel_op = "??????????"  # A highly unlikely rel_op for a new subclass.
     x = sympy.Symbol("x")
-    assert_raises(NotImplementedError, _bng_print, NewRelational(x, x))
+    with pytest.raises(NotImplementedError):
+            _bng_print(NewRelational(x, x))
 
 
 def test_parse_bngl_expression_if():

@@ -19,3 +19,4 @@ setuptools*.zip
 *.egg-info
 .eggs
 .asv
+venv/*

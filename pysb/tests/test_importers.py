@@ -4,11 +4,11 @@ from pysb.bng import BngFileInterface
 from pysb.importers.bngl import model_from_bngl, BnglImportError
 from pysb.importers.sbml import model_from_sbml, model_from_biomodels
 import numpy
-from nose.tools import assert_raises_regexp, raises
 import warnings
 import mock
 import tempfile
 import shutil
+import pytest
 from pysb.logging import get_logger
 
 # Some models don't match BNG originals exactly due to loss of numerical
@@ -231,6 +231,6 @@ def test_biomodels_import_with_mock():
     model_from_biomodels('1')
 
 
-@raises(ValueError)
+@pytest.mark.raises(exception=ValueError)
 def test_biomodels_invalid_mirror():
     model_from_biomodels('1', mirror='spam')
