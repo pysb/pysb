@@ -21,6 +21,6 @@ dependencies:
   - mock
   - pip
   - pip:
-      - libroadrunner
+      - libroadrunner<2.5.0
       - python-libsbml
       - pynose
