@@ -31,6 +31,13 @@ jobs:
       - name: Fix gfortran DLL linker error on Windows/Python 3.8
         if: matrix.os == 'windows-latest' && matrix.python-version == '3.8'
         run: pip install --upgrade --force-reinstall scipy
+      - name: Workaround broken roadrunner wheels
+        if: matrix.os == 'macos-latest'
+        run: |
+          # FIXME: This is a workaround for broken roadrunner wheels on intel macs. 
+          # Remove this step once the wheels are fixed and properly compatible.
+          PYTHON_VER=$(echo "${{ matrix.python-version }}" | tr -d '.')
+          pip install --force-reinstall "https://files.pythonhosted.org/packages/c7/d5/286069f614965bec425d2efe8b190de3a5670c476c0afa7b56545b8072dc/libroadrunner-2.5.0-cp${PYTHON_VER}-cp${PYTHON_VER}-macosx_11_0_x86_64.whl"
       - name: Conda environment info
         run: |
           conda info
