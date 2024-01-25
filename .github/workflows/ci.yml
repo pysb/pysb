@@ -46,6 +46,7 @@ jobs:
           # FIXME: This is a workaround for broken roadrunner wheels. 
           # Remove this step once the wheels are fixed and properly compatible.
           pip install --force-reinstall ${{ matrix.wheel-url }}
+      - name: Conda environment info
         run: |
           conda info
           conda list
