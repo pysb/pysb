@@ -12,7 +12,7 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
         include:
           - python-version: '3.8'
-            roadrunner: 'libroadrunner<2.5.0'
+            roadrunner: 'libroadrunner==2.4.0'
           - python-version: '3.9'
             roadrunner: 'https://files.pythonhosted.org/packages/03/43/4b15a075676619dd273255f2eaa61f12a5ed4876c490e853c18d3d110cac/libroadrunner-2.5.0-cp39-cp39-macosx_11_0_x86_64.whl'
           - python-version: '3.10'
