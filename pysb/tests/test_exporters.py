@@ -15,9 +15,6 @@ import tempfile
 import os
 import sys
 try:
-    # FIXME: please note that there currentl is an incompatibility with pre-built universal wheels on Intel macs in
-    #  version 2.5 (see https://github.com/sys-bio/roadrunner/issues/1177 for details) that can lead to segfaults and
-    #  import errors. To use roadrunner on Intel macs, force install x86_64 wheels (see .github/workflows/ci.yml).
     import roadrunner
 except ImportError:
     roadrunner = None

@@ -10,15 +10,6 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
         python-version: ["3.8", "3.9", "3.10", "3.11"]
-        include:
-          - python-version: '3.8'
-            roadrunner: 'libroadrunner==2.2.2'
-          - python-version: '3.9'
-            roadrunner: 'https://files.pythonhosted.org/packages/03/43/4b15a075676619dd273255f2eaa61f12a5ed4876c490e853c18d3d110cac/libroadrunner-2.5.0-cp39-cp39-macosx_11_0_x86_64.whl'
-          - python-version: '3.10'
-            roadrunner: 'https://files.pythonhosted.org/packages/21/fa/3811a2f27f37cc8f7764841e574ef13ecf7a188dce9ca13332f7103e5483/libroadrunner-2.5.0-cp310-cp310-macosx_11_0_x86_64.whl'
-          - python-version: '3.11'
-            roadrunner: 'https://files.pythonhosted.org/packages/c7/d5/286069f614965bec425d2efe8b190de3a5670c476c0afa7b56545b8072dc/libroadrunner-2.5.0-cp311-cp311-macosx_11_0_x86_64.whl'
     defaults:
       run:
         shell: bash -l {0}
@@ -40,12 +31,6 @@ jobs:
       - name: Fix gfortran DLL linker error on Windows/Python 3.8
         if: matrix.os == 'windows-latest' && matrix.python-version == '3.8'
         run: pip install --upgrade --force-reinstall scipy
-      - name: Workaround broken roadrunner wheels
-        if: matrix.os == 'macos-latest'
-        run: |
-          # FIXME: This is a workaround for broken roadrunner wheels. 
-          # Remove this step once the wheels are fixed and properly compatible.
-          pip install --force-reinstall ${{ matrix.roadrunner }}
       - name: Conda environment info
         run: |
           conda info
