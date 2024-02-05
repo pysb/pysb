@@ -187,6 +187,6 @@ def export(model, format, docstring=None):
 def pad(text, depth=0):
     "Dedent multi-line string and pad with spaces."
     text = textwrap.dedent(text)
-    text = re.sub(r'^(?m)', ' ' * depth, text)
+    text = re.sub(r'(?m)^', ' ' * depth, text)
     text += '\n'
     return text
