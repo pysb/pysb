@@ -267,6 +267,30 @@ def test_complex_pattern_call():
     ok_(cp(r).monomer_patterns[0].site_conditions['x'] == r['x'])
     assert_raises(RedundantSiteConditionsError, cp, {'x': 'f'}, z='h')
 
+
+@with_model
+def test_reaction_pattern_compartments():
+    """Ensure compartment consistency is enforced in ComplexPatterns."""
+    Monomer('A')
+    Compartment('ec', parent=None, dimension=3)
+    Compartment('pm', parent=ec, dimension=2)
+    Compartment('cp', parent=pm, dimension=3)
+    Compartment('nm', parent=cp, dimension=2)
+    Compartment('nuc', parent=nm, dimension=3)
+    for args in (
+        ([A() ** pm, A() ** nm], None),
+        ([A() ** pm], ec),
+        ([A() ** pm], nm),
+        ([A() ** ec, A() ** nuc], None),
+        ([A() ** ec, A() ** nm], None),
+        ([A() ** ec], nm),
+        ([A() ** ec, A() ** nuc, A() ** nuc], None),
+        ([A() ** ec], cp),
+        ([A()], 'not a compartment'),
+    ):
+        assert_raises(ValueError, ComplexPattern, *args)
+
+
 @with_model
 def test_monomer_unicode():
     Monomer(u'A', [u's'], {u's': [u's1', u's2']})

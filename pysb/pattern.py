@@ -282,12 +282,14 @@ def _match_graphs(pattern, candidate, exact, count):
 
 def match_complex_pattern(pattern, candidate, exact=False, count=False):
     """
-    Compare two ComplexPatterns against each other
+    Compare two ComplexPatterns against each other. For non-exact matches,
+    this function tests that pattern is a subgraph isomorphism of candidate,
+    i.e. that pattern would match everything that candidate would match.
 
     Parameters
     ----------
     pattern: pysb.ComplexPattern
-    candidate: pysb.Complex.Pattern
+    candidate: pysb.ComplexPattern
     exact: bool
         Set to True for exact matches (i.e. species equivalence,
         or exact graph isomorphism). Set to False to compare as a

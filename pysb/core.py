@@ -741,12 +741,60 @@ class ComplexPattern(object):
     def __init__(self, monomer_patterns, compartment, match_once=False):
         # ensure compartment is a Compartment
         if compartment and not isinstance(compartment, Compartment):
-            raise Exception("compartment is not a Compartment object")
+            raise ValueError("compartment is not a Compartment object")
 
         # Drop species cpt, if redundant
         if compartment and len(monomer_patterns) == 1 and \
                 monomer_patterns[0].compartment == compartment:
             compartment = None
+
+        cpts_by_dim = {
+            dim: {
+                mp.compartment for mp in monomer_patterns
+                if mp.compartment is not None and
+                mp.compartment.dimension == dim
+            } for dim in (2, 3)
+        }
+
+        if len(cpts_by_dim[2]) > 1:
+            raise ValueError("ComplexPatterns are not allowed to span multiple "
+                             "surface compartments. Offending compartments: "
+                             "{cpts_by_dim[2]}")
+
+        if (len(cpts_by_dim[2]) == 1 and compartment is not None and
+                compartment != cpts_by_dim[2].pop()):
+            raise ValueError("ComplexPatterns spanning surface compartments "
+                             "can only be defined to be in that compartment.")
+
+        if len(cpts_by_dim[3]) > 2:
+            raise ValueError("ComplexPattern are not allowed to span more than "
+                             "two volume compartments. Offending compartments: "
+                             f"{cpts_by_dim[3]}")
+
+        if len(cpts_by_dim[3]) > 1 and any(
+            not any(cpt1.parent.parent == cpt2 for cpt2 in cpts_by_dim[3])
+            for cpt1 in cpts_by_dim[3]
+            if cpt1.parent is not None and cpt1.parent.parent is not None
+        ):
+            raise ValueError("ComplexPatterns that span multiple volume "
+                             "compartments must have these volume compartments "
+                             "separated by a single surface compartment.")
+
+        if len(cpts_by_dim[3]) > 0:
+            surface_cpt = (cpts_by_dim[2].pop() if cpts_by_dim[2] else
+                           compartment)
+            if surface_cpt and not all(
+                cpt.parent == surface_cpt or surface_cpt.parent == cpt
+                for cpt in cpts_by_dim[3]
+            ):
+                raise ValueError("ComplexPatterns are only allowed to span "
+                                 "adjacent volume and surface compartments.")
+
+        if (len(cpts_by_dim[3]) > 1 and compartment is not None and
+                compartment.dimension == 3):
+            raise ValueError(f"ComplexPatterns that span multiple volume "
+                             f"compartments cannot be defined to be in a "
+                             f"volume compartment.")
 
         self.monomer_patterns = monomer_patterns
         self.compartment = compartment
@@ -811,12 +859,15 @@ class ComplexPattern(object):
         bond" node - as special private `WildTester` function is used for
         this purpose.
 
-        Compartment nodes are tracked and kept unique by the private
-        `add_or_get_compartment_node` function, which uses a dictionary to
-        track Compartment->node_id mapping.
+        Compartment nodes for monomer patterns are tracked and kept unique by
+        the private `add_or_get_compartment_node` function, which uses a
+        dictionary to track Compartment->node_id mapping. The compartment of the
+        species [Harris2009]_ is also added as a separate node, as long as
+        inference is unambiguous.
 
         .. [Blinov2006] https://link.springer.com/chapter/10.1007%2F11905455_5
         .. [Faeder2009] https://www.csb.pitt.edu/Faculty/Faeder/Publications/Reprints/Faeder_2009.pdf
+        .. [Harris2009] https://www.informs-sim.org/wsc09papers/087.pdf
         """
         if self._graph is not None:
             return self._graph
@@ -849,9 +900,11 @@ class ComplexPattern(object):
                 g.add_node(cpt_node_id, id=cpt)
                 return cpt_node_id
 
-        species_cpt_node_id = None
-        if self.compartment:
-            species_cpt_node_id = add_or_get_compartment_node(self.compartment)
+        scpt_node_id = None
+        if scpt := self.species_compartment() or self.compartment:
+            scpt_node_id = next(node_count)
+            # note: this is not a regular compartment node
+            g.add_node(scpt_node_id, id=f'cpt_{scpt.name}')
 
         def _handle_site_instance(state_or_bond):
             mon_site_id = next(node_count)
@@ -894,9 +947,20 @@ class ComplexPattern(object):
         for mp in self.monomer_patterns:
             mon_node_id = next(node_count)
             g.add_node(mon_node_id, id=mp.monomer)
-            if mp.compartment or self.compartment:
+
+            if scpt_node_id:
+                g.add_edge(scpt_node_id, mon_node_id)
+
+            if mp.compartment or (
+                scpt and (
+                    scpt.dimension == 3 or (
+                        len(self.monomer_patterns) == 1 and
+                        self.monomer_patterns[0].is_site_concrete()
+                    )
+                )
+            ):
                 cpt_node_id = add_or_get_compartment_node(mp.compartment or
-                                                          self.compartment)
+                                                          scpt)
                 g.add_edge(mon_node_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
@@ -924,14 +988,47 @@ class ComplexPattern(object):
             for n1, n2 in itertools.combinations(site_nodes, 2):
                 g.add_edge(n1, n2)
 
-        # Remove the species compartment if all monomer nodes have a
-        # compartment
-        if species_cpt_node_id is not None and \
-                        g.degree(species_cpt_node_id) == 0:
-            g.remove_node(species_cpt_node_id)
-
         self._graph = g
         return self._graph
+
+    def species_compartment(self):
+        """
+        Computes the compartment of the species defined by this ComplexPattern
+        according to the cBNGL definition. Returns None if the species
+        compartment cannot be unambigously inferred, which is the case if
+            (i) the MonomerPatterns are not site-concrete
+            (ii) the ComplexPattern does not define a compartment
+            and
+            (iii) none of the monomer patterns are defined to be in a surface
+               compartment
+        """
+        if not (
+            all(mp.is_site_concrete() for mp in self.monomer_patterns)
+            or self.compartment
+            or any(
+                mp.compartment.dimension == 2 for mp in self.monomer_patterns
+                if mp.compartment is not None
+            )
+        ):
+            return None
+
+        if self.compartment:
+            return self.compartment
+
+        compartments = {
+            mp.compartment for mp in self.monomer_patterns
+        }
+
+        # if monomer patterns span multiple compartments, cBNGL defines
+        # the species compartment as the surface compartment (there may only be one surface
+        # compartment per species according to the cBNGL spec, and there cannot be two volume
+        # compartments without a surface compartment). Thus, we either have to find the surface
+        # compartment or there should be only one compartment in the set.
+        return next(
+            comp for comp in compartments
+            if (len(compartments) > 1 and comp is not None and comp.dimension == 2)
+            or len(compartments) == 1
+        )
 
     def is_equivalent_to(self, other):
         """
