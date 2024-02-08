@@ -8,7 +8,6 @@ import collections
 import weakref
 import copy
 import itertools
-import numbers
 import sympy
 import scipy.sparse
 import networkx as nx
@@ -781,8 +780,11 @@ class ComplexPattern(object):
                              "separated by a single surface compartment.")
 
         if len(cpts_by_dim[3]) > 0:
-            surface_cpt = (cpts_by_dim[2].pop() if cpts_by_dim[2] else
-                           compartment)
+            surface_cpt = (
+                cpts_by_dim[2].pop() if cpts_by_dim[2]
+                else compartment if (compartment and compartment.dimension == 2)
+                else None
+            )
             if surface_cpt and not all(
                 cpt.parent == surface_cpt or surface_cpt.parent == cpt
                 for cpt in cpts_by_dim[3]
@@ -993,14 +995,9 @@ class ComplexPattern(object):
 
     def species_compartment(self):
         """
-        Computes the compartment of the species defined by this ComplexPattern
-        according to the cBNGL definition. Returns None if the species
-        compartment cannot be unambigously inferred, which is the case if
-            (i) the MonomerPatterns are not site-concrete
-            (ii) the ComplexPattern does not define a compartment
-            and
-            (iii) none of the monomer patterns are defined to be in a surface
-               compartment
+        Infers the species compartment of species matched by this ComplexPattern
+        according to the cBNGL definition. Returns `None` if inference of the
+        species compartment is ambiguous.
         """
         if not (
             all(mp.is_site_concrete() for mp in self.monomer_patterns)
@@ -1020,13 +1017,15 @@ class ComplexPattern(object):
         }
 
         # if monomer patterns span multiple compartments, cBNGL defines
-        # the species compartment as the surface compartment (there may only be one surface
-        # compartment per species according to the cBNGL spec, and there cannot be two volume
-        # compartments without a surface compartment). Thus, we either have to find the surface
-        # compartment or there should be only one compartment in the set.
+        # the species compartment as the surface compartment (there may only be
+        # one surface compartment per species according to the cBNGL spec, and
+        # there cannot be two volume compartments without a surface
+        # compartment). Thus, we either have to find the surface compartment or
+        # there should be only one compartment in the set.
         return next(
             comp for comp in compartments
-            if (len(compartments) > 1 and comp is not None and comp.dimension == 2)
+            if (len(compartments) > 1 and comp is not None
+                and comp.dimension == 2)
             or len(compartments) == 1
         )
 
