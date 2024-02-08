@@ -754,16 +754,13 @@ class ComplexPattern(object):
                 mp.compartment.dimension == dim
             } for dim in (2, 3)
         }
+        if compartment is not None:
+            cpts_by_dim[compartment.dimension].add(compartment)
 
         if len(cpts_by_dim[2]) > 1:
             raise ValueError("ComplexPatterns are not allowed to span multiple "
                              "surface compartments. Offending compartments: "
-                             "{cpts_by_dim[2]}")
-
-        if (len(cpts_by_dim[2]) == 1 and compartment is not None and
-                compartment != cpts_by_dim[2].pop()):
-            raise ValueError("ComplexPatterns spanning surface compartments "
-                             "can only be defined to be in that compartment.")
+                             f"{cpts_by_dim[2]}")
 
         if len(cpts_by_dim[3]) > 2:
             raise ValueError("ComplexPattern are not allowed to span more than "
@@ -781,8 +778,7 @@ class ComplexPattern(object):
 
         if len(cpts_by_dim[3]) > 0:
             surface_cpt = (
-                cpts_by_dim[2].pop() if cpts_by_dim[2]
-                else compartment if (compartment and compartment.dimension == 2)
+                next(iter(cpts_by_dim[2])) if cpts_by_dim[2]
                 else None
             )
             if surface_cpt and not all(
@@ -796,6 +792,12 @@ class ComplexPattern(object):
                 compartment.dimension == 3):
             raise ValueError(f"ComplexPatterns that span multiple volume "
                              f"compartments cannot be defined to be in a "
+                             f"volume compartment.")
+
+        if (len(cpts_by_dim[2]) > 0 and compartment is not None and
+                compartment.dimension == 3):
+            raise ValueError(f"ComplexPatterns that span a surface "
+                             f"compartment cannot be defined to be in a "
                              f"volume compartment.")
 
         self.monomer_patterns = monomer_patterns

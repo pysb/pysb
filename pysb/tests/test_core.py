@@ -269,7 +269,7 @@ def test_complex_pattern_call():
 
 
 @with_model
-def test_reaction_pattern_compartments():
+def test_complex_pattern_compartment_consistency():
     """Ensure compartment consistency is enforced in ComplexPatterns."""
     Monomer('A')
     Compartment('ec', parent=None, dimension=3)
@@ -277,18 +277,16 @@ def test_reaction_pattern_compartments():
     Compartment('cp', parent=pm, dimension=3)
     Compartment('nm', parent=cp, dimension=2)
     Compartment('nuc', parent=nm, dimension=3)
-    for args in (
-        ([A() ** pm, A() ** nm], None),
-        ([A() ** pm], ec),
-        ([A() ** pm], nm),
-        ([A() ** ec, A() ** nuc], None),
-        ([A() ** ec, A() ** nm], None),
-        ([A() ** ec], nm),
-        ([A() ** ec, A() ** nuc, A() ** nuc], None),
-        ([A() ** ec], cp),
-        ([A()], 'not a compartment'),
-    ):
-        assert_raises(ValueError, ComplexPattern, *args)
+    arvcp = partial(assert_raises, ValueError, ComplexPattern)
+    arvcp([A() ** pm, A() ** nm], None)
+    arvcp([A() ** pm], ec),
+    arvcp([A() ** pm], nm),
+    arvcp([A() ** ec, A() ** nuc], None),
+    arvcp([A() ** ec, A() ** nm], None),
+    arvcp([A() ** ec], nm),
+    arvcp([A() ** ec, A() ** nuc, A() ** nuc], None),
+    arvcp([A() ** ec], cp),
+    arvcp([A()], 'not a compartment'),
 
 
 @with_model
