@@ -78,7 +78,6 @@ def test_compartment():
     Compartment('cp', parent=pm, dimension=3)
     Compartment('nm', parent=cp, dimension=2)
     Monomer('A', ['a'])
-    Monomer('B', ['b'])
     # `as_complex_pattern(A()) ** pm` would match
     #  `A(a=1) ** ec % B(a=1) ** pm`, but
     # `as_complex_pattern(A() ** pm)` would not match
