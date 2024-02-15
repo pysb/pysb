@@ -288,6 +288,10 @@ def test_complex_pattern_compartment_consistency():
     arvcp([A() ** ec, A() ** cp, A() ** nuc], None),
     arvcp([A() ** ec], cp),
     arvcp([A()], 'not a compartment'),
+    ComplexPattern(
+        [A() ** nuc, A() ** nm, A() ** cp],
+        None
+    )
 
 
 @with_model

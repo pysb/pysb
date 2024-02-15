@@ -767,8 +767,8 @@ class ComplexPattern(object):
                              "two volume compartments. Offending compartments: "
                              f"{cpts_by_dim[3]}")
 
-        if len(cpts_by_dim[3]) > 1 and any(
-            not any(cpt1.parent.parent == cpt2 for cpt2 in cpts_by_dim[3])
+        if len(cpts_by_dim[3]) > 1 and not any(
+            any(cpt1.parent.parent == cpt2 for cpt2 in cpts_by_dim[3])
             for cpt1 in cpts_by_dim[3]
             if cpt1.parent is not None and cpt1.parent.parent is not None
         ):
