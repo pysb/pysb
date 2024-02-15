@@ -904,11 +904,9 @@ class ComplexPattern(object):
                 g.add_node(cpt_node_id, id=cpt)
                 return cpt_node_id
 
-        scpt_node_id = None
         if scpt := self.species_compartment() or self.compartment:
-            scpt_node_id = next(node_count)
             # note: this is not a regular compartment node
-            g.add_node(scpt_node_id, id=f'cpt_{scpt.name}')
+            g.add_node(next(node_count), id=f'cpt_{scpt.name}')
 
         def _handle_site_instance(state_or_bond):
             mon_site_id = next(node_count)
