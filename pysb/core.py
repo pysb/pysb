@@ -952,9 +952,6 @@ class ComplexPattern(object):
             mon_node_id = next(node_count)
             g.add_node(mon_node_id, id=mp.monomer)
 
-            if scpt_node_id:
-                g.add_edge(scpt_node_id, mon_node_id)
-
             if mp.compartment or (
                 scpt and (
                     scpt.dimension == 3 or (
