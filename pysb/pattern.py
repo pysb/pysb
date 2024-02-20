@@ -1090,3 +1090,27 @@ class _Reaction(object):
     def _repr_species_dict(self, species_dict):
         return '{%s}' % ', '.join(["'__s%d': %s" % (k, self.species[k])
                                    for k in sorted(species_dict.keys())])
+
+
+# doctest fixtures
+
+
+def setup_module(module):
+    # Patch OrderedDict repr to match Python 3.11 and earlier.
+    global _old_od
+    _old_od = collections.OrderedDict
+    class OrderedDict(_old_od):
+        def __repr__(self):
+            if not self:
+                return '%s()' % (self.__class__.__name__,)
+            return '%s(%r)' % (self.__class__.__name__, list(self.items()))
+    collections.OrderedDict = OrderedDict
+setup_module.__test__ = False
+
+
+def teardown_module(module):
+    # Restore OrderedDict.
+    global _old_od
+    collections.OrderedDict = _old_od
+    del _old_od
+teardown_module.__test__ = False
