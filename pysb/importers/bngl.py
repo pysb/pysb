@@ -238,7 +238,7 @@ class BnglBuilder(Builder):
             try:
                 value = float(value_param)
                 # Need to create a new parameter for the initial conc. literal
-                name = re.sub('[^\w]+', '_', i.get('name').replace(
+                name = re.sub(r'[^\w]+', '_', i.get('name').replace(
                     ')', '').replace('(', '')) + '_0'
                 try:
                     value_param = self.parameter(name, value)
