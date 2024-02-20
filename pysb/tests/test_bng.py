@@ -4,7 +4,7 @@ from pysb.core import as_complex_pattern
 from pysb.bng import *
 import os
 import unittest
-from nose.tools import assert_raises_regexp
+from nose.tools import assert_raises_regex
 from pysb.generator.bng import BngPrinter
 import sympy
 import math
@@ -249,7 +249,7 @@ def test_bng_error():
     Parameter('kf', 1)
     # The following rule does not specify A's site on the RHS, so should generate a BNG error
     Rule('r1', A(a='s1') >> A(), kf)
-    assert_raises_regexp(
+    assert_raises_regex(
         BngInterfaceError,
         'Molecule created in reaction rule: Component\(s\) a missing from molecule A\(\)',
         generate_equations,
