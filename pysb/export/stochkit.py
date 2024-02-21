@@ -225,7 +225,7 @@ class StochKitExporter(Exporter):
 
         # Reactions
         reacs = etree.Element('ReactionsList')
-        pattern = re.compile("(__s\d+)\*\*(\d+)")
+        pattern = re.compile(r"(__s\d+)\*\*(\d+)")
         for rxn_id, rxn in enumerate(self.model.reactions):
             rxn_name = 'Rxn%d' % rxn_id
             rxn_desc = 'Rules: %s' % str(rxn["rule"])
@@ -325,6 +325,6 @@ class StochKitExporter(Exporter):
             doc = etree.tostring(document)
             xmldoc = xml.dom.minidom.parseString(doc)
             uglyXml = xmldoc.toprettyxml(indent='  ')
-            text_re = re.compile(">\n\s+([^<>\s].*?)\n\s+</", re.DOTALL)
-            prettyXml = text_re.sub(">\g<1></", uglyXml)
+            text_re = re.compile(r">\n\s+([^<>\s].*?)\n\s+</", re.DOTALL)
+            prettyXml = text_re.sub(r">\g<1></", uglyXml)
             return prettyXml

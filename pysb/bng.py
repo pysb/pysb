@@ -850,7 +850,7 @@ def _parse_reaction(model, line, reaction_cache):
     rule_list = rule_list.split(',')  # BNG lists all rules that generate a rxn
     # Support new (BNG 2.2.6-stable or greater) and old BNG naming convention
     # for reverse rules
-    rule_name, is_reverse = zip(*[re.subn('^_reverse_|\(reverse\)$', '', r)
+    rule_name, is_reverse = zip(*[re.subn(r'^_reverse_|\(reverse\)$', '', r)
                                   for r in rule_list])
     is_reverse = tuple(bool(i) for i in is_reverse)
     r_names = ['__s%d' % r for r in reactants]
