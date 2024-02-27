@@ -16,8 +16,8 @@ jobs:
         shell: bash -l {0}
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
@@ -47,7 +47,7 @@ jobs:
           --with-coverage --cover-inclusive --cover-package=build/lib/pysb
           --cover-xml
           -a '!gpu'
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           verbose: true
           flags: os-${{ matrix.os }},python-${{ matrix.python-version }}
