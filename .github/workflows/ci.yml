@@ -23,8 +23,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           environment-file: .github/pysb-conda-env.yml
           activate-environment: pysb
-      - name: Install StochKit (except on Windows)
-        if: matrix.os != 'windows-latest'
+      - name: Install StochKit (Linux only)
+        if: matrix.os == 'ubuntu-latest'
         run: conda install -y -c alubbock stochkit
       - name: Install StochKit Lite (Windows only)
         if: matrix.os == 'windows-latest'
