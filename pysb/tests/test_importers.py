@@ -4,7 +4,7 @@ from pysb.bng import BngFileInterface
 from pysb.importers.bngl import model_from_bngl, BnglImportError
 from pysb.importers.sbml import model_from_sbml, model_from_biomodels
 import numpy
-from nose.tools import assert_raises_regexp, raises
+from nose.tools import assert_raises_regex, raises
 import warnings
 import mock
 import tempfile
@@ -203,7 +203,7 @@ def test_bngl_import_expected_errors():
 
     for filename, errmsg in expected_errors.items():
         full_filename = _bngl_location(filename)
-        yield (assert_raises_regexp,
+        yield (assert_raises_regex,
                BnglImportError,
                errmsg,
                bngl_import_compare_simulations,

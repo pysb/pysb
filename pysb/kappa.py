@@ -1,4 +1,4 @@
-"""
+r"""
 Wrapper functions for running the Kappa programs *KaSim* and *KaSa*.
 
 The path to the directory containing the KaSim and KaSa executables can be
