@@ -196,7 +196,8 @@ def test_bngl_import_expected_errors():
     expected_errors = {'ANx': errtype['plusminus'],
                        'CaOscillate_Sat': errtype['ratelawtype'],
                        'heise': errtype['statelabels'],
-                       'isingspin_energy': errtype['ratelawmissing'],
+                       # following model's error differs between BNG versions
+                       'isingspin_energy': f"({errtype['ratelawmissing']})|({errtype['ratelawtype']})",
                        'test_MM': errtype['ratelawtype'],
                        'test_sat': errtype['ratelawtype'],
                        }
