@@ -4,6 +4,7 @@ channels:
   - conda-forge
 dependencies:
   - alubbock::bionetgen
+  - alubbock::nfsim==1.12.1
   - alubbock::atomizer
   - alubbock::kappa
   - numpy
