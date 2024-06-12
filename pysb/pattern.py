@@ -266,18 +266,17 @@ def _match_graphs(pattern, candidate, exact, count):
         match = nx.is_isomorphic(pattern._as_graph(),
                                  candidate._as_graph(),
                                  node_match=node_matcher)
-        return 1 if count else match
+        return int(match) if count else match
+    gm = GraphMatcher(
+        candidate._as_graph(), pattern._as_graph(),
+        node_match=node_matcher
+    )
+    if count:
+        if pattern.match_once:
+            return 1 if gm.subgraph_is_isomorphic() else 0
+        return sum(1 for _ in gm.subgraph_isomorphisms_iter())
     else:
-        gm = GraphMatcher(
-            candidate._as_graph(), pattern._as_graph(),
-            node_match=node_matcher
-        )
-        if count:
-            if pattern.match_once:
-                return 1 if gm.subgraph_is_isomorphic() else 0
-            return sum(1 for _ in gm.subgraph_isomorphisms_iter())
-        else:
-            return gm.subgraph_is_isomorphic()
+        return gm.subgraph_is_isomorphic()
 
 
 def match_complex_pattern(pattern, candidate, exact=False, count=False):
@@ -307,17 +306,15 @@ def match_complex_pattern(pattern, candidate, exact=False, count=False):
             raise ValueError('Candidate must be concrete for '
                              'exact matching: {}'.format(candidate))
 
-    if exact and len(pattern.monomer_patterns) != len(
-            candidate.monomer_patterns):
-        return False
-
+        if len(pattern.monomer_patterns) != len(candidate.monomer_patterns):
+            return False
     # Compare the monomer counts in the patterns so we can fail fast
     # without having to compare bonds using graph isomorphism checks, which
     # are more computationally expensive
-    mons_pat = collections.Counter([mp.monomer for mp in \
-            pattern.monomer_patterns])
-    mons_cand = collections.Counter([mp.monomer for mp in \
-            candidate.monomer_patterns])
+    mons_pat = collections.Counter([mp.monomer
+                                    for mp in pattern.monomer_patterns])
+    mons_cand = collections.Counter([mp.monomer
+                                     for mp in candidate.monomer_patterns])
 
     for mon, mon_count_cand in mons_cand.items():
         mon_count_pat = mons_pat.get(mon, 0)
@@ -489,11 +486,7 @@ class SpeciesPatternMatcher(object):
             self._add_species(idx, sp)
 
     def _add_species(self, idx, sp):
-        if sp.compartment:
-            raise NotImplementedError
         for mp in sp.monomer_patterns:
-            if mp.compartment:
-                raise NotImplementedError
             self._species_cache[mp.monomer].add(idx)
 
     def add_species(self, species, check_duplicate=True):
