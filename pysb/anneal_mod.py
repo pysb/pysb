@@ -29,9 +29,9 @@ class base_schedule(object):
     def init(self, **options):
         self.__dict__.update(options)
         self.lower = asarray(self.lower)
-        self.lower = where(self.lower == numpy.NINF, -_double_max, self.lower)
+        self.lower = where(self.lower == -numpy.inf, -_double_max, self.lower)
         self.upper = asarray(self.upper)
-        self.upper = where(self.upper == numpy.PINF, _double_max, self.upper)
+        self.upper = where(self.upper == numpy.inf, _double_max, self.upper)
         self.k = 0
         self.accepted = 0
         self.feval = 0
