@@ -26,10 +26,14 @@ jobs:
           activate-environment: pysb
       - name: Install StochKit (Linux only)
         if: matrix.os == 'ubuntu-latest'
-        run: conda install -y -c alubbock stochkit
+        run: |
+          conda install -y -c alubbock stochkit
+          echo "HAS_STOCHKIT=1" >> "$GITHUB_ENV"
       - name: Install StochKit Lite (Windows only)
         if: matrix.os == 'windows-latest'
-        run: conda install -y -c alubbock -c conda-forge stochkit-lite
+        run: |
+          conda install -y -c alubbock -c conda-forge stochkit-lite
+          echo "HAS_STOCHKIT=1" >> "$GITHUB_ENV"
       - name: Fix gfortran DLL linker error on Windows/Python 3.8
         if: matrix.os == 'windows-latest' && matrix.python-version == '3.8'
         run: pip install --upgrade --force-reinstall scipy
@@ -48,6 +52,7 @@ jobs:
           --with-coverage --cover-inclusive --cover-package=build/lib/pysb
           --cover-xml
           -a '!gpu'
+          ${{ env.HAS_STOCHKIT && ' ' || '--exclude stochkit' }}
       - uses: codecov/codecov-action@v4
         with:
           verbose: true
