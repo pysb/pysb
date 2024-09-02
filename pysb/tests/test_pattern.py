@@ -4,7 +4,7 @@ from pysb.examples import robertson, bax_pore, bax_pore_sequential, \
 from pysb.bng import generate_equations
 from nose.tools import assert_raises
 from pysb import as_complex_pattern, as_reaction_pattern, ANY, WILD, \
-    Monomer
+    Monomer, Model, Compartment, MultiState
 import collections
 
 
@@ -69,3 +69,64 @@ def test_all_species_generated():
     for model in [bax_pore, earm_1_3, bax_pore_sequential, kinase_cascade,
                   bngwiki_egfr_simple]:
         yield (check_all_species_generated, model.model)
+
+
+def test_patternmatching_compartments():
+    Model()
+    A = Monomer('A')
+    c = Compartment('c')
+    d = Compartment('d')
+    assert match_complex_pattern(A() % A() ** c, A() ** c % A() ** c)
+    assert match_complex_pattern(A() ** c % A() ** c, A() ** c % A() ** c)
+    assert match_complex_pattern((A() % A()) ** c, A() ** c % A() ** c)
+    assert match_complex_pattern(A() % A() ** c, A() ** d % A() ** c)
+    assert not match_complex_pattern(A() % A() ** c, A() ** d % A() ** d)
+
+
+def test_patternmatching_multibinding():
+    Model()
+    A = Monomer('A', sites=['a', 'b'], site_states={'b': ['x', 'y']})
+    assert match_complex_pattern(
+        as_complex_pattern(A(a=ANY, b='x')),
+        A(a=1, b='y') % A(a=[1, 2], b='x') % A(a=2, b='y'),
+        count=True
+    ) == 2
+
+
+def test_patternmatching_multistate():
+    Model()
+    A = Monomer('A', sites=['a', 'a', 'b'], site_states={'b': ['x', 'y']})
+    assert match_complex_pattern(
+        as_complex_pattern(A(a=ANY, b='x')),
+        A(a=MultiState(1, None), b='y') % A(a=MultiState(1, 2), b='x') %
+        A(a=MultiState(2, None), b='y'),
+        count=True
+    ) == 2
+    assert match_complex_pattern(
+        as_complex_pattern(A(a=MultiState(ANY, None), b='x')),
+        A(a=MultiState(1, None), b='y') % A(a=MultiState(1, 2), b='x') %
+        A(a=MultiState(2, None), b='y'),
+        count=True
+    ) == 0
+    assert match_complex_pattern(
+        as_complex_pattern(A(a=MultiState(ANY, ANY), b='x')),
+        A(a=MultiState(1, None), b='y') % A(a=MultiState(1, 2), b='x') %
+        A(a=MultiState(2, None), b='y'),
+        count=True
+    ) == 2
+
+    assert match_complex_pattern(
+        as_complex_pattern(A(a=ANY, b='x')),
+        A(a=MultiState(1, None), b='y') % A(a=MultiState(1, None), b='x'),
+        count=True
+    ) == 1
+    assert match_complex_pattern(
+        as_complex_pattern(A(a=MultiState(ANY, None), b='x')),
+        A(a=MultiState(1, None), b='y') % A(a=MultiState(1, None), b='x'),
+        count=True
+    ) == 1
+    assert match_complex_pattern(
+        as_complex_pattern(A(a=MultiState(ANY, ANY), b='x')),
+        A(a=MultiState(1, None), b='y') % A(a=MultiState(1, None), b='x'),
+        count=True
+    ) == 0

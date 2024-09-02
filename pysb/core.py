@@ -13,6 +13,7 @@ import sympy
 import scipy.sparse
 import networkx as nx
 from collections.abc import Iterable, Mapping, Sequence, Set
+from collections import defaultdict, Counter
 
 from importlib import reload
 
@@ -43,6 +44,13 @@ def MatchOnce(pattern):
     cp = as_complex_pattern(pattern).copy()
     cp.match_once = True
     return cp
+
+
+def autoinc(init=0):
+    i = init
+    while True:
+        yield i
+        i += 1
 
 
 # A module may define a global with this name (_pysb_doctest_...) to request
@@ -411,7 +419,7 @@ def validate_site_value(state, monomer=None, site=None, _in_multistate=False):
             raise ValueError('Cannot nest MultiState within each other')
 
         if monomer and site:
-            site_counts = collections.Counter(monomer.sites)
+            site_counts = Counter(monomer.sites)
             if len(state) > site_counts[site]:
                 raise ValueError(
                     'MultiState for site "{}" on monomer "{}" has maximum '
@@ -481,6 +489,83 @@ class MultiState(object):
             repr(s) for s in self))
 
 
+def site_condition_from_node(graph, monomer, site_node, bonds, bond_count):
+    """
+    Reconstruct a site condition given the respective node
+
+    Parameters
+    ----------
+    graph: nx.Graph
+        Full graph potentially including the parent ComplexPattern
+    monomer: Monomer
+        Monomer for which this node defines a site_condition
+    site_node: str
+        Node which defines the site condition
+    bonds:
+        Dict that keeps track of identified bonds in the parent
+        ComplexPattern (if applicable). For every node the respective field
+        in the dict keeps a stack of dangling bonds.
+    bond_count:
+        Iterator that keeps track of the overall number of bonds in the
+        molecule.
+    """
+    states = list()
+    site = graph.nodes[site_node]['id']
+    mp_id = graph.nodes[site_node]['mp_id']
+
+    for condition_node in graph.neighbors(site_node):
+        state_candidate = graph.nodes[condition_node]['id']
+        candiditate_mp_id = graph.nodes[condition_node]['mp_id']
+        if state_candidate == 'NoBond':
+            continue
+        elif isinstance(state_candidate, Monomer):
+            continue
+        # need to make sure that site is in same monomer pattern!
+        elif site in monomer.site_states and state_candidate in \
+                monomer.site_states[site] and mp_id == candiditate_mp_id:
+            states.append(state_candidate)
+        elif isinstance(state_candidate, AnyBondTester) and \
+                not isinstance(state_candidate, int):
+            states.append(ANY)
+        else:
+            if bonds[site_node]:
+                # existing bond
+                bond = bonds[site_node].pop()
+            else:
+                # add new bond
+                bond = next(bond_count)
+                bonds[condition_node].append(bond)
+            states.append(bond)
+
+    return normalize_state(states)
+
+
+def normalize_state(states):
+    if len(states) == 0:
+        return None
+    elif len(states) == 1:
+        return states[0]
+    elif len(states) == 2 and any(not isinstance(state, int)
+                                  for state in states):
+        # sort as (state, bond)
+        if isinstance(states[1], int):
+            return tuple(states)
+        else:
+            return states[1], states[0]
+    elif len(states) == 2 and all(isinstance(state, int) for state in states):
+        return sorted(states)
+    else:
+        raise ValueError('Failed to reconstruct site condition from node')
+
+
+NO_BOND = 'NoBond'
+
+
+class AnyBondTester(object):
+    def __eq__(self, other):
+        return not isinstance(other, Component) and other != NO_BOND
+
+
 class MonomerPattern(object):
 
     """
@@ -523,7 +608,7 @@ class MonomerPattern(object):
     def __init__(self, monomer, site_conditions, compartment):
         # ensure all keys in site_conditions are sites in monomer
         unknown_sites = [site for site in site_conditions
-                              if site not in monomer.sites]
+                         if site not in monomer.sites]
         if unknown_sites:
             raise Exception("MonomerPattern with unknown sites in " +
                             str(monomer) + ": " + str(unknown_sites))
@@ -570,7 +655,7 @@ class MonomerPattern(object):
 
         'Site-concrete' means all sites have specified conditions."""
         dup_sites = {k: v for k, v in
-                     collections.Counter(self.monomer.sites).items() if v > 1}
+                     Counter(self.monomer.sites).items() if v > 1}
         if len(self.site_conditions) != len(self.monomer.sites) and \
                 not dup_sites:
             return False
@@ -605,6 +690,56 @@ class MonomerPattern(object):
             return False
 
         return True
+
+    @classmethod
+    def _from_graph(cls, graph, monomer_node, bonds, bond_count):
+        """
+        Convert networkx graph to MonomerPattern
+
+        Parameters
+        ----------
+        graph: nx.Graph
+            Full graph potentially including the parent ComplexPattern
+        monomer_node: str
+            The node corresponding to the Monomer that is to be reconstructed
+        bonds:
+            see :func:`site_condition_from_node`
+        bond_count:
+            see :func:`site_condition_from_node`
+        """
+        monomer = graph.nodes[monomer_node]['id']
+        compartment = None
+
+        site_conditions = dict()
+        site_states = defaultdict(list)
+        for site in graph.neighbors(monomer_node):
+            if isinstance(graph.nodes[site]['id'], str):
+                if graph.nodes[site]['id'] == 'NoBond':
+                    continue
+
+                if graph.nodes[site]['id'] == 'cpt':
+                    compartment = next(
+                        graph.nodes[n]['id']
+                        for n in graph.neighbors(site)
+                        if isinstance(graph.nodes[n]['id'], Compartment)
+                    )
+                    continue
+
+            site_states[graph.nodes[site]['id']].append(
+                site_condition_from_node(graph, monomer, site, bonds,
+                                         bond_count)
+            )
+
+        for site, states in site_states.items():
+            if len(states) == 0:
+                site_condition = None
+            elif len(states) == 1:
+                site_condition = states[0]
+            else:
+                site_condition = MultiState(*states)
+            site_conditions[site] = site_condition
+
+        return cls(monomer, site_conditions, compartment)
 
     def _as_graph(self):
         """
@@ -714,7 +849,6 @@ class MonomerPattern(object):
 
 
 class ComplexPattern(object):
-
     """
     A bound set of MonomerPatterns, i.e. a pattern to match a complex.
 
@@ -769,13 +903,78 @@ class ComplexPattern(object):
             all(mp.is_site_concrete() for mp in self.monomer_patterns)
         return mp_concrete_ok or compartment_ok
 
-    def _as_graph(self):
+    def species_compartment(self):
+        """
+        Computes the compartment of this ComplexPattern according to the cBNGL
+        definition. Only works if this is a species, i.e. the pattern is
+        concrete.
+        """
+        if not self.is_concrete():
+            raise ValueError('Pattern must be concrete to compute species '
+                             'volume.')
+
+        compartments = {
+            mp.compartment for mp in self.monomer_patterns
+        }
+        # if monomer patterns span multiple compartments, cBNGL defines
+        # the species compartment as the surface compartment
+        compartment = self.compartment
+        if compartment is None:
+            compartment = next((
+                comp for comp in compartments
+                if len(compartments) == 1
+                # if more than one, search for surface compartment
+                or (comp is not None and comp.dimension == 2)
+            ), next((
+                comp for comp in compartments
+                if comp is not None
+                # if no surface compartment pick the one that is not None
+            ), None))
+
+        return compartment
+
+    @classmethod
+    def _from_graph(cls, graph):
+        """
+        Convert networkx graph to ComplexPattern
+
+        Parameters
+        ----------
+        graph: nx.Graph
+            Full graph potentially including the parent ReactionPattern
+        """
+        bonds = defaultdict(list)
+        bond_count = autoinc(1)
+        mps = []
+        compartment = None
+        for n, d in graph.nodes(data=True):
+            if isinstance(d['id'], Monomer):
+                mps.append(MonomerPattern._from_graph(graph, n, bonds,
+                                                      bond_count))
+            if isinstance(d['id'], Compartment):
+                if compartment is None:
+                    compartment = d['id']
+                # only overwrite if surface compartment that is connected to
+                # any node
+                elif d['id'].dimension == 2 and graph.degree(n) > 0:
+                    compartment = d['id']
+
+        if all(mp.compartment is not None for mp in mps):
+            compartment = None  # don't provide redundant compartment defintion
+
+        if mps:
+            return cls(mps, compartment)
+        else:
+            return None
+
+    def _as_graph(self, mp_alignment=None, prefix='mp'):
         """
         Return the ComplexPattern represented as a networkx graph
 
         ComplexPatterns can be represented as a graph. This is mainly useful
         for comparing if ComplexPatterns are equivalent (see
-        :func:`ComplexPattern.is_equivalent_to`).
+        :func:`ComplexPattern.is_equivalent_to`) and to compute the effect
+        of Rules on species (see :class:`ReactionGenerator`)
 
         It turns out this is non-trivial because 1) bond numbering is
         arbitrary and 2) ComplexPatterns can contain MonomerPatterns which
@@ -802,10 +1001,17 @@ class ComplexPattern(object):
         subgraph, and we need to distinguish between explicitly unbound and
         unspecified bond (equivalent to the `ANY` keyword).
 
-        Internally, networkx references nodes using an integer. We use a
-        private autoincrementing integer generator function `autoinc` to track
-        nodes, but this is not used when checking graph isomorphism (instead,
-        node to node object equality is checked).
+        Internally, networkx references nodes using an a string that
+        uniquely encodes type-information (index of the MonomerPattern in
+        the ComplexPattern, index of site in the MonomerPattern, index of
+        state for MultiState sites and whether its defines a condition or
+        wildcard-bond) about the node. Moreover index of the MonomerPattern in
+        the ComplexPattern, if applicable, encoded in data field `mp_id`.
+        Neither the string references nor the two attributes are used when
+        checking graph isomorphism (instead, equality of the `id` data field
+        is checked). The data field `mp_id` is required for the reconstruction
+        of a Monomer/ComplexPattern from a graph (see
+        :func:`ComplexPattern._as_graph`).
 
         The `WILD` keyword should match any bond except the special "no
         bond" node - as special private `WildTester` function is used for
@@ -817,46 +1023,47 @@ class ComplexPattern(object):
 
         .. [Blinov2006] https://link.springer.com/chapter/10.1007%2F11905455_5
         .. [Faeder2009] https://www.csb.pitt.edu/Faculty/Faeder/Publications/Reprints/Faeder_2009.pdf
+
+        Parameters
+        ----------
+        mp_alignment: List[int]
+            List of indices used for indexing in the node identifiers.
+            Does not affect the structure of the graph.
+        prefix: str
+            prefix used when creating the node identifiers
         """
-        if self._graph is not None:
-            return self._graph
+        default_alignment = mp_alignment is None
+        #if self._graph is not None and default_alignment:
+        #    return self._graph
 
-        NO_BOND = 'NoBond'
+        if default_alignment:
+            mp_alignment = range(len(self.monomer_patterns))
 
-        def autoinc():
-            i = 0
-            while True:
-                yield i
-                i += 1
-        node_count = autoinc()
-
-        class AnyBondTester(object):
-            def __eq__(self, other):
-                return not isinstance(other, Component) and other != NO_BOND
+        if len(mp_alignment) != len(self.monomer_patterns):
+            raise ValueError('Length of mp_alignment_indices does not match '
+                             'the number of complex patterns')
 
         any_bond_tester = AnyBondTester()
 
         bond_edges = collections.defaultdict(list)
         g = nx.Graph()
         _cpt_nodes = {}
-
         def add_or_get_compartment_node(cpt):
             try:
                 return _cpt_nodes[cpt]
             except KeyError:
-                cpt_node_id = next(node_count)
-                _cpt_nodes[cpt] = cpt_node_id
-                g.add_node(cpt_node_id, id=cpt)
-                return cpt_node_id
+                cpt_node = f'compartment_{cpt.name}'
+                _cpt_nodes[cpt] = cpt_node
+                g.add_node(cpt_node, id=cpt, mp_id=None)
+                return cpt_node
 
         species_cpt_node_id = None
         if self.compartment:
             species_cpt_node_id = add_or_get_compartment_node(self.compartment)
 
-        def _handle_site_instance(state_or_bond):
-            mon_site_id = next(node_count)
-            g.add_node(mon_site_id, id=site)
-            g.add_edge(mon_node_id, mon_site_id)
+        def _handle_site_instance(state_or_bond, site, mp_id, state_index=0):
+            site_index = mp.monomer.sites.index(site)
+            mon_site_id = f'{mp_id}_s{site_index}_{state_index}'
             state = None
             bond_num = None
             if state_or_bond is WILD:
@@ -872,15 +1079,19 @@ class ComplexPattern(object):
                 raise ValueError('Unrecognized state: {}'.format(
                     state_or_bond))
 
+            g.add_node(mon_site_id, id=site, mp_id=mp_id,
+                       state_index=state_index)
+            g.add_edge(mon_node, mon_site_id)
+
             if state_or_bond is ANY or bond_num is ANY:
                 bond_num = any_bond_tester
-                any_bond_tester_id = next(node_count)
-                g.add_node(any_bond_tester_id, id=any_bond_tester)
-                g.add_edge(mon_site_id, any_bond_tester_id)
+                any_bond_tester_node = f'{mp_id}_s{site_index}_{state_index}b'
+                g.add_node(any_bond_tester_node, id=any_bond_tester)
+                g.add_edge(mon_site_id, any_bond_tester_node)
 
             if state is not None:
-                mon_site_state_id = next(node_count)
-                g.add_node(mon_site_state_id, id=state)
+                mon_site_state_id = f'{mp_id}_s{site_index}_{state_index}c'
+                g.add_node(mon_site_state_id, id=state, mp_id=mp_id)
                 g.add_edge(mon_site_id, mon_site_state_id)
 
             if bond_num is None:
@@ -891,34 +1102,37 @@ class ComplexPattern(object):
                 for bond in bond_num:
                     bond_edges[bond].append(mon_site_id)
 
-        for mp in self.monomer_patterns:
-            mon_node_id = next(node_count)
-            g.add_node(mon_node_id, id=mp.monomer)
+        for imp, mp in zip(mp_alignment, self.monomer_patterns):
+            mp_id = f'{prefix}{imp}'
+            mon_node = f'{mp_id}_monomer'
+            g.add_node(mon_node, id=mp.monomer, mp_id=mp_id)
             if mp.compartment or self.compartment:
                 cpt_node_id = add_or_get_compartment_node(mp.compartment or
                                                           self.compartment)
-                g.add_edge(mon_node_id, cpt_node_id)
+                cpt_id = f'{mp_id}_cpt'
+                g.add_node(cpt_id, id='cpt', mp_id=mp_id)
+                g.add_edge(mon_node, cpt_id)
+                g.add_edge(cpt_id, cpt_node_id)
 
             for site, state_or_bond in mp.site_conditions.items():
                 if isinstance(state_or_bond, MultiState):
                     # Duplicate sites
-                    [_handle_site_instance(s) for s in state_or_bond]
+                    [_handle_site_instance(state, site, mp_id, istate)
+                     for istate, state in enumerate(state_or_bond)]
                 else:
-                    _handle_site_instance(state_or_bond)
+                    _handle_site_instance(state_or_bond, site, mp_id)
 
-        # Unbound edges
         unbound_sites = bond_edges.pop(NO_BOND, None)
         if unbound_sites is not None:
-            no_bond_id = next(node_count)
-            g.add_node(no_bond_id, id=NO_BOND)
+            g.add_node(NO_BOND, id=NO_BOND, mp_id=None)
             for unbound_site in unbound_sites:
-                g.add_edge(unbound_site, no_bond_id)
+                g.add_edge(unbound_site, NO_BOND)
 
         # Add bond edges
         for site_nodes in bond_edges.values():
             if len(site_nodes) == 1:
                 # Treat dangling bond as WILD
-                any_bond_tester_id = next(node_count)
+                any_bond_tester_id = 'wild'
                 g.add_node(any_bond_tester_id, id=any_bond_tester)
                 g.add_edge(site_nodes[0], any_bond_tester_id)
             for n1, n2 in itertools.combinations(site_nodes, 2):
@@ -927,11 +1141,13 @@ class ComplexPattern(object):
         # Remove the species compartment if all monomer nodes have a
         # compartment
         if species_cpt_node_id is not None and \
-                        g.degree(species_cpt_node_id) == 0:
+                g.degree(species_cpt_node_id) == 0:
             g.remove_node(species_cpt_node_id)
 
-        self._graph = g
-        return self._graph
+        if default_alignment:
+            self._graph = g
+
+        return g
 
     def is_equivalent_to(self, other):
         """
@@ -991,8 +1207,7 @@ class ComplexPattern(object):
         kwargs = extract_site_conditions(conditions, **kwargs)
 
         # Ensure we don't have more than one of any Monomer in our patterns.
-        mon_counts = collections.Counter(mp.monomer.name for mp in
-                                         self.monomer_patterns)
+        mon_counts = Counter(mp.monomer.name for mp in self.monomer_patterns)
         dup_monomers = [mon for mon, count in mon_counts.items() if count > 1]
         if dup_monomers:
             raise DuplicateMonomerError("ComplexPattern has duplicate "
@@ -1150,6 +1365,90 @@ class ReactionPattern(object):
         self.complex_patterns = complex_patterns
         from pysb.pattern import check_dangling_bonds
         check_dangling_bonds(self)
+        self._graph = None
+
+    def _as_graph(self, mp_alignments=None, prefix='mp'):
+        """
+        Creates a graph representation of the reaction pattern as
+        networkx.Graph. For a reaction pattern this is equal to the
+        composition of the graphs of the constituent ComplexPatterns. The
+        individual monomer patterns in complex patterns can be aligned by
+        passing an mp_alignment, which becomes relevant when later applying
+        precomputed graph-operations based on that alignment.
+
+        Parameters
+        ----------
+        mp_alignments: List[List[int]]
+            List of lists of indices for every ComplexPattern that defines
+            the indexing of the respective MonomerPatterns
+        prefix: str
+            Prefix used for the naming of nodes in the graph
+        """
+        default_alignment = mp_alignments is None
+        if self._graph is not None and default_alignment:
+            return self._graph
+
+        mp_count = autoinc()
+
+        # generate default alignment
+        if default_alignment:
+            mp_alignments = [
+                [next(mp_count) for _ in cp.monomer_patterns]
+                for cp in self.complex_patterns
+            ]
+
+        if len(mp_alignments) != len(self.complex_patterns):
+            raise ValueError('Length of mp_alignment does not match'
+                             'the number of complex patterns')
+
+        if self.complex_patterns:
+            graph = nx.compose_all([
+                cp._as_graph(mp_alignment=mp_alignments[icp], prefix=prefix)
+                for icp, cp in enumerate(self.complex_patterns)
+            ])
+        else:
+            graph = nx.Graph()
+
+        if default_alignment:
+            self._graph = graph
+
+        return graph
+
+    @classmethod
+    def _from_graph(cls, graph):
+        """
+        Convert networkx graph to ReactionPattern
+
+        Parameters
+        ----------
+        graph: nx.Graph
+            Full graph where each connected non-compartment componen
+            corresponds to an individual ComplexPattern
+        """
+        # we can reconstruct the individual complex patterns by looking at
+        # the connected components while ignoring links through compartments
+        # (as connections do not constitute bonds. Note that this will fail
+        # for complex patterns that are not concrete since non-explicit
+        # edges such as A() % A() cannot be recovered.
+        compartments = {n for n, d in graph.nodes(data=True)
+                        if isinstance(d['id'], Compartment)}
+        components = nx.connected_components(
+            graph.subgraph([n for n in graph.nodes
+                            if n not in compartments
+                            and n is not NO_BOND])
+        )
+        # we need re-add compartments for proper reconstruction of complex
+        # patterns. extraneous compartments will be safely ignored as they
+        # wont be connected to any monomer
+        cps = [
+            ComplexPattern._from_graph(graph.subgraph(c | compartments))
+            for c in components
+        ]
+        cps = [cp for cp in cps if cp is not None]
+        if cps:
+            return cls(cps)
+        else:
+            return None
 
     def __add__(self, other):
         if isinstance(other, MonomerPattern):
