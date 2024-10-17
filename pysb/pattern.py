@@ -282,12 +282,14 @@ def _match_graphs(pattern, candidate, exact, count):
 
 def match_complex_pattern(pattern, candidate, exact=False, count=False):
     """
-    Compare two ComplexPatterns against each other
+    Compare two ComplexPatterns against each other. For non-exact matches,
+    this function tests that pattern is a subgraph isomorphism of candidate,
+    i.e. that pattern would match everything that candidate would match.
 
     Parameters
     ----------
     pattern: pysb.ComplexPattern
-    candidate: pysb.Complex.Pattern
+    candidate: pysb.ComplexPattern
     exact: bool
         Set to True for exact matches (i.e. species equivalence,
         or exact graph isomorphism). Set to False to compare as a
@@ -489,11 +491,7 @@ class SpeciesPatternMatcher(object):
             self._add_species(idx, sp)
 
     def _add_species(self, idx, sp):
-        if sp.compartment:
-            raise NotImplementedError
         for mp in sp.monomer_patterns:
-            if mp.compartment:
-                raise NotImplementedError
             self._species_cache[mp.monomer].add(idx)
 
     def add_species(self, species, check_duplicate=True):
@@ -808,11 +806,7 @@ class RulePatternMatcher(object):
             for cache, rp in ((self._reactant_cache, rule.reactant_pattern),
                               (self._product_cache, rule.product_pattern)):
                 for cp in rp.complex_patterns:
-                    if cp.compartment:
-                        raise NotImplementedError
                     for mp in cp.monomer_patterns:
-                        if mp.compartment:
-                            raise NotImplementedError
                         cache[mp.monomer].add(rule.name)
 
     def match_reactants(self, pattern):
@@ -993,8 +987,6 @@ class ReactionPatternMatcher(object):
                     (self._product_cache, rxn['products'])):
                 for sp_id in species_ids:
                     sp = model.species[sp_id]
-                    if sp.compartment:
-                        raise NotImplementedError
                     cache[sp].add(r_id)
 
     def match_reactants(self, pattern):
@@ -1019,7 +1011,7 @@ class ReactionPatternMatcher(object):
         rxn_ids.sort()
 
         return [_Reaction(rxn_dict=self.model.reactions_bidirectional[rxn_id],
-                         model=self.model) for rxn_id in rxn_ids]
+                          model=self.model) for rxn_id in rxn_ids]
 
 
 class _Reaction(object):
