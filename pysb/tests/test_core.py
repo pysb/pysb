@@ -267,6 +267,33 @@ def test_complex_pattern_call():
     ok_(cp(r).monomer_patterns[0].site_conditions['x'] == r['x'])
     assert_raises(RedundantSiteConditionsError, cp, {'x': 'f'}, z='h')
 
+
+@with_model
+def test_complex_pattern_compartment_consistency():
+    """Ensure compartment consistency is enforced in ComplexPatterns."""
+    Monomer('A')
+    Compartment('ec', parent=None, dimension=3)
+    Compartment('pm', parent=ec, dimension=2)
+    Compartment('cp', parent=pm, dimension=3)
+    Compartment('nm', parent=cp, dimension=2)
+    Compartment('nuc', parent=nm, dimension=3)
+    arvcp = partial(assert_raises, ValueError, ComplexPattern)
+    arvcp([A() ** pm, A() ** nm], None)
+    arvcp([A() ** pm], ec),
+    arvcp([A() ** pm], nm),
+    arvcp([A() ** ec, A() ** nuc], None),
+    arvcp([A() ** ec, A() ** nm], None),
+    arvcp([A() ** ec], nm),
+    arvcp([A() ** ec, A() ** nuc, A() ** nuc], None),
+    arvcp([A() ** ec, A() ** cp, A() ** nuc], None),
+    arvcp([A() ** ec], cp),
+    arvcp([A()], 'not a compartment'),
+    ComplexPattern(
+        [A() ** nuc, A() ** nm, A() ** cp],
+        None
+    )
+
+
 @with_model
 def test_monomer_unicode():
     Monomer(u'A', [u's'], {u's': [u's1', u's2']})
