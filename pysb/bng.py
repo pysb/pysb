@@ -998,6 +998,13 @@ def _convert_comparative_operators(tokens, local_dict, global_dict):
     sympy.
     """
     res1 = sympy_parser._group_parentheses(_convert_comparative_operators)(tokens, local_dict, global_dict)
+    # check if the expression contains an if statement and if so revert all
+    # conversions. In this setting we actually want to return boolean values.
+    # This check needs to happen after grouping of parentheses, as we only want
+    # to check for the if statement in the (current) top level of the
+    # expression.
+    if (tokenize.NAME, 'if') in res1:
+        return tokens
     res2 = _apply_functions(res1, local_dict, global_dict)
     res3 = _transform_operator_symbols(res2, local_dict, global_dict)
     result = _flatten(res3)
