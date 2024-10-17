@@ -19,6 +19,7 @@ import pysb.pathfinder as pf
 import tokenize
 from pysb.logging import get_logger, EXTENDED_DEBUG
 from sympy.logic.boolalg import Boolean
+from sympy import Function
 from io import StringIO
 
 
@@ -29,6 +30,75 @@ def set_bng_path(dir):
          stacklevel=2)
     pf.set_path('bng', dir)
 
+
+class BNGLLessThan(Function):
+    nargs = 2
+
+    @classmethod
+    def eval(cls, left, right):
+        return sympy.Piecewise((1, left < right), (0, True))
+
+    def __str__(self):
+        return f'({self.args[0]} < {self.args[1]})'
+
+    __repr__ = __str__
+
+class BNGLLessThanEqual(Function):
+    nargs = 2
+
+    @classmethod
+    def eval(cls, left, right):
+        return sympy.Piecewise((1, left <= right), (0, True))
+
+    def __str__(self):
+        return f'({self.args[0]} <= {self.args[1]})'
+
+    __repr__ = __str__
+
+class BNGLGreaterThan(Function):
+    nargs = 2
+
+    @classmethod
+    def eval(cls, left, right):
+        return sympy.Piecewise((1, left > right), (0, True))
+
+    def __str__(self):
+        return f'({self.args[0]} > {self.args[1]})'
+
+    __repr__ = __str__
+
+class BNGLGreaterThanEqual(Function):
+    nargs = 2
+
+    @classmethod
+    def eval(cls, left, right):
+        return sympy.Piecewise((1, left >= right), (0, True))
+
+    def __str__(self):
+        return f'({self.args[0]} >= {self.args[1]})'
+
+    __repr__ = __str__
+
+
+class BNGLIf(Function):
+    nargs = 3
+
+    @classmethod
+    def eval(cls, condition, true, false):
+        return sympy.Piecewise((true, condition), (false, True))
+
+    def __str__(self):
+        return f'if {self.args[0]} then {self.args[1]} else {self.args[2]}'
+
+    __repr__ = __str__
+
+
+BNG_COMPARATIVE_OPERATORS = {
+    '<': BNGLLessThan,
+    '>': BNGLGreaterThan,
+    '<=': BNGLLessThanEqual,
+    '>=': BNGLGreaterThanEqual,
+}
 
 class BngInterfaceError(RuntimeError):
     """BNG reported an error"""
@@ -905,12 +975,11 @@ def _parse_group(model, line):
             # -1 to change to 0-based indexing
             obs.species.append(int(terms[1]) - 1)
 
-
 def _convert_tokens(tokens, local_dict, global_dict):
     for pos, tok in enumerate(tokens):
         if tok == (tokenize.NAME, 'if'):
             tokens[pos] = (tokenize.NAME, '__bngl_if')
-            local_dict['__bngl_if'] = sympy.Function('bngl_if')
+            local_dict['__bngl_if'] = BNGLIf
         elif tok == (tokenize.OP, '^'):
             tokens[pos] = (tokenize.OP, '**')
         elif tok == (tokenize.NAME, 'and'):
@@ -920,58 +989,102 @@ def _convert_tokens(tokens, local_dict, global_dict):
     return tokens
 
 
+def _convert_comparative_operators(tokens, local_dict, global_dict):
+    """ Transforms comparative operators to corresponding Piecewise functions.
+
+    Supported operators are less-than and greater than (``<``, ``>``, ``<=``,
+    ``>=``). Transformation ensure compatibility with other symbolic operators
+    such as multiplication or division, which is supported in BNGL but not in
+    sympy.
+    """
+    res1 = sympy_parser._group_parentheses(_convert_comparative_operators)(tokens, local_dict, global_dict)
+    res2 = _apply_functions(res1, local_dict, global_dict)
+    res3 = _transform_operator_symbols(res2, local_dict, global_dict)
+    result = _flatten(res3)
+    return result
+
+def _apply_functions(tokens, local_dict, global_dict):
+    """Convert a NAME token + ParenthesisGroup into an AppliedFunction.
+
+    Based on sympy_parser._apply_functions.
+    NB: In contrast to sympy_parser._apply_functions, ParenthesisGroups, if not
+    applied to any function, are _not_ converted back into lists of tokens.
+
+    """
+    result = []
+    symbol = None
+    for tok in tokens:
+        if isinstance(tok, sympy_parser.ParenthesisGroup):
+            if symbol and sympy_parser._token_callable(symbol, local_dict, global_dict):
+                result[-1] = sympy_parser.AppliedFunction(symbol, tok)
+                symbol = None
+            else:
+                result.append(tok)
+        elif tok[0] == tokenize.NAME:
+            symbol = tok
+            result.append(tok)
+        else:
+            symbol = None
+            result.append(tok)
+    return result
+
+def _flatten(result):
+    """Flatten AppliedFunctions and Parenthis Groups into lists of tokens.
+
+    Based on sympy_parser._flatten.
+    NB: In contrast to sympy_parser.__flatten, this function will also flatten
+    ParenthesisGroups and flattening is done recursively.
+    """
+    result2 = []
+    for tok in result:
+        if isinstance(tok, sympy_parser.AppliedFunction):
+            result2.extend(_flatten(tok.expand()))
+        elif isinstance(tok, sympy_parser.ParenthesisGroup):
+            result2.extend(_flatten(tok))
+        else:
+            result2.append(tok)
+    return result2
+
+def _transform_operator_symbols(tokens, local_dict, global_dict):
+    """Transforms the infix comparative operator symbols to function calls.
+
+    This is a helper function for ``_convert_comparative_operators``.
+    Works with expressions containing one comparative operator, no
+    nesting and grouped parenthesis. Expressions like ``(1<2)<4`` will not work
+    with this and should be used with ``_convert_comparative_operators``.
+
+    Examples: 1<2     to BNGLessThan(1,2)
+              1*2<x   to BNGLessThan(1*2, x)
+              1*(2<x)   to 1*BNGLessThan(2, x)
+    """
+    result = tokens
+    for op, fun in BNG_COMPARATIVE_OPERATORS.items():
+        if (tokenize.OP, op) not in tokens:
+            continue
+        # enable parsing of the function implementing the operator
+        local_dict[fun.__name__] = fun
+        # find the operator
+        op_idx = tokens.index((tokenize.OP, op))
+        # insert the function call, with the left and right tokens as arguments
+        # NB: tokenization adds parenthesis based on operator precedence, so we
+        # can assume that the arguments are the tokens immediately before and
+        # after the operator
+        left = tokens[op_idx-1]
+        right = tokens[op_idx+1]
+        # replace the operator and its arguments with the function call
+        result = result[:op_idx-1] + [
+            (tokenize.NAME, fun.__name__),
+            (tokenize.OP, "("),
+            left,
+            (tokenize.OP, ","),
+            right,
+            (tokenize.OP, ")"),
+        ] + result[op_idx+2:]
+    return result
+
+
 def _is_bool_expr(e):
     return isinstance(e, Boolean) and not isinstance(e, sympy.AtomicExpr)
-
-
-# BNG's expression syntax supports multiplication with a boolean, e.g.
-# `2 * (x > 0)`, but sympy does not. Our overall strategy is to convert
-# multiplication with a boolean expression into a BNG-equivalent Piecewise,
-# leaving other multiplications alone. First, we use a transformation function
-# during parsing to temporarily replace any '*' operators with a fake 'bngl_mul'
-# function call. Then, after parsing and evaluation, we perform a subexpression
-# replacement on the 'bngl_mul' calls that converts Boolean args to a Piecewise
-# and emits a normal Mul. This can't be done entirely in a parser transformation
-# because sympy hasn't yet parsed the expression to determine the AST structure
-# that lets us identify boolean subexpressions, and it can't be done entirely
-# post-parsing because multiplication of booleans raises an immediate error
-# during the evaluation step in parse_expr. This function is the parser
-# transformation.
-def _convert_mul(tokens, local_dict, global_dict):
-    res1 = sympy_parser._group_parentheses(_convert_mul)(tokens, local_dict, global_dict)
-    res2 = sympy_parser._apply_functions(res1, local_dict, global_dict)
-    res3 = _transform_mul(res2, local_dict, global_dict)
-    result = sympy_parser._flatten(res3)
-    return result
-
-
-# Helper function for _convert_mul.
-def _transform_mul(tokens, local_dict, global_dict):
-    # Strongly based on sympy.parsing.sympy_parser._transform_equals_sign.
-    result = []
-    if (tokenize.OP, '*') in tokens:
-        local_dict['__bngl_mul'] = sympy.Function('bngl_mul')
-        result.append((tokenize.NAME, '__bngl_mul'))
-        result.append((tokenize.OP, '('))
-        for token in tokens:
-            if token == (tokenize.OP, '*'):
-                result.append((tokenize.OP, ','))
-                continue
-            result.append(token)
-        result.append((tokenize.OP, ')'))
-    else:
-        result = tokens
-    return result
-
-
-# Convert Booleans in Mul() to Piecewise for BNG semantics (see _convert_mul).
-def _fix_boolean_multiplication(*args):
-    args = [
-        sympy.Piecewise((1, a), (0, True)) if _is_bool_expr(a) else a
-        for a in args
-    ]
-    return sympy.Mul(*args)
-
 
 def parse_bngl_expr(text, *args, **kwargs):
     """Convert a BNGL math expression string to a sympy Expr."""
@@ -983,19 +1096,10 @@ def parse_bngl_expr(text, *args, **kwargs):
     trans = (
         *sympy_parser.standard_transformations,
         sympy_parser.convert_equals_signs,
+        _convert_comparative_operators,
         _convert_tokens,
-        _convert_mul,
     )
     expr = sympy_parser.parse_expr(text, *args, transformations=trans, **kwargs)
-    # Second half of boolean multiplication support (see _convert_mul).
-    expr = expr.replace(sympy.Function('bngl_mul'), _fix_boolean_multiplication)
-    # Transforming 'if' to Piecewise requires subexpression rearrangement, so we
-    # use sympy's replace functionality rather than attempt it using text
-    # replacements above.
-    expr = expr.replace(
-        sympy.Function('bngl_if'),
-        lambda cond, t, f: sympy.Piecewise((t, cond), (f, True))
-    )
     # Check for unsupported constructs.
     if expr.has(sympy.Symbol('time')):
         raise ValueError(
