@@ -31,6 +31,7 @@ try:
 except ImportError:
     pygraphviz = None
 import pysb.bng
+from pysb import MultiState
 
 
 def run(model):
@@ -75,13 +76,15 @@ def render_species_as_dot(species_list, graph_name=""):
             monomer_label = '<<table border="0" cellborder="1" cellspacing="0">'
             monomer_label += '<tr><td bgcolor="#a0ffa0"><b>%s</b></td></tr>' % \
                              mp.monomer.name
-            for site in mp.monomer.sites:
+            for sidx, site in enumerate(mp.monomer.sites):
                 site_state = None
                 cond = mp.site_conditions[site]
                 if isinstance(cond, str):
                     site_state = cond
                 elif isinstance(cond, tuple):
                     site_state = cond[0]
+                elif isinstance(cond, MultiState):
+                    site_state = cond.sites[sidx]
                 site_label = site
                 if site_state is not None:
                     site_label += '=<font color="purple">%s</font>' % site_state
@@ -93,6 +96,10 @@ def render_species_as_dot(species_list, graph_name=""):
                     site_bonds.append(value)
                 elif isinstance(value, tuple):
                     site_bonds.append(value[1])
+                elif isinstance(value, MultiState):
+                    for vs in value.sites:
+                        if vs is not None:
+                            site_bonds.append(vs)
                 elif isinstance(value, list):
                     site_bonds += value
                 for b in site_bonds:
