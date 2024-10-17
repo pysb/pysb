@@ -319,7 +319,7 @@ class Simulator(object):
 
         # If new_initials is a list, convert to numpy array
         if isinstance(new_initials, list):
-            new_initials = np.array(new_initials, copy=False)
+            new_initials = np.asarray(new_initials)
 
         # Check if new_initials is a dict, and if so validate the keys
         # (ComplexPatterns)
