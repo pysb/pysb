@@ -408,6 +408,23 @@ def test_parse_bngl_expression_if():
     assert parse_bngl_expr('if(x>y, 1, 3)') == \
         sympy.Piecewise((1, x > y), (3, True))
 
+    # if statement in comparison
+    assert parse_bngl_expr('(if(x>y, 1, 3)<2)*3') == \
+        3*sympy.Piecewise(
+            (1, sympy.Piecewise(
+                (1, x > y),
+                (3, True)
+            )<2),
+            (0, True)
+        )
+
+    # nested comparison in if statement
+    assert parse_bngl_expr('if((x<2)>y, 1, 3)') == \
+        sympy.Piecewise(
+            (1, sympy.ITE(x < 2, y < 1, y < 0)),
+            (3, True)
+        )
+
 
 def test_parse_bngl_expression_exponentiate():
     x, y = sympy.symbols('x y')

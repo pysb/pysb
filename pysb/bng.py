@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 from __future__ import print_function as _
+
+from sympy.parsing.sympy_parser import ParenthesisGroup
+
 import pysb.core
 from pysb.generator.bng import BngGenerator, format_complexpattern
 import os
@@ -31,7 +34,12 @@ def set_bng_path(dir):
     pf.set_path('bng', dir)
 
 
-class BNGLLessThan(Function):
+class BNGLStrictLessThan(Function):
+    """ BNGL compatible implementation of sympy.StrictLessThan.
+
+    Name formatted such that respective tokenization can easily be reverted to
+    corresponding sympy function.
+    """
     nargs = 2
 
     @classmethod
@@ -43,7 +51,12 @@ class BNGLLessThan(Function):
 
     __repr__ = __str__
 
-class BNGLLessThanEqual(Function):
+class BNGLLessThan(Function):
+    """ BNGL compatible implementation of sympy.LessThan.
+
+    Name formatted such that respective tokenization can easily be reverted to
+    corresponding sympy function.
+    """
     nargs = 2
 
     @classmethod
@@ -55,7 +68,13 @@ class BNGLLessThanEqual(Function):
 
     __repr__ = __str__
 
-class BNGLGreaterThan(Function):
+
+class BNGLStrictGreaterThan(Function):
+    """ BNGL compatible implementation of sympy.StrictGreaterThan.
+
+    Name formatted such that respective tokenization can easily be reverted to
+    corresponding sympy function.
+    """
     nargs = 2
 
     @classmethod
@@ -67,7 +86,12 @@ class BNGLGreaterThan(Function):
 
     __repr__ = __str__
 
-class BNGLGreaterThanEqual(Function):
+class BNGLGreaterThan(Function):
+    """ BNGL compatible implementation of sympy.GreaterThan.
+
+    Name formatted such that respective tokenization can easily be reverted to
+    corresponding sympy function.
+    """
     nargs = 2
 
     @classmethod
@@ -88,16 +112,16 @@ class BNGLIf(Function):
         return sympy.Piecewise((true, condition), (false, True))
 
     def __str__(self):
-        return f'if {self.args[0]} then {self.args[1]} else {self.args[2]}'
+        return f'ITE({self.args[0]}, {self.args[1]}, {self.args[2]})'
 
     __repr__ = __str__
 
 
 BNG_COMPARATIVE_OPERATORS = {
-    '<': BNGLLessThan,
-    '>': BNGLGreaterThan,
-    '<=': BNGLLessThanEqual,
-    '>=': BNGLGreaterThanEqual,
+    '<': BNGLStrictLessThan,
+    '>': BNGLStrictGreaterThan,
+    '<=': BNGLLessThan,
+    '>=': BNGLGreaterThan,
 }
 
 class BngInterfaceError(RuntimeError):
@@ -978,8 +1002,8 @@ def _parse_group(model, line):
 def _convert_tokens(tokens, local_dict, global_dict):
     for pos, tok in enumerate(tokens):
         if tok == (tokenize.NAME, 'if'):
-            tokens[pos] = (tokenize.NAME, '__bngl_if')
-            local_dict['__bngl_if'] = BNGLIf
+            tokens[pos] = (tokenize.NAME, 'BNGLIf')
+            local_dict['BNGLIf'] = BNGLIf
         elif tok == (tokenize.OP, '^'):
             tokens[pos] = (tokenize.OP, '**')
         elif tok == (tokenize.NAME, 'and'):
@@ -997,17 +1021,57 @@ def _convert_comparative_operators(tokens, local_dict, global_dict):
     such as multiplication or division, which is supported in BNGL but not in
     sympy.
     """
-    res1 = sympy_parser._group_parentheses(_convert_comparative_operators)(tokens, local_dict, global_dict)
+    res1 = sympy_parser._group_parentheses(_convert_comparative_operators)(
+        tokens, local_dict, global_dict
+    )
+    res2 = _apply_functions(res1, local_dict, global_dict)
+    res3 = _revert_conversion(res2)
+    result = _transform_operator_symbols(res3, local_dict, global_dict)
+    return result
+
+def _revert_conversion(tokens):
+    """ Reverts certain conversions of comparative operators to function calls.
+
+    For settings where a comparative operator appears in an if statement,
+    we actually want to return boolean values. This function reverts the
+    conversion of comparative operators (with boolean return values) to function
+    calls (with numerical return values) in the top level expression of the
+    first argument of an if statement.
+    """
+
     # check if the expression contains an if statement and if so revert all
     # conversions. In this setting we actually want to return boolean values.
     # This check needs to happen after grouping of parentheses, as we only want
     # to check for the if statement in the (current) top level of the
     # expression.
-    if (tokenize.NAME, 'if') in res1:
-        return tokens
-    res2 = _apply_functions(res1, local_dict, global_dict)
-    res3 = _transform_operator_symbols(res2, local_dict, global_dict)
-    result = _flatten(res3)
+    result = tokens
+    revert_ops = [
+        func.__name__
+        for func in BNG_COMPARATIVE_OPERATORS.values()
+    ]
+    for pos, tok in enumerate(tokens):
+        if not isinstance(tok, sympy_parser.AppliedFunction):
+            continue
+
+        if not tok.function == (tokenize.NAME, 'BNGLIf'):
+            continue
+
+        # we need to revert the conversions we just applied, but
+        # only for the first argument of the if statement and only
+        # at the top level of the expression
+        for arg_pos, arg_tok in enumerate(tok.args):
+            if arg_tok == (tokenize.OP, ','):
+                break
+
+            if isinstance(arg_tok, sympy_parser.AppliedFunction) and (
+                arg_tok.function[0] == tokenize.NAME and
+                arg_tok.function[1] in revert_ops
+            ):
+                result[pos].args[arg_pos].function = (
+                    tokenize.NAME,
+                    arg_tok.function[1].replace('BNGL', '')
+                )
+
     return result
 
 def _apply_functions(tokens, local_dict, global_dict):
@@ -1035,22 +1099,22 @@ def _apply_functions(tokens, local_dict, global_dict):
             result.append(tok)
     return result
 
-def _flatten(result):
+def _flatten(tokens, local_dict, global_dict):
     """Flatten AppliedFunctions and Parenthis Groups into lists of tokens.
 
     Based on sympy_parser._flatten.
     NB: In contrast to sympy_parser.__flatten, this function will also flatten
     ParenthesisGroups and flattening is done recursively.
     """
-    result2 = []
-    for tok in result:
+    result = []
+    for tok in tokens:
         if isinstance(tok, sympy_parser.AppliedFunction):
-            result2.extend(_flatten(tok.expand()))
+            result.extend(_flatten(tok.expand(), local_dict, global_dict))
         elif isinstance(tok, sympy_parser.ParenthesisGroup):
-            result2.extend(_flatten(tok))
+            result.extend(_flatten(tok, local_dict, global_dict))
         else:
-            result2.append(tok)
-    return result2
+            result.append(tok)
+    return result
 
 def _transform_operator_symbols(tokens, local_dict, global_dict):
     """Transforms the infix comparative operator symbols to function calls.
@@ -1079,14 +1143,12 @@ def _transform_operator_symbols(tokens, local_dict, global_dict):
         left = tokens[op_idx-1]
         right = tokens[op_idx+1]
         # replace the operator and its arguments with the function call
-        result = result[:op_idx-1] + [
-            (tokenize.NAME, fun.__name__),
-            (tokenize.OP, "("),
-            left,
-            (tokenize.OP, ","),
-            right,
-            (tokenize.OP, ")"),
-        ] + result[op_idx+2:]
+        args = ParenthesisGroup([
+            (tokenize.OP, '('), left, (tokenize.OP, ','), right,(tokenize.OP, ')')
+        ])
+        result = result[:op_idx-1] + [sympy_parser.AppliedFunction(
+            (tokenize.NAME, fun.__name__), args
+        )] + result[op_idx+2:]
     return result
 
 
@@ -1103,8 +1165,10 @@ def parse_bngl_expr(text, *args, **kwargs):
     trans = (
         *sympy_parser.standard_transformations,
         sympy_parser.convert_equals_signs,
-        _convert_comparative_operators,
+        # order is important here
         _convert_tokens,
+        _convert_comparative_operators,
+        _flatten,
     )
     expr = sympy_parser.parse_expr(text, *args, transformations=trans, **kwargs)
     # Check for unsupported constructs.
