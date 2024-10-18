@@ -5,7 +5,7 @@ import numpy as np
 import sympy
 
 from pysb.bng import generate_equations
-from pysb.core import Expression
+from pysb.core import Expression, time
 from pysb.logging import setup_logger
 from pysb.simulator.base import Simulator, SimulatorException
 
@@ -49,10 +49,15 @@ class SSABase(Simulator):
             stoich_string += '\n'
         output_string = ''
 
-        expr_strings = {
-            e.name: '(%s)' % sympy.ccode(
-                e.expand_expr(expand_observables=True)
-            ) for e in self.model.expressions}
+        expr_strings = {}
+        for expr in self.model.expressions:
+            ee = expr.expand_expr(expand_observables=True)
+            if ee.has(time):
+                raise ValueError(
+                    "Expressions referencing simulation time are not supported"
+                )
+            expr_strings[expr.name] = '(%s)' % sympy.ccode(ee)
+
         for n, rxn in enumerate(self._model.reactions):
             output_string += "\th[%s] = " % repr(n)
             rate = sympy.fcode(rxn["rate"])

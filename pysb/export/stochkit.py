@@ -8,7 +8,7 @@ For information on how to use the model exporters, see the documentation
 for :py:mod:`pysb.export`.
 """
 from pysb.export import Exporter, CompartmentsNotSupported
-from pysb.core import as_complex_pattern, Expression, Parameter
+from pysb.core import as_complex_pattern, Expression, Parameter, time
 from pysb.bng import generate_equations
 import numpy as np
 import sympy
@@ -212,16 +212,18 @@ class StochKitExporter(Exporter):
         document.append(params)
 
         # Expressions and observables
-        expr_strings = {
-            e.name: '(%s)' % sympy.ccode(
-                e.expand_expr(expand_observables=True)
-            )
-            for e in itertools.chain(
-                self.model.expressions_constant(),
-                self.model.expressions_dynamic(include_local=False),
-                self.model._derived_expressions
-            )
-        }
+        expr_strings = {}
+        for e in itertools.chain(
+            self.model.expressions_constant(),
+            self.model.expressions_dynamic(include_local=False),
+            self.model._derived_expressions
+        ):
+            ee = e.expand_expr(expand_observables=True)
+            if ee.has(time):
+                raise ValueError(
+                    "Expressions referencing simulation time are not supported"
+                )
+            expr_strings[e.name] = '(%s)' % sympy.ccode(ee)
 
         # Reactions
         reacs = etree.Element('ReactionsList')
