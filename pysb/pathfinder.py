@@ -4,6 +4,12 @@ import sysconfig
 # Set to False to not utilize the system PATH environment variable
 use_path = 'PYSB_PATHFINDER_IGNORE_PATH' not in os.environ
 
+try:
+    import bionetgen
+    bng_search_paths = (bionetgen.defaults.bng_path,)
+except ImportError:
+    bng_search_paths = ()
+
 _path_config = {
     'atomizer': {
         'name': 'Atomizer',
@@ -25,8 +31,8 @@ _path_config = {
         'batch_file': 'BNG2.bat',
         'env_var': 'BNGPATH',
         'search_paths': {
-            'posix': ('/usr/local/share/BioNetGen', ),
-            'nt': ('c:/Program Files/BioNetGen', )
+            'posix': ('/usr/local/share/BioNetGen', *bng_search_paths),
+            'nt': ('c:/Program Files/BioNetGen', *bng_search_paths)
         },
         'conda_install_cmd': 'conda install -c alubbock bionetgen'
     },
