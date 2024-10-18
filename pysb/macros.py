@@ -854,6 +854,10 @@ def create_t_obs():
         This macro is usually used to create rate laws that depend on time.
         Time tracking rate laws using this macro only work for deterministic simulations.
 
+    .. note::
+        Explicit time dependence can also be expressed using the special symbol
+        `pysb.core.time`.
+
     Returns
     -------
     components : ComponentSet

@@ -83,7 +83,7 @@ class PysbFlatExporter(Exporter):
         output.write("from pysb import Model, Monomer, Parameter, Expression, "
                      "Compartment, Rule, Observable, Initial, MatchOnce, "
                      "EnergyPattern, Annotation, MultiState, Tag, ANY, WILD, "
-                     "as_complex_pattern\n")
+                     "as_complex_pattern, time\n")
         if sympy_functions:
             output.write(
                 "from sympy import " + ", ".join(sympy_functions) + "\n"
