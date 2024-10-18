@@ -3,7 +3,6 @@ name: pysb
 channels:
   - conda-forge
 dependencies:
-  - alubbock::bionetgen
   - alubbock::nfsim==1.12.1
   - alubbock::atomizer
   - alubbock::kappa
@@ -25,3 +24,4 @@ dependencies:
       - libroadrunner
       - python-libsbml
       - pynose
+      - bionetgen
