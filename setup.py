@@ -31,7 +31,7 @@ def main():
           setup_requires=['pynose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'h5py', 'mock', 'cython',
-                         'python-libsbml', 'libroadrunner', 'bionetgen'],
+                         'python-libsbml', 'libroadrunner'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],
           classifiers=[
