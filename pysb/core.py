@@ -2791,3 +2791,10 @@ class WILD(Keyword):
 
 warnings.simplefilter('always', ModelExistsWarning)
 warnings.simplefilter('always', SymbolExistsWarning)
+
+
+class SpecialSymbol(sympy.Symbol):
+    """ Class to manage specie/implicit variable such as time in the model."""
+
+
+time = SpecialSymbol('time', real=True)

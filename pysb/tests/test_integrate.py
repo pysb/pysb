@@ -1,7 +1,9 @@
+from ast import Param
+
 from pysb.testing import *
 from pysb.integrate import Solver
 import numpy as np
-from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
+from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression, time
 from pysb.bng import run_ssa
 from pysb.simulator.base import SimulatorException
 
@@ -109,14 +111,29 @@ def test_integrate_with_expression():
     Rule('R2', None >> s20(), ks0)
     Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
-    time = np.linspace(0, 40)
+    tspan = np.linspace(0, 40)
 
-    solver = Solver(model, time)
+    solver = Solver(model, tspan)
     solver.run()
 
-    assert solver.yexpr_view.shape == (len(time),
+    assert solver.yexpr_view.shape == (len(tspan),
                                        len(model.expressions_dynamic()))
-    assert solver.yobs_view.shape == (len(time), len(model.observables))
+    assert solver.yobs_view.shape == (len(tspan), len(model.observables))
+
+@with_model
+def test_integrate_with_time():
+    Monomer('A')
+
+    Parameter('ksynthA', 1)
+
+    Expression('synthrate', ksynthA*time)
+
+    Rule('synthesize_A', None >> A(), synthrate)
+
+    tspan = np.linspace(0, 40)
+
+    solver = Solver(model, tspan)
+    solver.run()
 
 
 def test_robertson_integration():

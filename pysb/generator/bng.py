@@ -1,7 +1,7 @@
 import inspect
 import warnings
 import pysb
-from pysb.core import MultiState
+from pysb.core import MultiState, time
 import sympy
 from sympy.printing import StrPrinter
 from sympy.printing.precedence import precedence
@@ -359,6 +359,12 @@ class BngPrinter(StrPrinter):
             self._print(expr.args[0] if len(expr.args) == 1 else
                         ', '.join([self._print(a) for a in expr.args]))
         )
+
+    def _print_SpecialSymbol(self, expr):
+        if expr is time:
+            return 'time()'
+
+        raise NotImplementedError('SpecialSymbol not supported: %s' % expr)
 
     _print_Abs = __make_lower
     _print_Min = __make_lower

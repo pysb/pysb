@@ -14,6 +14,7 @@ import warnings
 import os
 import inspect
 from pysb.logging import get_logger, PySBModelLoggerAdapter, EXTENDED_DEBUG
+from pysb import time
 import logging
 import contextlib
 import importlib
@@ -383,6 +384,8 @@ class RhsBuilder:
     cleanup : bool
         Whether to delete the work directory with generated code and compiled
         output files upon destruction.
+    t : sympy.Symbol
+        Symbol "t" representing time.
     y : sympy.MatrixSymbol
         Symbol "y" representing the amount of all model species.
     p : sympy.MatrixSymbol
@@ -415,6 +418,7 @@ class RhsBuilder:
         self._logger = _logger
         expr_dynamic = model.expressions_dynamic(include_derived=True)
         expr_constant = model.expressions_constant(include_derived=True)
+        self.t = sympy.Symbol('t')
         self.y = sympy.MatrixSymbol('y', len(model.species), 1)
         self.p = sympy.MatrixSymbol('p', len(model.parameters_all()), 1)
         self.e = sympy.MatrixSymbol('e', len(expr_constant), 1)
@@ -423,6 +427,8 @@ class RhsBuilder:
         param_subs = dict(zip(model.parameters_all(), self.p))
         # All substitution rules we need to apply to the reaction expressions.
         all_subs = param_subs.copy()
+        # Time symbol.
+        all_subs.update({time: self.t})
         # Species symbols.
         all_subs.update({
             sympy.Symbol('__s%d' % i): self.y[i]
@@ -585,12 +591,12 @@ class PythonRhsBuilder(RhsBuilder):
 
     def _get_rhs(self):
         kinetics = sympy.lambdify(
-            [self.y, self.p, self.e, self.o], self.kinetics
+            [self.t, self.y, self.p, self.e, self.o], self.kinetics
         )
 
         def rhs(t, y, p, e):
             o = (self.observables_matrix * y)[:, None]
-            v = kinetics(y[:, None], p[:, None], e, o)
+            v = kinetics(t, y[:, None], p[:, None], e, o)
             ydot = self.stoichiometry_matrix * v[:, 0]
             return ydot
 

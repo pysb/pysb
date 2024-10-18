@@ -6,7 +6,7 @@ import collections
 from collections.abc import Mapping, Sequence
 import numbers
 from pysb.core import MonomerPattern, ComplexPattern, as_complex_pattern, \
-                      Parameter, Expression, Model, ComponentSet
+                      Parameter, Expression, Model, ComponentSet, time
 from pysb.logging import get_logger, EXTENDED_DEBUG
 import pickle
 from pysb.export.json import JsonExporter
@@ -843,7 +843,7 @@ class SimulationResult(object):
                 self._yexpr[n]), -1) for n in range(self.nsims)]
 
             # loop over simulations
-            sym_names = obs_names + param_names
+            sym_names = obs_names + param_names + [time.name]
             expanded_exprs = [sympy.lambdify(sym_names, expr.expand_expr(),
                                              "numpy") for expr in exprs]
             for n in range(self.nsims):
@@ -862,8 +862,16 @@ class SimulationResult(object):
                 sym_dict.update(dict((p.name, self.param_values[
                     n // self.n_sims_per_parameter_set][i]) for i, p in
                                 enumerate(self._model.parameters)))
+                sym_dict[time.name] = 0.0
                 for i, expr in enumerate(exprs):
-                    self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)
+                    if expr.expr.has(time):
+                        for it, t in enumerate(self.tout[n]):
+                            sym_dict[time.name] = t
+                            self._yexpr_view[n][it, i] = expanded_exprs[i](
+                                **sym_dict
+                            )
+                    else:
+                        self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)
 
         if simulator:
             simulator._reset_run_overrides()
