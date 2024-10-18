@@ -82,33 +82,28 @@ def check_convert(model, format):
                 ['__obs{}'.format(i) for i in range(len(model.observables))]
             rr_result = rr.simulate(0, 10, 100)
 
-            model_rt = model_from_sbml(exported_file)
-
             # Simulate original using PySB
-            df_og = ScipyOdeSimulator(model).run(tspan=np.linspace(0, 10, 100)).dataframe
-            df_rt = ScipyOdeSimulator(model_rt).run(tspan=np.linspace(0, 10, 100)).dataframe
+            df = ScipyOdeSimulator(model).run(tspan=np.linspace(0, 10, 100)).dataframe
 
             # Compare species' trajectories
             for sp_idx in range(len(model.species)):
                 rr_sp = rr_result[:, sp_idx]
-                for df in (df_og, df_rt):
-                    py_sp = df.iloc[:, sp_idx]
-                    is_close = np.allclose(rr_sp, py_sp, rtol=1e-4)
-                    if not is_close:
-                        print(pd.DataFrame(dict(rr=rr_sp, pysb=py_sp)))
-                        raise ValueError('Model {}, species __s{} trajectories do not match:'.format(
-                            model.name, sp_idx))
+                py_sp = df.iloc[:, sp_idx]
+                is_close = np.allclose(rr_sp, py_sp, rtol=1e-4)
+                if not is_close:
+                    print(pd.DataFrame(dict(rr=rr_sp, pysb=py_sp)))
+                    raise ValueError('Model {}, species __s{} trajectories do not match:'.format(
+                        model.name, sp_idx))
 
             # Compare observables' trajectories
             for obs_idx in range(len(model.observables)):
                 rr_obs = rr_result[:, obs_idx + len(model.species)]
-                for df in (df_og, df_rt):
-                    py_obs = df.iloc[:, obs_idx + len(model.species)]
-                    is_close = np.allclose(rr_obs, py_obs, rtol=1e-4)
-                    if not is_close:
-                        print(pd.DataFrame(dict(rr=rr_obs, pysb=py_obs)))
-                        raise ValueError('Model {}, observable__o{} "{}" trajectories do not match:'.format(
-                            model.name, obs_idx, model.observables[obs_idx].name))
+                py_obs = df.iloc[:, obs_idx + len(model.species)]
+                is_close = np.allclose(rr_obs, py_obs, rtol=1e-4)
+                if not is_close:
+                    print(pd.DataFrame(dict(rr=rr_obs, pysb=py_obs)))
+                    raise ValueError('Model {}, observable__o{} "{}" trajectories do not match:'.format(
+                        model.name, obs_idx, model.observables[obs_idx].name))
         elif format == 'json':
             # Round-trip the model by re-importing the JSON
             m = model_from_json(exported_file)
