@@ -686,6 +686,7 @@ class CythonRhsBuilder(RhsBuilder):
         routine = Routine(
             name,
             [
+                InputArgument(self.t, dimensions=()),
                 InputArgument(self.y, dimensions=_mat_sym_dims(self.y)),
                 InputArgument(self.p, dimensions=_mat_sym_dims(self.p)),
                 InputArgument(self.e, dimensions=_mat_sym_dims(self.e)),
@@ -723,7 +724,7 @@ class CythonRhsBuilder(RhsBuilder):
 
         def rhs(t, y, p, e):
             o = (self.observables_matrix * y)[:, None]
-            v = kinetics(y[:, None], p[:, None], e, o)
+            v = kinetics(np.array(t), y[:, None], p[:, None], e, o)
             ydot = self.stoichiometry_matrix * v[:, 0]
             return ydot
 
@@ -735,8 +736,8 @@ class CythonRhsBuilder(RhsBuilder):
 
         def jacobian(t, y, p, e):
             o = (self.observables_matrix * y)[:, None]
-            dy = kinetics_jacobian_y(y[:, None], p[:, None], e, o)
-            do = kinetics_jacobian_o(y[:, None], p[:, None], e, o)
+            dy = kinetics_jacobian_y(np.array(t), y[:, None], p[:, None], e, o)
+            do = kinetics_jacobian_o(np.array(t), y[:, None], p[:, None], e, o)
             # Compute Jacobian of the kinetics vector by total derivative.
             jv = dy + do * self.observables_matrix
             jac = self.stoichiometry_matrix * jv
