@@ -137,8 +137,16 @@ class BngBaseInterface(object):
             Arguments and values to supply to BNG
         """
         if kwargs:
-            action_args = ','.join('%s=>%s' % (k, BngConsole._bng_param(v))
-                                   for k, v in kwargs.items())
+            processed_pars = []
+            for k, v in kwargs.items():
+                bng_param = BngConsole._bng_param(v)
+                if isinstance(bng_param, collections.Mapping):
+                    par_string = f'{k}' + '=>{' + ','.join(f"{k}=>{v}" for k, v in bng_param.items()) + '}'
+                else:
+                    par_string = f'{k}=>{bng_param}'
+                processed_pars.append(par_string)
+
+            action_args = ','.join(processed_pars)
         else:
             action_args = ''
         return action_args
