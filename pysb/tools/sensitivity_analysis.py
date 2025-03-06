@@ -104,7 +104,7 @@ class PairwiseSensitivity(object):
             objective_function=obj_func_cell_cycle,\
             solver=solver\
         )
-    >>> print(sens.b_matrix)
+    >>> print([[tuple(elem) for elem in row] for row in sens.b_matrix])
     [[((0.8, 'cdc0'), (0.8, 'cdc0')) ((0.8, 'cdc0'), (1.2, 'cdc0'))
       ((0.8, 'cdc0'), (0.8, 'cyc0')) ((0.8, 'cdc0'), (1.2, 'cyc0'))]
      [((1.2, 'cdc0'), (0.8, 'cdc0')) ((1.2, 'cdc0'), (1.2, 'cdc0'))
