@@ -27,13 +27,7 @@ class MathMLContentPrinter(MathMLPrinter):
     def _print_SpecialSymbol(self, sym):
         if sym.name == 'time':
             # SBML spec (Level 3 Version 2) provides example on page 26:
-            # <math xmlns="http://www.w3.org/1998/Math/MathML">
-            #   <apply>
-            #     <plus/>
-            #     <ci> x </ci>
-            #     <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time">t</csymbol>
-            #   </apply>
-            # </math>
+            # <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time">t</csymbol>
             csymbol = self.dom.createElement("csymbol")
             csymbol.setAttribute("encoding", "text")
             csymbol.setAttribute("definitionURL",
