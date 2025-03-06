@@ -38,12 +38,7 @@ class MathMLContentPrinter(MathMLPrinter):
             csymbol.setAttribute("encoding", "text")
             csymbol.setAttribute("definitionURL",
                                  "http://www.sbml.org/sbml/symbols/time")
-
-            # Create a text node for 't'
-            t_text = self.dom.createTextNode("t")
-
-            # Append the text node to the csymbol element
-            csymbol.appendChild(t_text)
+            csymbol.appendChild(self.dom.createTextNode("t"))
             return csymbol
 
     def to_xml(self, expr):
