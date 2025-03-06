@@ -236,7 +236,7 @@ class Simulator(object):
             # Only need parameter substitutions if model initials include
             # expressions
             subs = [
-                dict((p, pv[i]) for i, p in
+                dict((p, float(pv[i])) for i, p in
                      enumerate(self._model.parameters))
                 for pv in self.param_values]
             if len(subs) == 1 and n_sims_actual > 1:
