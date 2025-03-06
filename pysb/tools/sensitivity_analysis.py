@@ -104,7 +104,8 @@ class PairwiseSensitivity(object):
             objective_function=obj_func_cell_cycle,\
             solver=solver\
         )
-    >>> print([[tuple(elem) for elem in row] for row in sens.b_matrix])#doctest: +NORMALIZE_WHITESPACE
+    >>> print([[tuple(elem) for elem in row] for row in sens.b_matrix]) \
+            #doctest: +NORMALIZE_WHITESPACE
     [[((0.8, 'cdc0'), (0.8, 'cdc0')), ((0.8, 'cdc0'), (1.2, 'cdc0')),
       ((0.8, 'cdc0'), (0.8, 'cyc0')), ((0.8, 'cdc0'), (1.2, 'cyc0'))],
      [((1.2, 'cdc0'), (0.8, 'cdc0')), ((1.2, 'cdc0'), (1.2, 'cdc0')),
@@ -209,7 +210,8 @@ class PairwiseSensitivity(object):
             solver=solver,\
             sample_list=['k1', 'cdc0']\
         )
-    >>> print([[tuple(elem) for elem in row] for row in sens.b_matrix])
+    >>> print([[tuple(elem) for elem in row] for row in sens.b_matrix]) \
+            #doctest: +NORMALIZE_WHITESPACE
     [[((0.9, 'k1'), (0.9, 'k1')), ((0.9, 'k1'), (1.1, 'k1')),
       ((0.9, 'k1'), (0.9, 'cdc0')), ((0.9, 'k1'), (1.1, 'cdc0'))],
      [((1.1, 'k1'), (0.9, 'k1')), ((1.1, 'k1'), (1.1, 'k1')),
