@@ -109,14 +109,14 @@ def test_integrate_with_expression():
     Rule('R2', None >> s20(), ks0)
     Rule('R3', s16() + s20() >> s16() + s1(), keff)
 
-    tspan = np.linspace(0, 40)
+    time = np.linspace(0, 40)
 
-    solver = Solver(model, tspan)
+    solver = Solver(model, time)
     solver.run()
 
-    assert solver.yexpr_view.shape == (len(tspan),
+    assert solver.yexpr_view.shape == (len(time),
                                        len(model.expressions_dynamic()))
-    assert solver.yobs_view.shape == (len(tspan), len(model.observables))
+    assert solver.yobs_view.shape == (len(time), len(model.observables))
 
 
 def test_robertson_integration():
