@@ -1,5 +1,3 @@
-from ast import Param
-
 from pysb.testing import *
 from pysb.integrate import Solver
 import numpy as np
