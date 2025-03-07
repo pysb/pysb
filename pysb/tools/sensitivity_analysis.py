@@ -76,7 +76,7 @@ class PairwiseSensitivity(object):
     >>> from pysb.examples.tyson_oscillator import model
     >>> import numpy as np
     >>> from pysb.simulator.scipyode import ScipyOdeSimulator
-    >>> np.set_printoptions(precision=4, suppress=True)
+    >>> np.set_printoptions(precision=4, suppress=True, legacy='1.13')
     >>> tspan=np.linspace(0, 200, 201)
     >>> observable = 'Y3'
     >>> values_to_sample = [.8, 1.2]
@@ -104,16 +104,15 @@ class PairwiseSensitivity(object):
             objective_function=obj_func_cell_cycle,\
             solver=solver\
         )
-    >>> print([[tuple(elem) for elem in row] for row in sens.b_matrix]) \
-            #doctest: +NORMALIZE_WHITESPACE
-    [[((0.8, 'cdc0'), (0.8, 'cdc0')), ((0.8, 'cdc0'), (1.2, 'cdc0')),
-      ((0.8, 'cdc0'), (0.8, 'cyc0')), ((0.8, 'cdc0'), (1.2, 'cyc0'))],
-     [((1.2, 'cdc0'), (0.8, 'cdc0')), ((1.2, 'cdc0'), (1.2, 'cdc0')),
-      ((1.2, 'cdc0'), (0.8, 'cyc0')), ((1.2, 'cdc0'), (1.2, 'cyc0'))],
-     [((0.8, 'cyc0'), (0.8, 'cdc0')), ((0.8, 'cyc0'), (1.2, 'cdc0')),
-      ((0.8, 'cyc0'), (0.8, 'cyc0')), ((0.8, 'cyc0'), (1.2, 'cyc0'))],
-     [((1.2, 'cyc0'), (0.8, 'cdc0')), ((1.2, 'cyc0'), (1.2, 'cdc0')),
-      ((1.2, 'cyc0'), (0.8, 'cyc0')), ((1.2, 'cyc0'), (1.2, 'cyc0'))]]
+    >>> print(sens.b_matrix)
+    [[((0.8, 'cdc0'), (0.8, 'cdc0')) ((0.8, 'cdc0'), (1.2, 'cdc0'))
+      ((0.8, 'cdc0'), (0.8, 'cyc0')) ((0.8, 'cdc0'), (1.2, 'cyc0'))],
+     [((1.2, 'cdc0'), (0.8, 'cdc0')) ((1.2, 'cdc0'), (1.2, 'cdc0'))
+      ((1.2, 'cdc0'), (0.8, 'cyc0')) ((1.2, 'cdc0'), (1.2, 'cyc0'))],
+     [((0.8, 'cyc0'), (0.8, 'cdc0')) ((0.8, 'cyc0'), (1.2, 'cdc0'))
+      ((0.8, 'cyc0'), (0.8, 'cyc0')) ((0.8, 'cyc0'), (1.2, 'cyc0'))],
+     [((1.2, 'cyc0'), (0.8, 'cdc0')) ((1.2, 'cyc0'), (1.2, 'cdc0'))
+      ((1.2, 'cyc0'), (0.8, 'cyc0')) ((1.2, 'cyc0'), (1.2, 'cyc0'))]]
     >>> sens.run()
     >>> print(sens.p_matrix)#doctest: +NORMALIZE_WHITESPACE
     [[ 0.      0.      5.0243 -4.5381]
@@ -210,16 +209,15 @@ class PairwiseSensitivity(object):
             solver=solver,\
             sample_list=['k1', 'cdc0']\
         )
-    >>> print([[tuple(elem) for elem in row] for row in sens.b_matrix]) \
-            #doctest: +NORMALIZE_WHITESPACE
-    [[((0.9, 'k1'), (0.9, 'k1')), ((0.9, 'k1'), (1.1, 'k1')),
-      ((0.9, 'k1'), (0.9, 'cdc0')), ((0.9, 'k1'), (1.1, 'cdc0'))],
-     [((1.1, 'k1'), (0.9, 'k1')), ((1.1, 'k1'), (1.1, 'k1')),
-      ((1.1, 'k1'), (0.9, 'cdc0')), ((1.1, 'k1'), (1.1, 'cdc0'))],
-     [((0.9, 'cdc0'), (0.9, 'k1')), ((0.9, 'cdc0'), (1.1, 'k1')),
-      ((0.9, 'cdc0'), (0.9, 'cdc0')), ((0.9, 'cdc0'), (1.1, 'cdc0'))],
-     [((1.1, 'cdc0'), (0.9, 'k1')), ((1.1, 'cdc0'), (1.1, 'k1')),
-      ((1.1, 'cdc0'), (0.9, 'cdc0')), ((1.1, 'cdc0'), (1.1, 'cdc0'))]]
+    >>> print(sens.b_matrix)
+    [[((0.9, 'k1'), (0.9, 'k1')) ((0.9, 'k1'), (1.1, 'k1'))
+      ((0.9, 'k1'), (0.9, 'cdc0')) ((0.9, 'k1'), (1.1, 'cdc0'))],
+     [((1.1, 'k1'), (0.9, 'k1')) ((1.1, 'k1'), (1.1, 'k1'))
+      ((1.1, 'k1'), (0.9, 'cdc0')) ((1.1, 'k1'), (1.1, 'cdc0'))],
+     [((0.9, 'cdc0'), (0.9, 'k1')) ((0.9, 'cdc0'), (1.1, 'k1'))
+      ((0.9, 'cdc0'), (0.9, 'cdc0')) ((0.9, 'cdc0'), (1.1, 'cdc0'))],
+     [((1.1, 'cdc0'), (0.9, 'k1')) ((1.1, 'cdc0'), (1.1, 'k1'))
+      ((1.1, 'cdc0'), (0.9, 'cdc0')) ((1.1, 'cdc0'), (1.1, 'cdc0'))]]
     """
 
     def __init__(self, solver, values_to_sample, objective_function,
