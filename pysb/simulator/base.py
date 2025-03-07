@@ -236,7 +236,7 @@ class Simulator(object):
             # Only need parameter substitutions if model initials include
             # expressions
             subs = [
-                dict((p, pv[i]) for i, p in
+                dict((p, float(pv[i])) for i, p in
                      enumerate(self._model.parameters))
                 for pv in self.param_values]
             if len(subs) == 1 and n_sims_actual > 1:
@@ -319,7 +319,7 @@ class Simulator(object):
 
         # If new_initials is a list, convert to numpy array
         if isinstance(new_initials, list):
-            new_initials = np.array(new_initials, copy=False)
+            new_initials = np.asarray(new_initials)
 
         # Check if new_initials is a dict, and if so validate the keys
         # (ComplexPatterns)
