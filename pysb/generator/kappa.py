@@ -9,6 +9,7 @@ import pysb.logging
 from pysb.export import (
     CompartmentsNotSupported, LocalFunctionsNotSupported, EnergyNotSupported
 )
+from pysb.core import time
 
 
 class KappaGenerator(object):
@@ -333,6 +334,9 @@ class KappaPrinter(StrPrinter):
 
 def expression_to_muparser(expression):
     """Render the Expression as a muparser-compatible string."""
+    if expression.expr.has(time):
+        raise KappaException("Expressions referencing simulation time are not "
+                             "supported")
 
     return KappaPrinter(order='none').doprint(expression.expr)
 

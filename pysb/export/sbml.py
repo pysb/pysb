@@ -24,6 +24,17 @@ class MathMLContentPrinter(MathMLPrinter):
         ci.appendChild(self.dom.createTextNode(sym.name))
         return ci
 
+    def _print_SpecialSymbol(self, sym):
+        if sym.name == 'time':
+            # SBML spec (Level 3 Version 2) provides example on page 26:
+            # <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time">t</csymbol>
+            csymbol = self.dom.createElement("csymbol")
+            csymbol.setAttribute("encoding", "text")
+            csymbol.setAttribute("definitionURL",
+                                 "http://www.sbml.org/sbml/symbols/time")
+            csymbol.appendChild(self.dom.createTextNode("t"))
+            return csymbol
+
     def to_xml(self, expr):
         # Preferably this should use a public API, but as that doesn't exist...
         return self._print(expr)

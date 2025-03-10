@@ -9,6 +9,7 @@ from pysb import export
 from pysb.export.json import JsonExporter
 from pysb.simulator import ScipyOdeSimulator
 from pysb.importers.bngl import model_from_bngl
+from pysb.importers.sbml import model_from_sbml
 import numpy as np
 import pandas as pd
 import tempfile
@@ -26,6 +27,8 @@ from pysb.testing import check_model_against_component_list
 # Pairs of model, format that are expected to be incompatible.
 skip_combinations = {
     ('fixed_initial', 'kappa'),
+    ('time', 'kappa'),
+    ('time', 'stochkit'),
 }
 
 

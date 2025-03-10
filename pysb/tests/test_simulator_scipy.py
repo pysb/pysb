@@ -2,7 +2,7 @@ from pysb.testing import *
 import sys
 import copy
 import numpy as np
-from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression
+from pysb import Monomer, Parameter, Initial, Observable, Rule, Expression, time
 from pysb.simulator import ScipyOdeSimulator, InconsistentParameterError
 from pysb.simulator.scipyode import CythonRhsBuilder
 from pysb.examples import robertson, earm_1_0, tyson_oscillator, localfunc
@@ -407,6 +407,24 @@ def test_integrate_with_expression():
     keff_vals = simres.expressions['keff']
     assert len(keff_vals) == len(time)
     assert np.allclose(keff_vals, 1.8181818181818182e-05)
+
+
+@with_model
+def test_integrate_with_time():
+    Monomer('A')
+
+    Parameter('ksynthA', 1)
+
+    Expression('synthrate', ksynthA*time)
+
+    Rule('synthesize_A', None >> A(), synthrate)
+
+    tspan = np.linspace(0, 40)
+
+    sim = ScipyOdeSimulator(model, tspan=tspan)
+    simres = sim.run()
+    # \int_0^t t dt = 0.5 * t^2
+    assert np.allclose(simres.species[:, 0], 0.5 * np.square(tspan))
 
 
 def test_set_initial_to_zero():
