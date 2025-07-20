@@ -1,5 +1,5 @@
 from pysb.core import MonomerPattern, ComplexPattern, RuleExpression, \
-    ReactionPattern, ANY, WILD, MultiState
+    ReactionPattern, ANY, WILD, MultiState, time
 from pysb.builder import Builder
 from pysb.bng import BngFileInterface, parse_bngl_expr
 import xml.etree.ElementTree
@@ -378,6 +378,7 @@ class BnglBuilder(Builder):
     def _parse_expressions(self):
         expr_namespace = (self.model.parameters | self.model.expressions)
         expr_symbols = {e.name: e for e in expr_namespace}
+        expr_symbols['time'] = time
 
         for e in self._x.iterfind(_ns('{0}ListOfFunctions/{0}Function')):
             for arg in e.iterfind(_ns('{0}ListOfArguments/{0}Argument')):

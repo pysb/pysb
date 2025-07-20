@@ -1170,12 +1170,6 @@ def parse_bngl_expr(text, *args, **kwargs):
         _convert_comparative_operators,
         _flatten,
     )
-    expr = sympy_parser.parse_expr(text, *args, transformations=trans, **kwargs)
-    # Check for unsupported constructs.
-    if expr.has(sympy.Symbol('time')):
-        raise ValueError(
-            "Expressions referencing simulation time are not supported"
-        )
     return expr
 
 
