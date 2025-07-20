@@ -76,7 +76,7 @@ class PairwiseSensitivity(object):
     >>> from pysb.examples.tyson_oscillator import model
     >>> import numpy as np
     >>> from pysb.simulator.scipyode import ScipyOdeSimulator
-    >>> np.set_printoptions(precision=4, suppress=True)
+    >>> np.set_printoptions(precision=4, suppress=True, legacy='1.13')
     >>> tspan=np.linspace(0, 200, 201)
     >>> observable = 'Y3'
     >>> values_to_sample = [.8, 1.2]
