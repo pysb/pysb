@@ -670,8 +670,8 @@ class SimulationResult(object):
 
     >>> print(simulation_result.observables['Bax_c0']) \
         #doctest: +NORMALIZE_WHITESPACE
-    [1.0000e+00   1.1744e-02   1.3791e-04   1.6196e-06   1.9020e-08
-     2.2337e-10   2.6232e-12   3.0806e-14   3.6178e-16   4.2492e-18]
+    [1.0000e+00   1.1744e-02   1.3792e-04   1.6197e-06   1.9022e-08   2.2339e-10
+     2.6235e-12   3.0810e-14   3.6183e-16   4.2495e-18]
 
     It is also possible to retrieve the value of all observables at a
     particular time point, e.g. the final concentrations:
@@ -691,14 +691,14 @@ class SimulationResult(object):
     >>> print(simulation_result.species) #doctest: +NORMALIZE_WHITESPACE
     [[1.0000e+00   0.0000e+00   0.0000e+00]
      [1.1744e-02   5.2194e-02   9.3606e-01]
-     [1.3791e-04   1.2259e-03   9.9864e-01]
-     [1.6196e-06   2.1595e-05   9.9998e-01]
-     [1.9020e-08   3.3814e-07   1.0000e+00]
-     [2.2337e-10   4.9637e-09   1.0000e+00]
-     [2.6232e-12   6.9951e-11   1.0000e+00]
-     [3.0806e-14   9.5840e-13   1.0000e+00]
-     [3.6178e-16   1.2863e-14   1.0000e+00]
-     [4.2492e-18   1.6996e-16   1.0000e+00]]
+     [1.3792e-04   1.2259e-03   9.9864e-01]
+     [1.6197e-06   2.1595e-05   9.9998e-01]
+     [1.9022e-08   3.3815e-07   1.0000e+00]
+     [2.2339e-10   4.9640e-09   1.0000e+00]
+     [2.6235e-12   6.9955e-11   1.0000e+00]
+     [3.0810e-14   9.5847e-13   1.0000e+00]
+     [3.6183e-16   1.2864e-14   1.0000e+00]
+     [4.2495e-18   1.6997e-16   1.0000e+00]]
 
     Species, observables and expressions can be combined into a single numpy
     ndarray and accessed similarly. Here, the initial concentrations of all
