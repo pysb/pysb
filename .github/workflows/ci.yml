@@ -42,7 +42,7 @@ jobs:
           conda info
           conda list
       - name: Build PySB
-        run: python setup.py build --build-lib=build/lib
+        run: pip install .
       - name: Run nosetests
         env:
           PYTHONFAULTHANDLER: 1
