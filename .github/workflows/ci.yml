@@ -45,7 +45,7 @@ jobs:
           PYTHONFAULTHANDLER: 1
         run: >
           nosetests .
-          --with-coverage --cover-inclusive
+          --with-coverage --cover-inclusive --cover-package=pysb
           --cover-xml
           -a '!gpu'
           ${{ env.HAS_STOCHKIT && ' ' || '--exclude stochkit' }}
