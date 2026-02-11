@@ -25,7 +25,7 @@ def main():
           # We should really specify some minimum versions here.
           python_requires='>=3.6',
           install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6,<1.12',
-                            'networkx'],
+                            'networkx>=3.6.1'],
           setup_requires=['pynose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'h5py', 'mock', 'cython',
