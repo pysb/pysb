@@ -10,6 +10,7 @@ dependencies:
   - numpy
   - scipy
   - sympy<1.12
+  - setuptools<82
   - cython
   - matplotlib
   - networkx
