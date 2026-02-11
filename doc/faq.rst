@@ -15,9 +15,9 @@ General
 
 * What Python versions does PySB support?
 
-    The current release of PySB supports Python 3.6, 3.7, and
-    3.8. Earlier versions, including Python 2.7, are not supported
-    from PySB 2.0 onwards.
+    The current release of PySB supports Python 3.8 and later.
+    Earlier versions, including Python 2.7, 3.6 and 3.7, are not
+    supported from PySB 2.0 onwards.
 
     In PySB version 1.5 and earlier, the `<>` operator was used for
     reversible rules. `<>` is pending deprecation from PySB, and does not
