@@ -21,6 +21,7 @@ dependencies:
   - coveralls
   - mock
   - pip
+  - setuptools
   - pip:
       - libroadrunner
       - python-libsbml

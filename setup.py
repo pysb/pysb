@@ -24,7 +24,7 @@ def main():
           scripts=['scripts/pysb_export'],
           python_requires='>=3.11',
           install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6,<1.12',
-                            'networkx>=3.6.1', 'setuptools>=64'],
+                            'networkx>=3.6.1'],
           setup_requires=['pynose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'h5py', 'mock', 'cython',
