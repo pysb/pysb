@@ -4,7 +4,6 @@ from sympy.utilities.autowrap import CythonCodeWrapper
 from sympy.utilities.codegen import (
     C99CodeGen, Routine, InputArgument, OutputArgument, default_datatypes
 )
-import distutils
 import pysb.bng
 import sympy
 import re
@@ -15,9 +14,7 @@ import os
 import inspect
 from pysb.logging import get_logger, PySBModelLoggerAdapter, EXTENDED_DEBUG
 from pysb import time
-import logging
 import contextlib
-import importlib
 import tempfile
 import shutil
 from concurrent.futures import ProcessPoolExecutor, Executor, Future
@@ -168,11 +165,6 @@ class ScipyOdeSimulator(Simulator):
                 warnings.filterwarnings('error', 'No integrator name match')
                 self.integrator.set_integrator(integrator, **options)
 
-    @property
-    def _patch_distutils_logging(self):
-        """Return distutils logging context manager based on our logger."""
-        return _patch_distutils_logging(self._logger.logger)
-
     def run(self, tspan=None, initials=None, param_values=None,
             num_processors=1):
         """
@@ -234,50 +226,6 @@ class ScipyOdeSimulator(Simulator):
 
 
 @contextlib.contextmanager
-def _patch_distutils_logging(base_logger):
-    """Patch distutils logging functionality with logging.Logger calls.
-
-    The value of the 'base_logger' argument should be a logging.Logger instance,
-    and its effective level will be passed on to the patched distutils loggers.
-
-    distutils.log contains its own internal PEP 282 style logging system that
-    sends messages straight to stdout/stderr, and numpy.distutils.log extends
-    that. This code patches all of this with calls to logging.LoggerAdapter
-    instances, and disables the module-level threshold-setting functions so we
-    can retain full control over the threshold. Also all WARNING messages are
-    "downgraded" to INFO to suppress excessive use of WARNING-level logging in
-    numpy.distutils.
-
-    """
-    logger = get_logger(__name__)
-    logger.debug('patching distutils and numpy.distutils logging')
-    logger_methods = 'log', 'debug', 'info', 'warn', 'error', 'fatal'
-    other_functions = 'set_threshold', 'set_verbosity'
-    saved_symbols = {}
-    for module_name in 'distutils.log', 'numpy.distutils.log':
-        new_logger = _DistutilsProxyLoggerAdapter(
-            base_logger, {'module': module_name}
-        )
-        module = importlib.import_module(module_name)
-        # Save the old values.
-        for name in logger_methods + other_functions:
-            saved_symbols[module, name] = getattr(module, name)
-        # Replace logging functions with bound methods of the Logger object.
-        for name in logger_methods:
-            setattr(module, name, getattr(new_logger, name))
-        # Replace threshold-setting functions with no-ops.
-        for name in other_functions:
-            setattr(module, name, lambda *args, **kwargs: None)
-    try:
-        yield
-    finally:
-        logger.debug('restoring distutils and numpy.distutils logging')
-        # Restore everything we overwrote.
-        for (module, name), value in saved_symbols.items():
-            setattr(module, name, value)
-
-
-@contextlib.contextmanager
 def _set_cflags_no_warnings(logger):
     """ Suppress cython warnings by setting -w flag """
     del_cflags = False
@@ -290,16 +238,6 @@ def _set_cflags_no_warnings(logger):
     finally:
         if del_cflags:
             del os.environ['CFLAGS']
-
-
-class _DistutilsProxyLoggerAdapter(logging.LoggerAdapter):
-    """A logging adapter for the distutils logging patcher."""
-    def process(self, msg, kwargs):
-        return '(from %s) %s' % (self.extra['module'], msg), kwargs
-    # Map 'warn' to 'info' to reduce chattiness.
-    warn = logging.LoggerAdapter.info
-    # Provide 'fatal' to match up with distutils log functions.
-    fatal = logging.LoggerAdapter.critical
 
 
 def _integrator_process(
@@ -767,8 +705,6 @@ class CythonRhsBuilder(RhsBuilder):
         # chained exception with a more helpful message.
         except (
             Cython.Compiler.Errors.CompileError,
-            distutils.errors.CCompilerError,
-            distutils.errors.DistutilsPlatformError,
         ) as e:
             compiler_exc = e
         except ValueError as e:
