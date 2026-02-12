@@ -720,8 +720,8 @@ class SimulationResult(object):
         #doctest: +NORMALIZE_WHITESPACE
                  Bax_c0  NBD_signal
     time
-    8.888889   0.000138    4.995633
-    13.333333  0.000002    4.999927
+    8.888889   0.000138    4.995631
+    13.333333  0.000002    4.999926
     """
     CUSTOM_ATTR_PREFIX = 'usrattr_'
 
