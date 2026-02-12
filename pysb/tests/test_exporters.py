@@ -77,13 +77,17 @@ def check_convert(model, format):
 
             # Simulate SBML using roadrunner
             rr = roadrunner.RoadRunner(exported_file)
+            rr.integrator.absolute_tolerance = 1e-8
+            rr.integrator.relative_tolerance = 1e-8
             rr.timeCourseSelections = \
                 ['__s{}'.format(i) for i in range(len(model.species))] + \
                 ['__obs{}'.format(i) for i in range(len(model.observables))]
             rr_result = rr.simulate(0, 10, 100)
 
             # Simulate original using PySB
-            df = ScipyOdeSimulator(model).run(tspan=np.linspace(0, 10, 100)).dataframe
+            df = ScipyOdeSimulator(
+                model, integrator_options={'rtol': 1e-8, 'atol': 1e-8}
+            ).run(tspan=np.linspace(0, 10, 100)).dataframe
 
             # Compare species' trajectories
             for sp_idx in range(len(model.species)):
