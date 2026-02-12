@@ -463,6 +463,8 @@ class Simulator(object):
             new_params = np.array(new_params)
 
         if isinstance(new_params, dict):
+            # copy to avoid modifying the original dict
+            new_params = copy.deepcopy(new_params)
             n_sims = 1
             if len(new_params) > 0:
                 n_sims = self._num_sims_calc(new_params)
