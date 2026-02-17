@@ -146,7 +146,12 @@ def _from_pydot(P):
     >>> G = nx.Graph(nx.nx_pydot.from_pydot(A))
 
     """
-    if P.get_strict(None):  # pydot bug: get_strict() shouldn't take argument
+    try: # remove when pydot 3 support is dropped
+        is_strict = P.get_strict() # works for pydot 4+
+    except TypeError:
+        is_strict = P.get_strict(None) # workaround for pydot 3 bug
+
+    if is_strict:
         multiedges = False
     else:
         multiedges = True
