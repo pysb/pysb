@@ -676,7 +676,7 @@ class CupSodaSimulator(Simulator):
     def _load_with_openfile(filename):
         with open(filename, 'r') as f:
             data = [line.rstrip('\n').split() for line in f]
-        data = np.array(data, dtype=np.float, copy=False)
+        data = np.asarray(data, dtype=np.float)
         return data
 
 

@@ -924,6 +924,47 @@ def _is_bool_expr(e):
     return isinstance(e, Boolean) and not isinstance(e, sympy.AtomicExpr)
 
 
+# BNG's expression syntax supports multiplication with a boolean, e.g.
+# `2 * (x > 0)`, but sympy does not. Our overall strategy is to convert
+# multiplication with a boolean expression into a BNG-equivalent Piecewise,
+# leaving other multiplications alone. First, we use a transformation function
+# during parsing to temporarily replace any '*' operators with a fake 'bngl_mul'
+# function call. Then, after parsing and evaluation, we perform a subexpression
+# replacement on the 'bngl_mul' calls that converts Boolean args to a Piecewise
+# and emits a normal Mul. This can't be done entirely in a parser transformation
+# because sympy hasn't yet parsed the expression to determine the AST structure
+# that lets us identify boolean subexpressions, and it can't be done entirely
+# post-parsing because multiplication of booleans raises an immediate error
+# during the evaluation step in parse_expr. This function is the parser
+# transformation.
+def _convert_mul(tokens, local_dict, global_dict):
+    res1 = sympy_parser._group_parentheses(_convert_mul)(tokens, local_dict, global_dict)
+    res2 = sympy_parser._apply_functions(res1, local_dict, global_dict)
+    res3 = _transform_mul(res2, local_dict, global_dict)
+    result = sympy_parser._flatten(res3)
+    return result
+
+
+# Helper function for _convert_mul.
+def _transform_mul(tokens, local_dict, global_dict):
+    # Strongly based on sympy.parsing.sympy_parser._transform_equals_sign.
+    result = []
+    if (tokenize.OP, '*') in tokens:
+        local_dict['__bngl_mul'] = sympy.Function('bngl_mul')
+        result.append((tokenize.NAME, '__bngl_mul'))
+        result.append((tokenize.OP, '('))
+        for token in tokens:
+            if token == (tokenize.OP, '*'):
+                result.append((tokenize.OP, ','))
+                continue
+            result.append(token)
+        result.append((tokenize.OP, ')'))
+    else:
+        result = tokens
+    return result
+
+
+# Convert Booleans in Mul() to Piecewise for BNG semantics (see _convert_mul).
 def _fix_boolean_multiplication(*args):
     args = [
         sympy.Piecewise((1, a), (0, True)) if _is_bool_expr(a) else a
@@ -940,16 +981,14 @@ def parse_bngl_expr(text, *args, **kwargs):
     text = text.replace('==', '=')
     # Use sympy to parse the text into an Expr.
     trans = (
-        sympy_parser.standard_transformations
-        + (sympy_parser.convert_equals_signs, _convert_tokens)
+        *sympy_parser.standard_transformations,
+        sympy_parser.convert_equals_signs,
+        _convert_tokens,
+        _convert_mul,
     )
-    expr = sympy_parser.parse_expr(text, *args, transformations=trans,
-                                   evaluate=False, **kwargs)
-
-    # Replace Boolean multiplications, e.g. `2 * (3 > 0)`
-    # See https://github.com/pysb/pysb/pull/494
-    expr = expr.replace(sympy.Mul, _fix_boolean_multiplication)
-
+    expr = sympy_parser.parse_expr(text, *args, transformations=trans, **kwargs)
+    # Second half of boolean multiplication support (see _convert_mul).
+    expr = expr.replace(sympy.Function('bngl_mul'), _fix_boolean_multiplication)
     # Transforming 'if' to Piecewise requires subexpression rearrangement, so we
     # use sympy's replace functionality rather than attempt it using text
     # replacements above.
