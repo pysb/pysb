@@ -75,15 +75,25 @@ def check_convert(model, format):
 
             roadrunner.Logger.setLevel(roadrunner.Logger.LOG_ERROR)
 
+            integration_tolerance = 1e-10
+
             # Simulate SBML using roadrunner
             rr = roadrunner.RoadRunner(exported_file)
+            rr.integrator.absolute_tolerance = integration_tolerance
+            rr.integrator.relative_tolerance = integration_tolerance
             rr.timeCourseSelections = \
                 ['__s{}'.format(i) for i in range(len(model.species))] + \
                 ['__obs{}'.format(i) for i in range(len(model.observables))]
             rr_result = rr.simulate(0, 10, 100)
 
             # Simulate original using PySB
-            df = ScipyOdeSimulator(model).run(tspan=np.linspace(0, 10, 100)).dataframe
+            df = ScipyOdeSimulator(
+                model,
+                integrator_options={
+                    'rtol': integration_tolerance,
+                    'atol': integration_tolerance
+                }
+            ).run(tspan=np.linspace(0, 10, 100)).dataframe
 
             # Compare species' trajectories
             for sp_idx in range(len(model.species)):
