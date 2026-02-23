@@ -1,5 +1,3 @@
-from ez_setup import use_setuptools
-use_setuptools()
 from setuptools import setup
 import versioneer
 import os
@@ -24,9 +22,9 @@ def main():
                     'pysb.examples', 'pysb.export', 'pysb.simulator',
                     'pysb.simulator.templates', 'pysb.testing', 'pysb.tests'],
           scripts=['scripts/pysb_export'],
-          # We should really specify some minimum versions here.
-          python_requires='>=3.6',
-          install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6', 'networkx'],
+          python_requires='>=3.11',
+          install_requires=['numpy', 'scipy>=1.1', 'sympy>=1.6',
+                            'networkx>=3.6.1'],
           setup_requires=['pynose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
                          'pandas', 'h5py', 'mock', 'cython',
