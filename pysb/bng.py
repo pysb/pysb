@@ -1175,7 +1175,9 @@ def parse_bngl_expr(text, *args, **kwargs):
         _convert_comparative_operators,
         _flatten,
     )
-    return expr
+    return sympy_parser.parse_expr(
+        text, *args, transformations=trans, evaluate=False, **kwargs
+    )
 
 
 class NoInitialConditionsError(RuntimeError):
