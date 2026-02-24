@@ -1108,7 +1108,7 @@ def _flatten(tokens, local_dict, global_dict):
     """Flatten AppliedFunctions and Parenthesis Groups into lists of tokens.
 
     Based on sympy_parser._flatten.
-    NB: In contrast to sympy_parser.__flatten, this function will also flatten
+    NB: In contrast to sympy_parser._flatten, this function will also flatten
     ParenthesisGroups and flattening is done recursively.
     """
     result = []
