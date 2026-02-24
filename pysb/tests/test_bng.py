@@ -405,11 +405,14 @@ def test_bng_printer_relational_unknown():
 
 def test_parse_bngl_expression_if():
     x, y = sympy.symbols('x y')
-    assert parse_bngl_expr('if(x>y, 1, 3)') == \
+    assert sympy.simplify(
+        parse_bngl_expr('if(x>y, 1, 3)') -
         sympy.Piecewise((1, x > y), (3, True))
+    ).is_zero
 
     # if statement in comparison
-    assert parse_bngl_expr('(if(x>y, 1, 3)<2)*3') == \
+    assert sympy.simplify(
+        parse_bngl_expr('(if(x>y, 1, 3)<2)*3') -
         3*sympy.Piecewise(
             (1, sympy.Piecewise(
                 (1, x > y),
@@ -417,13 +420,16 @@ def test_parse_bngl_expression_if():
             )<2),
             (0, True)
         )
+    ).is_zero
 
     # nested comparison in if statement
-    assert parse_bngl_expr('if((x<2)>y, 1, 3)') == \
+    assert sympy.simplify(
+        parse_bngl_expr('if((x<2)>y, 1, 3)') -
         sympy.Piecewise(
             (1, sympy.ITE(x < 2, y < 1, y < 0)),
             (3, True)
         )
+    ).is_zero
 
 
 def test_parse_bngl_expression_exponentiate():
@@ -441,15 +447,15 @@ def test_parse_bngl_expression_and_or_equals():
 def test_bng_boolean_multiply_number():
     x = sympy.symbols('x')
 
-    assert parse_bngl_expr('(2 > 1) * 4') == 4
-    assert parse_bngl_expr('(2 >= 1) * 4') == 4
-    assert parse_bngl_expr('(1 < 2) * 4') == 4
-    assert parse_bngl_expr('(1 <= 2) * 4') == 4
-    assert parse_bngl_expr('4 * (2 > 1)') == 4
+    assert sympy.simplify(parse_bngl_expr('(2 > 1) * 4') - 4).is_zero
+    assert sympy.simplify(parse_bngl_expr('(2 >= 1) * 4') - 4).is_zero
+    assert sympy.simplify(parse_bngl_expr('(1 < 2) * 4') - 4).is_zero
+    assert sympy.simplify(parse_bngl_expr('(1 <= 2) * 4') - 4).is_zero
+    assert sympy.simplify(parse_bngl_expr('4 * (2 > 1)') - 4).is_zero
 
-    assert parse_bngl_expr('2 * x > 0') == sympy.Mul(
+    assert sympy.simplify(parse_bngl_expr('2 * x > 0') - sympy.Mul(
         2, sympy.Piecewise((1, x > 0), (0, True))
-    )
+    )).is_zero
     assert sympy.simplify(
         parse_bngl_expr('(2 * x - 3) > 0') - sympy.Piecewise(
             (1, x > 3 / 2), (0, True)
