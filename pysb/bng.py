@@ -105,6 +105,11 @@ class BNGLGreaterThan(Function):
 
 
 class BNGLIf(Function):
+    """ BNGL compatible implementation of an if-statement.
+
+    Implemented using sympy.Piecewise to allow conversion between BNGL
+    conditional expressions and their SymPy equivalents.
+    """
     nargs = 3
 
     @classmethod
@@ -1100,7 +1105,7 @@ def _apply_functions(tokens, local_dict, global_dict):
     return result
 
 def _flatten(tokens, local_dict, global_dict):
-    """Flatten AppliedFunctions and Parenthis Groups into lists of tokens.
+    """Flatten AppliedFunctions and Parenthesis Groups into lists of tokens.
 
     Based on sympy_parser._flatten.
     NB: In contrast to sympy_parser.__flatten, this function will also flatten
@@ -1144,7 +1149,7 @@ def _transform_operator_symbols(tokens, local_dict, global_dict):
         right = tokens[op_idx+1]
         # replace the operator and its arguments with the function call
         args = ParenthesisGroup([
-            (tokenize.OP, '('), left, (tokenize.OP, ','), right,(tokenize.OP, ')')
+            (tokenize.OP, '('), left, (tokenize.OP, ','), right, (tokenize.OP, ')')
         ])
         result = result[:op_idx-1] + [sympy_parser.AppliedFunction(
             (tokenize.NAME, fun.__name__), args
