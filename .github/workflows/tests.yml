@@ -1,0 +1,68 @@
+---
+name: Tests
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      python-version:
+        required: true
+        type: string
+      coverage:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.os) }}
+        python-version: ${{ fromJson(inputs.python-version) }}
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: "latest"
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+          environment-file: .github/pysb-conda-env.yml
+          activate-environment: pysb
+      - name: Install StochKit (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          conda install -y -c alubbock stochkit
+          echo "HAS_STOCHKIT=1" >> "$GITHUB_ENV"
+      - name: Install StochKit Lite (Windows only)
+        if: matrix.os == 'windows-latest'
+        run: |
+          conda install -y -c alubbock -c conda-forge stochkit-lite
+          echo "HAS_STOCHKIT=1" >> "$GITHUB_ENV"
+      - name: Conda environment info
+        run: |
+          conda info
+          conda list
+      - name: Build PySB
+        run: pip install -e .
+      - name: Run nosetests
+        env:
+          PYTHONFAULTHANDLER: 1
+        run: >
+          nosetests .
+          --with-coverage --cover-inclusive --cover-package=pysb
+          ${{ inputs.coverage && '--cover-xml' || '' }}
+          -a '!gpu'
+          ${{ env.HAS_STOCHKIT && ' ' || '--exclude stochkit' }}
+      - uses: codecov/codecov-action@v4
+        if: inputs.coverage
+        with:
+          verbose: true
+          flags: os-${{ matrix.os }},python-${{ matrix.python-version }}
