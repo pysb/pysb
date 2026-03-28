@@ -475,7 +475,7 @@ paper about `extrinsic apoptosis signaling`_. To run the simulation we
 must use a numerical integrator. Common examples include LSODA, VODE,
 CVODE, Matlab's ode15s, etc. We will use two *python* modules that are
 very useful for numerical manipulation. We have adapted the
-integrators in the *SciPy*[#sp]_ module to function seamlessly with
+integrators in the *SciPy* [#sp]_ module to function seamlessly with
 PySB for integration of ODE systems. We will also be using the *PyLab*
 [#pl]_ package for graphing and plotting from the command line. 
 
