@@ -30,7 +30,8 @@ needs_sphinx = '1.4'
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.coverage',
               'sphinx.ext.imgmath', 'sphinx.ext.ifconfig', 'numpydoc',
               'sphinx.ext.viewcode', 'sphinx.ext.autosummary',
-              'IPython.sphinxext.ipython_console_highlighting']
+              'IPython.sphinxext.ipython_console_highlighting',
+              'sphinx_rtd_theme']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -124,7 +125,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
