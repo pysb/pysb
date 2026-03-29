@@ -516,6 +516,9 @@ if sys.version_info[0] < 3:
         simres = sim.run(tspan=t)
 
 
+@unittest.skip(
+    "Skipped: scipy VODE analytic Jacobian bug (scipy/scipy#24933)"
+)
 def test_multiprocessing_lambdify():
     model = tyson_oscillator.model
     pars = [p.value for p in model.parameters]

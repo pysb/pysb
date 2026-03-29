@@ -22,14 +22,15 @@ def plot_mean_min_max(name, title=None):
     plt.xlabel('Time')
     plt.ylabel('Population of %s' % name)
 
-tspan = np.linspace(0, 50, 5001)
-sim = StochKitSimulator(model, verbose=True)
-simres = sim.run(tspan=tspan, n_runs=5, seed=None, algorithm="ssa")
-tout = simres.tout
-trajectories = simres.all
+if __name__ == '__main__':
+    tspan = np.linspace(0, 50, 5001)
+    sim = StochKitSimulator(model, verbose=True)
+    simres = sim.run(tspan=tspan, n_runs=5, seed=None, algorithm="ssa")
+    tout = simres.tout
+    trajectories = simres.all
 
-plot_mean_min_max('__s0', str(model.species[0]))
-plot_mean_min_max('YT')
-plot_mean_min_max('M')
+    plot_mean_min_max('__s0', str(model.species[0]))
+    plot_mean_min_max('YT')
+    plot_mean_min_max('M')
 
-plt.show()
+    plt.show()

@@ -8,11 +8,12 @@ from pysb.simulator import ScipyOdeSimulator
 from bax_pore import model
 
 
-t = linspace(0, 100)
-print("Simulating...")
-x = ScipyOdeSimulator(model).run(tspan=t).all
+if __name__ == '__main__':
+    t = linspace(0, 100)
+    print("Simulating...")
+    x = ScipyOdeSimulator(model).run(tspan=t).all
 
-plt.plot(t, x['BAX4'])
-plt.plot(t, x['BAX4_inh'])
-plt.legend(['BAX4', 'BAX4_inh'], loc='upper left')
-plt.show()
+    plt.plot(t, x['BAX4'])
+    plt.plot(t, x['BAX4_inh'])
+    plt.legend(['BAX4', 'BAX4_inh'], loc='upper left')
+    plt.show()

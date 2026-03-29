@@ -216,7 +216,6 @@ def test_set_initials_by_params():
     # overwritten in bng file. lines 196-202.
     # Values from initials_dict are used, but it should take them from
     # self.initials, so I don't see how they are getting overwritten?
-    print(traj.dataframe.loc[0])
     assert np.allclose(traj.dataframe.loc[0][0:3], [1, 1, 1])
 
     # Same here

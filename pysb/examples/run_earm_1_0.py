@@ -90,6 +90,7 @@ def fig_4b():
     a.set_ylim((-.05, 1.05))
 
 
-fig_4a()
-fig_4b()
-plt.show()
+if __name__ == '__main__':
+    fig_4a()
+    fig_4b()
+    plt.show()
