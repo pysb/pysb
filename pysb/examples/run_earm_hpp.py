@@ -37,29 +37,30 @@ def plot_mean_min_max(name, title=None):
     plt.xlabel('Time')
     plt.ylabel('Population of %s' % name)
 
-PARP, CPARP, Mito, mCytoC = [model.monomers[x] for x in
-                             ['PARP', 'CPARP', 'Mito', 'mCytoC']]
-klump = Parameter('klump', 10000, _export=False)
-model.add_component(klump)
+if __name__ == '__main__':
+    PARP, CPARP, Mito, mCytoC = [model.monomers[x] for x in
+                                 ['PARP', 'CPARP', 'Mito', 'mCytoC']]
+    klump = Parameter('klump', 10000, _export=False)
+    model.add_component(klump)
 
-population_maps = [
-    PopulationMap(PARP(b=None), klump),
-    PopulationMap(CPARP(b=None), klump),
-    PopulationMap(Mito(b=None), klump),
-    PopulationMap(mCytoC(b=None), klump)
-]
+    population_maps = [
+        PopulationMap(PARP(b=None), klump),
+        PopulationMap(CPARP(b=None), klump),
+        PopulationMap(Mito(b=None), klump),
+        PopulationMap(mCytoC(b=None), klump)
+    ]
 
-sim = BngSimulator(model, tspan=np.linspace(0, 20000, 101))
-simres = sim.run(n_runs=20, method='nf', population_maps=population_maps)
+    sim = BngSimulator(model, tspan=np.linspace(0, 20000, 101))
+    simres = sim.run(n_runs=20, method='nf', population_maps=population_maps)
 
-trajectories = simres.all
-tout = simres.tout
+    trajectories = simres.all
+    tout = simres.tout
 
-plot_mean_min_max('Bid_unbound')
-plot_mean_min_max('PARP_unbound')
-plot_mean_min_max('mSmac_unbound')
-plot_mean_min_max('tBid_total')
-plot_mean_min_max('CPARP_total')
-plot_mean_min_max('cSmac_total')
+    plot_mean_min_max('Bid_unbound')
+    plot_mean_min_max('PARP_unbound')
+    plot_mean_min_max('mSmac_unbound')
+    plot_mean_min_max('tBid_total')
+    plot_mean_min_max('CPARP_total')
+    plot_mean_min_max('cSmac_total')
 
-plt.show()
+    plt.show()

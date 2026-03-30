@@ -22,18 +22,19 @@ def plot_mean_min_max(name, title=None):
     plt.xlabel('Time')
     plt.ylabel('Population of %s' % name)
 
-tspan = np.linspace(0, 20000, 1000)
-sim = StochKitSimulator(model, tspan)
-simres = sim.run(n_runs=20, seed=None, algorithm="ssa")
+if __name__ == '__main__':
+    tspan = np.linspace(0, 20000, 1000)
+    sim = StochKitSimulator(model, tspan)
+    simres = sim.run(n_runs=20, seed=None, algorithm="ssa")
 
-trajectories = simres.all
-tout = simres.tout
+    trajectories = simres.all
+    tout = simres.tout
 
-plot_mean_min_max('Bid_unbound')
-plot_mean_min_max('PARP_unbound')
-plot_mean_min_max('mSmac_unbound')
-plot_mean_min_max('tBid_total')
-plot_mean_min_max('CPARP_total')
-plot_mean_min_max('cSmac_total')
+    plot_mean_min_max('Bid_unbound')
+    plot_mean_min_max('PARP_unbound')
+    plot_mean_min_max('mSmac_unbound')
+    plot_mean_min_max('tBid_total')
+    plot_mean_min_max('CPARP_total')
+    plot_mean_min_max('cSmac_total')
 
-plt.show()
+    plt.show()

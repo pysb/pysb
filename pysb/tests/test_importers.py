@@ -5,6 +5,7 @@ from pysb.importers.bngl import model_from_bngl, BnglImportError
 from pysb.importers.sbml import model_from_sbml, model_from_biomodels
 import numpy
 from nose.tools import assert_raises_regex, raises
+from nose.plugins.skip import SkipTest
 import warnings
 import mock
 import tempfile
@@ -90,10 +91,6 @@ def bngl_import_compare_nfsim(bng_file):
 
     # Check all species trajectories are equal (within numerical tolerance)
     for i in range(len(m.observables)):
-        print(i)
-        print(yfull1[i])
-        print(yfull2[i])
-        print(yfull1[i] == yfull2[i])
         assert yfull1[i] == yfull2[i]
 
 
@@ -211,11 +208,20 @@ def test_bngl_import_expected_errors():
                full_filename)
 
 
+def _require_atomizer():
+    try:
+        pf.get_path('atomizer')
+    except Exception:
+        raise SkipTest('atomizer (sbmlTranslator) not available')
+
+
 def test_sbml_import_flat_model():
+    _require_atomizer()
     model_from_sbml(_sbml_location('test_sbml_flat_SBML'))
 
 
 def test_sbml_import_structured_model():
+    _require_atomizer()
     model_from_sbml(_sbml_location('test_sbml_structured_SBML'), atomize=True)
 
 
@@ -229,6 +235,7 @@ def _sbml_for_mocks(accession_no, mirror):
 
 @mock.patch('pysb.importers.sbml._download_biomodels', _sbml_for_mocks)
 def test_biomodels_import_with_mock():
+    _require_atomizer()
     model_from_biomodels('1')
 
 
