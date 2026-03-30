@@ -1965,6 +1965,19 @@ class Model(object):
     base : Model, optional
         If specified, the model will begin as a copy of `base`. This can be used
         to achieve a simple sort of model extension and enhancement.
+    auto_netgen : bool, optional
+        If ``True``, the model will automatically run
+        :class:`~pysb.netgen.NetworkGenerator` when ``species``,
+        ``reactions``, or ``reactions_bidirectional`` are accessed and the
+        network has not yet been generated or the model has been modified since
+        the last network generation.  Defaults to ``False``.
+
+        .. note::
+            Direct mutation of the internals of a :class:`Rule` or
+            :class:`Initial` object (e.g. ``model.rules['r'].rate_forward =
+            new_param``) is **not** automatically detected.  After such deep
+            mutations, call :meth:`reset_equations` explicitly to force
+            regeneration on the next access.
 
     Attributes
     ----------
@@ -1983,7 +1996,8 @@ class Model(object):
     species : list of ComplexPattern
         List of all complexes which can be produced by the model, starting from
         the initial conditions and successively applying the rules. Each
-        ComplexPattern is concrete.
+        ComplexPattern is concrete.  When ``auto_netgen=True`` this attribute
+        triggers lazy network generation.
     reactions : list of dict
         Structures describing each possible unidirectional reaction that can be
         produced by the model. Each structure stores the name of the rule that
@@ -1991,34 +2005,47 @@ class Model(object):
         rate of the reaction ('rate'), tuples of species indexes for the
         reactants and products ('reactants', 'products'), and a bool indicating
         whether the reaction is the reverse component of a bidirectional
-        reaction ('reverse').
+        reaction ('reverse').  When ``auto_netgen=True`` this attribute
+        triggers lazy network generation.
     reactions_bidirectional : list of dict
         Similar to `reactions` but with only one entry for each bidirectional
         reaction. The fields are identical except 'reverse' is replaced by
         'reversible', a bool indicating whether the reaction is reversible. The
-        'rate' is the forward rate minus the reverse rate.
+        'rate' is the forward rate minus the reverse rate.  When
+        ``auto_netgen=True`` this attribute triggers lazy network generation.
     annotations : list of Annotation
         Structured annotations of model components. See the Annotation class for
         details.
 
     """
 
-    _component_types = (Monomer, Compartment, Parameter, Rule, Observable,
-                        Expression, EnergyPattern, Tag)
+    _component_types = (
+        Monomer,
+        Compartment,
+        Parameter,
+        Rule,
+        Observable,
+        Expression,
+        EnergyPattern,
+        Tag,
+    )
 
-    def __init__(self, name=None, base=None, _export=True):
+    def __init__(self, name=None, base=None, _export=True, auto_netgen=False):
         self.name = name
         self.base = base
         self._export = _export
+        self.auto_netgen = auto_netgen
+        self._netgen_dirty = True  # needs generation on first access
+        self._netgen_source = None  # 'pysb' or 'bng' once equations are generated
         self.monomers = ComponentSet()
         self.compartments = ComponentSet()
         self.parameters = ComponentSet()
-        self.rules = ComponentSet()
+        self.rules = _DirtyComponentSet(self)
         self.observables = ComponentSet()
         self.expressions = ComponentSet()
         self.energypatterns = ComponentSet()
         self.tags = ComponentSet()
-        self.initials = []
+        self.initials = _DirtyList(self)
         self.annotations = []
         self._odes = OdeView(self)
         self._initial_conditions = InitialConditionsView(self)
@@ -2035,7 +2062,7 @@ class Model(object):
             for component in model_copy.all_components():
                 self.add_component(component)
                 component._do_export()
-            self.initials = model_copy.initials
+            self.initials = _DirtyList(self, model_copy.initials)
             self.annotations = model_copy.annotations
 
     def __getstate__(self):
@@ -2047,10 +2074,21 @@ class Model(object):
         return state
 
     def __setstate__(self, state):
+        # Migrate pre-property attribute names to private backing attributes.
+        # Pickles created before rules/initials became properties stored them
+        # as 'rules' and 'initials' directly in __dict__.
+        for old, new in [('rules', '_rules'), ('initials', '_initials')]:
+            if old in state and new not in state:
+                state[new] = state.pop(old)
         # restore the 'model' weakrefs on all components
         self.__dict__.update(state)
         for c in self.all_components():
             c.model = weakref.ref(self)
+        # Restore model weakrefs in dirty containers
+        if isinstance(self._rules, _DirtyComponentSet):
+            self._rules._model_ref = weakref.ref(self)
+        if isinstance(self._initials, _DirtyList):
+            self._initials._model_ref = weakref.ref(self)
 
     def reload(self):
         """
@@ -2355,15 +2393,97 @@ class Model(object):
 
     def reset_equations(self):
         """Clear out fields generated by bng.generate_equations or the like."""
-        self.species = []
-        self.reactions = []
-        self.reactions_bidirectional = []
+        self._species = []
+        self._reactions = []
+        self._reactions_bidirectional = []
         self._stoichiometry_matrix = None
         self._derived_parameters = ComponentSet()
         self._derived_expressions = ComponentSet()
         for obs in self.observables:
             obs.species = []
             obs.coefficients = []
+        self._netgen_dirty = True
+        self._netgen_source = None
+
+    @property
+    def species(self):
+        """List of species complexes; triggers auto-netgen if enabled."""
+        self._maybe_run_netgen()
+        return self._species
+
+    @species.setter
+    def species(self, value):
+        self._species = value
+
+    @property
+    def reactions(self):
+        """List of unidirectional reactions; triggers auto-netgen if enabled."""
+        self._maybe_run_netgen()
+        return self._reactions
+
+    @reactions.setter
+    def reactions(self, value):
+        self._reactions = value
+
+    @property
+    def reactions_bidirectional(self):
+        """List of bidirectional reactions; triggers auto-netgen if enabled."""
+        self._maybe_run_netgen()
+        return self._reactions_bidirectional
+
+    @reactions_bidirectional.setter
+    def reactions_bidirectional(self, value):
+        self._reactions_bidirectional = value
+
+    @property
+    def rules(self):
+        """ComponentSet of rules; setter converts plain ComponentSet to _DirtyComponentSet."""
+        return self._rules
+
+    @rules.setter
+    def rules(self, value):
+        if not isinstance(value, _DirtyComponentSet):
+            value = _DirtyComponentSet(self, value)
+        self._rules = value
+        if hasattr(self, '_netgen_dirty'):
+            self._netgen_dirty = True
+
+    @property
+    def initials(self):
+        """List of initial conditions; setter converts plain lists to _DirtyList."""
+        return self._initials
+
+    @initials.setter
+    def initials(self, value):
+        if not isinstance(value, _DirtyList):
+            value = _DirtyList(self, value)
+        self._initials = value
+        if hasattr(self, '_netgen_dirty'):
+            self._netgen_dirty = True
+
+    def _maybe_run_netgen(self):
+        """Run network generation if auto_netgen is on and the model is dirty."""
+        if not self.auto_netgen:
+            return
+        if not self._netgen_dirty:
+            return
+        # Guard against re-entry (populate_model accesses species/reactions
+        # internally while filling them in).
+        if getattr(self, "_netgen_running", False):
+            return
+        self._netgen_running = True
+        try:
+            from pysb.netgen import NetworkGenerator
+
+            ng = NetworkGenerator(self)
+            # populate=True (default): populate_model is called inside
+            # generate_network. populate_model calls reset_equations which
+            # sets _netgen_dirty=True; we clear it after population completes.
+            ng.generate_network()
+            self._netgen_dirty = False
+            self._netgen_source = 'pysb'
+        finally:
+            self._netgen_running = False
 
     def __repr__(self):
         return ("<%s '%s' (monomers: %d, rules: %d, parameters: %d, "
@@ -2669,6 +2789,107 @@ class ComponentSet(Set, Mapping, Sequence):
         for m in self._map, self._index_map:
             m[new_name] = m[c.name]
             del m[c.name]
+
+
+class _DirtyComponentSet(ComponentSet):
+    """ComponentSet that marks its owning model dirty on mutation.
+
+    Used for ``model.rules`` to support ``auto_netgen``.
+    """
+
+    def __init__(self, model, iterable=None):
+        self._model_ref = weakref.ref(model)
+        super().__init__(iterable)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # weakref cannot be pickled; Model.__setstate__ restores it
+        del state["_model_ref"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        # _model_ref is restored by Model.__setstate__; set a no-op ref meanwhile
+        self._model_ref = lambda: None
+
+    def add(self, c):
+        super().add(c)
+        m = self._model_ref()
+        if m is not None:
+            m._netgen_dirty = True
+
+
+class _DirtyList(list):
+    """list subclass that marks its owning model dirty on mutation.
+
+    Used for ``model.initials`` to support ``auto_netgen``.
+    """
+
+    def __init__(self, model, iterable=()):
+        self._model_ref = weakref.ref(model)
+        super().__init__(iterable)
+
+    def __reduce__(self):
+        # list uses __reduce__ for pickling; we must include _model_ref in
+        # the reconstruction but it's a weakref so we drop it and rely on
+        # Model.__setstate__ to restore it.
+        return (_DirtyList_unpickle, (list(self),))
+
+    def _mark_dirty(self):
+        m = self._model_ref()
+        if m is not None:
+            m._netgen_dirty = True
+
+    def append(self, item):
+        super().append(item)
+        self._mark_dirty()
+
+    def extend(self, items):
+        super().extend(items)
+        self._mark_dirty()
+
+    def insert(self, index, item):
+        super().insert(index, item)
+        self._mark_dirty()
+
+    def remove(self, item):
+        super().remove(item)
+        self._mark_dirty()
+
+    def pop(self, *args):
+        result = super().pop(*args)
+        self._mark_dirty()
+        return result
+
+    def __setitem__(self, index, value):
+        super().__setitem__(index, value)
+        self._mark_dirty()
+
+    def __delitem__(self, index):
+        super().__delitem__(index)
+        self._mark_dirty()
+
+    def __iadd__(self, other):
+        result = super().__iadd__(other)
+        self._mark_dirty()
+        return result
+
+    def __imul__(self, n):
+        result = super().__imul__(n)
+        self._mark_dirty()
+        return result
+
+    def clear(self):
+        super().clear()
+        self._mark_dirty()
+
+
+def _DirtyList_unpickle(items):
+    """Reconstruct a _DirtyList without a model reference (restored later)."""
+    obj = list.__new__(_DirtyList)
+    list.__init__(obj, items)
+    obj._model_ref = lambda: None  # placeholder until Model.__setstate__
+    return obj
 
 
 class OdeView(Sequence):

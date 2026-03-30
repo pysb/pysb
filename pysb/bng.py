@@ -818,6 +818,7 @@ def generate_equations(model, cleanup=True, verbose=False, **kwargs):
     lines = iter(generate_network(model, cleanup=cleanup,
                                   verbose=verbose, **kwargs).split('\n'))
     _parse_netfile(model, lines)
+    model._netgen_source = 'bng'
 
 
 def _parse_netfile(model, lines):

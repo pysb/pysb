@@ -1,5 +1,4 @@
 from pysb.simulator.base import SimulationResult
-from pysb.bng import generate_equations
 from pysb.simulator.ssa_base import SSABase
 import numpy as np
 import os
@@ -84,7 +83,7 @@ class OpenCLSSASimulator(SSABase):
                               ''.format(self.__class__.__name__))
         super(OpenCLSSASimulator, self).__init__(model, verbose, **kwargs)
 
-        generate_equations(self._model)
+        self._run_netgen()
 
         self.tspan = tspan
         self.verbose = verbose
