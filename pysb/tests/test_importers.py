@@ -7,7 +7,7 @@ import numpy
 from nose.tools import assert_raises_regex, raises
 from nose.plugins.skip import SkipTest
 import warnings
-import mock
+from unittest import mock
 import tempfile
 import shutil
 from pysb.logging import get_logger

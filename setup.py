@@ -27,7 +27,7 @@ def main():
                             'networkx>=3.6.1'],
           setup_requires=['pynose'],
           tests_require=['coverage', 'pygraphviz', 'matplotlib', 'pexpect',
-                         'pandas', 'h5py', 'mock', 'cython',
+                         'pandas', 'h5py', 'cython',
                          'python-libsbml', 'libroadrunner'],
           cmdclass=cmdclass,
           keywords=['systems', 'biology', 'model', 'rules'],
