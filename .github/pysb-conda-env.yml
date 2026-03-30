@@ -18,9 +18,9 @@ dependencies:
   - pandas
   - pydot
   - coverage
-  - coveralls
-  - mock
   - pip
+  # setuptools required by Cython
+  # https://github.com/cython/cython/issues/5976
   - setuptools
   - pip:
       - libroadrunner
