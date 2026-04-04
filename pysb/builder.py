@@ -99,7 +99,7 @@ class Builder(object):
         self.model.add_component(m)
         return m
 
-    def parameter(self, name, value, factor=1, prior=None):
+    def parameter(self, name, value, factor=1, prior=None, nonnegative=True):
         """Adds a parameter to the Builder's model instance.
 
         Examines the params_dict attribute of the Builder instance (which is
@@ -129,6 +129,10 @@ class Builder(object):
             values for this parameter, if the parameter should be included among
             the parameters to estimate (contained in the set
             ``Builder.estimate_params``).
+        nonnegative : bool, optional
+            If True (default), the parameter is assumed to be non-negative and
+            an error is raised if a negative value is assigned.  Set to False
+            to allow negative values (e.g. reversal potentials).
         """
 
         if self.params_dict is None:
@@ -139,7 +143,7 @@ class Builder(object):
             else:
                 param_val = value * factor
 
-        p = Parameter(name, param_val, _export=False)
+        p = Parameter(name, param_val, _export=False, nonnegative=nonnegative)
         self.model.add_component(p)
 
         if prior is not None:
