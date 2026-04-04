@@ -3582,3 +3582,85 @@ def test_cross_compartment_matches_bng_full():
     ng.generate_network()
     corr = ng.check_species_against_bng()
     ng.check_reactions_against_bng(corr)
+
+
+# ---------------------------------------------------------------------------
+# Compartment volume correction tests for bimolecular reactions
+# ---------------------------------------------------------------------------
+
+
+def _build_bimolecular_compartment_model():
+    """Return a minimal model with a bimolecular reaction inside a compartment.
+
+    Model:  A(b) + B(a) -> A(b!1).B(a!1)   kf   inside EC (size=1e-15)
+
+    BNG embeds the 1/V factor into the rate expression for bimolecular
+    reactions in non-unit-size compartments.  Netgen must do the same.
+    """
+    from pysb.core import Compartment, Initial
+
+    SelfExporter.do_export = False
+    try:
+        m = Model(_export=False)
+        vol = Parameter("vol", 1e-15, _export=False)
+        m.add_component(vol)
+        EC = Compartment("EC", dimension=3, size=vol, _export=False)
+        m.add_component(EC)
+        A = Monomer("A", ["b"], _export=False)
+        B = Monomer("B", ["a"], _export=False)
+        m.add_component(A)
+        m.add_component(B)
+        kf = Parameter("kf", 1e6, _export=False)
+        m.add_component(kf)
+        r = Rule(
+            "bind",
+            A(b=None) ** EC + B(a=None) ** EC >> A(b=1) % B(a=1) ** EC,
+            kf,
+            _export=False,
+        )
+        m.add_component(r)
+        A_0 = Parameter("A_0", 1000.0, _export=False)
+        B_0 = Parameter("B_0", 500.0, _export=False)
+        m.add_component(A_0)
+        m.add_component(B_0)
+        m.add_initial(Initial(A(b=None) ** EC, A_0, _export=False))
+        m.add_initial(Initial(B(a=None) ** EC, B_0, _export=False))
+        return m
+    finally:
+        SelfExporter.do_export = True
+
+
+def test_bimolecular_compartment_rate_matches_bng():
+    """Netgen must apply 1/V correction for bimolecular reactions in compartments.
+
+    BNG embeds a ``1/V`` factor into the kinetic rate for bimolecular
+    reactions in a compartment with non-unit size.  Netgen must produce the
+    same rate expression; failing to do so gives ODEs that are off by a
+    factor of V relative to BNG.
+    """
+    import sympy
+    from pysb.bng import generate_equations
+
+    m = _build_bimolecular_compartment_model()
+
+    # Netgen
+    ng = NetworkGenerator(m)
+    ng.generate_network(populate=True)
+    ng_rates = {(rxn["reactants"], rxn["products"]): rxn["rate"] for rxn in m.reactions}
+
+    # BNG
+    generate_equations(m)
+    bng_rates = {
+        (rxn["reactants"], rxn["products"]): rxn["rate"] for rxn in m.reactions
+    }
+
+    assert_true(len(ng_rates) > 0, "Netgen produced no reactions")
+    for key, ng_rate in ng_rates.items():
+        assert_in(key, bng_rates, f"Reaction {key} missing from BNG output")
+        bng_rate = bng_rates[key]
+        diff = sympy.simplify(ng_rate - bng_rate)
+        assert_equal(
+            diff,
+            sympy.Integer(0),
+            f"Rate mismatch for {key}: netgen={ng_rate}, BNG={bng_rate}",
+        )

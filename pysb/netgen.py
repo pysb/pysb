@@ -3176,6 +3176,42 @@ class NetworkGenerator:
                 )
                 combined_rate += sym_factor * sympy.Mul(sympy.S(rate_obj), species_syms)
 
+            # Apply the compartment volume correction 1/V^(n-1) that BNG
+            # embeds in kinetic rates for reactions of order n>=2 in
+            # compartmented models.  PySB's __s variables represent molecule
+            # counts (amounts), so the correct ODE requires dividing by the
+            # compartment volume for each pair of reactants.
+            #
+            # BNG does NOT apply a volume factor to synthesis (n==0) or
+            # unimolecular (n==1) reactions, so no correction is needed there.
+            if model.compartments:
+                n_order = len(reactant_ids)
+                if n_order >= 2:
+                    # Collect the compartment of every reactant species.
+                    reactant_cpts = set()
+                    for sp_idx in reactant_ids:
+                        sp = model.species[sp_idx]
+                        cpt = sp.species_compartment()
+                        reactant_cpts.add(cpt)
+
+                    # Remove None (default/unassigned compartment).
+                    non_none_cpts = reactant_cpts - {None}
+
+                    if len(non_none_cpts) == 1:
+                        cpt = next(iter(non_none_cpts))
+                        # Only correct when the compartment has a non-unit size.
+                        if cpt.size is not None:
+                            combined_rate *= sympy.Symbol(cpt.name) ** (1 - n_order)
+                    elif len(non_none_cpts) > 1:
+                        warnings.warn(
+                            f"Reaction involves reactants from multiple compartments "
+                            f"({[c.name for c in non_none_cpts]}); compartment volume "
+                            f"correction not applied.",
+                            stacklevel=2,
+                        )
+                    # If non_none_cpts is empty (all reactants in default
+                    # compartment), no correction is needed.
+
             reaction = {
                 "reactants": reactant_ids,
                 "products": product_ids,
