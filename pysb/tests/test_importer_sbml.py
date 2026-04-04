@@ -380,8 +380,8 @@ def test_roundtrip_robertson():
 
     # Species count should match (exported as __s0, __s1, __s2)
     assert len(m.monomers) == len(robertson.model.species)
-    # Reaction count should match
-    assert len(m.rules) == len(robertson.model.reactions_bidirectional)
+    # Reaction count should match (exporter uses unidirectional reactions)
+    assert len(m.rules) == len(robertson.model.reactions)
     # Parameters should be preserved
     orig_pnames = {p.name for p in robertson.model.parameters}
     imp_pnames = {p.name for p in m.parameters}
@@ -403,6 +403,76 @@ def test_roundtrip_initial_values():
         ic_map[mon_name] = ic.value
     # A_0 must be 1.0 (referenced by initialAssignment)
     assert any(getattr(v, "value", None) == 1.0 for v in ic_map.values())
+
+
+def test_roundtrip_nonunit_compartment_trajectories():
+    """Export/import round-trip with a non-unit compartment must reproduce
+    the same ODE trajectories to within rtol=1e-3.
+
+    This is a regression test for a bug where the exporter wrote BNG's
+    concentration-based rates directly as SBML kinetic laws, causing the
+    importer to double-count the volume factor for non-unit compartments.
+    """
+    import numpy as np
+    import pysb.core
+    from pysb import (
+        Model,
+        Monomer,
+        Parameter,
+        Initial,
+        Observable,
+        Rule,
+        Compartment,
+    )
+    from pysb.export import export
+    from pysb.simulator import ScipyOdeSimulator
+
+    # Build a model with compartment size V=2 (non-unit) so the volume
+    # correction factor is 0.5 for bimolecular and 2 for synthesis.
+    # Parameters are chosen to give well-conditioned dynamics over t=[0, 10].
+    pysb.core.SelfExporter.cleanup()
+    m_orig = Model()
+    Compartment("cell", dimension=3, size=Parameter("Vcell", 2.0))
+    Monomer("A")
+    Monomer("B")
+    Monomer("C")
+    Parameter("kf", 0.1)
+    Parameter("kr", 0.5)
+    Initial(A() ** cell, Parameter("A0", 1.0))
+    Initial(B() ** cell, Parameter("B0", 2.0))
+    Initial(C() ** cell, Parameter("C0", 0))
+    Observable("obs_A", A() ** cell)
+    Observable("obs_B", B() ** cell)
+    Observable("obs_C", C() ** cell)
+    Rule("bind", A() ** cell + B() ** cell >> C() ** cell, kf)
+    Rule("unbind", C() ** cell >> A() ** cell + B() ** cell, kr)
+
+    try:
+        t = np.linspace(0, 10, 51)
+        traj_orig = ScipyOdeSimulator(m_orig, tspan=t).run().dataframe
+
+        sbml_str = export(m_orig, "sbml")
+        m_rt = _model_from_sbml_libsbml(sbml_str)
+        traj_rt = ScipyOdeSimulator(m_rt, tspan=t).run().dataframe
+
+        # Match observables by position: obs_A -> obs___s0, etc.
+        # (the re-imported model uses BNG species indices as names)
+        for orig_col, rt_col in [
+            ("obs_A", "obs___s0"),
+            ("obs_B", "obs___s1"),
+            ("obs_C", "obs___s2"),
+        ]:
+            orig_vals = traj_orig[orig_col].values
+            rt_vals = traj_rt[rt_col].values
+            scale = np.abs(orig_vals).max() + 1e-30
+            rel_err = np.max(np.abs(orig_vals - rt_vals)) / scale
+            assert rel_err < 1e-3, (
+                "Round-trip trajectory mismatch for {}: max rel error {:.2e}".format(
+                    orig_col, rel_err
+                )
+            )
+    finally:
+        pysb.core.SelfExporter.cleanup()
 
 
 # ---------------------------------------------------------------------------
