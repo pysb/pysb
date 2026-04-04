@@ -1,6 +1,5 @@
 from pysb.simulator.base import Simulator, SimulatorException, SimulationResult
 import pysb
-import pysb.bng
 import numpy as np
 from scipy.constants import N_A
 import os
@@ -178,6 +177,7 @@ class CupSodaSimulator(Simulator):
         self._base_dir = kwargs.pop('base_dir', None)
         self.integrator = kwargs.pop('integrator', 'cupsoda')
         integrator_options = kwargs.pop('integrator_options', {})
+        kwargs.pop('netgen', None)  # consumed by Simulator base class
 
         if kwargs:
             raise ValueError('Unknown keyword argument(s): {}'.format(
@@ -196,7 +196,7 @@ class CupSodaSimulator(Simulator):
             )
 
         # generate the equations for the model
-        pysb.bng.generate_equations(self._model, self._cleanup, self.verbose)
+        self._run_netgen(cleanup=self._cleanup)
 
         # build integrator options list from our defaults and any kwargs
         # passed to this function
