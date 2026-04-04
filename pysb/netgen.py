@@ -176,6 +176,7 @@ live on the ``NetworkGenerator`` instance.
 import collections
 import itertools
 import logging
+import math
 import sympy
 import time
 import warnings
@@ -3158,15 +3159,22 @@ class NetworkGenerator:
             # Determine rate parameter/expression for this reaction from the
             # first matching rule. Supports multi-rule reactions by summing.
             combined_rate = sympy.Integer(0)
+            # BNG divides by n! for each group of n identical reactant species
+            # (statistical / symmetry factor).  Compute 1/∏(count!)  where
+            # the product runs over unique species in reactant_ids.
+            reactant_counts = collections.Counter(reactant_ids)
+            sym_factor = sympy.Rational(
+                1, math.prod(math.factorial(c) for c in reactant_counts.values())
+            )
             for rule_name, is_rev in zip(rule_names, reverse_flags):
                 rule = model.rules[rule_name]
                 rate_obj = rule.rate_reverse if is_rev else rule.rate_forward
-                # Build the propensity: rate_constant * product(s_i)
+                # Build the propensity: symmetry_factor * rate_constant * product(s_i)
                 # where s_i are the concentrations of each reactant species.
                 species_syms = sympy.Mul(
                     *[sympy.Symbol("__s%d" % r) for r in reactant_ids]
                 )
-                combined_rate += sympy.Mul(sympy.S(rate_obj), species_syms)
+                combined_rate += sym_factor * sympy.Mul(sympy.S(rate_obj), species_syms)
 
             reaction = {
                 "reactants": reactant_ids,

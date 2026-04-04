@@ -3294,3 +3294,291 @@ def test_localfunc_raises_not_implemented():
         assert False, "Expected NotImplementedError for local-function model"
     except NotImplementedError as exc:
         assert_in("local function", str(exc).lower())
+
+
+# ---------------------------------------------------------------------------
+# Homo-multimer symmetry-factor regression tests
+# ---------------------------------------------------------------------------
+
+
+def _build_homodimer_model():
+    """Return a minimal PySB model with a reversible homodimerisation rule.
+
+    Model:  A(b) + A(b) <-> A(b!1).A(b!1)   kf, kr
+    All components are added without exporting to the module namespace so the
+    model can be created inside a test function without polluting SelfExporter.
+    """
+    SelfExporter.do_export = False
+    try:
+        m = Model(_export=False)
+        A = Monomer("A", ["b"], _export=False)
+        m.add_component(A)
+        kf = Parameter("kf", 1.0, _export=False)
+        kr = Parameter("kr", 0.5, _export=False)
+        m.add_component(kf)
+        m.add_component(kr)
+        r = Rule(
+            "bind",
+            A(b=None) + A(b=None) | A(b=1) % A(b=1),
+            kf,
+            kr,
+            _export=False,
+        )
+        m.add_component(r)
+        from pysb.core import Initial
+
+        A_0 = Parameter("A_0", 2.0, _export=False)
+        m.add_component(A_0)
+        m.add_initial(Initial(A(b=None), A_0, _export=False))
+        return m
+    finally:
+        SelfExporter.do_export = True
+
+
+def test_homodimer_symmetry_factor_rate():
+    """Homo-dimer rule A+A->D must carry a 1/2! symmetry factor in the rate.
+
+    BNG divides the reaction propensity by ``n!`` for each group of *n*
+    identical reactant species.  For ``A(b) + A(b) -> A(b!1).A(b!1)`` there
+    is one group of size 2, so the forward rate must be ``kf/2 * s0^2``,
+    not ``kf * s0^2``.  Omitting the factor causes ODEs that consume A twice
+    as fast as BNG and makes netgen simulations disagree with BNG simulations.
+    """
+    import sympy
+
+    m = _build_homodimer_model()
+    ng = NetworkGenerator(m)
+    ng.generate_network(populate=True)
+
+    fwd_rxns = [rxn for rxn in m.reactions if len(rxn["reactants"]) == 2]
+    assert_true(len(fwd_rxns) == 1, "Expected exactly one bimolecular reaction")
+    rate = fwd_rxns[0]["rate"]
+    # Rate must equal kf/2 * __s0^2: the Rational(1,2) coefficient must be present.
+    coeff, rest = sympy.Rational(rate.as_coeff_Mul()[0]), rate.as_coeff_Mul()[1]
+    assert_equal(
+        coeff,
+        sympy.Rational(1, 2),
+        f"Forward rate coefficient should be 1/2, got {coeff}",
+    )
+    # The remaining factor must contain kf and __s0**2
+    sym_names = {s.name for s in rest.free_symbols}
+    assert_true(
+        "kf" in sym_names,
+        f"kf missing from rate: {rate}",
+    )
+    s0 = sympy.Symbol("__s0")
+    assert_true(
+        rest.has(s0**2),
+        f"__s0^2 missing from rate: {rate}",
+    )
+
+
+def test_homodimer_rate_matches_bng():
+    """Netgen reaction rates for homodimerisation must match BNG exactly."""
+    import sympy
+    from pysb.bng import generate_equations
+
+    m = _build_homodimer_model()
+
+    # Netgen
+    ng = NetworkGenerator(m)
+    ng.generate_network(populate=True)
+    ng_rates = {(rxn["reactants"], rxn["products"]): rxn["rate"] for rxn in m.reactions}
+
+    # BNG
+    generate_equations(m)
+    bng_rates = {
+        (rxn["reactants"], rxn["products"]): rxn["rate"] for rxn in m.reactions
+    }
+
+    # Map netgen species to BNG species and compare
+    for key, ng_rate in ng_rates.items():
+        assert_in(key, bng_rates, f"Reaction {key} missing from BNG output")
+        bng_rate = bng_rates[key]
+        diff = sympy.simplify(ng_rate - bng_rate)
+        assert_equal(
+            diff,
+            sympy.Integer(0),
+            f"Rate mismatch for {key}: netgen={ng_rate}, BNG={bng_rate}",
+        )
+
+
+def test_homodimer_simulation_matches_bng():
+    """Simulation trajectory from netgen must match BNG for homodimerisation.
+
+    The ODE from netgen must agree with BNG to within rtol=1e-4 over t=[0,5].
+    Prior to the symmetry-factor fix, netgen produced ODEs twice as fast,
+    causing large divergence.
+    """
+    import numpy as np
+    from pysb.bng import generate_equations
+    from pysb.simulator import ScipyOdeSimulator
+
+    m = _build_homodimer_model()
+    from pysb.core import Observable
+
+    # Add an observable for free A
+    obs = Observable("free_A", m.monomers["A"](b=None), _export=False)
+    m.add_component(obs)
+
+    # Netgen simulation
+    ng = NetworkGenerator(m)
+    ng.generate_network(populate=True)
+    tspan = np.linspace(0, 5, 200)
+    res_ng = ScipyOdeSimulator(m, tspan=tspan, compiler="python").run()
+    ng_traj = res_ng.observables["free_A"]
+
+    # BNG simulation
+    generate_equations(m)
+    res_bng = ScipyOdeSimulator(m, tspan=tspan, compiler="python").run()
+    bng_traj = res_bng.observables["free_A"]
+
+    np.testing.assert_allclose(
+        ng_traj,
+        bng_traj,
+        rtol=1e-4,
+        err_msg="Netgen homodimer trajectory diverges from BNG",
+    )
+
+
+def test_trimerisation_symmetry_factor_rate():
+    """3A -> T must carry a 1/3! = 1/6 symmetry factor in the rate."""
+    import sympy
+
+    from pysb.core import Initial
+
+    SelfExporter.do_export = False
+    try:
+        m = Model(_export=False)
+        A = Monomer("A", ["b"], _export=False)
+        T = Monomer("T", [], _export=False)
+        m.add_component(A)
+        m.add_component(T)
+        k = Parameter("k", 1.0, _export=False)
+        m.add_component(k)
+        r = Rule(
+            "trim",
+            A(b=None) + A(b=None) + A(b=None) >> T(),
+            k,
+            _export=False,
+        )
+        m.add_component(r)
+        m.add_initial(Initial(A(b=None), Parameter("A_0", 3.0, _export=False)))
+    finally:
+        SelfExporter.do_export = True
+
+    ng = NetworkGenerator(m)
+    ng.generate_network(populate=True)
+
+    assert_true(len(m.reactions) >= 1, "Expected at least one reaction")
+    fwd_rxns = [rxn for rxn in m.reactions if len(rxn["reactants"]) == 3]
+    assert_true(len(fwd_rxns) == 1, "Expected exactly one trimer-forming reaction")
+    rate = fwd_rxns[0]["rate"]
+    coeff = sympy.Rational(rate.as_coeff_Mul()[0])
+    assert_equal(
+        coeff,
+        sympy.Rational(1, 6),
+        f"Trimerisation symmetry factor should be 1/6, got {coeff}",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cross-compartment transport regression tests
+# ---------------------------------------------------------------------------
+
+
+def _build_transport_model():
+    """Return a minimal PySB model with a single-species compartment transport rule.
+
+    Model:  A()@EC >> B()@CP   k
+    EC is a 3-D extracellular volume; CP is a 2-D membrane inside EC.
+    This exercises the compartment inference path in _apply_rule_with_monomer_map.
+    """
+    from pysb.core import Compartment, Initial
+
+    SelfExporter.do_export = False
+    try:
+        m = Model(_export=False)
+        EC = Compartment("EC", dimension=3, _export=False)
+        CP = Compartment("CP", dimension=2, parent=EC, _export=False)
+        m.add_component(EC)
+        m.add_component(CP)
+        A = Monomer("A", [], _export=False)
+        B = Monomer("B", [], _export=False)
+        m.add_component(A)
+        m.add_component(B)
+        k = Parameter("k", 0.5, _export=False)
+        m.add_component(k)
+        r = Rule("transport", A() ** EC >> B() ** CP, k, _export=False)
+        m.add_component(r)
+        A_0 = Parameter("A_0", 1.0, _export=False)
+        m.add_component(A_0)
+        m.add_initial(Initial(A() ** EC, A_0, _export=False))
+        return m
+    finally:
+        SelfExporter.do_export = True
+
+
+def test_cross_compartment_species_and_reactions():
+    """Cross-compartment transport generates correct species and reactions.
+
+    Netgen must produce two species (A@EC, B@CP) and one reaction
+    (species 0 -> species 1) attributed to rule 'transport'.
+    """
+    m = _build_transport_model()
+    ng = NetworkGenerator(m)
+    ng.generate_network(populate=True)
+
+    assert_equal(len(ng.species), 2, f"Expected 2 species, got {ng.species}")
+    assert_equal(len(m.reactions), 1, f"Expected 1 reaction, got {m.reactions}")
+    rxn = m.reactions[0]
+    assert_equal(rxn["rule"], ("transport",))
+    # Reactants contain one species (A@EC), products contain one species (B@CP)
+    assert_equal(len(rxn["reactants"]), 1)
+    assert_equal(len(rxn["products"]), 1)
+    assert_true(
+        rxn["reactants"][0] != rxn["products"][0],
+        "Reactant and product must be different species",
+    )
+
+
+def test_cross_compartment_rate_matches_bng():
+    """Netgen reaction rate for cross-compartment transport must match BNG.
+
+    Both netgen and BNG express the rate as ``k * __s0`` where __s0 is the
+    concentration of the source species.  Volume scaling is handled at the
+    ODE level, not at the reaction-rate level.
+    """
+    import sympy
+    from pysb.bng import generate_equations
+
+    m = _build_transport_model()
+
+    # Netgen
+    ng = NetworkGenerator(m)
+    ng.generate_network(populate=True)
+    ng_rates = {(rxn["reactants"], rxn["products"]): rxn["rate"] for rxn in m.reactions}
+
+    # BNG
+    generate_equations(m)
+    bng_rates = {
+        (rxn["reactants"], rxn["products"]): rxn["rate"] for rxn in m.reactions
+    }
+
+    for key, ng_rate in ng_rates.items():
+        assert_in(key, bng_rates, f"Reaction {key} missing from BNG output")
+        diff = sympy.simplify(ng_rate - bng_rates[key])
+        assert_equal(
+            diff,
+            sympy.Integer(0),
+            f"Rate mismatch for {key}: netgen={ng_rate}, BNG={bng_rates[key]}",
+        )
+
+
+def test_cross_compartment_matches_bng_full():
+    """Cross-compartment transport: species and reactions both match BNG."""
+    m = _build_transport_model()
+    ng = NetworkGenerator(m)
+    ng.generate_network()
+    corr = ng.check_species_against_bng()
+    ng.check_reactions_against_bng(corr)
