@@ -3159,12 +3159,22 @@ class NetworkGenerator:
             # Determine rate parameter/expression for this reaction from the
             # first matching rule. Supports multi-rule reactions by summing.
             combined_rate = sympy.Integer(0)
-            # BNG divides by n! for each group of n identical reactant species
-            # (statistical / symmetry factor).  Compute 1/∏(count!)  where
-            # the product runs over unique species in reactant_ids.
+            # BNG divides by n! for each group of n identical reactant
+            # species that are *fully consumed* by the reaction (statistical /
+            # symmetry factor).  Species that also appear as products are not
+            # counted: e.g. B()+B()->C()+B() has no factor because one B acts
+            # as a catalyst, while A()+A()->AA() gets 1/2 because both As are
+            # consumed.  Concretely: use the net number of times each species
+            # is consumed (reactant count minus product count, floored at 0).
             reactant_counts = collections.Counter(reactant_ids)
+            product_counts = collections.Counter(product_ids)
             sym_factor = sympy.Rational(
-                1, math.prod(math.factorial(c) for c in reactant_counts.values())
+                1, math.prod(
+                    math.factorial(
+                        max(0, reactant_counts[sp] - product_counts.get(sp, 0))
+                    )
+                    for sp in reactant_counts
+                )
             )
             for rule_name, is_rev in zip(rule_names, reverse_flags):
                 rule = model.rules[rule_name]
