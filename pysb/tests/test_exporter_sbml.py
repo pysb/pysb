@@ -47,6 +47,7 @@ def _sbml_string(pysb_model):
 
 # Model ID
 
+
 @with_model
 def test_model_id_simple_name():
     """A model whose name contains no special characters is exported as-is."""
@@ -101,6 +102,7 @@ def test_model_id_roundtrip():
 
 
 # Stoichiometry consolidation
+
 
 @with_model
 def test_stoichiometry_no_duplicate_reactants():
@@ -199,6 +201,7 @@ def test_stoichiometry_no_duplicate_products():
 
 # Modifiers must not duplicate reactants, products, or special symbols
 
+
 @with_model
 def test_no_reactant_as_modifier():
     """Species listed as reactants must not also appear as modifiers."""
@@ -295,6 +298,7 @@ def test_time_not_added_as_modifier():
 
 # Fixed species, docstring notes, and level conversion
 
+
 @with_model
 def test_fixed_species_boundary_condition():
     """A fixed initial condition is exported as boundaryCondition=true."""
@@ -343,6 +347,7 @@ def test_level_conversion():
 
 # Energy models
 
+
 @with_model
 def test_energy_model_raises():
     """Exporting an energy model must raise EnergyNotSupported."""
@@ -351,3 +356,48 @@ def test_energy_model_raises():
     EnergyPattern("ep_A", A(), G_A)
 
     assert_raises(EnergyNotSupported, _sbml_string, model)
+
+
+@with_model
+def test_catalyst_reaction_kinetic_law_volume_exponent():
+    """Catalyst reaction B+B->C+B in a non-unit compartment: kinetic law must
+    use V^1 (net-consumed = 1), not V^2 (raw reactant count = 2).
+
+    For Robertson's second reaction (B+B->C+B, BNG rate = k*[B]^2), the
+    SBML kinetic law J = V^n_net * k*[B]^2 where n_net = 1 (one B is
+    consumed net).  Previously the exporter used len(reactants)=2, writing
+    V^2*k*[B]^2 which inflated J by V and broke round-trip accuracy for
+    non-unit compartments.
+    """
+    from pysb import Compartment
+    from pysb.bng import generate_equations
+
+    Compartment("cell", dimension=3, size=Parameter("Vcell", 2.0))
+    Monomer("B")
+    Monomer("C")
+    Parameter("k2", 3e7)
+    Initial(B() ** cell, Parameter("B_0", 1e-3))
+    Initial(C() ** cell, Parameter("C_0", 0.0))
+    Rule("BB_to_BC", B() ** cell + B() ** cell >> C() ** cell + B() ** cell, k2)
+    Observable("obs_B", B() ** cell)
+    generate_equations(model)
+
+    sbml_model = _get_sbml_model(model)
+    # Find the reaction in the exported SBML
+    assert sbml_model.getNumReactions() == 1
+    rxn = sbml_model.getReaction(0)
+    math_str = libsbml.formulaToL3String(rxn.getKineticLaw().getMath())
+
+    # The kinetic law must contain Vcell^1 (i.e. "Vcell" appears exactly once
+    # as a factor), not Vcell^2.  We check that the string does NOT contain
+    # "Vcell^2" or "Vcell * Vcell".
+    assert "Vcell^2" not in math_str, (
+        "Kinetic law should use V^1 for catalyst reaction, got: {}".format(math_str)
+    )
+    assert "Vcell * Vcell" not in math_str, (
+        "Kinetic law should use V^1 for catalyst reaction, got: {}".format(math_str)
+    )
+    # And Vcell must appear at least once (volume correction is applied)
+    assert "Vcell" in math_str, (
+        "Kinetic law must include compartment volume, got: {}".format(math_str)
+    )

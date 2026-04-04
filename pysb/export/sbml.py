@@ -347,7 +347,22 @@ class SbmlExporter(Exporter):
             # For models without explicit compartments, V = 1 (no correction).
             bng_rate = reaction["rate"]
             if self.model.compartments:
-                n_reac = len(reaction["reactants"])
+                # Use net-consumed molecule count for the V^n exponent.
+                # BNG embeds 1/V^(n-1) for mass-action, where n is the number
+                # of *net-consumed* reactant molecules (reactant count minus the
+                # count of identical species that also appear as products, i.e.
+                # catalysts).  Using the raw reactant count over-corrects for
+                # catalyst reactions such as B+B->C+B (net consumed = 1, not 2).
+                reactant_counts = {}
+                for sp in reaction["reactants"]:
+                    reactant_counts[sp] = reactant_counts.get(sp, 0) + 1
+                product_counts = {}
+                for sp in reaction["products"]:
+                    product_counts[sp] = product_counts.get(sp, 0) + 1
+                n_reac = sum(
+                    max(0, r - product_counts.get(sp, 0))
+                    for sp, r in reactant_counts.items()
+                )
                 # Identify the reference species list (reactants if present,
                 # otherwise products) to determine the reaction compartment.
                 ref_indices = (

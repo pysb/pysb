@@ -2248,6 +2248,149 @@ def test_reversible_homodimer_combinatorial_correction():
         assert abs(float(rev_rate.value) - kr) < 1e-9
 
 
+def test_catalyst_combinatorial_correction_value():
+    """Catalyst reaction B+B->C+B: combinatorial correction must be 1, not 2.
+
+    BNG only applies the symmetry factor to *net-consumed* species.  In
+    B+B->C+B one copy of B is regenerated as a product, so the net consumption
+    of B is 1 and BNG applies no 1/2 factor.  The importer must also compute
+    the correction from the net-consumed stoichiometry (2 - 1 = 1, 1! = 1) to
+    avoid inflating the recovered rate by a spurious factor of 2.
+    """
+    k = 3e7
+    sbml = _minimal_sbml(
+        species=(
+            '<species id="B" compartment="c" initialConcentration="1.0"'
+            ' hasOnlySubstanceUnits="false"/>'
+            '<species id="C" compartment="c" initialConcentration="0.0"'
+            ' hasOnlySubstanceUnits="false"/>'
+        ),
+        parameters='<parameter id="k" value="{}" constant="true"/>'.format(k),
+        reactions="""
+          <reaction id="r1" reversible="false">
+            <listOfReactants>
+              <speciesReference species="B" stoichiometry="2"/>
+            </listOfReactants>
+            <listOfProducts>
+              <speciesReference species="B" stoichiometry="1"/>
+              <speciesReference species="C" stoichiometry="1"/>
+            </listOfProducts>
+            <kineticLaw>
+              <math xmlns="http://www.w3.org/1998/Math/MathML">
+                <apply><times/><ci>k</ci>
+                  <apply><power/><ci>B</ci><cn>2</cn></apply>
+                </apply>
+              </math>
+            </kineticLaw>
+          </reaction>""",
+    )
+    m = _model_from_sbml_libsbml(sbml)
+    rate = m.rules["r1"].rate_forward
+    # Net-consumed B = 2 - 1 = 1, so correction = 1! = 1.
+    # The recovered rule rate must equal k (not 2*k).
+    if hasattr(rate, "expr"):
+        coeff = float(rate.expr.as_coeff_Mul()[0])
+    else:
+        coeff = float(rate.value)
+    assert abs(coeff - k) < 1.0, (
+        "Catalyst rate coefficient should be k={}, got {}".format(k, coeff)
+    )
+
+
+def test_catalyst_simulation_accuracy():
+    """B+B->C+B: ODE trajectories must match the analytic solution.
+
+    This is a regression test for the catalyst symmetry-factor bug where
+    _combinatorial_correction used the raw reactant stoichiometry (2) instead
+    of the net-consumed stoichiometry (1), inflating the rate constant by 2.
+
+    With rate k and initial [B]=1, [C]=0:
+        d[B]/dt = -k*[B]^2  =>  [B](t) = 1 / (1 + k*t)
+        d[C]/dt = +k*[B]^2  =>  [C](t) = k*t / (1 + k*t)
+    """
+    import numpy as np
+    from pysb.simulator import ScipyOdeSimulator
+
+    k = 0.5
+    sbml = _minimal_sbml(
+        species=(
+            '<species id="B" compartment="c" initialConcentration="1.0"'
+            ' hasOnlySubstanceUnits="false"/>'
+            '<species id="C" compartment="c" initialConcentration="0.0"'
+            ' hasOnlySubstanceUnits="false"/>'
+        ),
+        parameters='<parameter id="k" value="{}" constant="true"/>'.format(k),
+        reactions="""
+          <reaction id="r1" reversible="false">
+            <listOfReactants>
+              <speciesReference species="B" stoichiometry="2"/>
+            </listOfReactants>
+            <listOfProducts>
+              <speciesReference species="B" stoichiometry="1"/>
+              <speciesReference species="C" stoichiometry="1"/>
+            </listOfProducts>
+            <kineticLaw>
+              <math xmlns="http://www.w3.org/1998/Math/MathML">
+                <apply><times/><ci>k</ci>
+                  <apply><power/><ci>B</ci><cn>2</cn></apply>
+                </apply>
+              </math>
+            </kineticLaw>
+          </reaction>""",
+    )
+    m = _model_from_sbml_libsbml(sbml)
+    tspan = np.linspace(0, 5, 200)
+    res = ScipyOdeSimulator(m, tspan=tspan, compiler="python").run()
+
+    B_sim = res.observables["obs_B"]
+    C_sim = res.observables["obs_C"]
+    B_ref = 1.0 / (1.0 + k * tspan)
+    C_ref = k * tspan / (1.0 + k * tspan)
+
+    np.testing.assert_allclose(B_sim, B_ref, rtol=1e-4, err_msg="[B] mismatch")
+    np.testing.assert_allclose(C_sim, C_ref, rtol=1e-4, err_msg="[C] mismatch")
+
+
+def test_roundtrip_robertson_trajectories():
+    """Round-trip Robertson model and verify ODE trajectories match exactly.
+
+    This is a regression test for the catalyst symmetry-factor bug in the
+    importer (_combinatorial_correction used raw stoichiometry for B in the
+    B+B->C+B reaction, giving rate 2*k2 instead of k2).  After the fix the
+    re-imported model must reproduce the original trajectories to machine
+    precision (since Robertson has no compartment, V=1 and the exporter
+    applies no volume correction).
+    """
+    import importlib
+    import numpy as np
+    import pysb.examples.robertson as _robertson_module
+    from pysb.export import export
+    from pysb.simulator import ScipyOdeSimulator
+
+    # Re-load the module to ensure the model attribute is present even if a
+    # prior test called SelfExporter.cleanup() (which removes module-level
+    # model objects from their parent module's namespace).
+    importlib.reload(_robertson_module)
+    robertson_model = _robertson_module.model
+
+    tspan = np.linspace(0, 40, 500)
+    sim_orig = ScipyOdeSimulator(robertson_model, tspan=tspan, compiler="python").run()
+
+    sbml_str = export(robertson_model, "sbml")
+    m_imp = _model_from_sbml_libsbml(sbml_str)
+    sim_imp = ScipyOdeSimulator(m_imp, tspan=tspan, compiler="python").run()
+
+    for i in range(len(robertson_model.species)):
+        orig = sim_orig.species[:, i]
+        imp = sim_imp.species[:, i]
+        np.testing.assert_allclose(
+            imp,
+            orig,
+            rtol=1e-6,
+            err_msg="Round-trip trajectory mismatch for species s{}".format(i),
+        )
+
+
 def test_boundary_species_excluded_from_rule_pattern():
     """Boundary species appears in kinetic law but is absent from rule pattern.
 

@@ -1071,49 +1071,70 @@ class SbmlImporter(Builder):
             product = product * obs**stoich
         return product
 
-    def _combinatorial_correction(self, list_of_refs):
-        """Compute the combinatorial correction factor for a species-reference list.
+    def _combinatorial_correction(self, reactant_refs, product_refs=None):
+        """Compute the combinatorial correction factor for a reaction.
 
-        PySB/BNG divides the rule rate by ``n!`` for each species that appears
-        with stoichiometry *n* (identical-reactant symmetry correction).  The
-        SBML kinetic law encodes the *net flux* directly and does not include
-        this factor, so the importer must multiply the intrinsic rate by the
-        same ``n!`` to counteract BNG's division.
+        PySB/BNG divides the rule rate by ``n!`` for each species that is
+        *net consumed* with multiplicity *n* (statistical / symmetry factor).
+        The SBML kinetic law does not include this factor, so the importer must
+        multiply the recovered rate by the same ``n!`` to counteract BNG's
+        division.
 
-        For example, a homodimerisation reaction ``A + A -> B`` (stoichiometry
-        2 for A) gets a correction factor of ``2! = 2``.  A reaction with
-        distinct reactants (all stoichiometries equal to 1) gets a factor of 1
-        and no correction is needed.
+        Critically, BNG only applies the factor based on **net consumption**
+        (reactant stoichiometry minus product stoichiometry, floored at zero).
+        For a catalytic species that appears on both sides (e.g. ``B`` in
+        ``B + B -> C + B``), the net consumption is 1, giving ``1! = 1`` (no
+        correction).  Only species that are *fully consumed* (not regenerated as
+        products) contribute to the factor.
+
+        Examples:
+
+        * ``A + A -> D``: net consumed A = 2, correction = ``2! = 2``.
+        * ``B + B -> C + B``: net consumed B = 1, correction = ``1! = 1``.
+        * ``A + B -> C``: net consumed A = 1, B = 1, correction = 1.
 
         Parameters
         ----------
-        list_of_refs : libsbml.ListOfSpeciesReferences
-            Reactant (or product) species-reference list from a libsbml reaction.
+        reactant_refs : libsbml.ListOfSpeciesReferences
+            Reactant species-reference list from a libsbml reaction.
+        product_refs : libsbml.ListOfSpeciesReferences, optional
+            Product species-reference list.  When provided, the net-consumed
+            stoichiometry (reactant - product, ≥ 0) is used; when omitted the
+            raw reactant stoichiometry is used.
 
         Returns
         -------
         int
-            Product of ``stoich!`` over all unique species in *list_of_refs*.
+            Product of ``net_stoich!`` over all unique reactant species.
         """
-        # Accumulate stoichiometry per unique species ID
-        stoich_by_species = {}
-        for j in range(list_of_refs.size()):
-            sr = list_of_refs.get(j)
-            sp_id = sr.getSpecies()
-            # Boundary species are excluded from PySB rule patterns, so BNG
-            # applies no symmetry correction for them.  Skip them here.
-            if sp_id in self._boundary_species:
-                continue
-            stoich = 1
-            if sr.isSetStoichiometry():
-                s = sr.getStoichiometry()
-                stoich = (
-                    int(round(s)) if math.isclose(s, round(s), rel_tol=1e-9) else int(s)
-                )
-            stoich_by_species[sp_id] = stoich_by_species.get(sp_id, 0) + stoich
+
+        def _stoich_map(refs):
+            result = {}
+            if refs is None:
+                return result
+            for j in range(refs.size()):
+                sr = refs.get(j)
+                sp_id = sr.getSpecies()
+                if sp_id in self._boundary_species:
+                    continue
+                stoich = 1
+                if sr.isSetStoichiometry():
+                    s = sr.getStoichiometry()
+                    stoich = (
+                        int(round(s))
+                        if math.isclose(s, round(s), rel_tol=1e-9)
+                        else int(s)
+                    )
+                result[sp_id] = result.get(sp_id, 0) + stoich
+            return result
+
+        reactant_stoich = _stoich_map(reactant_refs)
+        product_stoich = _stoich_map(product_refs)
+
         correction = 1
-        for stoich in stoich_by_species.values():
-            correction *= math.factorial(stoich)
+        for sp_id, r_stoich in reactant_stoich.items():
+            net = max(0, r_stoich - product_stoich.get(sp_id, 0))
+            correction *= math.factorial(net)
         return correction
 
     def _stoich_refs_to_patterns(self, sbml_model, list_of_refs):
@@ -1321,7 +1342,7 @@ class SbmlImporter(Builder):
                 # Forward rule: reactants -> products
                 reactant_factor = self._obs_product_for_refs(rxn.getListOfReactants())
                 fwd_correction = self._combinatorial_correction(
-                    rxn.getListOfReactants()
+                    rxn.getListOfReactants(), rxn.getListOfProducts()
                 )
                 fwd_rate_expr = sympy.simplify(
                     fwd_correction * fwd_flux / (rxn_vol * reactant_factor)
@@ -1366,7 +1387,7 @@ class SbmlImporter(Builder):
                 if rev_flux is not None:
                     product_factor = self._obs_product_for_refs(rxn.getListOfProducts())
                     rev_correction = self._combinatorial_correction(
-                        rxn.getListOfProducts()
+                        rxn.getListOfProducts(), rxn.getListOfReactants()
                     )
                     rev_rate_expr = sympy.simplify(
                         rev_correction * rev_flux / (prod_vol * product_factor)
@@ -1412,7 +1433,9 @@ class SbmlImporter(Builder):
                 # BNG rules, then multiply by the combinatorial correction so
                 # that PySB/BNG's internal symmetry division cancels out.
                 reactant_factor = self._obs_product_for_refs(rxn.getListOfReactants())
-                correction = self._combinatorial_correction(rxn.getListOfReactants())
+                correction = self._combinatorial_correction(
+                    rxn.getListOfReactants(), rxn.getListOfProducts()
+                )
                 rate_expr = sympy.simplify(
                     correction * net_flux / (rxn_vol * reactant_factor)
                 )
