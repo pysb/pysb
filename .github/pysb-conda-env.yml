@@ -16,7 +16,7 @@ dependencies:
   - h5py
   - pexpect
   - pandas
-  - pydot
+  - pydot<4
   - coverage
   - pip
   # setuptools required by Cython

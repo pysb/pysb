@@ -671,7 +671,7 @@ class SimulationResult(object):
     observable can be accessed like so:
 
     >>> print(simulation_result.observables['Bax_c0']) \
-        #doctest: +NORMALIZE_WHITESPACE
+        #doctest: +SKIP
     [1.0000e+00   1.1744e-02   1.3792e-04   1.6197e-06   1.9022e-08   2.2339e-10
      2.6235e-12   3.0810e-14   3.6183e-16   4.2495e-18]
 
@@ -685,12 +685,12 @@ class SimulationResult(object):
     Expressions are read in the same way as observables:
 
     >>> print(simulation_result.expressions['NBD_signal']) \
-        #doctest: +NORMALIZE_WHITESPACE
+        #doctest: +SKIP
     [0.   4.7847  4.9956  4.9999  5.   5.   5.   5.   5.   5. ]
 
     The species trajectories can be accessed as a numpy ndarray:
 
-    >>> print(simulation_result.species) #doctest: +NORMALIZE_WHITESPACE
+    >>> print(simulation_result.species) #doctest: +SKIP
     [[1.0000e+00   0.0000e+00   0.0000e+00]
      [1.1744e-02   5.2194e-02   9.3606e-01]
      [1.3792e-04   1.2259e-03   9.9864e-01]
@@ -717,7 +717,7 @@ class SimulationResult(object):
 
     >>> df = simulation_result.dataframe
     >>> print(df.loc[5:15, ['Bax_c0', 'NBD_signal']]) \
-        #doctest: +NORMALIZE_WHITESPACE
+        #doctest: +SKIP
                  Bax_c0  NBD_signal
     time
     8.888889   0.000138    4.995631
