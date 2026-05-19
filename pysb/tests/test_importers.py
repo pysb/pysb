@@ -216,13 +216,15 @@ def _require_atomizer():
 
 
 def test_sbml_import_flat_model():
-    _require_atomizer()
+    # Default importer is now libsbml; no atomizer required
     model_from_sbml(_sbml_location('test_sbml_flat_SBML'))
 
 
 def test_sbml_import_structured_model():
+    # Structured (atomised) import still requires sbmlTranslator
     _require_atomizer()
-    model_from_sbml(_sbml_location('test_sbml_structured_SBML'), atomize=True)
+    model_from_sbml(_sbml_location('test_sbml_structured_SBML'),
+                    use_libsbml=False, atomize=True)
 
 
 def _sbml_for_mocks(accession_no, mirror):
@@ -235,7 +237,7 @@ def _sbml_for_mocks(accession_no, mirror):
 
 @mock.patch('pysb.importers.sbml._download_biomodels', _sbml_for_mocks)
 def test_biomodels_import_with_mock():
-    _require_atomizer()
+    # Default importer is now libsbml; no atomizer required
     model_from_biomodels('1')
 
 
