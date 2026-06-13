@@ -4,7 +4,6 @@ import re
 import numpy as np
 import sympy
 
-from pysb.bng import generate_equations
 from pysb.core import Expression, time
 from pysb.logging import setup_logger
 from pysb.simulator.base import Simulator, SimulatorException
@@ -16,7 +15,7 @@ class SSABase(Simulator):
     def __init__(self, model, verbose=False, tspan=None, **kwargs):
         super(SSABase, self).__init__(model, verbose, **kwargs)
 
-        generate_equations(self._model)
+        self._run_netgen()
 
         self.tspan = tspan
         self.verbose = verbose

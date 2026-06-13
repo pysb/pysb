@@ -1,5 +1,4 @@
 from pysb.simulator.base import Simulator, SimulationResult, SimulatorException
-from pysb.bng import generate_equations
 from pysb.export.stochkit import StochKitExporter
 import numpy as np
 import subprocess
@@ -98,14 +97,13 @@ class StochKitSimulator(Simulator):
                                                 verbose=verbose,
                                                 **kwargs)
         self.cleanup = kwargs.pop('cleanup', True)
+        kwargs.pop('netgen', None)  # consumed by Simulator base class
         if kwargs:
             raise ValueError('Unknown keyword argument(s): {}'.format(
                 ', '.join(kwargs.keys())
             ))
         self._outdir = None
-        generate_equations(self._model,
-                           cleanup=self.cleanup,
-                           verbose=self.verbose)
+        self._run_netgen(cleanup=self.cleanup)
 
     def _run_stochkit(self, t=20, t_length=100, number_of_trajectories=1,
                       seed=None, algorithm='ssa', method=None,

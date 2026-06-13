@@ -10,6 +10,7 @@ PySB Modules Reference
    pathfinder.rst
    modeltests.rst
    bng.rst
+   netgen.rst
    kappa.rst
    macros.rst
    pattern.rst

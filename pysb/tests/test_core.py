@@ -2,8 +2,9 @@ import copy
 
 from pysb.testing import *
 from pysb.core import *
+from pysb.core import _DirtyList
 from functools import partial
-from nose.tools import assert_raises
+from nose.tools import assert_equal, assert_raises, assert_true
 import operator
 import re
 
@@ -734,3 +735,41 @@ def test_energy():
     Initial(A(a=None, b=1) % B(a=1), AB_0)
 
     assert "energy=True" in repr(A_dimerize)
+
+
+def test_dirty_list_mutation_methods_mark_model_dirty():
+    m = Model(_export=False)
+    dl = _DirtyList(m, [1, 2, 3, 4])
+
+    m._netgen_dirty = False
+    dl.extend([5])
+    assert_true(m._netgen_dirty)
+
+    m._netgen_dirty = False
+    dl.insert(0, 0)
+    assert_true(m._netgen_dirty)
+
+    m._netgen_dirty = False
+    dl.remove(0)
+    assert_true(m._netgen_dirty)
+
+    m._netgen_dirty = False
+    popped = dl.pop()
+    assert_equal(popped, 5)
+    assert_true(m._netgen_dirty)
+
+    m._netgen_dirty = False
+    dl[0] = 10
+    assert_true(m._netgen_dirty)
+
+    m._netgen_dirty = False
+    del dl[0]
+    assert_true(m._netgen_dirty)
+
+    m._netgen_dirty = False
+    dl *= 2
+    assert_true(m._netgen_dirty)
+
+    m._netgen_dirty = False
+    dl.clear()
+    assert_true(m._netgen_dirty)

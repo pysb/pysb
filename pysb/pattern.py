@@ -410,6 +410,14 @@ class SpeciesPatternMatcher(object):
     """
     Match a pattern against a model's species list
 
+    The species list can come from two sources:
+
+    * :func:`pysb.bng.generate_equations` (BioNetGen subprocess) — populates
+      ``model.species`` from a BNGL net file.
+    * :class:`pysb.netgen.NetworkGenerator` (pure-Python) — call
+      ``ng.generate_network()`` (populates the model by default), or pass
+      ``ng.species`` directly as the ``species`` argument.
+
     Examples
     --------
 
@@ -477,11 +485,11 @@ class SpeciesPatternMatcher(object):
     """
     def __init__(self, model, species=None):
         self.model = model
-        if not species and not model.species:
+        if species is None and not model.species:
             raise Exception('Model needs species list - run '
                             'generate_equations() first')
 
-        if not species:
+        if species is None:
             species = model.species
 
         self.species = species
@@ -609,9 +617,9 @@ class SpeciesPatternMatcher(object):
         sp_indexes = set.intersection(*[self._species_cache[mon] for mon in
                                         monomer_list])
         if num_mon_pats:
-            retval = zip(*[(self.species[sp], sp) for sp in sp_indexes
-                           if len(self.species[sp].monomer_patterns)
-                           == num_mon_pats])
+            retval = list(zip(*[(self.species[sp], sp) for sp in sp_indexes
+                               if len(self.species[sp].monomer_patterns)
+                               == num_mon_pats]))
             return retval if retval else ((), ())
         else:
             return [self.species[sp] for sp in sp_indexes], list(sp_indexes)

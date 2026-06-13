@@ -4,7 +4,6 @@ from sympy.utilities.autowrap import CythonCodeWrapper
 from sympy.utilities.codegen import (
     C99CodeGen, Routine, InputArgument, OutputArgument, default_datatypes
 )
-import pysb.bng
 import sympy
 import re
 from functools import partial
@@ -133,13 +132,14 @@ class ScipyOdeSimulator(Simulator):
         integrator = kwargs.pop('integrator', 'vode')
         compiler = kwargs.pop('compiler', None)
         integrator_options = kwargs.pop('integrator_options', {})
+        kwargs.pop('netgen', None)  # consumed by Simulator base class
 
         if kwargs:
             raise ValueError('Unknown keyword argument(s): {}'.format(
                 ', '.join(kwargs.keys())
             ))
         # Generate the equations for the model
-        pysb.bng.generate_equations(self._model, cleanup, self.verbose)
+        self._run_netgen(cleanup=cleanup)
 
         builder_cls = _select_rhs_builder(compiler, self._logger)
         self._logger.debug("Using RhsBuilder: %s", builder_cls.__name__)
@@ -402,7 +402,7 @@ class RhsBuilder:
             obs_matrix[i, obs.species] = obs.coefficients
         self.observables_matrix = obs_matrix.tocsr()
         self.stoichiometry_matrix = model.stoichiometry_matrix
-        self.model_name = model.name
+        self.model_name = model.name or "unnamed_model"
         self._expressions_constant = [
             e.expand_expr().xreplace(param_subs) for e in expr_constant
         ]
