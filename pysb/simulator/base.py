@@ -868,9 +868,14 @@ class SimulationResult(object):
                 for i, expr in enumerate(exprs):
                     if expr.expr.has(time):
                         for it, t in enumerate(self.tout[n]):
-                            sym_dict[time.name] = t
+                            # Observables must be evaluated at this time point
+                            # too, as they may appear alongside time
+                            t_dict = dict(sym_dict)
+                            t_dict[time.name] = t
+                            for obs_name in obs_names:
+                                t_dict[obs_name] = self._yobs[n][obs_name][it]
                             self._yexpr_view[n][it, i] = expanded_exprs[i](
-                                **sym_dict
+                                **t_dict
                             )
                     else:
                         self._yexpr_view[n][:, i] = expanded_exprs[i](**sym_dict)

@@ -4,5 +4,15 @@ Importing from other formats (:py:mod:`pysb.importers`)
 .. automodule:: pysb.importers.bngl
    :members: model_from_bngl
 
+SBML import (:py:mod:`pysb.importers.sbml`)
+--------------------------------------------
+
 .. automodule:: pysb.importers.sbml
-   :members: model_from_sbml, model_from_biomodels, sbml_translator
+
+.. autoclass:: pysb.importers.sbml.SbmlImporter
+
+.. autofunction:: pysb.importers.sbml.model_from_sbml
+
+.. autofunction:: pysb.importers.sbml.model_from_biomodels
+
+.. autofunction:: pysb.importers.sbml.sbml_translator

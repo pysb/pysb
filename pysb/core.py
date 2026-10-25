@@ -1384,8 +1384,10 @@ class Parameter(Component, Symbol):
         The numerical value of the parameter. Defaults to 0.0 if not specified.
         The provided value is converted to a float before being stored, so any
         value that cannot be coerced to a float will trigger an exception.
-    nonnegative : bool, optional
+    nonnegative : bool or None, optional
         Sets the assumption whether this parameter is nonnegative (>=0).
+        Use None to make no assumption about the sign (False means the
+        parameter is assumed negative by sympy).
         Affects simplifications of expressions that involve this parameter.
         By default, parameters are assumed to be non-negative.
     integer : bool, optional
@@ -1406,7 +1408,8 @@ class Parameter(Component, Symbol):
                                              integer=integer)
 
     def __getnewargs__(self):
-        return (self.name, self.value, False, self.assumptions0['nonnegative'],
+        return (self.name, self.value, False,
+                self.assumptions0.get('nonnegative'),
                 self.assumptions0['integer'])
 
     def __init__(self, name, value=0.0, _export=True, nonnegative=True,

@@ -427,6 +427,23 @@ def test_integrate_with_time():
     assert np.allclose(simres.species[:, 0], 0.5 * np.square(tspan))
 
 
+@with_model
+def test_expression_with_time_and_observable():
+    """Expressions combining time and an observable evaluate per time point"""
+    Monomer('A')
+    Parameter('A_0', 1)
+    Parameter('k', 0.5)
+    Initial(A(), A_0)
+    Observable('A_obs', A())
+    Expression('decay', k * A_obs * (1 + time))
+    Rule('degrade', A() >> None, k)
+
+    tspan = np.linspace(0, 4, 9)
+    simres = ScipyOdeSimulator(model, tspan=tspan, compiler='python').run()
+    expected = 0.5 * simres.observables['A_obs'] * (1 + tspan)
+    assert np.allclose(simres.expressions['decay'], expected)
+
+
 def test_set_initial_to_zero():
     sim = ScipyOdeSimulator(robertson.model, tspan=np.linspace(0, 100))
     simres = sim.run(initials={robertson.model.monomers['A'](): 0})
