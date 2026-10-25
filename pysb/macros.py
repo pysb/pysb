@@ -1420,10 +1420,12 @@ def catalyze_one_step(enzyme, substrate, product, kf):
 
 def catalyze_one_step_reversible(enzyme, substrate, product, klist):
     """
-    Create fwd and reverse rules for catalysis of the form::
+    Create fwd and reverse rules for one-step reversible catalysis.
 
-       E + S -> E + P
-           P -> S 
+    The rules have the form::
+
+        E + S -> E + P
+            P -> S
 
     Parameters
     ----------
